@@ -1,0 +1,30 @@
+<launch>
+  <!-- 开启RGB摄像头  -->
+  <include file="$(find stepper_arm)/launch/arm_cam.launch" />
+  <!-- 开启小车、机械臂控制初始化节点  -->
+  <include file="$(find stepper_arm)/launch/turn_on_robot_and_arm.launch" >
+    <arg name="Arm_Visualization"       default="false"/>
+  </include>
+  <!-- 开启自动寻找并抓取色块功能节点  -->
+  <node name="arm_2_auto_pick_colorBlock" pkg="stepper_arm" type="arm_2_auto_pick_colorBlock" output="screen" >
+  </node>
+  
+  <!-- robot_base_height 机械臂底座与地面的距离 -->
+  <!-- Angle_B_bias 关节B默认角度(相对X轴) -->
+  <!-- Angle_C_bias 关节C默认角度(相对关节B) -->
+  <rosparam >
+    arm_base_height: 0.220
+    Angle_B_bias:    1.571
+    Angle_C_bias:    0.384
+  </rosparam>
+
+  <!-- 开启避障功能，小车前方120度0.5米范围内有物体则小车停止 -->
+  <!-- turn on lidar开启雷达  -->
+  <include file="$(find turn_on_wheeltec_robot)/launch/wheeltec_lidar.launch" />
+    <param name="/rplidarNode/angle_start"         type="double" value="300"/> <!-- 扫描起始角度-->
+    <param name="/rplidarNode/angle_end"           type="double" value="60"/>  <!-- 扫描结束角度-->
+  </include>
+  <include file='$(find simple_follower)/launch/nodes/laserTracker.launch' />
+  <node pkg="stepper_arm" type="car_avoidance" name="car_avoidance"  output="screen"/>
+
+</launch>

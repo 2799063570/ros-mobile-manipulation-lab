@@ -1,0 +1,1189 @@
+<?xml version="1.0"?>
+<robot name="wheeltec" xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <!--M_PI-->
+    <xacro:property name="M_PI" value="3.1415926535897931" />
+    <!--rplidar description-->
+    <!--rplidar position-->
+    <xacro:property name="rplidar_offset_x" value="0.048632" />
+    <xacro:property name="rplidar_offset_y" value="0.00018237" />
+    <xacro:property name="rplidar_offset_z" value="0.1296" />
+    <!--rplidar scanning angle-->
+    <xacro:property name="rplidar_min_angle" value="-180" /> 
+    <xacro:property name="rplidar_max_angle" value="180" /> 
+    <!--camera description-->
+    <!--camera position-->
+    <xacro:property name="camera_offset_x" value="0.13784" />
+    <xacro:property name="camera_offset_y" value="0.000398" />
+    <xacro:property name="camera_offset_z" value="0.092334" />
+    <!--robot_body description-->
+    <!--wheel position-->
+    <xacro:property name="front_wheel_position_x" value="0.085132" /> 
+    <xacro:property name="left_front_wheel_position_y" value="0.079068" />
+    <xacro:property name="left_rear_wheel_position_y" value="0.080568" />
+    <xacro:property name="right_front_wheel_position_y" value="-0.078932" /> 
+    <xacro:property name="right_rear_wheel_position_y" value="-0.080432385013156" /> 
+    <xacro:property name="wheel_position_z" value="-0.036" />
+    <xacro:property name="rear_wheel_position_x" value="-0.087868" />
+    <xacro:property name="wheel_mass"   value="0.026412" />
+    <xacro:property name="shaft_mass"   value="0.00016066" />
+    <xacro:property name="roll_mass"   value="0.0023973" />
+    <xacro:property name="box_position_x" value="0" />
+    <xacro:property name="box_position_y" value="0" /> 
+    <xacro:property name="box_position_z" value="0.072" />  
+    <xacro:property name="box_length" value="0.24" /> 
+    <xacro:property name="box_height" value="0.07" />
+    <xacro:property name="box_width" value="0.12" /> 
+    <xacro:property name="box_mass"   value="0.082" />
+    <!--robot with rplidar and camera -->
+    <xacro:include filename="$(find wheeltec_description)/urdf/mini_mec/minimec_body.xacro" />
+    <xacro:include filename="$(find wheeltec_description)/urdf/mini_mec/minimec_rplidar.xacro" />
+    <xacro:include filename="$(find wheeltec_description)/urdf/mini_mec/minimec_camera.xacro" />
+    <xacro:include filename="$(find wheeltec_description)/urdf/imu.xacro" />
+    <xacro:include filename="$(find wheeltec_description)/urdf/material.xacro" />
+    <xacro:include filename="$(find wheeltec_description)/urdf/mini_mec/minimec_transmission.xacro" />
+    <joint name="rplidar_joint" type="fixed">
+        <origin xyz="${rplidar_offset_x} ${rplidar_offset_y} ${rplidar_offset_z}" rpy="0 0 0" />
+	<parent link="base_link"/>
+	<child link="laser_link"/>
+    </joint>    
+    <!-- Attach the camera -->
+    <joint name="camera_frame_joint" type="fixed">
+	<origin xyz="${camera_offset_x} ${camera_offset_y} ${camera_offset_z}" rpy="0 0 0" />
+	<parent link="base_link"/>
+	<child link="camera_link"/>
+    </joint>
+    <xacro:macro name="wheel_joint" params="LR FR *origin ">
+    <joint name="${LR}_${FR}_wheel_joint" type="continuous">
+        <xacro:insert_block name="origin"/>
+        <parent link="base_link"/>
+        <child link="${LR}_${FR}_wheel_link"/>
+        <axis xyz="0 1 0" rpy="0 0 0"/>
+        <limit effort="3.9" velocity="36.92"/>
+    </joint>
+    </xacro:macro>
+    <xacro:macro name="shaft_roll_joint" params="LR FR ROLL SHAFT *origin1 *origin2 *axis">
+    <joint name="${LR}_${FR}_${SHAFT}_joint" type="fixed">
+        <xacro:insert_block name="origin1"/>
+        <parent link="${LR}_${FR}_wheel_link"/>
+        <child link="${LR}_${FR}_${SHAFT}_link"/>
+    </joint>
+    <joint name="${LR}_${FR}_${ROLL}_joint" type="continuous">
+        <xacro:insert_block name="origin2"/>
+        <parent link="${LR}_${FR}_${SHAFT}_link"/>
+        <child link="${LR}_${FR}_${ROLL}_link"/>
+        <xacro:insert_block name="axis"/>
+    </joint>
+    </xacro:macro>
+    <joint name="imu_joint" type="fixed">
+      <origin xyz="0 0 0.0275" rpy="0 0 0" />
+      <parent link="base_link"/>
+      <child link="imu_link"/>
+    </joint>
+    <imu prefix="imu"/>
+    <roll_gazebo LR="left" FR="front" ROLL="roll1"/>
+    <roll_gazebo LR="left" FR="front" ROLL="roll2"/>
+    <roll_gazebo LR="left" FR="front" ROLL="roll3"/>
+    <roll_gazebo LR="left" FR="front" ROLL="roll4"/>
+    <roll_gazebo LR="left" FR="front" ROLL="roll5"/>
+    <roll_gazebo LR="left" FR="front" ROLL="roll6"/>
+    <roll_gazebo LR="left" FR="front" ROLL="roll7"/>
+    <roll_gazebo LR="left" FR="front" ROLL="roll8"/>
+    <roll_gazebo LR="left" FR="front" ROLL="roll9"/>
+    <roll_gazebo LR="left" FR="front" ROLL="roll10"/>
+    <roll_gazebo LR="right" FR="front" ROLL="roll1"/>
+    <roll_gazebo LR="right" FR="front" ROLL="roll2"/>
+    <roll_gazebo LR="right" FR="front" ROLL="roll3"/>
+    <roll_gazebo LR="right" FR="front" ROLL="roll4"/>
+    <roll_gazebo LR="right" FR="front" ROLL="roll5"/>
+    <roll_gazebo LR="right" FR="front" ROLL="roll6"/>
+    <roll_gazebo LR="right" FR="front" ROLL="roll7"/>
+    <roll_gazebo LR="right" FR="front" ROLL="roll8"/>
+    <roll_gazebo LR="right" FR="front" ROLL="roll9"/>
+    <roll_gazebo LR="right" FR="front" ROLL="roll10"/>
+    <roll_gazebo LR="left" FR="rear" ROLL="roll1"/>
+    <roll_gazebo LR="left" FR="rear" ROLL="roll2"/>
+    <roll_gazebo LR="left" FR="rear" ROLL="roll3"/>
+    <roll_gazebo LR="left" FR="rear" ROLL="roll4"/>
+    <roll_gazebo LR="left" FR="rear" ROLL="roll5"/>
+    <roll_gazebo LR="left" FR="rear" ROLL="roll6"/>
+    <roll_gazebo LR="left" FR="rear" ROLL="roll7"/>
+    <roll_gazebo LR="left" FR="rear" ROLL="roll8"/>
+    <roll_gazebo LR="left" FR="rear" ROLL="roll9"/>
+    <roll_gazebo LR="left" FR="rear" ROLL="roll10"/>
+    <roll_gazebo LR="right" FR="rear" ROLL="roll1"/>
+    <roll_gazebo LR="right" FR="rear" ROLL="roll2"/>
+    <roll_gazebo LR="right" FR="rear" ROLL="roll3"/>
+    <roll_gazebo LR="right" FR="rear" ROLL="roll4"/>
+    <roll_gazebo LR="right" FR="rear" ROLL="roll5"/>
+    <roll_gazebo LR="right" FR="rear" ROLL="roll6"/>
+    <roll_gazebo LR="right" FR="rear" ROLL="roll7"/>
+    <roll_gazebo LR="right" FR="rear" ROLL="roll8"/>
+    <roll_gazebo LR="right" FR="rear" ROLL="roll9"/>
+    <roll_gazebo LR="right" FR="rear" ROLL="roll10"/>
+    <astra_camera prefix="camera"/>
+    <xacro:wheel_joint LR="right" FR="front" >
+        <origin xyz="${front_wheel_position_x} ${right_front_wheel_position_y} ${wheel_position_z} " rpy="0 0 0"/>
+    </xacro:wheel_joint>
+    <xacro:wheel_joint LR="left"  FR="front" >    
+        <origin xyz="${front_wheel_position_x} ${left_front_wheel_position_y} ${wheel_position_z} " rpy="0 0 0"/>
+    </xacro:wheel_joint> 
+    <xacro:wheel_joint LR="right" FR="rear"  >
+        <origin xyz="${rear_wheel_position_x} ${right_rear_wheel_position_y} ${wheel_position_z} " rpy="0 0 0"/>
+    </xacro:wheel_joint>
+    <xacro:wheel_joint LR="left"  FR="rear"  >
+        <origin xyz="${rear_wheel_position_x} ${left_rear_wheel_position_y} ${wheel_position_z} " rpy="0 0 0"/>
+    </xacro:wheel_joint>
+    <xacro:wheel_link LR="right" FR="front">
+        <origin xyz="5.48970274971694E-06 -0.0127495288632179 -9.41395330111144E-06" rpy="0 0 0"  />
+        <inertia
+          ixx="4.59972260796131E-06"
+          ixy="-6.47318183121867E-10"
+          ixz="-6.40362334617672E-10"
+          iyy="6.75163076593965E-06"
+          iyz="1.13228810166169E-09"
+          izz="4.60060476443752E-06" />
+    </xacro:wheel_link>
+    <xacro:wheel_link LR="left"  FR="front">
+        <origin xyz="-5.7757E-06 0.012818 9.8107E-06" rpy="0 0 0" />
+        <inertia
+          ixx="4.4591E-06"
+          ixy="-6.3949E-10"
+          ixz="-6.551E-10"
+          iyy="6.7496E-06"
+          iyz="1.1447E-09"
+          izz="4.46E-06" />
+    </xacro:wheel_link>
+    <xacro:wheel_link LR="right" FR="rear">
+        <origin xyz="5.7679E-06 -0.012818 9.7978E-06" rpy="0 0 0" />
+        <inertia
+          ixx="4.4591E-06"
+          ixy="-6.385E-10"
+          ixz="6.5391E-10"
+          iyy="6.7496E-06"
+          iyz="-1.1453E-09"
+          izz="4.46E-06" />
+    </xacro:wheel_link>
+    <xacro:wheel_link LR="left"  FR="rear">
+        <origin xyz="-5.49105510379289E-06 0.0112495301175029 -9.41376970186453E-06" rpy="0 0 0" />
+        <inertia
+          ixx="4.59972328083854E-06"
+          ixy="-6.47459444831917E-10"
+          ixz="6.40217125744382E-10"
+          iyy="6.75163115978229E-06"
+          iyz="-1.13218887733361E-09"
+          izz="4.60060413465442E-06" />
+    </xacro:wheel_link>
+    <transmission_choose LR="right" FR="front" />
+    <transmission_choose LR="left"  FR="front" />
+    <transmission_choose LR="right" FR="rear"  />
+    <transmission_choose LR="left"  FR="rear"  />
+    <rplidar LA="laser"/>
+
+    <xacro:shaft_link LR="left"  FR="front" SHAFT="shaft1">
+        <origin xyz="5.2047E-05 5.6757E-05 -1.8943E-05" rpy="0 0 0"  />
+        <inertia
+          ixx="9.6321E-09"
+          ixy="-8.2452E-09"
+          ixz="2.5479E-09"
+          iyy="8.8042E-09"
+          iyz="2.679E-09"
+          izz="1.6646E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="left"  FR="front" ROLL="roll1">
+        <origin xyz="1.2316E-07 1.4905E-07 9.7312E-08" rpy="0 0 0"  />
+        <inertia
+          ixx="1.0529E-07"
+          ixy="-6.1108E-08"
+          ixz="1.8879E-08"
+          iyy="9.9156E-08"
+          iyz="1.9859E-08"
+          izz="1.5729E-07" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="left"  FR="front" SHAFT="shaft2">
+        <origin xyz="5.3243E-05 5.6758E-05 1.5268E-05" rpy="0 0 0"  />
+        <inertia
+          ixx="9.632E-09"
+          ixy="-8.2452E-09"
+          ixz="-2.5479E-09"
+          iyy="8.8042E-09"
+          iyz="-2.6791E-09"
+          izz="1.6646E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="left"  FR="front" ROLL="roll2">
+        <origin xyz="4.2438E-08 1.4905E-07 1.5112E-07" rpy="0 0 0"  />
+        <inertia
+          ixx="1.053E-07"
+          ixy="-6.111E-08"
+          ixz="-1.8893E-08"
+          iyy="9.9156E-08"
+          iyz="-1.9852E-08"
+          izz="1.5728E-07" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="left"  FR="front" SHAFT="shaft3">
+        <origin xyz="3.41008919905739E-05 5.67605356237705E-05 4.36482320567855E-05" rpy="0 0 0"  />
+        <inertia
+          ixx="1.44784855687519E-08"
+          ixy="-5.09582987800773E-09"
+          ixz="-4.12263390835166E-09"
+          iyy="8.80418258990671E-09"
+          iyz="-7.0138259848688E-09"
+          izz="1.17994585449409E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="left"  FR="front" ROLL="roll3">
+        <origin xyz="-5.44911842870199E-08 1.49049838901738E-07 1.47201040712544E-07" rpy="0 0 0"  />
+        <inertia
+          ixx="1.41225456851793E-07"
+          ixy="-3.77701537921315E-08"
+          ixz="-3.05553788213061E-08"
+          iyy="9.91559647165183E-08"
+          iyz="-5.19800715730912E-08"
+          izz="1.21351734748691E-07" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="left"  FR="front" SHAFT="shaft4">
+        <origin xyz="1.93271011555973E-06 5.67554883428648E-05 5.53516241567076E-05" rpy="0 0 0"  />
+        <inertia
+          ixx="1.74737597588723E-08"
+          ixy="1.12365923563295E-14"
+          ixz="-1.1500043019456E-14"
+          iyy="8.80418252778327E-09"
+          iyz="-8.66955940740086E-09"
+          izz="8.80418200309373E-09" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="left"  FR="front" ROLL="roll4">
+        <origin xyz="-1.30609793341785E-07 1.490531833237E-07 8.70613247119789E-08" rpy="0 0 0"  />
+        <inertia
+          ixx="1.6343416237922E-07"
+          ixy="-3.57680837975825E-12"
+          ixz="8.38512341701668E-12"
+          iyy="9.9163372767693E-08"
+          iyz="-6.42611081348135E-08"
+          izz="9.91654527798752E-08" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="left"  FR="front" SHAFT="shaft5">
+        <origin xyz="-3.09740624515747E-05 5.67590800882589E-05 4.5919438227994E-05" rpy="0 0 0" />
+        <inertia
+          ixx="1.44785063469806E-08"
+          ixy="5.09584681271587E-09"
+          ixz="4.12262707340288E-09"
+          iyy="8.80418271023643E-09"
+          iyz="-7.01381366577016E-09"
+          izz="1.17994382080624E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="left"  FR="front" ROLL="roll5">
+        <origin xyz="-1.56835210970985E-07 1.49049838908677E-07 -6.33657272486321E-09" rpy="0 0 0" />
+        <inertia
+          ixx="1.41209507388162E-07"
+          ixy="3.77643663851583E-08"
+          ixz="3.05605611161835E-08"
+          iyy="9.91559647165163E-08"
+          iyz="-5.19842763703837E-08"
+          izz="1.21367684212323E-07" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="left"  FR="front" SHAFT="shaft6">
+        <origin xyz="-5.20466932003028E-05 5.67572106858136E-05 1.89431358290776E-05" rpy="0 0 0" />
+        <inertia
+          ixx="9.63205922160264E-09"
+          ixy="8.24524350763447E-09"
+          ixz="2.54793468836317E-09"
+          iyy="8.80418240290934E-09"
+          iyz="-2.67903061311419E-09"
+          izz="1.66458835328536E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="left"  FR="front" ROLL="roll6">
+        <origin xyz="-1.23157806980467E-07 1.49049838908677E-07 -9.73118190611411E-08" rpy="0 0 0" />
+        <inertia
+          ixx="1.0528950528942E-07"
+          ixy="6.11076051890013E-08"
+          ixz="1.8879080355816E-08"
+          iyy="9.91559647165154E-08"
+          iyz="-1.9858825400562E-08"
+          izz="1.57287686311064E-07" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="left"  FR="front" SHAFT="shaft7">
+        <origin xyz="-5.324267083337E-05 5.67582049171358E-05 -1.52677540278812E-05" rpy="0 0 0"/>
+        <inertia
+          ixx="9.63204591315678E-09"
+          ixy="8.24523681158207E-09"
+          ixz="-2.5479164436586E-09"
+          iyy="8.8041821662825E-09"
+          iyz="2.67905125059222E-09"
+          izz="1.66458967400721E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="left"  FR="front" ROLL="roll7">
+        <origin xyz="-4.24383067021417E-08 1.49049838894799E-07 -1.51117258026523E-07" rpy="0 0 0"/>
+        <inertia
+          ixx="1.05299362600044E-07"
+          ixy="6.11098157817586E-08"
+          ixz="-1.88926477799489E-08"
+          iyy="9.915596471652E-08"
+          iyz="1.9852021895627E-08"
+          izz="1.57277829000438E-07" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="left"  FR="front" SHAFT="shaft8">
+        <origin xyz="-3.41008919906016E-05 5.67605356237427E-05 -4.3648232056763E-05" rpy="0 0 0" />
+        <inertia
+          ixx="1.44784855687519E-08"
+          ixy="5.09582987800772E-09"
+          ixz="-4.12263390835165E-09"
+          iyy="8.80418258990668E-09"
+          iyz="7.01382598486878E-09"
+          izz="1.17994585449409E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="left"  FR="front" ROLL="roll8">
+        <origin xyz="5.44911843147755E-08 1.49049838922555E-07 -1.47201040738565E-07" rpy="0 0 0" />
+        <inertia
+          ixx="1.41225456851793E-07"
+          ixy="3.77701537921313E-08"
+          ixz="-3.05553788213058E-08"
+          iyy="9.91559647165176E-08"
+          iyz="5.19800715730908E-08"
+          izz="1.21351734748691E-07" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="left"  FR="front" SHAFT="shaft9">
+        <origin xyz="-1.93271011558749E-06 5.67554883428925E-05 -5.53516241567353E-05" rpy="0 0 0"  />
+        <inertia
+          ixx="1.74737597588723E-08"
+          ixy="-1.12365923560211E-14"
+          ixz="-1.15000430197415E-14"
+          iyy="8.80418252778327E-09"
+          iyz="8.66955940740086E-09"
+          izz="8.80418200309372E-09" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="left"  FR="front" ROLL="roll9">
+        <origin xyz="1.30609793341785E-07 1.49053183358394E-07 -8.70613247397345E-08" rpy="0 0 0"  />
+        <inertia
+          ixx="1.63434162379221E-07"
+          ixy="3.57680837964895E-12"
+          ixz="8.38512341713126E-12"
+          iyy="9.9163372767693E-08"
+          iyz="6.42611081348135E-08"
+          izz="9.91654527798752E-08" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="left"  FR="front" SHAFT="shaft10">
+        <origin xyz="3.09740624515886E-05 5.67590800882936E-05 -4.591943822802E-05" rpy="0 0 0"  />
+        <inertia
+          ixx="1.44785063469806E-08"
+          ixy="-5.09584681271587E-09"
+          ixz="4.12262707340288E-09"
+          iyy="8.80418271023644E-09"
+          iyz="7.01381366577016E-09"
+          izz="1.17994382080624E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="left"  FR="front" ROLL="roll10">
+        <origin xyz="1.56835210957107E-07 1.49049838915616E-07 6.33657271792432E-09" rpy="0 0 0"  />
+        <inertia
+          ixx="1.41209507388162E-07"
+          ixy="-3.77643663851585E-08"
+          ixz="3.05605611161836E-08"
+          iyy="9.91559647165168E-08"
+          iyz="5.19842763703839E-08"
+          izz="1.21367684212324E-07" />
+    </xacro:roll_link>
+
+    <xacro:shaft_link LR="right"  FR="front" SHAFT="shaft1">
+        <origin xyz="5.20462394646426E-05 -5.67559518082073E-05 -1.89419002477645E-05" rpy="0 0 0"  />
+        <inertia
+          ixx="9.63206316232051E-09"
+          ixy="8.24524410738887E-09"
+          ixz="2.54792458130309E-09"
+          iyy="8.80419052050094E-09"
+          iyz="-2.67903936244382E-09"
+          izz="1.66458881092378E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="right"  FR="front" ROLL="roll1">
+        <origin xyz="-1.49809342986362E-07 1.46385052052223E-07 1.54534542549153E-07" rpy="0 0 0"  />
+        <inertia
+          ixx="1.05288626408422E-07"
+          ixy="6.11048879177485E-08"
+          ixz="1.88843930735712E-08"
+          iyy="9.91548004146007E-08"
+          iyz="-1.98603543854421E-08"
+          izz="1.57279713773416E-07" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="right"  FR="front" SHAFT="shaft2">
+        <origin xyz="5.32404172367273E-05 -5.67563187065523E-05 1.52678030883495E-05" rpy="0 0 0"  />
+        <inertia
+          ixx="9.6320598901089E-09"
+          ixy="8.24524239243314E-09"
+          ixz="-2.54792007490334E-09"
+          iyy="8.80419052283201E-09"
+          iyz="2.67904464370211E-09"
+          izz="1.6645891380447E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="right"  FR="front" ROLL="roll2">
+        <origin xyz="-2.12031434257409E-07 1.46385050858733E-07 3.69653530706178E-08" rpy="0 0 0"  />
+        <inertia
+          ixx="1.0529098082905E-07"
+          ixy="6.11085158608626E-08"
+          ixz="-1.88876336555466E-08"
+          iyy="9.9154800414443E-08"
+          iyz="1.98491887245572E-08"
+          izz="1.57277359352994E-07" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="right"  FR="front" SHAFT="shaft3">
+        <origin xyz="3.40981663209533E-05 -5.67560188602101E-05 4.36456751424404E-05" rpy="0 0 0"  />
+        <inertia
+          ixx="1.44784952183614E-08"
+          ixy="5.09583814005112E-09"
+          ixz="-4.12262599645462E-09"
+          iyy="8.80419035918888E-09"
+          iyz="7.01382445671051E-09"
+          izz="1.17994558448812E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="right"  FR="front" ROLL="roll3">
+        <origin xyz="-1.93264717465724E-07 1.46385051913445E-07 -9.47233550676468E-08" rpy="0 0 0"  />
+        <inertia
+          ixx="1.4121504030925E-07"
+          ixy="3.77707667587497E-08"
+          ixz="-3.05575921270482E-08"
+          iyy="9.91548016201023E-08"
+          iyz="5.19770159030073E-08"
+          izz="1.2135329866712E-07" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="right"  FR="front" SHAFT="shaft4">
+        <origin xyz="1.93172058710056E-06 -5.67558942353996E-05 5.53524158045798E-05" rpy="0 0 0"  />
+        <inertia
+          ixx="1.74737593985865E-08"
+          ixy="-2.8990559060597E-15"
+          ixz="-2.46071892799745E-15"
+          iyy="8.80419183846378E-09"
+          iyz="8.66956208396677E-09"
+          izz="8.80419181199568E-09" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="right"  FR="front" ROLL="roll4">
+        <origin xyz="-1.00679538608817E-07 1.46389023847338E-07 -1.90235494280933E-07" rpy="0 0 0"  />
+        <inertia
+          ixx="1.63429990020261E-07"
+          ixy="5.86846827037145E-12"
+          ixz="2.00444487431651E-12"
+          iyy="9.91622116500128E-08"
+          iyz="6.42589963670807E-08"
+          izz="9.91607706503607E-08" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="right"  FR="front" SHAFT="shaft5">
+        <origin xyz="-3.09726515423103E-05 -5.67560743668649E-05 4.59165875821219E-05" rpy="0 0 0" />
+        <inertia
+          ixx="1.44784998899881E-08"
+          ixy="-5.09584280454422E-09"
+          ixz="4.12262461120074E-09"
+          iyy="8.80419103417873E-09"
+          iyz="7.01382107060735E-09"
+          izz="1.17994507813093E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="right"  FR="front" ROLL="roll5">
+        <origin xyz="3.03651834787644E-08 1.4638504516884E-07 -2.13076801258705E-07" rpy="0 0 0" />
+        <inertia
+          ixx="1.4121122687487E-07"
+          ixy="-3.77612708530364E-08"
+          ixz="3.05588326045158E-08"
+          iyy="9.91548055222423E-08"
+          iyz="5.19839150822973E-08"
+          izz="1.2135710819938E-07" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="right"  FR="front" SHAFT="shaft6">
+        <origin xyz="-5.20462423968387E-05 -5.67559491196079E-05 1.89419002477736E-05" rpy="0 0 0" />
+        <inertia
+          ixx="9.63206231038981E-09"
+          ixy="-8.24524415015839E-09"
+          ixz="2.54792471970738E-09"
+          iyy="8.80419137243148E-09"
+          iyz="2.67903923081294E-09"
+          izz="1.66458881092381E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="right"  FR="front" ROLL="roll6">
+        <origin xyz="1.49809350535879E-07 1.46385044336172E-07 -1.54534542551321E-07" rpy="0 0 0" />
+        <inertia
+          ixx="1.05288620094828E-07"
+          ixy="-6.11048882346345E-08"
+          ixz="1.88843940995948E-08"
+          iyy="9.91548067281957E-08"
+          iyz="1.98603534098368E-08"
+          izz="1.57279713773418E-07" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="right"  FR="front" SHAFT="shaft7">
+        <origin xyz="-5.32404201688819E-05 -5.67563159560303E-05 -1.52678030883313E-05" rpy="0 0 0"/>
+        <inertia
+          ixx="9.63205903817834E-09"
+          ixy="-8.24524243520237E-09"
+          ixz="-2.54792021330817E-09"
+          iyy="8.80419137476255E-09"
+          iyz="-2.67904451207173E-09"
+          izz="1.6645891380447E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="right"  FR="front" ROLL="roll7">
+        <origin xyz="2.12031441848559E-07 1.46385039867525E-07 -3.69653530701841E-08" rpy="0 0 0"/>
+        <inertia
+          ixx="1.05290974515082E-07"
+          ixy="-6.11085161778694E-08"
+          ixz="-1.88876346809955E-08"
+          iyy="9.9154806728414E-08"
+          iyz="-1.98491877487865E-08"
+          izz="1.57277359352994E-07" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="right"  FR="front" SHAFT="shaft8">
+        <origin xyz="-3.40981692529829E-05 -5.67560170985359E-05 -4.3645675142423E-05" rpy="0 0 0" />
+        <inertia
+          ixx="1.44784946918396E-08"
+          ixy="-5.09583843319663E-09"
+          ixz="-4.12262635880252E-09"
+          iyy="8.80419088571094E-09"
+          iyz="-7.01382424372767E-09"
+          izz="1.17994558448809E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="right"  FR="front" ROLL="roll8">
+        <origin xyz="1.93264725001363E-07 1.46385041921437E-07 9.47233550901982E-08" rpy="0 0 0" />
+        <inertia
+          ixx="1.41215036406627E-07"
+          ixy="-3.77707689316624E-08"
+          ixz="-3.05575948122825E-08"
+          iyy="9.91548055227264E-08"
+          iyz="-5.19770143243427E-08"
+          izz="1.21353298667117E-07" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="right"  FR="front" SHAFT="shaft9">
+        <origin xyz="-1.93172351925508E-06 -5.67558941355351E-05 -5.53524158045313E-05" rpy="0 0 0"  />
+        <inertia
+          ixx="1.74737593985868E-08"
+          ixy="2.45116916544356E-15"
+          ixz="-2.9086053353919E-15"
+          iyy="8.8041918384639E-09"
+          iyz="-8.66956208396666E-09"
+          izz="8.80419181199545E-09" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="right"  FR="front" ROLL="roll9">
+        <origin xyz="1.0067954417381E-07 1.46389019767268E-07 1.90235493219282E-07" rpy="0 0 0"  />
+        <inertia
+          ixx="1.6342999001966E-07"
+          ixy="-5.8717884657564E-12"
+          ixz="2.00112513815967E-12"
+          iyy="9.91622116506131E-08"
+          iyz="-6.42589963671822E-08"
+          izz="9.91607706503497E-08" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="right"  FR="front" SHAFT="shaft10">
+        <origin  xyz="3.09726486101281E-05 -5.67560759670571E-05 -4.59165875821357E-05" rpy="0 0 0"  />
+        <inertia
+          ixx="1.44785004165104E-08"
+          ixy="5.09584251139829E-09"
+          ixz="4.12262424885318E-09"
+          iyy="8.80419050765681E-09"
+          iyz="-7.01382128359024E-09"
+          izz="1.17994507813091E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="right"  FR="front" ROLL="roll10">
+        <origin xyz="-3.03651759014922E-08 1.46385046723152E-07 2.13076801250031E-07" rpy="0 0 0"  />
+        <inertia
+          ixx="1.41211230776513E-07"
+          ixy="3.77612686803197E-08"
+          ixz="3.05588299189267E-08"
+          iyy="9.91548016206038E-08"
+          iyz="-5.1983916661027E-08"
+          izz="1.2135710819938E-07" />
+    </xacro:roll_link>
+
+    <xacro:shaft_link LR="left"  FR="rear" SHAFT="shaft1">
+        <origin xyz="-0.0158028480151643 0.190057819088767 0.0114588539364135" rpy="0 0 0"  />
+        <inertia
+          ixx="9.63205917407725E-09"
+          ixy="8.24524242837994E-09"
+          ixz="2.5479201912298E-09"
+          iyy="8.8041912388636E-09"
+          iyz="-2.67904453306909E-09"
+          izz="1.6645891380447E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="left"  FR="rear" ROLL="roll1">
+        <origin xyz="2.12031440634253E-07 -1.46385041623065E-07 3.69653530680157E-08" rpy="0 0 0"  />
+        <inertia
+          ixx="1.05290975522278E-07"
+          ixy="6.11085161273013E-08"
+          ixz="1.8887634517416E-08"
+          iyy="9.91548057212165E-08"
+          iyz="-1.98491879044391E-08"
+          izz="1.57277359352995E-07" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="left"  FR="rear" SHAFT="shaft2">
+        <origin xyz="-5.20462419290532E-05 5.67559495484316E-05 -1.89419002477671E-05" rpy="0 0 0"  />
+        <inertia
+          ixx="9.63206244628889E-09"
+          ixy="8.24524414333585E-09"
+          ixz="-2.54792469762944E-09"
+          iyy="8.80419123653268E-09"
+          iyz="2.67903925181072E-09"
+          izz="1.66458881092379E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="left"  FR="rear" ROLL="roll2">
+        <origin  xyz="1.49809349307695E-07 -1.46385045529662E-07 1.54534542537443E-07" rpy="0 0 0"  />
+        <inertia
+          ixx="1.05288621101965E-07"
+          ixy="6.11048881840843E-08"
+          ixz="-1.88843939359257E-08"
+          iyy="9.91548057210581E-08"
+          iyz="1.98603535654652E-08"
+          izz="1.57279713773415E-07" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="left"  FR="rear" SHAFT="shaft3">
+        <origin xyz="-3.09726510744901E-05 5.67560746221399E-05 -4.59165875820733E-05" rpy="0 0 0"  />
+        <inertia
+          ixx="1.44784999739784E-08"
+          ixy="5.09584275778183E-09"
+          ixz="-4.12262455339953E-09"
+          iyy="8.80419095018876E-09"
+          iyz="7.01382110458223E-09"
+          izz="1.17994507813091E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="left"  FR="rear" ROLL="roll3">
+        <origin xyz="3.03651822575191E-08 -1.46385045439457E-07 2.13076801265644E-07" rpy="0 0 0"  />
+        <inertia
+          ixx="1.41211227497257E-07"
+          ixy="3.77612705064468E-08"
+          ixz="-3.05588321761143E-08"
+          iyy="9.91548048998592E-08"
+          iyz="5.19839153341353E-08"
+          izz="1.21357108199379E-07" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="left"  FR="rear" SHAFT="shaft4">
+        <origin xyz="1.93172105482364E-06 5.67558942194957E-05 -5.5352415804566E-05" rpy="0 0 0"  />
+        <inertia
+          ixx="1.74737593985864E-08"
+          ixy="2.82760946670193E-15"
+          ixz="2.53216533277026E-15"
+          iyy="8.80419183846416E-09"
+          iyz="8.66956208396684E-09"
+          izz="8.80419181199565E-09" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="left"  FR="rear" ROLL="roll4">
+        <origin xyz="-1.00679539802306E-07 -1.46389023021609E-07 1.90235494253177E-07" rpy="0 0 0"  />
+        <inertia
+          ixx="1.63429990020164E-07"
+          ixy="-5.86899790521694E-12"
+          ixz="-2.00391531189522E-12"
+          iyy="9.91622116501112E-08"
+          iyz="6.42589963670971E-08"
+          izz="9.91607706503588E-08" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="left"  FR="rear" SHAFT="shaft5">
+        <origin xyz="3.40981667886348E-05 5.67560185790947E-05 -4.36456751424022E-05" rpy="0 0 0" />
+        <inertia
+          ixx="1.44784951343712E-08"
+          ixy="-5.09583818681337E-09"
+          ixz="4.122626054256E-09"
+          iyy="8.80419044317918E-09"
+          iyz="7.01382442273572E-09"
+          izz="1.17994558448811E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="left"  FR="rear" ROLL="roll5">
+        <origin xyz="-1.93264718645336E-07 -1.46385050275866E-07 9.47233550555038E-08" rpy="0 0 0" />
+        <inertia
+          ixx="1.41215039686708E-07"
+          ixy="-3.77707671053705E-08"
+          ixz="3.05575925553942E-08"
+          iyy="9.91548022426451E-08"
+          iyz="5.19770156511804E-08"
+          izz="1.21353298667119E-07" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="left"  FR="rear" SHAFT="shaft6">
+        <origin xyz="5.32404177044851E-05 5.67563182677436E-05 -1.52678030883452E-05" rpy="0 0 0" />
+        <inertia
+          ixx="9.63205975420997E-09"
+          ixy="-8.24524239925568E-09"
+          ixz="2.54792009698149E-09"
+          iyy="8.80419065873106E-09"
+          iyz="2.67904462270459E-09"
+          izz="1.6645891380447E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="left"  FR="rear" ROLL="roll6">
+        <origin xyz="-2.12031435478655E-07 -1.46385049082376E-07 -3.69653530840619E-08" rpy="0 0 0" />
+        <inertia
+          ixx="1.05290979821854E-07"
+          ixy="-6.11085159114314E-08"
+          ixz="1.88876338191251E-08"
+          iyy="9.91548014216409E-08"
+          iyz="1.98491885689035E-08"
+          izz="1.57277359352994E-07" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="left"  FR="rear" SHAFT="shaft7">
+        <origin xyz="5.20462399324143E-05 5.67559513794322E-05 1.89419002477736E-05" rpy="0 0 0"/>
+        <inertia
+          ixx="9.6320630264217E-09"
+          ixy="-8.24524411421147E-09"
+          ixz="-2.54792460338115E-09"
+          iyy="8.80419065639991E-09"
+          iyz="-2.67903934144625E-09"
+          izz="1.66458881092379E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="left"  FR="rear" ROLL="roll7">
+        <origin xyz="-1.49809344152096E-07 -1.46385050803222E-07 -1.54534542537443E-07" rpy="0 0 0"/>
+        <inertia
+          ixx="1.05288625401285E-07"
+          ixy="-6.11048879682976E-08"
+          ixz="-1.8884393237241E-08"
+          iyy="9.9154801421737E-08"
+          iyz="-1.98603542298146E-08"
+          izz="1.57279713773415E-07" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="left"  FR="rear" SHAFT="shaft8">
+        <origin xyz="3.09726490778268E-05 5.67560757117891E-05 4.59165875820802E-05" rpy="0 0 0" />
+        <inertia
+          ixx="1.44785003325203E-08"
+          ixy="-5.09584255816054E-09"
+          ixz="-4.12262430665435E-09"
+          iyy="8.80419059164682E-09"
+          iyz="-7.0138212496155E-09"
+          izz="1.17994507813092E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="left"  FR="rear" ROLL="roll8">
+        <origin xyz="-3.03651771157987E-08 -1.46385046514985E-07 -2.13076801279521E-07" rpy="0 0 0" />
+        <inertia
+          ixx="1.41211230154128E-07"
+          ixy="-3.77612690269087E-08"
+          ixz="-3.05588303473282E-08"
+          iyy="9.91548022429875E-08"
+          iyz="-5.19839164091901E-08"
+          izz="1.2135710819938E-07" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="left"  FR="rear" SHAFT="shaft9">
+        <origin xyz="-1.931723051447E-06 5.6755894151557E-05 5.53524158045868E-05" rpy="0 0 0"  />
+        <inertia
+          ixx="1.74737593985867E-08"
+          ixy="-2.52261543323399E-15"
+          ixz="2.83715913996613E-15"
+          iyy="8.80419183846389E-09"
+          iyz="-8.66956208396676E-09"
+          izz="8.80419181199585E-09" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="left"  FR="rear" ROLL="roll9">
+        <origin xyz="1.00679542954299E-07 -1.4638902057218E-07 -1.90235493212343E-07" rpy="0 0 0"  />
+        <inertia
+          ixx="1.63429990019757E-07"
+          ixy="5.87125883234022E-12"
+          ixz="-2.00165469918455E-12"
+          iyy="9.91622116505148E-08"
+          iyz="-6.42589963671659E-08"
+          izz="9.91607706503516E-08" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="left"  FR="rear" SHAFT="shaft10">
+        <origin xyz="-3.40981687852911E-05 5.67560173794987E-05 4.36456751424161E-05" rpy="0 0 0"  />
+        <inertia
+          ixx="1.44784947758296E-08"
+          ixy="5.09583838643454E-09"
+          ixz="4.1226263010012E-09"
+          iyy="8.80419080172063E-09"
+          iyz="-7.01382427770235E-09"
+          izz="1.17994558448812E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="left"  FR="rear" ROLL="roll10">
+        <origin xyz="1.93264723811343E-07 -1.46385043496566E-07 -9.47233550607079E-08" rpy="0 0 0"  />
+        <inertia
+          ixx="1.41215037029168E-07"
+          ixy="3.77707685850431E-08"
+          ixz="3.0557594383937E-08"
+          iyy="9.91548049001836E-08"
+          iyz="-5.19770145761689E-08"
+          izz="1.2135329866712E-07" />
+    </xacro:roll_link>
+
+    <xacro:shaft_link LR="right"  FR="rear" SHAFT="shaft1">
+        <origin xyz="-3.41008919906051E-05 -5.67605356238121E-05 4.36482320568289E-05" rpy="0 0 0"  />
+        <inertia
+          ixx="1.44784855687518E-08"
+          ixy="-5.09582987800775E-09"
+          ixz="4.12263390835162E-09"
+          iyy="8.80418258990659E-09"
+          iyz="7.01382598486873E-09"
+          izz="1.17994585449409E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="right"  FR="rear" ROLL="roll1">
+        <origin xyz="5.44911842870199E-08 -1.49049838915616E-07 1.47201040722952E-07" rpy="0 0 0"  />
+        <inertia
+          ixx="1.41225456851793E-07"
+          ixy="-3.77701537921317E-08"
+          ixz="3.05553788213058E-08"
+          iyy="9.91559647165176E-08"
+          iyz="5.19800715730908E-08"
+          izz="1.21351734748692E-07" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="right"  FR="rear" SHAFT="shaft2">
+        <origin xyz="-5.324267083337E-05 -5.67582049171012E-05 1.52677540278764E-05" rpy="0 0 0"  />
+        <inertia
+          ixx="9.63204591315672E-09"
+          ixy="-8.24523681158206E-09"
+          ixz="2.54791644365853E-09"
+          iyy="8.80418216628247E-09"
+          iyz="2.67905125059215E-09"
+          izz="1.66458967400721E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="right"  FR="rear" ROLL="roll2">
+        <origin xyz="-4.24383067229583E-08 -1.4904983888786E-07 1.51117258033896E-07" rpy="0 0 0"  />
+        <inertia
+          ixx="1.05299362600044E-07"
+          ixy="-6.11098157817586E-08"
+          ixz="1.88926477799484E-08"
+          iyy="9.91559647165198E-08"
+          iyz="1.98520218956264E-08"
+          izz="1.57277829000438E-07" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="right"  FR="rear" SHAFT="shaft3">
+        <origin xyz="-5.20466932002958E-05 -5.6757210685765E-05 -1.89431358290928E-05" rpy="0 0 0"  />
+        <inertia
+          ixx="9.63205922160257E-09"
+          ixy="-8.24524350763441E-09"
+          ixz="-2.54793468836323E-09"
+          iyy="8.80418240290937E-09"
+          iyz="-2.67903061311424E-09"
+          izz="1.66458835328535E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="right"  FR="rear" ROLL="roll3">
+        <origin xyz="-1.23157807008223E-07 -1.49049838943371E-07 9.73118190624421E-08" rpy="0 0 0"  />
+        <inertia
+          ixx="1.05289505289421E-07"
+          ixy="-6.11076051890017E-08"
+          ixz="-1.88790803558165E-08"
+          iyy="9.91559647165162E-08"
+          iyz="-1.98588254005624E-08"
+          izz="1.57287686311065E-07" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="right"  FR="rear" SHAFT="shaft4">
+        <origin xyz="-3.09740624516164E-05 -5.67590800882589E-05 -4.59194382280131E-05" rpy="0 0 0"  />
+        <inertia
+          ixx="1.44785063469805E-08"
+          ixy="-5.09584681271583E-09"
+          ixz="-4.12262707340292E-09"
+          iyy="8.80418271023653E-09"
+          iyz="-7.01381366577016E-09"
+          izz="1.17994382080622E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="right"  FR="rear" ROLL="roll4">
+        <origin xyz="-1.56835210984863E-07 -1.49049838943371E-07 6.33657271792432E-09" rpy="0 0 0"  />
+        <inertia
+          ixx="1.41209507388161E-07"
+          ixy="-3.77643663851579E-08"
+          ixz="-3.05605611161837E-08"
+          iyy="9.91559647165168E-08"
+          iyz="-5.19842763703835E-08"
+          izz="1.21367684212322E-07" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="right"  FR="rear" SHAFT="shaft5">
+        <origin xyz="1.93271011558749E-06 -5.67554883428301E-05 -5.53516241567006E-05" rpy="0 0 0" />
+        <inertia
+          ixx="1.74737597588723E-08"
+          ixy="-1.1236592364613E-14"
+          ixz="1.15000430110685E-14"
+          iyy="8.80418252778336E-09"
+          iyz="-8.66955940740083E-09"
+          izz="8.80418200309357E-09" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="right"  FR="rear" ROLL="roll5">
+        <origin xyz="-1.30609793355663E-07 -1.49053183351455E-07 -8.70613247258567E-08" rpy="0 0 0" />
+        <inertia
+          ixx="1.63434162379221E-07"
+          ixy="3.57680837953787E-12"
+          ixz="-8.3851234172637E-12"
+          iyy="9.9163372767694E-08"
+          iyz="-6.42611081348136E-08"
+          izz="9.91654527798746E-08" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="right"  FR="rear" SHAFT="shaft6">
+        <origin xyz="3.41008919905461E-05 -5.67605356237288E-05 -4.36482320567491E-05" rpy="0 0 0" />
+        <inertia
+          ixx="1.44784855687519E-08"
+          ixy="5.09582987800768E-09"
+          ixz="4.12263390835167E-09"
+          iyy="8.80418258990675E-09"
+          iyz="-7.0138259848688E-09"
+          izz="1.17994585449408E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="right"  FR="rear" ROLL="roll6">
+        <origin xyz="-5.44911842731421E-08 -1.49049838915616E-07 -1.47201040731626E-07" rpy="0 0 0" />
+        <inertia
+          ixx="1.41225456851793E-07"
+          ixy="3.77701537921312E-08"
+          ixz="3.05553788213061E-08"
+          iyy="9.91559647165187E-08"
+          iyz="-5.19800715730911E-08"
+          izz="1.2135173474869E-07" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="right"  FR="rear" SHAFT="shaft7">
+        <origin xyz="5.32426708334255E-05 -5.67582049171289E-05 -1.52677540278534E-05" rpy="0 0 0"/>
+        <inertia
+          ixx="9.63204591315676E-09"
+          ixy="8.24523681158201E-09"
+          ixz="2.54791644365864E-09"
+          iyy="8.80418216628246E-09"
+          iyz="-2.67905125059226E-09"
+          izz="1.6645896740072E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="right"  FR="rear" ROLL="roll7">
+        <origin xyz="4.24383067160194E-08 -1.49049838915616E-07 -1.51117258040401E-07" rpy="0 0 0"/>
+        <inertia
+          ixx="1.05299362600044E-07"
+          ixy="6.11098157817583E-08"
+          ixz="1.88926477799492E-08"
+          iyy="9.915596471652E-08"
+          iyz="-1.98520218956274E-08"
+          izz="1.57277829000437E-07" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="right"  FR="rear" SHAFT="shaft8">
+        <origin xyz="5.20466932002681E-05 -5.6757210685765E-05 1.89431358290498E-05" rpy="0 0 0" />
+        <inertia
+          ixx="9.63205922160265E-09"
+          ixy="8.24524350763445E-09"
+          ixz="-2.5479346883631E-09"
+          iyy="8.80418240290923E-09"
+          iyz="2.67903061311414E-09"
+          izz="1.66458835328536E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="right"  FR="rear" ROLL="roll8">
+        <origin xyz="1.23157807008223E-07 -1.49049838915616E-07 -9.73118190611411E-08" rpy="0 0 0" />
+        <inertia
+          ixx="1.05289505289421E-07"
+          ixy="6.11076051890019E-08"
+          ixz="-1.88790803558156E-08"
+          iyy="9.91559647165153E-08"
+          iyz="1.98588254005616E-08"
+          izz="1.57287686311065E-07" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="right"  FR="rear" SHAFT="shaft9">
+        <origin xyz="3.09740624516303E-05 -5.67590800883144E-05 4.59194382280495E-05" rpy="0 0 0"  />
+        <inertia
+          ixx="1.44785063469806E-08"
+          ixy="5.09584681271587E-09"
+          ixz="-4.12262707340282E-09"
+          iyy="8.80418271023631E-09"
+          iyz="7.01381366577015E-09"
+          izz="1.17994382080624E-08" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="right"  FR="rear" ROLL="roll9">
+        <origin xyz="1.56835210981393E-07 -1.49049838915616E-07 -6.3365727318021E-09" rpy="0 0 0"  />
+        <inertia
+          ixx="1.41209507388162E-07"
+          ixy="3.77643663851586E-08"
+          ixz="-3.05605611161832E-08"
+          iyy="9.91559647165158E-08"
+          iyz="5.19842763703838E-08"
+          izz="1.21367684212325E-07" />
+    </xacro:roll_link>
+    <xacro:shaft_link LR="right"  FR="rear" SHAFT="shaft10">
+        <origin xyz="-1.93271011556667E-06 -5.67554883428856E-05 5.53516241567076E-05" rpy="0 0 0"  />
+        <inertia
+          ixx="1.74737597588723E-08"
+          ixy="1.1236592328808E-14"
+          ixz="1.1500043046608E-14"
+          iyy="8.80418252778311E-09"
+          iyz="8.66955940740082E-09"
+          izz="8.80418200309381E-09" />
+    </xacro:shaft_link>
+    <xacro:roll_link LR="right"  FR="rear" ROLL="roll10">
+        <origin xyz="1.30609793353928E-07 -1.49053183351455E-07 8.70613247119789E-08" rpy="0 0 0"  />
+        <inertia
+          ixx="1.63434162379221E-07"
+          ixy="-3.57680837985164E-12"
+          ixz="-8.38512341697891E-12"
+          iyy="9.9163372767692E-08"
+          iyz="6.42611081348135E-08"
+          izz="9.91654527798763E-08" />
+    </xacro:roll_link>
+
+    <xacro:shaft_roll_joint LR="left"  FR="front" ROLL="roll1" SHAFT="shaft1" >
+        <origin xyz="0.009733 0.016001 0.029959" rpy="0 0 0" />
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <axis xyz="-0.6725 -0.70711 0.21851"  />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="left"  FR="front" ROLL="roll2" SHAFT="shaft2" >
+        <origin xyz="-0.0097351 0.016001 0.029958" rpy="0 0 0" />
+        <origin xyz="0 0 0"/>
+        <axis xyz="-0.6725 -0.70711 -0.21851"  />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="left"  FR="front" ROLL="roll3" SHAFT="shaft3" >
+        <origin xyz="-0.025485 0.016001 0.018514" rpy="0 0 0" />
+        <origin xyz="0 0 0"/>
+        <axis xyz="-0.41563 -0.70711 -0.57206"  />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="left"  FR="front" ROLL="roll4" SHAFT="shaft4"  >
+        <origin xyz="-0.0315 0.016001 0" rpy="0 0 0"/>
+        <origin xyz="0 0 0"/>
+        <axis xyz="0 -0.70711 -0.70711"  />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="left"  FR="front" ROLL="roll5" SHAFT="shaft5"  >
+        <origin xyz="-0.025483 0.016001 -0.018516" rpy="0 0 0" />
+        <origin xyz="0 0 0"/>
+        <axis xyz="0.41563 -0.70711 -0.57206"   />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="left"  FR="front" ROLL="roll6" SHAFT="shaft6" >
+        <origin xyz="-0.009733 0.016001 -0.029959" rpy="0 0 0" />
+        <origin xyz="0 0 0"/>
+        <axis xyz="0.6725 -0.70711 -0.21851" />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="left"  FR="front" ROLL="roll7" SHAFT="shaft7" >
+        <origin xyz="0.0097351 0.016001 -0.029958" rpy="0 0 0" />
+        <origin xyz="0 0 0"/>
+        <axis xyz="0.6725 -0.70711 0.21851"/>
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="left"  FR="front" ROLL="roll8" SHAFT="shaft8" >
+        <origin xyz="0.025485 0.016001 -0.018514" rpy="0 0 0"/>
+        <origin xyz="0 0 0"/>
+        <axis xyz="0.41563 -0.70711 0.57206" />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="left"  FR="front" ROLL="roll9" SHAFT="shaft9" >
+        <origin xyz="0.0315 0.016001 0" rpy="0 0 0" />
+        <origin xyz="0 0 0"/>
+        <axis xyz="0 -0.70711 0.70711" />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="left"  FR="front" ROLL="roll10" SHAFT="shaft10" >
+        <origin xyz="0.025483 0.016001 0.018516" rpy="0 0 0"/>
+        <origin xyz="0 0 0"/>
+        <axis xyz="-0.41563 -0.70711 0.57206" />
+    </xacro:shaft_roll_joint>
+
+    <xacro:shaft_roll_joint LR="left"  FR="rear" ROLL="roll1" SHAFT="shaft1" >
+        <origin xyz="0.025485 -0.1755 0.018514" rpy="0 0 0" />
+        <origin xyz="-0.01575 0.19 0.011444"/>
+        <axis xyz="0.6725 -0.70711 -0.21851"  />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="left"  FR="rear" ROLL="roll2" SHAFT="shaft2" >
+        <origin xyz="-0.009733 0.014501 0.029959" rpy="0 0 0" />
+        <origin xyz="0 0 0"/>
+        <axis xyz="-0.6725 0.70711 -0.21851"  />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="left"  FR="rear" ROLL="roll3" SHAFT="shaft3" >
+        <origin xyz="-0.025483 0.014501 0.018516" rpy="0 0 0" />
+        <origin xyz="0 0 0"/>
+        <axis xyz="-0.41563 0.70711 -0.57206"  />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="left"  FR="rear" ROLL="roll4" SHAFT="shaft4"  >
+        <origin xyz="-0.0315 0.014501 0" rpy="0 0 0"/>
+        <origin xyz="0 0 0"/>
+        <axis xyz="0 0.70711 -0.70711"  />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="left"  FR="rear" ROLL="roll5" SHAFT="shaft5"  >
+        <origin xyz="-0.025485 0.014501 -0.018514" rpy="0 0 0" />
+        <origin xyz="0 0 0"/>
+        <axis xyz="0.41563 0.70711 -0.57206"   />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="left"  FR="rear" ROLL="roll6" SHAFT="shaft6" >
+        <origin xyz="-0.0097351 0.014501 -0.029958" rpy="0 0 0" />
+        <origin xyz="0 0 0"/>
+        <axis xyz="0.6725 0.70711 -0.21851" />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="left"  FR="rear" ROLL="roll7" SHAFT="shaft7" >
+        <origin xyz="0.009733 0.014501 -0.029959" rpy="0 0 0" />
+        <origin xyz="0 0 0"/>
+        <axis xyz="0.6725 0.70711 0.21851"/>
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="left"  FR="rear" ROLL="roll8" SHAFT="shaft8" >
+        <origin xyz="0.025483 0.014501 -0.018516" rpy="0 0 0"/>
+        <origin xyz="0 0 0"/>
+        <axis xyz="0.41563 0.70711 0.57206" />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="left"  FR="rear" ROLL="roll9" SHAFT="shaft9" >
+        <origin xyz="0.0315 0.014501 0" rpy="0 0 0" />
+        <origin xyz="0 0 0"/>
+        <axis xyz="0 -0.70711 -0.70711" />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="left"  FR="rear" ROLL="roll10" SHAFT="shaft10" >
+        <origin xyz="0.025485 0.014501 0.018514" rpy="0 0 0"/>
+        <origin xyz="0 0 0"/>
+        <axis xyz="-0.41563 0.70711 0.57206" />
+    </xacro:shaft_roll_joint>
+
+    <xacro:shaft_roll_joint LR="right"  FR="front" ROLL="roll1" SHAFT="shaft1" >
+        <origin xyz="0.00973300552343784 -0.0160005314200533 0.0299586210924583" rpy="0 0 0" />
+        <origin xyz="0 0 0"/>
+        <axis xyz="0.672498493695189 -0.707106798557822 -0.218508012235274"   />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="right"  FR="front" ROLL="roll2" SHAFT="shaft2" >
+        <origin xyz="-0.00973506512255215 -0.0160005309171741 0.0299579522470881" rpy="0 0 0" />
+        <origin xyz="0 0 0"/>
+        <axis xyz="0.672498493702293 -0.707106798557788 0.218508012213516"  />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="right"  FR="front" ROLL="roll3" SHAFT="shaft3" >
+        <origin xyz="-0.025484671985402 -0.0160005305103463 0.0185143663235078" rpy="0 0 0" />
+        <origin xyz="0 0 0"/>
+        <axis xyz="0.415626919521477 -0.707106791922578 0.572061402810964"   />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="right"  FR="front" ROLL="roll4" SHAFT="shaft4"  >
+        <origin xyz="0 0 0"/>
+        <origin xyz="-0.0315000005529617 -0.0160005303549644 0" rpy="0 0 0"/>
+        <axis xyz="0 -0.707106781182517 0.707106781190578" />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="right"  FR="front" ROLL="roll5" SHAFT="shaft5"  >
+        <origin xyz="-0.0254833997659015 -0.0160005305103789 -0.0185161045716222" rpy="0 0 0" />
+        <origin xyz="0 0 0"/>
+        <axis xyz="-0.415626956033439 -0.70710677045048 0.572061402824443"    />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="right"  FR="front" ROLL="roll6" SHAFT="shaft6" >
+        <origin xyz="-0.00973300662816132 -0.0160005309172267 -0.0299586082806419" rpy="0 0 0" />
+        <origin xyz="0 0 0"/>
+        <axis xyz="-0.672498530225697 -0.707106763815239 0.218508012235286" />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="right"  FR="front" ROLL="roll7" SHAFT="shaft7" >
+        <origin xyz="0.00973506401782867 -0.0160005314201059 -0.0299579394352717" rpy="0 0 0" />
+        <origin xyz="0 0 0"/>
+        <axis xyz="-0.672498530232795 -0.707106763815206 -0.218508012213552" />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="right"  FR="front" ROLL="roll8" SHAFT="shaft8" >
+        <origin xyz="0.0254846708806785 -0.0160005318269337 -0.0185143535116914" rpy="0 0 0"/>
+        <origin xyz="0 0 0"/>
+        <axis xyz="-0.415626956051966 -0.707106770450474 -0.57206140281099"/>
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="right"  FR="front" ROLL="roll9" SHAFT="shaft9" >
+        <origin xyz="0.0314999994482383 -0.0160005319823156 0" rpy="0 0 0" />
+        <origin xyz="0 0 0"/>
+        <axis xyz="0 0.707106781182506 0.707106781190589" />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="right"  FR="front" ROLL="roll10" SHAFT="shaft10" >
+        <origin xyz="0.025483398661178 -0.0160005318269011 0.0185161173834386" rpy="0 0 0"/>
+        <origin xyz="0 0 0"/>
+        <axis xyz="0.41562691950295 -0.707106791922554 -0.572061402824454"  />
+    </xacro:shaft_roll_joint>
+
+    <xacro:shaft_roll_joint LR="right"  FR="rear" ROLL="roll1" SHAFT="shaft1" >
+        <origin xyz="0.0254846678878897 -0.0145005311686402 0.0185143566767768" rpy="0 0 0" />
+        <origin xyz="0 0 0"/>
+        <axis xyz="0.415626937786734 0.707106781186531 -0.572061402810962"  />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="right"  FR="rear" ROLL="roll2" SHAFT="shaft2" >
+        <origin xyz="0.00973506102503972 -0.0145005311686402 0.0299579426003567" rpy="0 0 0" />
+        <origin xyz="0 0 0"/>
+        <axis xyz="0.672498511967549 0.707106781186499 -0.218508012213514"   />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="right"  FR="rear" ROLL="roll3" SHAFT="shaft3" >
+        <origin xyz="-0.00973300962095029 -0.0145005311686402 0.0299586114457267" rpy="0 0 0" />
+        <origin xyz="0 0 0"/>
+        <axis xyz="0.67249851196044 0.707106781186528 0.218508012235299"  />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="right"  FR="rear" ROLL="roll4" SHAFT="shaft4"  >
+        <origin xyz="-0.0254834027586902 -0.0145005311686401 0.0185161077367067" rpy="0 0 0"/>
+        <origin xyz="0 0 0"/>
+        <axis xyz="0.415626937768182 0.707106781186521 0.572061402824454"  />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="right"  FR="rear" ROLL="roll5" SHAFT="shaft5"  >
+        <origin xyz="-0.0315000035457503 -0.0145005311686399 0" rpy="0 0 0" />
+        <origin xyz="0 0 0"/>
+        <axis xyz="0 0.707106781182508 0.707106781190587"   />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="right"  FR="rear" ROLL="roll6" SHAFT="shaft6" >
+        <origin xyz="-0.0254846749781902 -0.0145005311686398 -0.0185143631584233" rpy="0 0 0" />
+        <origin xyz="0 0 0"/>
+        <axis xyz="-0.415626937786727 0.707106781186528 0.57206140281097" />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="right"  FR="rear" ROLL="roll7" SHAFT="shaft7" >
+        <origin xyz="-0.00973506811534023 -0.0145005311686398 -0.0299579490820033" rpy="0 0 0" />
+        <origin xyz="0 0 0"/>
+        <axis xyz="-0.672498511967546 0.707106781186499 0.218508012213525"/>
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="right"  FR="rear" ROLL="roll8" SHAFT="shaft8" >
+        <origin xyz="0.00973300253064979 -0.0145005311686398 -0.0299586179273732" rpy="0 0 0"/>
+        <origin xyz="0 0 0"/>
+        <axis xyz="-0.672498511960439 0.707106781186535 -0.218508012235279"  />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="right"  FR="rear" ROLL="roll9" SHAFT="shaft9" >
+        <origin xyz="0.0254833956683898 -0.0145005311686399 -0.0185161142183532" rpy="0 0 0" />
+        <origin xyz="0 0 0"/>
+        <axis xyz="-0.415626937768179 0.707106781186531 -0.572061402824444"  />
+    </xacro:shaft_roll_joint>
+    <xacro:shaft_roll_joint LR="right"  FR="rear" ROLL="roll10" SHAFT="shaft10" >
+        <origin xyz="0.0314999964554497 -0.0145005311686401 0" rpy="0 0 0"/>
+        <origin xyz="0 0 0"/>
+        <axis xyz="0 0.707106781182518 -0.707106781190576"  />
+    </xacro:shaft_roll_joint>
+</robot>

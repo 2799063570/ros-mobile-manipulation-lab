@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<robot name="wheeltec" xmlns:xacro="http://www.ros.org/wiki/xacro">
+<!--Defining the LR wheel transmission in this robot-->
+    <gazebo reference="base_link">
+        <material>Gazebo/Grey</material>
+    </gazebo>
+    <xacro:macro name="transmission_choose" params="LR  FR ">    
+      <gazebo reference="${LR}_${FR}_wheel_link">
+        <material>Gazebo/Black</material>
+        <maxContacts>1</maxContacts>
+        <kp>100000.000000</kp>
+        <kd>1.000000</kd>
+        <maxVel>100.000000</maxVel>
+        <minDepth>0.000000</minDepth>
+        <dampingFactor>0.01</dampingFactor>
+      </gazebo>
+      <transmission name="${LR}_${FR}_wheel_joint_trans">
+        <type>transmission_interface/SimpleTransmission</type>
+        <joint name="${LR}_${FR}_wheel_joint">
+            <hardwareInterface>VelocityJointInterface</hardwareInterface>
+        </joint>
+        <actuator name="${LR}_${FR}_wheel_joint_motor">
+            <hardwareInterface>VelocityJointInterface</hardwareInterface>
+            <mechanicalReduction>1</mechanicalReduction>
+            <motorTorqueConstant>1</motorTorqueConstant>            
+        </actuator>
+      </transmission>
+    </xacro:macro>
+  <gazebo>
+    <plugin name="gazebo_ros_control" filename="libgazebo_ros_control.so">
+      <robotNamespace>/wheeltec</robotNamespace>
+      <robotSimType>gazebo_ros_control/DefaultRobotHWSim</robotSimType>
+    </plugin>
+  </gazebo>
+</robot>

@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot name="test" xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <xacro:macro name="box_inertial_matrix" params="m w h d">
+        <inertial>
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <mass value="${m}" />
+            <inertia ixx="${m*(d*d+h*h)/12}" ixy = "0" ixz = "0"
+                iyy="${m*(w*w+h*h)/12}" iyz = "0"
+                izz="${m*(w*w+d*d)/12}" /> 
+        </inertial>
+    </xacro:macro>
+<!--//////////////////////////////////base_link///////////////////////////////////////////-->
+    <!--xacro:property name="box_length" value="0.6" /> 
+    <xacro:property name="box_height" value="0.5" />
+    <xacro:property name="box_width" value="0.1" />
+    <xacro:property name="box_mass"   value="1.0" />
+    <xacro:property name="box_position_x" value="0" />
+    <xacro:property name="box_position_y" value="0" />
+    <xacro:property name="box_position_z" value="0.025" />
+    <link name="base_footprint"/>
+    <gazebo reference="base_footprint">
+        <gravity>false</gravity>
+    </gazebo>
+    <joint name="base_footprint_joint" type="fixed">
+      <origin xyz="${box_position_x} ${box_position_y} ${box_position_z}" rpy="0 0 0" />
+      <parent link="base_footprint"/>
+      <child link="base_link"/>
+    </joint>
+    <link name="base_link">
+      <box_inertial_matrix  m="${box_mass}" w="${box_length}" h="${box_height}" d="${box_width}"/>
+      <visual>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+          <mesh filename="package://wheeltec_description/meshes/mini_akm/base_link.STL" />
+        </geometry>
+        <material name="White"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="0 0 0" />
+        <geometry>
+          <mesh  filename="package://wheeltec_description/meshes/mini_akm/base_link.STL" />
+        </geometry>
+      </collision>
+    </link>
+    <gazebo reference="base_link">
+        <material>Gazebo/Grey</material>
+    </gazebo-->
+<!--//////////////////////////////////camera_link///////////////////////////////////////////-->
+    <!--xacro:property name="M_PI" value="3.1415926535897931" />
+    <link name="base_link"/>
+    <gazebo reference="base_link">
+        <gravity>false</gravity>
+    </gazebo>
+    <xacro:macro name="astra_camera" params="prefix">
+    <link name="${prefix}_link">
+        <box_inertial_matrix  m="0.001" w="0.001" h="0.001" d="0.001"/>
+        <visual>
+            <origin xyz="0 0 0" rpy="0 0 0 "/>
+            <geometry>
+                <mesh filename="package://wheeltec_description/meshes/mini_akm/camera_link.STL" />
+            </geometry>
+            <material name="white"/>
+        </visual>
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0 "/>
+            <geometry>
+                <mesh filename="package://wheeltec_description/meshes/mini_akm/camera_link.STL" />
+            </geometry>
+        </collision>
+    </link>
+    <joint name="${prefix}_optical_joint" type="fixed">
+        <origin xyz="0 0 0" rpy="${-M_PI/2} 0 ${-M_PI/2}"/>
+        <parent link="${prefix}_link"/>
+        <child link="${prefix}_frame_optical"/>
+    </joint>
+    <link name="${prefix}_frame_optical"/>
+    <gazebo reference="${prefix}_link">
+        <material>Gazebo/Grey</material>
+        <sensor type="depth" name="${prefix}">
+            <update_rate>20.0</update_rate>
+            <camera>
+                <horizontal_fov>${60.0*3.1415/180.0}</horizontal_fov>
+                <image>
+                    <format>R8G8B8</format>
+                    <width>640</width>
+                    <height>480</height>
+                </image>
+                <clip>
+                    <near>0.05</near>
+                    <far>8.0</far>
+                </clip>
+                <noise>
+                    <type>gaussian</type>
+                    <mean>0.0</mean>
+                    <stddev>0.007</stddev>
+                </noise>
+            </camera>
+            <plugin name="astra_camera_controller" filename="libgazebo_ros_openni_kinect.so">
+                    <cameraName>${prefix}</cameraName>
+                    <alwaysOn>true</alwaysOn>
+                    <updateRate>0</updateRate>
+                    <imageTopicName>rgb/image_raw</imageTopicName>
+                    <depthImageTopicName>depth/image_raw</depthImageTopicName>
+                    <pointCloudTopicName>depth/points</pointCloudTopicName>
+                    <cameraInfoTopicName>rgb/camera_info</cameraInfoTopicName>
+                    <depthImageCameraInfoTopicName>depth/camera_info</depthImageCameraInfoTopicName>
+                    <frameName>${prefix}_frame_optical</frameName>
+                    <baseline>0.1</baseline>
+                    <distortion_k1>0.0</distortion_k1>
+                    <distortion_k2>0.0</distortion_k2>
+                    <distortion_k3>0.0</distortion_k3>
+                    <distortion_t1>0.0</distortion_t1>
+                    <distortion_t2>0.0</distortion_t2>
+                    <pointCloudCutoff>0.4</pointCloudCutoff>
+            </plugin>
+        </sensor>
+    </gazebo>
+    </xacro:macro>
+    <astra_camera prefix="camera"/>
+    <joint name="camera_frame_joint" type="fixed">
+        <origin xyz="0 0 0.1" rpy="0 0 0" />
+        <parent link="base_link"/>
+        <child link="camera_link"/>
+    </joint-->
+<!--//////////////////////////////////rplidar_link///////////////////////////////////////////-->
+    <!--link name="base_link"/>
+    <gazebo reference="base_link">
+        <gravity>false</gravity>
+    </gazebo>
+    <xacro:property name="M_PI" value="3.1415926535897931" />
+    <xacro:property name="rplidar_position_x" value="0.051872" />
+    <xacro:property name="rplidar_position_y" value="0.00011578" />
+    <xacro:property name="rplidar_position_z" value="0.1306" />
+    <xacro:property name="rplidar_min_angle" value="-180" /> 
+    <xacro:property name="rplidar_max_angle" value="180" /> 
+    <joint name="rplidar_joint" type="fixed">
+        <origin xyz="${rplidar_position_x} ${rplidar_position_y} ${rplidar_position_z}" rpy="0 0 0" />
+        <parent link="base_link"/>
+        <child link="laser_link"/>
+    </joint>    
+    <xacro:macro name="rplidar" params="LA">
+        <link name="${LA}_link">
+            <box_inertial_matrix  m="0.001" w="0.001" h="0.001" d="0.001"/>
+            <visual>
+                <origin xyz=" 0 0 0 " rpy="0 0 0" />
+                <geometry>
+                    <mesh filename="package://wheeltec_description/meshes/mini_akm/rplidar_link.STL" />
+                </geometry>
+                <material name="black"/>
+            </visual>
+            <collision>
+                <origin xyz="0 0 0" rpy="0 0 0" />
+                <geometry>
+                    <mesh filename="package://wheeltec_description/meshes/mini_akm/rplidar_link.STL" />
+                </geometry>
+            </collision>
+        </link>
+        <gazebo reference="${LA}_link">
+            <material>Gazebo/Black</material>
+            <sensor type="ray" name="rplidar">
+                <visualize>false</visualize>
+                <update_rate>40</update_rate>
+                <ray>
+                    <scan>
+                      <horizontal>
+                        <samples>720</samples>
+                        <resolution>1</resolution>
+                        <min_angle>${rplidar_min_angle*M_PI/180}</min_angle>
+                        <max_angle>${rplidar_max_angle*M_PI/180}</max_angle>
+                      </horizontal>
+                    </scan>
+                    <range>
+                      <min>0.10</min>
+                      <max>10.0</max>
+                      <resolution>0.01</resolution>
+                    </range>
+                    <noise>
+                      <type>gaussian</type>
+                      <mean>0.0</mean>
+                      <stddev>0.0</stddev>
+                    </noise>
+                </ray>
+                <plugin name="gazebo_rplidar" filename="libgazebo_ros_laser.so">
+                    <topicName>/scan</topicName>
+                    <frameName>laser_link</frameName>
+                </plugin>
+            </sensor>
+        </gazebo>
+    </xacro:macro>    
+    <rplidar LA="laser"/-->
+</robot>

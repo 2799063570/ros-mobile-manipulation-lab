@@ -1,0 +1,11 @@
+moveit_setup_assistant_config:
+  URDF:
+    package: diff_arm_urdf
+    relative_path: urdf/diff_arm_urdf.urdf
+    xacro_args: ""
+  SRDF:
+    relative_path: config/diff_arm_urdf.srdf
+  CONFIG:
+    author_name: wheeltec
+    author_email: wubolin@wheeltec.net
+    generated_timestamp: 1627971164

@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<robot name="aubo_i5" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:property name="M_PI" value="3.14159"/>
+  <xacro:property name="PI" value="3.14159"/>
+   <!--camera position-->
+   <xacro:property name="camera_offset_x" value="0" />
+   <xacro:property name="camera_offset_y" value="-0.75" />
+   <xacro:property name="camera_offset_z" value="1" />
+   <xacro:include filename="$(find aubo_description)/urdf/camera.xacro"/>
+  
+
+  <xacro:include filename="$(find aubo_description)/urdf/jiazhua.urdf" />
+  <xacro:include filename="$(find aubo_description)/urdf/arm.xacro" />
+  
+    <joint name="ee_link_joint" type="fixed">
+        <origin xyz="0 0 0" rpy="0 0 0 " />
+        <parent link="wrist3_Link" />
+        <child  link="gripper_base_link" />
+    </joint>
+ <!--Camera -->
+    <joint name="camera_joint" type="fixed">
+        <origin xyz="${camera_offset_x} ${camera_offset_y} ${camera_offset_z}" rpy="${-M_PI/2} ${M_PI/2} ${-M_PI/2}" />
+        <parent link="base_link" />
+        <child  link="camera_link" />
+    </joint>
+    
+</robot>

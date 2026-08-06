@@ -1,0 +1,19 @@
+wheeltec:
+  #上面的wheeltec是运行命名空间
+  mini_akm_joint_state_controller:
+    type: joint_state_controller/JointStateController
+    publish_rate: 50
+  # Velocity Controllers ----速度控制器---------------------
+  mini_akm_left_wheel_velocity_controller:
+    type: velocity_controllers/JointVelocityController
+    joint: left_rear_wheel_joint
+  mini_akm_right_wheel_velocity_controller:
+    type: velocity_controllers/JointVelocityController
+    joint: right_rear_wheel_joint
+  # Position Controllers ---位置控制器-----------------------
+  mini_akm_left_steering_hinge_position_controller:
+    joint: left_steering_joint
+    type: position_controllers/JointPositionController
+  mini_akm_right_steering_hinge_position_controller:
+    joint: right_steering_joint
+    type: position_controllers/JointPositionController

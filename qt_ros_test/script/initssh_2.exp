@@ -1,0 +1,12 @@
+#!/usr/bin/expect -f    
+set timeout 20    
+spawn ssh-copy-id wheeltec@192.168.0.100
+expect {
+	"*yes/no*" {
+		send "yes\n"
+		expect "*password*" { send "dongguan\n" }
+	}
+	"*password*" {send "dongguan\n"}
+	timeout { send_error "error\n";exit 1;}
+}
+expect eof

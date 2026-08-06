@@ -1,0 +1,11 @@
+<launch>
+    <group ns="aubo_i5">
+        <!-- 加载控制器参数到 /aubo_i5/ 命名空间 -->
+        <rosparam file="$(find aubo_gazebo)/config/controllers.yaml" command="load"/>
+        
+        <!-- 启动控制器：spawn 完成后会自行退出，不能设为 required -->
+        <node name="controller_spawner" pkg="controller_manager" type="spawner"
+              respawn="false" output="screen"
+              args="joint_state_controller aubo_i5_controller"/>
+    </group>
+</launch>

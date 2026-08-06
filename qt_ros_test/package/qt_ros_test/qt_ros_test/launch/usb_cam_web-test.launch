@@ -1,0 +1,8 @@
+<launch>
+
+  <include file="$(find usb_cam)/launch/usb_cam-test.launch" />
+
+
+  <node name="web_video_server" pkg="web_video_server" type="web_video_server" output="screen"/>
+  
+</launch>

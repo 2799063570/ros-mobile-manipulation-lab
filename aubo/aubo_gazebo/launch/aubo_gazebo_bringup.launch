@@ -1,0 +1,27 @@
+<launch>
+
+    <!-- Allow this bringup to skip loading robot_description when MoveIt already loaded it -->
+    <arg name="load_robot_description" default="true" />
+
+    <!-- Whether to include the moveit_planning_execution.launch from this bringup.
+                When embedding this bringup from moveit_planning_execution.launch itself,
+                set include_moveit to "false" to avoid recursive includes. -->
+    <arg name="include_moveit" default="true" />
+
+        <!-- Launch Gazebo  加载机器人模型 加载gazebo世界 
+    <include file="$(find aubo_gazebo)/launch/robot_with_gripper_gazebo_world.launch">
+        <arg name="load_robot_description" value="$(arg load_robot_description)" />
+    </include>-->
+
+    <!-- ros_control arm launch file 创建关节状态控制器-->
+    <include file="$(find aubo_gazebo)/launch/aubo_world_gazebo.launch" />   
+
+    <!-- ros_control trajectory control dof arm launch file 创建关节轨迹控制器 -->
+    <include file="$(find aubo_gazebo)/launch/aubo_controller_gazebo.launch" />
+
+    <!-- moveit launch file -->
+    <group if="$(arg include_moveit)">
+        <include file="$(find aubo_moveit_config)/launch/moveit_planning_execution.launch" />
+    </group>
+
+</launch>

@@ -1,0 +1,6 @@
+<launch>
+  <node pkg="qt_ros_test" type="initssh.py" name="initssh" output="screen"/>
+  <node name="qt_ros_test"          pkg="qt_ros_test"  type="qt_ros_test" output="screen">
+  <param name="user_passward" value="dongguan"/>    <!-- 虚拟机root密码 -->
+  </node>
+</launch>

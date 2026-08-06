@@ -1,0 +1,8 @@
+<launch>
+
+  <include file="$(find xf_mic_asr_offline)/launch/base.launch" />
+  
+
+  <include file="$(find xf_mic_asr_offline)/launch/mic_init.launch" />
+  
+</launch>

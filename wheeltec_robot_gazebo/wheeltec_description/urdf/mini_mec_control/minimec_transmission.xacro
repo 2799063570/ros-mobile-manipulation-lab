@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+<robot name="wheeltec" xmlns:xacro="http://www.ros.org/wiki/xacro">
+<!--Defining the wheel link in gazebo-->
+    <gazebo reference="base_link">
+        <material>Gazebo/Grey</material>
+    </gazebo>
+    <xacro:macro name="wheel_link_gazebo" params="LR  FR ">    
+      <gazebo reference="${LR}_${FR}_wheel_link">
+        <material>Gazebo/Black</material>
+        <mu1>1</mu1>
+        <mu2>1</mu2>
+        <maxContacts>1</maxContacts>
+        <kp>100000.000000</kp>
+        <kd>1.000000</kd>
+        <maxVel>100.000000</maxVel>
+        <minDepth>0.000000</minDepth>
+        <dampingFactor>0.01</dampingFactor>
+      </gazebo>
+    </xacro:macro>
+  <gazebo>
+    <plugin name="gazebo_ros_mec_control" filename="libgazebo_ros_wheeltec_mec.so">
+      <robotNamespace>/wheeltec</robotNamespace>
+      <!--Whether TF connects ODOM to Base_footprint,The default value is true. For cartographer, change it to false-->
+      <broadcastTF>true</broadcastTF>
+      <!--wheel_joint-->
+      <leftFrontJoint>left_front_wheel_joint</leftFrontJoint>
+      <rightFrontJoint>right_front_wheel_joint</rightFrontJoint>
+      <leftRearJoint>left_rear_wheel_joint</leftRearJoint>
+      <rightRearJoint>right_rear_wheel_joint</rightRearJoint>
+      <!--the axle base,unit: m-->
+      <axlebase>0.19</axlebase>
+      <!--the wheel base,unit: m-->
+      <wheelbase>0.175</wheelbase>
+      <!--the wheel diameter,unit: m-->
+      <wheelDiameter>0.075</wheelDiameter>
+      <!--the torque-->
+      <torque>0.6</torque>
+      <!--Max velocity,unit m/s-->
+      <max_vel>1.4</max_vel>
+      <!--Max angular velocity,unit rad/s-->
+      <max_turn>3</max_turn>
+      <!--ROS: Subscribe to the velocity command topic (usually "cmd_vel")-->
+      <commandTopic>/cmd_vel</commandTopic>
+      <!--ROS: Publish to the odometry topic (usually "odom")-->
+      <odometryTopic>/odom</odometryTopic>
+      <!--tf connect odometryFrame to robotBaseFrame-->
+      <odometryFrame>odom</odometryFrame>
+      <robotBaseFrame>base_footprint</robotBaseFrame>
+      <updateRate>100.0</updateRate>
+      <!--pose twist covariance-->
+      <covariance_x>0.0001</covariance_x>
+      <covariance_y>0.0001</covariance_y>
+      <covariance_yaw>0.01</covariance_yaw>
+    </plugin>
+  </gazebo>
+</robot>

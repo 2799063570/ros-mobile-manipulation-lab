@@ -1,0 +1,30 @@
+注意：雷达扫描范围要注意适应修改，不能扫描到小车自身，也不可以浪费雷达扫描范围
+
+
+一、从【不同车型的机械臂功能包】复制对应文件夹内的功能包到小车【wheeltec_robot】工作空间并编译，只需要编译【stepper_arm】、【turn_on_wheeltec_robot】功能包。
+编译报错查看相关报错源码，有提示。
+
+二、参数修改
+雷达扫描范围修改为250-110。
+功能包【wheeltec_multi】、【xf_mic_asr_offline】照常修改。
+功能包【turn_on_wheeltec_robot】不需要修改，默认已改好。
+
+三、功能测试：键盘控制机械臂
+roslaunch stepper_arm arm_2_keyboard_control.launch
+可以键盘控制机械臂、机械爪、小车即可。
+
+四、功能测试：机械臂抓取色块
+1.放置2个色块，在小车右侧过道约15cm处。
+2.运行命令：roslaunch stepper_arm arm_2_auto_pick_colorBlock.launch，启动色块抓取功能
+3.运行命令：rqt，自定义色块抓取功能
+	 选择目标色块颜色【color】，点击开始寻找抓取色块【Pick_start】
+4.机器人可以把两个色块抓取放置在小车左侧，同时机器人前方有物体时会停止前进，即可。
+rqt的参数target_areaSize、down_KP、foward_KP默认值可能要改，改完后需要编译
+
+五、功能测试：使用moveit对机械臂进行控制
+1.文件【arm_2_movit_visualization.launch】内的参数【moveit_control_RealArm】设置为【true】。
+2.运行命令：roslaunch stepper_arm arm_2_movit_visualization.launch
+3.弹出的gui界面可以控制机械臂即可。
+4.文件【arm_2_movit_visualization.launch】内的参数【moveit_control_RealArm】设置为【false】。
+
+六、正常测试小车其它默认功能

@@ -1,0 +1,101 @@
+<?xml version="1.0"?>
+<robot name="wheeltec" xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <!-- Macro for inertia matrix -->
+    <xacro:macro name="box_inertial_matrix" params="m w h d">
+        <inertial>
+            <origin xyz="-0.0082636 -0.00011954 0.0015243" rpy="0 0 0" />
+            <mass value="${m}" />
+            <inertia ixx="${m*(d*d+h*h)/12}" ixy = "0" ixz = "0"
+                iyy="${m*(w*w+h*h)/12}" iyz = "0"
+                izz="${m*(w*w+d*d)/12}" /> 
+        </inertial>
+    </xacro:macro>
+  <link name="base_footprint"/>
+  <joint name="base_footprint_joint" type="fixed">
+    <origin xyz="${box_position_x} ${box_position_y} ${box_position_z}" rpy="0 0 0" />
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+  </joint>
+    <!-- Defining the base_link-->
+    <link name="base_link">
+        <box_inertial_matrix  m="${box_mass}" d="${box_width}" h="${box_height}" w="${box_length}" />
+        <visual>
+            <geometry>
+                <mesh filename="package://wheeltec_description/meshes/mini_mec/base_link.STL" />
+            </geometry>
+            <material name="white"/>
+        </visual>
+        <collision>
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <geometry>
+                <mesh filename="package://wheeltec_description/meshes/mini_mec/base_link.STL" />
+            </geometry>
+        </collision>
+    </link>
+    <xacro:macro name="wheel_link" params="LR  FR *origin  *inertia">
+    <link name="${LR}_${FR}_wheel_link">
+        <inertial>
+            <xacro:insert_block name="origin"/>
+            <mass value="${wheel_mass}"/>
+            <xacro:insert_block name="inertia"/>
+        </inertial>
+        <visual>
+          <origin xyz="0 0 0" rpy="0 0 0" />
+          <geometry>
+            <mesh filename="package://wheeltec_description/meshes/mini_mec/${LR}_${FR}_wheel_link.STL" />
+          </geometry>
+          <material name="white"/>    
+        </visual>
+        <collision>
+          <origin xyz="0 0 0" rpy="0 0 0" />
+          <geometry>
+            <mesh filename="package://wheeltec_description/meshes/mini_mec/${LR}_${FR}_wheel_link.STL" />
+          </geometry>   
+        </collision>
+    </link>
+    </xacro:macro>
+    <xacro:macro name="shaft_link" params="LR  FR  SHAFT *origin  *inertia">
+    <link name="${LR}_${FR}_${SHAFT}_link">
+        <inertial>
+            <xacro:insert_block name="origin"/>
+            <mass value="${shaft_mass}"/>
+            <xacro:insert_block name="inertia"/>
+        </inertial>
+        <visual>
+          <origin xyz="0 0 0" rpy="0 0 0" />
+          <geometry>
+            <mesh filename="package://wheeltec_description/meshes/mini_mec/${LR}_${FR}_${SHAFT}_link.STL" />
+          </geometry>
+          <material name="black"/>    
+        </visual>
+        <collision>
+          <origin xyz="0 0 0" rpy="0 0 0" />
+          <geometry>
+            <mesh filename="package://wheeltec_description/meshes/mini_mec/${LR}_${FR}_${SHAFT}_link.STL" />
+          </geometry>   
+        </collision>
+    </link>
+    </xacro:macro>
+    <xacro:macro name="roll_link" params="LR  FR  ROLL *origin  *inertia">
+    <link name="${LR}_${FR}_${ROLL}_link">
+        <inertial>
+            <xacro:insert_block name="origin"/>
+            <mass value="${roll_mass}"/>
+            <xacro:insert_block name="inertia"/>
+        </inertial>
+        <visual>
+          <origin xyz="0 0 0" rpy="0 0 0" />
+          <geometry>
+            <mesh filename="package://wheeltec_description/meshes/mini_mec/${LR}_${FR}_${ROLL}_link.STL" />
+          </geometry>
+          <material name="black"/>    
+        </visual>
+        <collision>
+          <origin xyz="0 0 0" rpy="0 0 0" />
+          <geometry>
+            <mesh filename="package://wheeltec_description/meshes/mini_mec/${LR}_${FR}_${ROLL}_link.STL" />
+          </geometry>   
+        </collision>
+    </link>
+    </xacro:macro>
+</robot>

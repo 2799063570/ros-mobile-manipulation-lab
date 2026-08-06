@@ -1,0 +1,42 @@
+<launch>
+  <arg name="slave_robot"             default=""/>
+  <arg name="slave_x"/>
+  <arg name="slave_y"/>
+  <arg name="car_mode"  default="mini_mec" 
+       doc="opt: mini_akm,senior_akm,top_akm_bs,top_akm_dl,
+                 mini_mec,senior_mec_bs,senior_mec_dl,top_mec_bs,top_mec_dl,senior_mec_EightDrive,top_mec_EightDrive,
+                 flagship_mec_bs,flagship_mec_dl,
+                 mini_omni,senior_omni,top_omni,
+                 mini_4wd,senior_4wd_bs,senior_4wd_dl,top_4wd_bs,top_4wd_dl,flagship_4wd_bs,flagship_4wd_dl,
+                 mini_tank,mini_diff,senior_diff,four_wheel_diff_bs,four_wheel_diff_dl,flagship_four_wheel_diff_dl,flagship_four_wheel_diff_bs, 
+                 brushless_senior_diff,
+                 mini_tank_moveit_four,mini_4wd_moveit_four,mini_mec_moveit_four,
+                 mini_mec_moveit_six,mini_4wd_moveit_six"/>
+
+  <!-- 是否为akm系列车型 在多机编队中需要进行判断，控制小车运动方式-->
+  <param if="$(eval car_mode=='mini_akm' or car_mode=='senior_akm' or car_mode=='top_akm_bs' or car_mode=='top_akm_dl')" name="/if_akm_yes_or_no" value="yes"/>
+
+  <!-- 多机编队的从机位姿初始化-->
+  <node name="pose_setter" pkg="wheeltec_multi" type="set_pose.py" args="0 0 0" output="screen" >
+    <param name='slave_x'    type='double' value='$(arg slave_x)'  />
+    <param name='slave_y'    type='double' value='$(arg slave_y)'  />
+  </node>
+  
+  <!-- turn on lidar开启雷达  -->
+  <include file="$(find wheeltec_multi)/launch/wheeltec_lidar.launch" >
+    <arg name="slave_robot" value="$(arg slave_robot)"/>
+  </include>
+
+  <!-- turn on base_serial 开启底层单片机的控制节点  -->
+  <include file="$(find wheeltec_multi)/launch/include/base_serial.launch" >
+    <arg name="slave_robot" value="$(arg slave_robot)"/>
+  </include>
+
+  <!-- 发布用于建图、导航的TF关系与小车外形可视化 -->
+  <include file="$(find wheeltec_multi)/launch/robot_model_visualization.launch" >
+    <arg name="slave_robot" value="$(arg slave_robot)"/>
+    <arg name="car_mode" value="$(arg car_mode)"/>
+  </include>
+  
+ </launch>
+

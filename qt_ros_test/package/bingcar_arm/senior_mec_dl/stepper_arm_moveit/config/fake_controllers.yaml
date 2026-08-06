@@ -1,0 +1,19 @@
+controller_list:
+  - name: fake_arm_controller
+    joints:
+      - arm_A_joint
+      - arm_B_joint
+      - arm_C_joint
+      - arm_D_link
+      - grasper_joint
+  - name: fake_hand_controller
+    joints:
+      - hand_left_joint
+      - hand_left2_joint
+      - hand_right_joint
+      - hand_right2_joint
+initial:  # Define initial robot poses.
+  - group: arm
+    pose: home
+  - group: hand
+    pose: home

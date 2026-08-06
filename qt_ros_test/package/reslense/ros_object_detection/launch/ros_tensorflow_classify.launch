@@ -1,0 +1,8 @@
+<launch>
+  <!-- 开启摄像头  -->
+  <include file="$(find realsense2_camera)/launch/rs_rgbd.launch" />
+  
+  <node pkg="ros_detection" name="ros_tensorflow_classify" type="ros_tensorflow_classify.py" output="screen"> 
+  </node>
+
+</launch>

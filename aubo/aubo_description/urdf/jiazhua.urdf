@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<robot name="jiazhua">
+
+  <link name="gripper_base_link">
+    <inertial>
+      <origin xyz="0.0012 2.42861286636753E-17 0.0475830266682981" rpy="0 0 0" />
+      <mass value="0.10588615547803" />
+      <inertia
+        ixx="0.000120405813410356"
+        ixy="-3.77401154477319E-21"
+        ixz="3.59933442415666E-21"
+        iyy="9.48339427252608E-05"
+        iyz="-1.11428968367808E-20"
+        izz="3.86432252264647E-05" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://aubo_description/meshes/jiazhua/base_link.STL" />
+      </geometry>
+      <material name="jiazhua_bask_link_material">
+        <color rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin  xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://aubo_description/meshes/jiazhua/base_link.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <link  name="Link1">
+    <inertial>
+      <origin xyz="0.00188050176688574 -0.00120387769826689 0.0150298969423478" rpy="0 0 0" />
+      <mass value="0.0054287821000724" />
+      <inertia
+        ixx="1.43577242109414E-06"
+        ixy="9.68992808778747E-11"
+        ixz="-2.28401464592307E-07"
+        iyy="1.47943037043788E-06"
+        iyz="4.56593730463517E-10"
+        izz="1.48811775578354E-07" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://aubo_description/meshes/jiazhua/Link1.STL" />
+      </geometry>
+      <material name="link1_material">
+        <color rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://aubo_description/meshes/jiazhua/Link1.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="joint1" type="fixed">
+    <origin xyz="0 -0.029 0.0892076231496363" rpy="0 -0.228448582107719 1.5707963267949" />
+    <parent  link="gripper_base_link" />
+    <child link="Link1" />
+  </joint>
+  <link name="Link2">
+    <inertial>
+      <origin xyz="0.00184644766642264 0.00119612230173309 0.0148207361975697" rpy="0 0 0" />
+      <mass  value="0.00542878210007239" />
+      <inertia
+        ixx="1.43577242109413E-06"
+        ixy="9.68992808778728E-11"
+        ixz="-2.28401464592308E-07"
+        iyy="1.47943037043787E-06"
+        iyz="4.56593730463535E-10"
+        izz="1.48811775578354E-07" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://aubo_description/meshes/jiazhua/Link2.STL" />
+      </geometry>
+      <material name="link2_material">
+        <color rgba="0.792156862745098 0.819607843137255 0.933333333333333 1" />
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://aubo_description/meshes/jiazhua/Link2.STL" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="joint2" type="fixed">
+    <origin xyz="0 0.029 0.0892076231496363" rpy="0 -0.252554771757915 -1.5707963267949" />
+    <parent link="gripper_base_link" />
+    <child link="Link2" />
+  </joint>
+
+  <joint name="gripper_joint" type="fixed">
+      <origin xyz="0 0 0.12" rpy="0 0 0"/>
+      <parent link="gripper_base_link"/>
+      <child link="gripper_link"/>
+  </joint>
+  <link name="gripper_link" />
+</robot>

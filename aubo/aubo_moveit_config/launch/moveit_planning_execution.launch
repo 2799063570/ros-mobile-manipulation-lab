@@ -1,0 +1,21 @@
+<launch>
+ # The planning and execution components of MoveIt! configured to 
+ # publish the current configuration of the robot (simulated or real)
+ # and the current state of the world as seen by the planner
+ <arg name="use_sensor_manager" default="false" />
+ <include file="$(find aubo_moveit_config)/launch/move_group.launch">
+  <arg name="publish_monitored_planning_scene" value="true" />
+  <arg name="use_sensor_manager" value="$(arg use_sensor_manager)" />
+ </include>
+
+ # The visualization component of MoveIt!
+ <include file="$(find aubo_moveit_config)/launch/moveit_rviz.launch">
+  <arg name="rviz_config" value="true" />
+ </include>
+
+  <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher">
+    <param name="/use_gui" value="false"/> 
+    <rosparam param="/source_list">[/aubo_i5/joint_states]</rosparam>
+  </node>
+
+</launch>

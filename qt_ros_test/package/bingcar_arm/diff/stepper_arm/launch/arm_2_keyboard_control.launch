@@ -1,0 +1,20 @@
+<launch>
+  <!-- 开启小车、机械臂控制初始化节点  -->
+  <include file="$(find stepper_arm)/launch/turn_on_robot_and_arm.launch" >
+    <arg name="Arm_Visualization"       default="false"/>
+  </include>
+  <!-- 开启键盘控制小车、机械臂节点  -->
+  <node name="arm_2_keyboard_control" pkg="stepper_arm" type="arm_2_keyboard_control" output="screen" >
+  </node>
+  
+  <rosparam >
+    <!-- robot_base_height 机械臂底座与地面的距离 -->
+    arm_base_height: 0.220
+    <!-- Angle_B_bias 关节B默认角度(相对X轴) -->
+    Angle_B_bias:    1.571
+    <!-- Angle_C_bias 关节C默认角度(相对关节B) -->
+    Angle_C_bias:    0.384
+    <!-- 如果需要在导航的时候控制机械臂，需要关闭键盘控制小车功能即下面参数设置为false  -->
+    cmd_vel_enable:  true
+  </rosparam>
+</launch>

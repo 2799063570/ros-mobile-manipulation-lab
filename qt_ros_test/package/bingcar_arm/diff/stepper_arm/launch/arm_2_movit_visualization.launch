@@ -1,0 +1,17 @@
+<launch>
+  <!-- 是否开启moveit控制真实机械臂功能(注意：开启后键盘控制、色块抓取功能无法使用)  -->
+  <arg name="moveit_control_RealArm"       default="false"/>
+  <!-- 开启机械臂控制初始化节点  -->
+  <include file="$(find stepper_arm)/launch/turn_on_robot_and_arm.launch" if="$(arg moveit_control_RealArm)">
+    <arg name="JointStates_topic"       default="joint_states"/>
+    <arg name="Arm_Visualization"       default="true"/>
+  </include>
+  <!-- 开启moveit机械臂节点  -->
+  <include file="$(find stepper_arm)/launch/arm_2_movit_demo.launch" >
+    <arg if="$(arg moveit_control_RealArm)" name="use_gui" default="true" />
+  </include>
+  <!-- 开启moveit可视化节点，用于对键盘控制、色块抓取功能的可视化  -->
+  <node name="arm_2_movit_visualization" pkg="stepper_arm" type="arm_2_movit_visualization" output="screen" unless="$(arg moveit_control_RealArm)">
+  </node>
+
+</launch>

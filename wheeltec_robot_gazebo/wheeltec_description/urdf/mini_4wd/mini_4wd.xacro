@@ -1,0 +1,128 @@
+<?xml version="1.0"?>
+<robot name="wheeltec" xmlns:xacro="http://www.ros.org/wiki/xacro">
+    <!--M_PI-->
+    <xacro:property name="M_PI" value="3.1415926535897931" />
+    <!--rplidar description-->
+    <!--rplidar position-->
+    <xacro:property name="rplidar_offset_x" value="0.036" />
+    <xacro:property name="rplidar_offset_y" value="0.0015048" />
+    <xacro:property name="rplidar_offset_z" value="0.13921" />
+    <!--rplidar scanning angle-->
+    <xacro:property name="rplidar_min_angle" value="-180" /> 
+    <xacro:property name="rplidar_max_angle" value="180" /> 
+    <!--camera description-->
+    <!--camera position-->
+    <xacro:property name="camera_offset_x" value="0.12521" />
+    <xacro:property name="camera_offset_y" value="0.0017204" />
+    <xacro:property name="camera_offset_z" value="0.10195" />
+    <!--robot_body description-->
+    <!--wheel position-->
+    <xacro:property name="front_wheel_position_x" value="0.0725" /> 
+    <xacro:property name="left_wheel_position_y" value="0.08939" />
+    <xacro:property name="right_wheel_position_y" value="-0.08661" /> 
+    <xacro:property name="wheel_position_z" value="-0.026385" />
+    <xacro:property name="rear_wheel_position_x" value="-0.1005" />
+    <xacro:property name="wheel_mass"   value="0.053774" />
+    <xacro:property name="box_position_x" value="0" />
+    <xacro:property name="box_position_y" value="0" /> 
+    <xacro:property name="box_position_z" value="0.07" />  
+    <xacro:property name="box_length" value="0.18" /> 
+    <xacro:property name="box_height" value="0.04" />
+    <xacro:property name="box_width" value="0.1" /> 
+    <xacro:property name="box_mass"   value="0.6" />
+    <!--robot with rplidar and camera -->
+    <xacro:include filename="$(find wheeltec_description)/urdf/mini_4wd/mini4wd_body.xacro" />
+    <xacro:include filename="$(find wheeltec_description)/urdf/mini_4wd/mini4wd_rplidar.xacro" />
+    <xacro:include filename="$(find wheeltec_description)/urdf/mini_4wd/mini4wd_camera.xacro" />
+    <xacro:include filename="$(find wheeltec_description)/urdf/imu.xacro" />
+    <xacro:include filename="$(find wheeltec_description)/urdf/material.xacro" />
+    <xacro:include filename="$(find wheeltec_description)/urdf/mini_4wd/mini4wd_transmission.xacro" />
+    <joint name="rplidar_joint" type="fixed">
+        <origin xyz="${rplidar_offset_x} ${rplidar_offset_y} ${rplidar_offset_z}" rpy="0 0 0" />
+	<parent link="base_link"/>
+	<child link="laser_link"/>
+    </joint>    
+    <!-- Attach the camera -->
+    <joint name="camera_frame_joint" type="fixed">
+	<origin xyz="${camera_offset_x} ${camera_offset_y} ${camera_offset_z}" rpy="0 0 0" />
+	<parent link="base_link"/>
+	<child link="camera_link"/>
+    </joint>
+    <xacro:macro name="joint_choose" params="LR FR *origin ">
+    <joint name="${LR}_${FR}_wheel_joint" type="continuous">
+        <xacro:insert_block name="origin"/>
+        <parent link="base_link"/>
+        <child link="${LR}_${FR}_wheel_link"/>
+        <axis xyz="0 1 0" rpy="0 0 0"/>
+        <limit effort="3.9" velocity="36.92"/>
+    </joint>
+    </xacro:macro>
+    <joint name="imu_joint" type="fixed">
+      <origin xyz="0 0 0.0275" rpy="0 0 0" />
+      <parent link="base_link"/>
+      <child link="imu_link"/>
+    </joint>
+    <imu prefix="imu"/>
+    <astra_camera prefix="camera"/>
+    <xacro:joint_choose LR="right" FR="front" >
+        <origin xyz="${front_wheel_position_x} ${right_wheel_position_y} ${wheel_position_z} " rpy="0 0 0"/>
+    </xacro:joint_choose>
+    <xacro:joint_choose LR="left"  FR="front" >    
+        <origin xyz="${front_wheel_position_x} ${left_wheel_position_y} ${wheel_position_z} " rpy="0 0 0"/>
+    </xacro:joint_choose> 
+    <xacro:joint_choose LR="right" FR="rear"  >
+        <origin xyz="${rear_wheel_position_x} ${right_wheel_position_y} ${wheel_position_z} " rpy="0 0 0"/>
+    </xacro:joint_choose>
+    <xacro:joint_choose LR="left"  FR="rear"  >
+        <origin xyz="${rear_wheel_position_x} ${left_wheel_position_y} ${wheel_position_z} " rpy="0 0 0"/>
+    </xacro:joint_choose>
+    <xacro:wheel_choose LR="right" FR="front">
+        <origin xyz="6.832E-08 -0.0098111 -7.0676E-07" rpy="0 0 0" />
+        <mass value="${wheel_mass}" />
+        <inertia
+          ixx="1.996E-05"
+          ixy="-1.4777E-14"
+          ixz="6.8928E-11"
+          iyy="3.4111E-05"
+          iyz="-1.8473E-15"
+          izz="1.996E-05" />
+    </xacro:wheel_choose>
+    <xacro:wheel_choose LR="left"  FR="front">
+        <origin xyz="-6.8329E-08 0.0098111 -7.0684E-07" rpy="0 0 0" />
+        <mass value="${wheel_mass}" />
+        <inertia
+          ixx="1.996E-05"
+          ixy="-1.4777E-14"
+          ixz="6.8928E-11"
+          iyy="3.4111E-05"
+          iyz="-1.8473E-15"
+          izz="1.996E-05" />
+    </xacro:wheel_choose>
+    <xacro:wheel_choose LR="right" FR="rear">
+        <origin xyz="6.832E-08 -0.0098111 -7.0676E-07" rpy="0 0 0" />
+        <mass value="${wheel_mass}" />
+        <inertia
+          ixx="1.996E-05"
+          ixy="-1.4777E-14"
+          ixz="-6.8928E-11"
+          iyy="3.4111E-05"
+          iyz="1.8473E-15"
+          izz="1.996E-05" />
+    </xacro:wheel_choose>
+    <xacro:wheel_choose LR="left"  FR="rear">
+        <origin xyz="-6.8366E-08 0.0098111 -7.068E-07" rpy="0 0 0" />
+        <mass value="${wheel_mass}" />
+        <inertia
+          ixx="1.996E-05"
+          ixy="-1.4777E-14"
+          ixz="-6.8928E-11"
+          iyy="3.4111E-05"
+          iyz="1.8473E-15"
+          izz="1.996E-05" />
+    </xacro:wheel_choose>
+    <transmission_choose LR="right" FR="front" />
+    <transmission_choose LR="left"  FR="front" />
+    <transmission_choose LR="right" FR="rear"  />
+    <transmission_choose LR="left"  FR="rear"  />
+    <rplidar LA="laser"/>
+</robot>
