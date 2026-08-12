@@ -1,0 +1,5 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="map_name" default="$(find simple_diff_robot_gazebo)/maps/my_map"/>
+  <node pkg="map_server" type="map_saver" name="map_saver" args="-f $(arg map_name)" output="screen"/>
+</launch>

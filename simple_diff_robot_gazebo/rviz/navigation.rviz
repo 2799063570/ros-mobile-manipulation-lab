@@ -1,0 +1,21 @@
+Panels:
+  - Class: rviz/Displays
+Visualization Manager:
+  Class: ""
+  Displays:
+    - {Class: rviz/Grid, Name: Grid, Enabled: true}
+    - {Class: rviz/RobotModel, Name: RobotModel, Enabled: true, Robot Description: robot_description}
+    - {Class: rviz/LaserScan, Name: LaserScan, Enabled: true, Topic: /scan, Size (m): 0.02}
+    - {Class: rviz/Map, Name: Map, Enabled: true, Topic: /map}
+    - {Class: rviz/Map, Name: GlobalCostmap, Enabled: true, Topic: /move_base/global_costmap/costmap}
+    - {Class: rviz/Map, Name: LocalCostmap, Enabled: true, Topic: /move_base/local_costmap/costmap}
+    - {Class: rviz/Path, Name: GlobalPlan, Enabled: true, Topic: /move_base/NavfnROS/plan}
+    - {Class: rviz/Path, Name: LocalPlan, Enabled: true, Topic: /move_base/DWAPlannerROS/local_plan}
+  Global Options: {Fixed Frame: map}
+  Name: root
+  Tools:
+    - {Class: rviz/Interact}
+    - {Class: rviz/MoveCamera}
+    - {Class: rviz/SetInitialPose, Topic: /initialpose}
+    - {Class: rviz/SetGoal, Topic: /move_base_simple/goal}
+Window Geometry: {Height: 750, Width: 1200}

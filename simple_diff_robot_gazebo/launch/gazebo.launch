@@ -1,0 +1,27 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="world" default="$(find simple_diff_robot_gazebo)/worlds/training.world"/>
+  <arg name="gui" default="true"/>
+  <arg name="paused" default="false"/>
+  <arg name="x" default="0.0"/>
+  <arg name="y" default="0.0"/>
+  <arg name="z" default="0.12"/>
+
+  <param name="robot_description"
+         command="$(find xacro)/xacro --inorder $(find simple_diff_robot_gazebo)/urdf/simple_diff_robot.xacro"/>
+
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="world_name" value="$(arg world)"/>
+    <arg name="gui" value="$(arg gui)"/>
+    <arg name="paused" value="$(arg paused)"/>
+    <arg name="use_sim_time" value="true"/>
+  </include>
+
+  <node pkg="gazebo_ros" type="spawn_model" name="spawn_simple_diff_robot"
+        args="-urdf -param robot_description -model simple_diff_robot -x $(arg x) -y $(arg y) -z $(arg z)"
+        output="screen"/>
+
+  <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher">
+    <param name="publish_frequency" value="50.0"/>
+  </node>
+</launch>

@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>simple_diff_robot_gazebo</name>
+  <version>0.1.0</version>
+  <description>A minimal two-wheel differential-drive robot with one caster for Gazebo.</description>
+
+  <maintainer email="student@example.com">Student</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <exec_depend>gazebo_plugins</exec_depend>
+  <exec_depend>gazebo_ros</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>amcl</exec_depend>
+  <exec_depend>dwa_local_planner</exec_depend>
+  <exec_depend>joint_state_publisher</exec_depend>
+  <exec_depend>map_server</exec_depend>
+  <exec_depend>move_base</exec_depend>
+  <exec_depend>navfn</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>rviz</exec_depend>
+  <exec_depend>gmapping</exec_depend>
+  <exec_depend>teleop_twist_keyboard</exec_depend>
+  <exec_depend>tf</exec_depend>
+  <exec_depend>urdf</exec_depend>
+  <exec_depend>xacro</exec_depend>
+
+  <export/>
+</package>
