@@ -5,6 +5,8 @@ Visualization Manager:
   Displays:
     - {Class: rviz/Grid, Name: Grid, Enabled: true}
     - {Class: rviz/RobotModel, Name: RobotModel, Enabled: true, Robot Description: robot_description}
+    - {Class: rviz/TF, Name: TF, Enabled: false, Frame Timeout: 15}
+    - {Class: rviz/Odometry, Name: Odometry, Enabled: true, Topic: /odom, Keep: 100}
     - {Class: rviz/LaserScan, Name: LaserScan, Enabled: true, Topic: /scan, Size (m): 0.02}
     - {Class: rviz/Map, Name: Map, Enabled: true, Topic: /map}
   Global Options: {Fixed Frame: map}

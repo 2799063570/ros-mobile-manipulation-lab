@@ -1,4 +1,5 @@
 robot_radius: 0.24
+footprint_padding: 0.01
 transform_tolerance: 0.5
 obstacle_layer:
   enabled: true
@@ -9,6 +10,8 @@ obstacle_layer:
     sensor_frame: laser_link
     data_type: LaserScan
     topic: scan
+    expected_update_rate: 0.15
+    observation_persistence: 0.0
     marking: true
     clearing: true
 inflation_layer:

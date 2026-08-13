@@ -20,3 +20,6 @@ DWAPlannerROS:
   goal_distance_bias: 20.0
   occdist_scale: 0.03
   stop_time_buffer: 0.2
+  oscillation_reset_dist: 0.10
+  publish_traj_pc: true
+  publish_cost_grid_pc: true

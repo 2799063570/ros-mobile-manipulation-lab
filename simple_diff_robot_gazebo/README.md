@@ -10,6 +10,8 @@
 - 激光：`/scan` (`sensor_msgs/LaserScan`)
 - 相机：`/camera/image_raw`、`/camera/camera_info`
 
+差速插件使用编码器里程计，而不是 Gazebo 世界真值，使 Gmapping 和 AMCL 实验更接近真实机器人。
+
 ## 编译
 
 把本包放在 Catkin 工作空间的 `src` 目录后执行：
@@ -36,6 +38,8 @@ roslaunch simple_diff_robot_gazebo gazebo.launch
 ```bash
 roslaunch simple_diff_robot_gazebo teleop.launch
 ```
+
+键位为 `W/S` 前进后退、`A/D` 左右转、空格或 `X` 停车、`Q` 退出。需要按住运动键；超过 0.5 秒没有键盘输入会自动停车。键盘节点已经包含在本包中，不需要额外安装 `teleop_twist_keyboard`。
 
 也可以直接测试：
 
@@ -67,10 +71,23 @@ roslaunch simple_diff_robot_gazebo teleop.launch
 roslaunch simple_diff_robot_gazebo map_saver.launch
 ```
 
+默认保存到源码包的 `maps` 目录。如果包位于只读安装目录，请使用：
+
+```bash
+mkdir -p ~/maps
+roslaunch simple_diff_robot_gazebo map_saver.launch map_name:=$HOME/maps/my_map
+```
+
 关闭建图进程后启动导航：
 
 ```bash
 roslaunch simple_diff_robot_gazebo navigation.launch
+```
+
+导航依赖已经存在的 YAML/PGM 地图；如果尚未生成 `maps/my_map.yaml`，启动会失败。指定其他地图：
+
+```bash
+roslaunch simple_diff_robot_gazebo navigation.launch map_file:=$HOME/maps/my_map.yaml
 ```
 
 在 RViz 中先用 **2D Pose Estimate** 指定初始位姿，再用 **2D Nav Goal** 指定目标。其他地图可通过 `map_file:=/绝对路径/map.yaml` 指定。
@@ -84,7 +101,18 @@ rqt_image_view /camera/image_raw
 ## 学习顺序
 
 1. 用 `display.launch` 只观察 URDF 关节和坐标系。
-2. 阅读 `simple_diff_robot.xacro` 中三个 link 和 joint。
+2. 阅读 `simple_diff_robot.xacro` 中底盘、车轮、万向轮、雷达和相机的 link/joint。
 3. 阅读末尾 `libgazebo_ros_diff_drive.so` 的参数。
 4. 在 Gazebo 中观察 `/cmd_vel`、`/odom` 和 TF。
-5. 掌握基础后再增加激光雷达、IMU、建图和导航。
+5. 依次实验激光雷达、相机、Gmapping、AMCL、代价地图和 DWA。
+6. 掌握现有链路后，可继续增加 IMU、传感器融合或视觉算法。
+
+## 运行前检查
+
+```bash
+rospack find simple_diff_robot_gazebo
+rosrun xacro xacro --inorder $(rospack find simple_diff_robot_gazebo)/urdf/simple_diff_robot.xacro > /tmp/simple_diff_robot.urdf
+check_urdf /tmp/simple_diff_robot.urdf
+```
+
+遇到启动、TF、地图或导航问题时，参见 [TROUBLESHOOTING.md](TROUBLESHOOTING.md)。

@@ -5,7 +5,8 @@
   <arg name="paused" default="false"/>
   <arg name="x" default="0.0"/>
   <arg name="y" default="0.0"/>
-  <arg name="z" default="0.12"/>
+  <!-- base_footprint is already the ground-contact plane. A small offset avoids initial penetration. -->
+  <arg name="z" default="0.01"/>
 
   <param name="robot_description"
          command="$(find xacro)/xacro --inorder $(find simple_diff_robot_gazebo)/urdf/simple_diff_robot.xacro"/>

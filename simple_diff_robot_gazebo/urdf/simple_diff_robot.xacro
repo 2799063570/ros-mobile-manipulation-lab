@@ -186,8 +186,9 @@
       <odometryTopic>odom</odometryTopic>
       <odometryFrame>odom</odometryFrame>
       <robotBaseFrame>base_footprint</robotBaseFrame>
-      <odometrySource>world</odometrySource>
-      <publishTf>true</publishTf>
+      <!-- Encoder odometry is more realistic for learning SLAM than Gazebo world ground truth. -->
+      <odometrySource>encoder</odometrySource>
+      <publishOdomTF>true</publishOdomTF>
       <publishWheelTF>false</publishWheelTF>
       <publishWheelJointState>true</publishWheelJointState>
     </plugin>

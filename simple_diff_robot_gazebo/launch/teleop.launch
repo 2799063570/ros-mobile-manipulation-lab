@@ -1,5 +1,12 @@
 <?xml version="1.0"?>
 <launch>
-  <node pkg="teleop_twist_keyboard" type="teleop_twist_keyboard.py" name="teleop_keyboard" output="screen"/>
+  <arg name="linear_speed" default="0.30"/>
+  <arg name="angular_speed" default="0.80"/>
+  <arg name="command_timeout" default="0.50"/>
+  <node pkg="simple_diff_robot_gazebo" type="keyboard_teleop.py"
+        name="keyboard_teleop" output="screen" required="true">
+    <param name="linear_speed" value="$(arg linear_speed)"/>
+    <param name="angular_speed" value="$(arg angular_speed)"/>
+    <param name="command_timeout" value="$(arg command_timeout)"/>
+  </node>
 </launch>
-

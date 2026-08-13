@@ -5,12 +5,17 @@ Visualization Manager:
   Displays:
     - {Class: rviz/Grid, Name: Grid, Enabled: true}
     - {Class: rviz/RobotModel, Name: RobotModel, Enabled: true, Robot Description: robot_description}
+    - {Class: rviz/TF, Name: TF, Enabled: false, Frame Timeout: 15}
+    - {Class: rviz/Odometry, Name: Odometry, Enabled: true, Topic: /odom, Keep: 100}
     - {Class: rviz/LaserScan, Name: LaserScan, Enabled: true, Topic: /scan, Size (m): 0.02}
+    - {Class: rviz/PoseArray, Name: AMCL Particles, Enabled: true, Topic: /particlecloud}
     - {Class: rviz/Map, Name: Map, Enabled: true, Topic: /map}
     - {Class: rviz/Map, Name: GlobalCostmap, Enabled: true, Topic: /move_base/global_costmap/costmap}
     - {Class: rviz/Map, Name: LocalCostmap, Enabled: true, Topic: /move_base/local_costmap/costmap}
     - {Class: rviz/Path, Name: GlobalPlan, Enabled: true, Topic: /move_base/NavfnROS/plan}
     - {Class: rviz/Path, Name: LocalPlan, Enabled: true, Topic: /move_base/DWAPlannerROS/local_plan}
+    - {Class: rviz/Polygon, Name: Global Footprint, Enabled: true, Topic: /move_base/global_costmap/footprint}
+    - {Class: rviz/Polygon, Name: Local Footprint, Enabled: true, Topic: /move_base/local_costmap/footprint}
   Global Options: {Fixed Frame: map}
   Name: root
   Tools:
