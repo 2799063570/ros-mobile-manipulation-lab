@@ -1,7 +1,6 @@
 image: /home/wheeltec-client/wheeltec_robot/src/wheeltec_robot_gazebo/wheeltec_gazebo_function/map/WHEELTEC.pgm
-resolution: 0.025000
-origin: [-4.987070, -3.683168, 0.000000]
+resolution: 0.050000
+origin: [-15.400000, -13.800000, 0.000000]
 negate: 0
 occupied_thresh: 0.65
 free_thresh: 0.196
-
