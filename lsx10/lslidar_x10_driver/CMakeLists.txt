@@ -42,6 +42,13 @@ add_library(lslidar_input_x10
   src/input.cc
 )
 
+# input.cc directly includes generated headers from lslidar_x10_msgs.
+# Without this dependency a parallel catkin build may compile input.cc
+# before LslidarX10Packet.h has been generated.
+add_dependencies(lslidar_input_x10
+  ${catkin_EXPORTED_TARGETS}
+)
+
 add_library(lslidar_serial_x10
   src/lsiosr.cpp
 )
@@ -92,7 +99,7 @@ add_dependencies(lslidar_x10_driver_node
 )
 
 # install options
-install(TARGETS lslidar_input_x10 lslidar_x10_driver_node lslidar_serial_x10
+install(TARGETS lslidar_input_x10 lslidar_x10_driver lslidar_x10_driver_node lslidar_serial_x10
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
