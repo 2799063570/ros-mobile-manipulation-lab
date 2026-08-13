@@ -98,6 +98,11 @@ class MapGenerator
       std::string mapmetadatafile = mapname_ + ".yaml";
       ROS_INFO("Writing map occupancy data to %s", mapmetadatafile.c_str());
       FILE* yaml = fopen(mapmetadatafile.c_str(), "w");
+      if (!yaml)
+      {
+        ROS_ERROR("Couldn't save map metadata to %s", mapmetadatafile.c_str());
+        return;
+      }
 
 
       /*
@@ -119,8 +124,12 @@ free_thresh: 0.196
       double yaw, pitch, roll;
       mat.getEulerYPR(yaw, pitch, roll);
 
+      const std::string::size_type slash = mapdatafile.find_last_of("/\\");
+      const std::string image_name = slash == std::string::npos
+        ? mapdatafile
+        : mapdatafile.substr(slash + 1);
       fprintf(yaml, "image: %s\nresolution: %f\norigin: [%f, %f, %f]\nnegate: 0\noccupied_thresh: 0.65\nfree_thresh: 0.196\n",
-              mapdatafile.c_str(), map->info.resolution, map->info.origin.position.x, map->info.origin.position.y, yaw);
+              image_name.c_str(), map->info.resolution, map->info.origin.position.x, map->info.origin.position.y, yaw);
 
       fclose(yaml);
 
@@ -173,6 +182,11 @@ class YamlEndPose
 
       std::string mapmetadatafile = mapname_ + "_end.yaml";
       FILE* yaml = fopen(mapmetadatafile.c_str(), "w");
+      if (!yaml)
+      {
+        ROS_ERROR("Couldn't save end pose to %s", mapmetadatafile.c_str());
+        return;
+      }
 
       //get end pose
       // tf2_ros::Buffer tfBuffer;

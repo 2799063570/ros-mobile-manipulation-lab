@@ -1,7 +1,9 @@
-#! /bin/bash
+#!/usr/bin/env bash
 
-### BEGIN INIT
-gnome-terminal -- bash -c "source /opt/ros/melodic/setup.bash;source /home/wheeltec/wheeltec_robot/devel/setup.bash;roslaunch wheeltec_multi wheeltec_slave.launch"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKSPACE_DIR="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+
+gnome-terminal -- bash -c "source /opt/ros/melodic/setup.bash; source '${WORKSPACE_DIR}/devel/setup.bash'; exec roslaunch wheeltec_multi wheeltec_slave.launch"
 sleep 10
 
 wait

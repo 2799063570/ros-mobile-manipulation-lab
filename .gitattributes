@@ -1,0 +1,3 @@
+# Executable scripts must retain Unix line endings when checked out on Windows.
+simple_diff_robot_gazebo/scripts/*.py text eol=lf
+wheeltec_multi/scripts/*.sh text eol=lf

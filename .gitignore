@@ -5,3 +5,10 @@ WHEELTEC-Obsidian/.obsidian/workspace-mobile.json
 # Maps generated while running the teaching simulation.
 simple_diff_robot_gazebo/maps/*.pgm
 simple_diff_robot_gazebo/maps/*.yaml
+
+# Catkin and Python generated files.
+build/
+devel/
+logs/
+*.py[cod]
+__pycache__/

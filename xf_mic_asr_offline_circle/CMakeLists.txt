@@ -10,6 +10,7 @@ set (CMAKE_VERBOSE_MAKEFILE ON)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   roscpp
+  roslib
   rospy
   std_msgs
   message_generation
@@ -182,57 +183,61 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-add_executable(voice_control src/voice_control.cpp)
+add_executable(${PROJECT_NAME}_voice_control src/voice_control.cpp)
 add_dependencies(
-  voice_control
+  ${PROJECT_NAME}_voice_control
   ${xf_mic_package_EXPORTED_TARGETS}
   xf_mic_asr_offline_circle_gencpp
 )
-target_link_libraries(voice_control ${catkin_LIBRARIES} offline_record_lib hid_lib rt dl pthread stdc++ )
+target_link_libraries(${PROJECT_NAME}_voice_control ${catkin_LIBRARIES} offline_record_lib hid_lib rt dl pthread stdc++ )
+set_target_properties(${PROJECT_NAME}_voice_control PROPERTIES OUTPUT_NAME voice_control)
 
 
-add_executable(call_recognition src/call_recognition.cpp)
+add_executable(${PROJECT_NAME}_call_recognition src/call_recognition.cpp)
 add_dependencies(
-  call_recognition
+  ${PROJECT_NAME}_call_recognition
   ${xf_mic_package_EXPORTED_TARGETS}
   xf_mic_asr_offline_circle_gencpp
 )
 target_link_libraries(
-    call_recognition 
+    ${PROJECT_NAME}_call_recognition
     ${catkin_LIBRARIES} 
 #    offline_record_lib hid_lib rt dl pthread stdc++ 
 )
+set_target_properties(${PROJECT_NAME}_call_recognition PROPERTIES OUTPUT_NAME call_recognition)
 
 
 
-add_executable(command_recognition 
+add_executable(${PROJECT_NAME}_command_recognition
   src/command_recognition.cpp 
 )
 add_dependencies(
-  command_recognition
+  ${PROJECT_NAME}_command_recognition
   ${xf_mic_package_EXPORTED_TARGETS}
   xf_mic_asr_offline_circle_gencpp
 )
 target_link_libraries(
-   command_recognition
+   ${PROJECT_NAME}_command_recognition
    ${catkin_LIBRARIES} 
 #    -ldl -lpthread -lm -lrt -lasound
  )
+set_target_properties(${PROJECT_NAME}_command_recognition PROPERTIES OUTPUT_NAME command_recognition)
 
 
-add_executable(motion_control
+add_executable(${PROJECT_NAME}_motion_control
   src/motion_control.cpp 
 )
 add_dependencies(
-  motion_control
+  ${PROJECT_NAME}_motion_control
   ${xf_mic_package_EXPORTED_TARGETS}
   xf_mic_asr_offline_circle_gencpp
 )
 target_link_libraries(
-   motion_control
+   ${PROJECT_NAME}_motion_control
    ${catkin_LIBRARIES} 
 #    -ldl -lpthread -lm -lrt -lasound
  )
+set_target_properties(${PROJECT_NAME}_motion_control PROPERTIES OUTPUT_NAME motion_control)
 
 # add_executable(refresh_mic
 #   src/refresh_mic.cpp 
@@ -249,18 +254,19 @@ target_link_libraries(
 #  )
 
 
-add_executable(point_navigation
+add_executable(${PROJECT_NAME}_point_navigation
   src/point_navigation.cpp 
 )
 add_dependencies(
-  point_navigation
+  ${PROJECT_NAME}_point_navigation
   ${xf_mic_package_EXPORTED_TARGETS}
   xf_mic_asr_offline_circle_gencpp
 )
 target_link_libraries(
-   point_navigation
+   ${PROJECT_NAME}_point_navigation
    ${catkin_LIBRARIES} 
  )
+set_target_properties(${PROJECT_NAME}_point_navigation PROPERTIES OUTPUT_NAME point_navigation)
 
 add_executable(node_feedback
   src/node_feedback.cpp 

@@ -1,4 +1,4 @@
-image: /home/wheeltec/wheeltec_robot/src/turn_on_wheeltec_robot/map/WHEELTEC.pgm
+image: WHEELTEC.pgm
 resolution: 0.050000
 origin: [-17.800000, -15.200000, 0.000000]
 negate: 0

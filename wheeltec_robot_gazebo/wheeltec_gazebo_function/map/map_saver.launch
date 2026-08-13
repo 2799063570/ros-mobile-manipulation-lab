@@ -1,4 +1,5 @@
 <launch>
-	<node pkg="map_server" type="map_saver" name="map_saver1" args="-f /home/wheeltec-client/wheeltec_robot/src/wheeltec_robot_gazebo/wheeltec_gazebo_function/map/WHEELTEC" output="screen">	
-	</node>
+  <arg name="map_name" default="$(find wheeltec_gazebo_function)/map/WHEELTEC"/>
+  <node pkg="map_server" type="map_saver" name="map_saver1"
+        args="-f $(arg map_name)" output="screen"/>
 </launch>

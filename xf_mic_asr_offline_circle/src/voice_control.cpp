@@ -12,6 +12,7 @@
 #include <joint.h>
 #include <record.h>
 #include <ros/ros.h>
+#include <ros/package.h>
 #include <std_msgs/String.h>
 #include <xf_mic_asr_offline_circle/Get_Offline_Result_srv.h>
 
@@ -230,7 +231,7 @@ int main(int argc, char *argv[])
 	ros::NodeHandle ndHandle("~");
 	ndHandle.param("/confidence", confidence, 0);//离线命令词识别置信度阈值
 	ndHandle.param("/seconds_per_order", time_per_order, 3); //单次录制音频的时长
-	ndHandle.param("source_path", source_path, std::string("/home/wheeltec/wheeltec_robot/src/vvui_ros-master/xf_mic_asr_offline_circle"));
+	ndHandle.param("source_path", source_path, ros::package::getPath("xf_mic_asr_offline_circle"));
 	ndHandle.param("/appid", appid, std::string("5fa0b8b9"));//appid，需要更换为自己的
 
 	printf("-----confidence =%d\n",confidence);
