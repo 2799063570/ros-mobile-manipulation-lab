@@ -102,7 +102,7 @@ int main(int argc, char** argv)
 	while(ros::ok())
 	{
 		ros::spinOnce();
-		avoidance_kw = fabs(avoidance_kw);
+		avoidance_kw = fabs(avoidance_kw);	// 角速度避障系数 先设置成正数
 		if(distance1<safe_distence && distance1>danger_distence)		//障碍物在安全距离和危险距离时，调整速度角度避让障碍物
 		{
 			printf("distance1= %f\n",distance1);

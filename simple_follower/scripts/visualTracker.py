@@ -30,6 +30,7 @@ class visualTracker:
 		self.targetUpper = np.array(rospy.get_param('~targetred/upper'))
 		self.targetLower = np.array(rospy.get_param('~targetred/lower'))
 
+		# 四组HSV阈值参数，分别对应红、蓝、绿、黄颜色
 		self.col_red_U =np.array(rospy.get_param('~targetred/upper'))# red
 		self.col_red_L =np.array(rospy.get_param('~targetred/lower'))
 
@@ -94,16 +95,16 @@ class visualTracker:
 		#mask = cv2.erode(org_mask, None, iterations=4)
 		# mask = cv2.dilate(mask,None, iterations=3)
 		kernel0 = np.ones((5,5),np.uint8)
-		hsv_erode = cv2.erode(hsv,kernel0,iterations=1)
-		hsv_dilate = cv2.dilate(hsv_erode,kernel0,iterations=1)
+		hsv_erode = cv2.erode(hsv,kernel0,iterations=1)# 五邻域取最小
+		hsv_dilate = cv2.dilate(hsv_erode,kernel0,iterations=1)# 五邻域取最大
 
-		mask_ori = cv2.inRange(hsv_dilate, self.targetUpper, self.targetLower)
-		kernel1 = np.ones((3,3),np.uint8)
+		mask_ori = cv2.inRange(hsv_dilate, self.targetUpper, self.targetLower)# 根据目标上下限生成掩码
+		kernel1 = np.ones((3,3),np.uint8)# 三邻域 腐蚀+膨胀去除噪声
 		mask_erode = cv2.erode(mask_ori,kernel1,iterations=1)
 		mask = cv2.dilate(mask_erode,kernel1,iterations=1)	
 
 		#cv2.imshow("mask", mask)
-                cv2.waitKey(3)
+		cv2.waitKey(3)
 		# find contours of the object 查找对象的轮廓
 		contours = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
 		newPos = None #if no contour at all was found the last position will again be set to none
@@ -137,7 +138,7 @@ class visualTracker:
 			# go threw all the contours. starting with the bigest one  抛出了所有的轮廓线。从最大的那个开始
 			contour = sorted(contours, key=cv2.contourArea, reverse=True)[0]
 			# get position of object for this contour 获取此轮廓的对象位置
-		 	pos = self.analyseContour(contour, depthFrame)
+		 	pos = self.analyseContour(contour, depthFrame)# 对象中心位置 和 对应的距离
 			# if it's the first one we found it will be the fall back for the next scan if we don't find a plausible one
 			#如果这是我们发现的第一个，如果我们找不到可信的，它将是下一次扫描的后备
 			if newPos is None:

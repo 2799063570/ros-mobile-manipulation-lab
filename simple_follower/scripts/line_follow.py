@@ -34,7 +34,7 @@ class Follower:
 
     def image_callback(self, msg):
         if self.temp == 0:
-            cv2.namedWindow('Adjust_hsv',cv2.WINDOW_NORMAL)
+            cv2.namedWindow('Adjust_hsv',cv2.WINDOW_NORMAL)# 创建选择窗口
             cv2.createTrackbar(Switch,'Adjust_hsv',0,4,nothing)
             self.temp = 1
         global last_erro
@@ -48,7 +48,7 @@ class Follower:
         kernel = numpy.ones((5,5),numpy.uint8)
         hsv_erode = cv2.erode(hsv,kernel,iterations=1)
         hsv_dilate = cv2.dilate(hsv_erode,kernel,iterations=1)
-        m=cv2.getTrackbarPos(Switch,'Adjust_hsv')
+        m=cv2.getTrackbarPos(Switch,'Adjust_hsv')# 获取当前选择的颜色
         if m == 0:
             lowerbH=col_red[0]
             lowerbS=col_red[1]

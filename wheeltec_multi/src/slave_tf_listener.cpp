@@ -92,7 +92,7 @@ int main(int argc, char** argv){
   geometry_msgs::Twist vel_msg;
   double e_angular_x = 0;
   double e_angular_y = 0;
-  slave_x = slave_x+slave_y;
+  slave_x = slave_x+slave_y;// map坐标系下，主车为原点，右边为x正方向，前面为y正方向的坐标系 到 base_link坐标系的转换关系
   slave_y = slave_x-slave_y;
   slave_x = -(slave_x-slave_y);//使得期望坐标slave_x slave_y是以主车为坐标原点，右边为x正方向，前面为y正方向的坐标系
 

@@ -218,7 +218,7 @@ class simplePID:
 		self.Kp		=np.array(P)
 		self.Ki		=np.array(I)
 		self.Kd		=np.array(D)
-		self.setPoint   =np.array(target)
+		self.setPoint   =np.array(target)		# 目标值 角度和距离
 		
 		self.last_error=0
 		self.integrator = 0
@@ -257,7 +257,7 @@ class simplePID:
 		
 		error = self.setPoint - current_value # 偏差值
 
-		# 偏差较小时停止移动
+		# 偏差较小时停止移动 设置控制死区
 		if error[0]<0.1 and error[0]>-0.1: # error[0]为角度偏差
 			error[0]=0
 		if error[1]<0.1 and error[1]>-0.1: # error[1]为距离偏差
@@ -288,14 +288,6 @@ class simplePID:
 		# 返回控制信号
 		return self.Kp*P + self.Ki*I + self.Kd*D
 		
-		
-	
-
-			
-
-
-
-
 if __name__ == '__main__':
 	
 	print('starting')

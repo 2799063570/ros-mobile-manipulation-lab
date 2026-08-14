@@ -21,9 +21,9 @@ class laserTracker:
 
 	def registerScan(self, scan_data):
 		# registers laser scan and publishes position of closest object (or point rather)
-		ranges = np.array(scan_data.ranges)
+		ranges = np.array(scan_data.ranges)		# 距离测量值
 		# sort by distance to check from closer to further away points if they might be something real
-		sortedIndices = np.argsort(ranges)
+		sortedIndices = np.argsort(ranges)	# 按距离从近到远排序索引 存储的是索引
 		
 		minDistanceID = None
 		minDistance   = float('inf')	
@@ -40,12 +40,14 @@ class laserTracker:
 				# in the last scan within that window
 				
 				# we kneed to clip the window so we don't have an index out of bounds
+				# 根据窗口的大小确定索引范围
 				windowIndex = np.clip([i-self.winSize, i+self.winSize+1],0,len(self.lastScan))
-				window = self.lastScan[windowIndex[0]:windowIndex[1]]
+				window = self.lastScan[windowIndex[0]:windowIndex[1]]	# 窗口内的距离测量值
 
 				with np.errstate(invalid='ignore'):
 					# check if any of the scans in the window (in the last scan) has a distance close enough to the current one
-					if(np.any(abs(window-tempMinDistance)<=self.deltaDist)):
+					# 判断窗口内是否有与当前测量值相近的距离
+					if(np.any(abs(window-tempMinDistance)<=self.deltaDist)):		
 					# this will also be false for all tempMinDistance = NaN or inf
 
 						# we found a plausible distance
