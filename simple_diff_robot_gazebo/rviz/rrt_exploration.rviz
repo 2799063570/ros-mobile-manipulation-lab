@@ -1,0 +1,66 @@
+Panels:
+  - Class: rviz/Displays
+    Name: Displays
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Class: rviz/Grid
+      Name: Grid
+      Enabled: true
+    - Class: rviz/RobotModel
+      Name: RobotModel
+      Enabled: true
+      Robot Description: robot_description
+    - Class: rviz/TF
+      Name: TF
+      Enabled: false
+      Frame Timeout: 15
+    - Class: rviz/Odometry
+      Name: Odometry
+      Enabled: true
+      Topic: /odom
+      Keep: 100
+    - Class: rviz/LaserScan
+      Name: LaserScan
+      Enabled: true
+      Topic: /scan
+      Size (m): 0.02
+    - Class: rviz/Map
+      Name: Map
+      Enabled: true
+      Topic: /map
+    - Class: rviz/Marker
+      Name: Global RRT
+      Enabled: true
+      Marker Topic: /global_detector_shapes
+    - Class: rviz/Marker
+      Name: Local RRT
+      Enabled: true
+      Marker Topic: /local_detector_shapes
+    - Class: rviz/Marker
+      Name: Raw Frontiers
+      Enabled: true
+      Marker Topic: /frontiers
+    - Class: rviz/Marker
+      Name: Filtered Centroids
+      Enabled: true
+      Marker Topic: /centroids
+  Global Options:
+    Fixed Frame: map
+  Tools:
+    - Class: rviz/Interact
+    - Class: rviz/MoveCamera
+    - Class: rviz/Select
+    - Class: rviz/FocusCamera
+    - Class: rviz/Measure
+    - Class: rviz/SetInitialPose
+      Topic: /initialpose
+    - Class: rviz/SetGoal
+      Topic: /move_base_simple/goal
+    - Class: rviz/PublishPoint
+      Single click: true
+      Topic: /clicked_point
+  Name: root
+Window Geometry:
+  Height: 750
+  Width: 1200

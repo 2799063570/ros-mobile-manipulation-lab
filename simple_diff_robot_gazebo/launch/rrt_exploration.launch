@@ -1,0 +1,110 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Gazebo and RRT visualization options. -->
+  <arg name="world" default="$(find simple_diff_robot_gazebo)/worlds/training.world"/>
+  <arg name="gui" default="true"/>
+  <arg name="rviz" default="true"/>
+  <arg name="paused" default="false"/>
+  <arg name="x" default="0.0"/>
+  <arg name="y" default="0.0"/>
+  <arg name="z" default="0.01"/>
+
+  <!-- RRT detector parameters. -->
+  <arg name="local_eta" default="0.5"/>
+  <arg name="global_eta" default="2.0"/>
+  <arg name="info_radius" default="0.8"/>
+  <arg name="info_multiplier" default="3.0"/>
+  <arg name="hysteresis_radius" default="3.0"/>
+  <arg name="hysteresis_gain" default="2.0"/>
+
+  <!-- Start the simulator exactly once. -->
+  <include file="$(find simple_diff_robot_gazebo)/launch/gazebo.launch">
+    <arg name="world" value="$(arg world)"/>
+    <arg name="gui" value="$(arg gui)"/>
+    <arg name="paused" value="$(arg paused)"/>
+    <arg name="x" value="$(arg x)"/>
+    <arg name="y" value="$(arg y)"/>
+    <arg name="z" value="$(arg z)"/>
+  </include>
+
+  <!-- Online SLAM. Gmapping publishes /map and map -> odom. -->
+  <node pkg="gmapping" type="slam_gmapping" name="slam_gmapping" output="screen">
+    <param name="base_frame" value="base_footprint"/>
+    <param name="odom_frame" value="odom"/>
+    <param name="map_frame" value="map"/>
+    <param name="map_update_interval" value="2.0"/>
+    <param name="maxUrange" value="11.5"/>
+    <param name="maxRange" value="12.0"/>
+    <param name="linearUpdate" value="0.15"/>
+    <param name="angularUpdate" value="0.15"/>
+    <param name="temporalUpdate" value="1.0"/>
+    <param name="particles" value="30"/>
+    <param name="xmin" value="-10.0"/>
+    <param name="ymin" value="-10.0"/>
+    <param name="xmax" value="10.0"/>
+    <param name="ymax" value="10.0"/>
+    <param name="delta" value="0.05"/>
+  </node>
+
+  <!-- Navigation while mapping: do not start map_server or AMCL here. -->
+  <node pkg="move_base" type="move_base" name="move_base" clear_params="true" output="screen">
+    <rosparam file="$(find simple_diff_robot_gazebo)/config/costmap_common.yaml" command="load" ns="global_costmap"/>
+    <rosparam file="$(find simple_diff_robot_gazebo)/config/costmap_common.yaml" command="load" ns="local_costmap"/>
+    <rosparam file="$(find simple_diff_robot_gazebo)/config/global_costmap.yaml" command="load"/>
+    <rosparam file="$(find simple_diff_robot_gazebo)/config/local_costmap.yaml" command="load"/>
+    <rosparam file="$(find simple_diff_robot_gazebo)/config/dwa_local_planner.yaml" command="load"/>
+    <param name="base_global_planner" value="navfn/NavfnROS"/>
+    <param name="base_local_planner" value="dwa_local_planner/DWAPlannerROS"/>
+    <param name="controller_frequency" value="10.0"/>
+    <param name="planner_frequency" value="1.0"/>
+    <param name="controller_patience" value="3.0"/>
+    <param name="planner_patience" value="5.0"/>
+    <param name="recovery_behavior_enabled" value="true"/>
+    <param name="clearing_rotation_allowed" value="true"/>
+  </node>
+
+  <!-- All detectors publish raw candidates on /detected_points. -->
+  <node pkg="rrt_exploration" type="global_rrt_detector" name="global_detector" output="screen">
+    <param name="eta" value="$(arg global_eta)"/>
+    <param name="map_topic" value="/map"/>
+  </node>
+
+  <node pkg="rrt_exploration" type="local_rrt_detector" name="local_detector" output="screen">
+    <param name="eta" value="$(arg local_eta)"/>
+    <param name="map_topic" value="/map"/>
+    <param name="robot_frame" value="base_link"/>
+  </node>
+
+  <node pkg="rrt_exploration" type="filter.py" name="filter" output="screen">
+    <param name="map_topic" value="/map"/>
+    <param name="info_radius" value="$(arg info_radius)"/>
+    <param name="costmap_clearing_threshold" value="70"/>
+    <param name="goals_topic" value="/detected_points"/>
+    <param name="global_costmap_topic" value="/move_base/global_costmap/costmap"/>
+    <param name="robot_frame" value="base_link"/>
+    <param name="namespace" value=""/>
+    <param name="n_robots" value="1"/>
+    <param name="rate" value="20"/>
+  </node>
+
+  <param name="namespace_init_count" value="1"/>
+  <node pkg="rrt_exploration" type="assigner.py" name="assigner" output="screen">
+    <param name="map_topic" value="/map"/>
+    <param name="global_frame" value="map"/>
+    <param name="robot_frame" value="base_link"/>
+    <param name="info_radius" value="$(arg info_radius)"/>
+    <param name="info_multiplier" value="$(arg info_multiplier)"/>
+    <param name="hysteresis_radius" value="$(arg hysteresis_radius)"/>
+    <param name="hysteresis_gain" value="$(arg hysteresis_gain)"/>
+    <param name="frontiers_topic" value="/filtered_points"/>
+    <param name="plan_service" value="/move_base/NavfnROS/make_plan"/>
+    <param name="namespace" value=""/>
+    <param name="n_robots" value="1"/>
+    <param name="delay_after_assignement" value="0.5"/>
+    <param name="rate" value="20"/>
+  </node>
+
+  <!-- wait_for_fin is intentionally omitted: it invokes the real-robot map saver. -->
+  <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz"
+        args="-d $(find simple_diff_robot_gazebo)/rviz/rrt_exploration.rviz"/>
+</launch>

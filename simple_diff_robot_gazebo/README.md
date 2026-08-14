@@ -92,6 +92,22 @@ roslaunch simple_diff_robot_gazebo navigation.launch map_file:=$HOME/maps/my_map
 
 在 RViz 中先用 **2D Pose Estimate** 指定初始位姿，再用 **2D Nav Goal** 指定目标。其他地图可通过 `map_file:=/绝对路径/map.yaml` 指定。
 
+## RRT 自主探索建图
+
+联合启动 Gazebo、Gmapping、Navigation Stack 和 `rrt_exploration`：
+
+```bash
+roslaunch simple_diff_robot_gazebo rrt_exploration.launch
+```
+
+等待 RViz 中 `/map` 出现后，使用 **Publish Point** 依次点击探索矩形的四个角，确保第 1、3 点互为对角点；第 5 点点击机器人附近的已知自由空间，作为 RRT 根节点。初始化后机器人会自动选择 frontier 并通过 `/move_base` 导航。
+
+该启动文件不会启动 AMCL、静态 `map_server` 或真机版 `wait_for_fin`。完成实验后可另开终端保存地图：
+
+```bash
+roslaunch simple_diff_robot_gazebo map_saver.launch
+```
+
 查看相机：
 
 ```bash

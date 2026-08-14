@@ -1,0 +1,66 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Supported models: mini_mec, mini_4wd, mini_akm, mini_mec_control. -->
+  <arg name="car_mode" default="mini_mec"/>
+
+  <!-- RRT detector and goal-assignment parameters. -->
+  <arg name="local_eta" default="0.5"/>
+  <arg name="global_eta" default="2.0"/>
+  <arg name="info_radius" default="0.8"/>
+  <arg name="info_multiplier" default="3.0"/>
+  <arg name="hysteresis_radius" default="3.0"/>
+  <arg name="hysteresis_gain" default="2.0"/>
+
+  <!-- Gmapping publishes /map and map -> odom during exploration. -->
+  <include file="$(find wheeltec_gazebo_function)/launch/include/algorithm_gmapping.launch"/>
+
+  <!-- Start the selected Gazebo robot and move_base with the existing TEB setup. -->
+  <include file="$(find wheeltec_gazebo_control)/launch/wheeltec_gazebo_control.launch">
+    <arg name="car_mode" value="$(arg car_mode)"/>
+    <arg name="gazebo_navigation" value="true"/>
+    <arg name="is_cartographer" value="false"/>
+  </include>
+
+  <!-- Global and local RRTs publish candidates on /detected_points. -->
+  <node pkg="rrt_exploration" type="global_rrt_detector" name="global_detector" output="screen">
+    <param name="eta" value="$(arg global_eta)"/>
+    <param name="map_topic" value="/map"/>
+  </node>
+
+  <node pkg="rrt_exploration" type="local_rrt_detector" name="local_detector" output="screen">
+    <param name="eta" value="$(arg local_eta)"/>
+    <param name="map_topic" value="/map"/>
+    <param name="robot_frame" value="base_link"/>
+  </node>
+
+  <node pkg="rrt_exploration" type="filter.py" name="filter" output="screen">
+    <param name="map_topic" value="/map"/>
+    <param name="info_radius" value="$(arg info_radius)"/>
+    <param name="costmap_clearing_threshold" value="70"/>
+    <param name="goals_topic" value="/detected_points"/>
+    <param name="global_costmap_topic" value="/move_base/global_costmap/costmap"/>
+    <param name="robot_frame" value="base_link"/>
+    <param name="namespace" value=""/>
+    <param name="n_robots" value="1"/>
+    <param name="rate" value="20"/>
+  </node>
+
+  <param name="namespace_init_count" value="1"/>
+  <node pkg="rrt_exploration" type="assigner.py" name="assigner" output="screen">
+    <param name="map_topic" value="/map"/>
+    <param name="global_frame" value="map"/>
+    <param name="robot_frame" value="base_link"/>
+    <param name="info_radius" value="$(arg info_radius)"/>
+    <param name="info_multiplier" value="$(arg info_multiplier)"/>
+    <param name="hysteresis_radius" value="$(arg hysteresis_radius)"/>
+    <param name="hysteresis_gain" value="$(arg hysteresis_gain)"/>
+    <param name="frontiers_topic" value="/filtered_points"/>
+    <param name="plan_service" value="/move_base/GlobalPlanner/make_plan"/>
+    <param name="namespace" value=""/>
+    <param name="n_robots" value="1"/>
+    <param name="delay_after_assignement" value="0.5"/>
+    <param name="rate" value="20"/>
+  </node>
+
+  <!-- wait_for_fin is omitted because it uses the real-robot map-saving workflow. -->
+</launch>

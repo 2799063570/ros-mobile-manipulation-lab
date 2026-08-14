@@ -291,6 +291,22 @@ XML 中两个 include 的节点会由 roslaunch 一起启动；并不是 `simple
 
 ## 9. 从零运行与 RViz 初始化
 
+本仓库的教学差速车已经提供联合仿真入口：
+
+```bash
+roslaunch simple_diff_robot_gazebo rrt_exploration.launch
+```
+
+该入口同时启动 Gazebo、Gmapping、`move_base` 和四个核心探索节点，并使用专用 RViz 配置；它不会启动会与 Gmapping 冲突的 AMCL/map_server，也不会启动依赖真机保存流程的 `wait_for_fin`。
+
+WHEELTEC 厂家 Gazebo 模型也提供了独立入口：
+
+```bash
+roslaunch wheeltec_gazebo_function rrt_exploration.launch car_mode:=mini_mec
+```
+
+可将 `car_mode` 改为 `mini_4wd`、`mini_akm` 或 `mini_mec_control`。该入口复用厂家 Gmapping、车型控制、TEB 和 RViz 配置，并将 assigner 的规划服务适配为 `/move_base/GlobalPlanner/make_plan`。
+
 ### 9.1 启动前检查
 
 ```bash
