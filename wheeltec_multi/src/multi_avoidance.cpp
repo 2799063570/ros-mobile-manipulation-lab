@@ -54,9 +54,11 @@ void current_position_Callback(const wheeltec_multi::avoid& msg)
 void cmd_vel_ori_Callback(const geometry_msgs::Twist& msg)
 {
 	cmd_vel_msg.linear.x = msg.linear.x;
+	cmd_vel_msg.linear.y = msg.linear.y;
 	cmd_vel_msg.angular.z = msg.angular.z;
 
 	cmd_vel_data.linear.x = msg.linear.x;
+	cmd_vel_data.linear.y = msg.linear.y;
 	cmd_vel_data.angular.z = msg.angular.z;
 }
 
@@ -137,6 +139,9 @@ int main(int argc, char** argv)
 		if(fabs(cmd_vel_msg.angular.z) < min_vel_theta)
 			cmd_vel_msg.angular.z=0;
 
+		// Preserve mecanum lateral velocity. The existing obstacle-avoidance
+		// algorithm still modifies only forward speed and yaw rate.
+		cmd_vel_msg.linear.y = distance1 < danger_distence ? 0.0 : cmd_vel_data.linear.y;
 		cmd_vel_Pub.publish(cmd_vel_msg);
 		ros::spinOnce();
 		loopRate2.sleep();

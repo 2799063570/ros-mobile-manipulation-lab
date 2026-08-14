@@ -236,6 +236,10 @@ add_executable(slave_tf_listener src/slave_tf_listener.cpp)
 add_dependencies(slave_tf_listener ${${PROJECT_NAME}_EXPORTED_TARGETS})
 target_link_libraries(slave_tf_listener ${catkin_LIBRARIES})
 
+add_executable(slave_tf_listener_mecanum src/slave_tf_listener_mecanum.cpp)
+add_dependencies(slave_tf_listener_mecanum ${${PROJECT_NAME}_EXPORTED_TARGETS})
+target_link_libraries(slave_tf_listener_mecanum ${catkin_LIBRARIES})
+
 
 
 #############
