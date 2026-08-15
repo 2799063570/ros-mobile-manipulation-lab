@@ -21,8 +21,9 @@ globalmaps = []
 
 def callBack(data, args):
     global frontiers, min_distance
-    transformedPoint = args[0].transformPoint(args[1], data)
+    transformedPoint = args[0].transformPoint(args[1], data)# map -> data.header.frame_id
     x = [array([transformedPoint.point.x, transformedPoint.point.y])]
+    # 全局坐标加入到frontiers中，后续会进行聚类和过滤
     if len(frontiers) > 0:
         frontiers = vstack((frontiers, x))
     else:
@@ -30,8 +31,8 @@ def callBack(data, args):
 
 
 def mapCallBack(data):
-    global mapData
-    mapData = data
+    global mapData # 全局变量，用于存储地图数据
+    mapData = data 
 
 
 def globalMap(data):
@@ -103,7 +104,7 @@ def node():
                                     rospy.Time(0), rospy.Duration(10.0))
     elif len(namespace) == 0:
         tfLisn.waitForTransform(global_frame[1:], '/' + robot_frame, rospy.Time(0),
-                                rospy.Duration(10.0))
+                                rospy.Duration(10.0))# map -> base_link
 
     rospy.Subscriber(goals_topic,
                      PointStamped,

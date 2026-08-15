@@ -40,6 +40,7 @@ void rvizCallBack(const geometry_msgs::PointStamped::ConstPtr& msg) {
 }
 
 int main(int argc, char** argv) {
+  // 随机数生成器初始化
   unsigned long init[4] = {0x123, 0x234, 0x345, 0x456}, length = 7;
   MTRand_int32 irand(init, length);  // 32-bit int generator
                                      // this is an example of initializing by an array
@@ -58,7 +59,7 @@ int main(int argc, char** argv) {
   std::string ns;
   ns = ros::this_node::getName();
 
-  ros::param::param<float>(ns + "/eta", eta, 0.5);
+  ros::param::param<float>(ns + "/eta", eta, 0.5);// 扩展距离
   ros::param::param<std::string>(ns + "/map_topic", map_topic, "/robot_1/map");
 
   // cout<<"map_topic= "<<map_topic<<endl;

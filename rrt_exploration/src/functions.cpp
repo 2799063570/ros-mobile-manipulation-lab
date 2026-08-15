@@ -24,7 +24,7 @@ float sign(float n) {
 
 // Nearest function
 std::vector<float> Nearest(std::vector<std::vector<float> > V, std::vector<float> x) {
-  float min = Norm(V[0], x);
+  float min = Norm(V[0], x);// 计算树中所有点到随机点的距离，找到最近的点
   int min_index;
   float temp;
 
@@ -46,7 +46,7 @@ std::vector<float> Steer(std::vector<float> x_nearest, std::vector<float> x_rand
   if (Norm(x_nearest, x_rand) <= eta) {
     x_new = x_rand;
   } else {
-    float m = (x_rand[1] - x_nearest[1]) / (x_rand[0] - x_nearest[0]);
+    float m = (x_rand[1] - x_nearest[1]) / (x_rand[0] - x_nearest[0]);// 斜率 tan(theta)
 
     x_new.push_back((sign(x_rand[0] - x_nearest[0])) * (sqrt((pow(eta, 2)) / ((pow(m, 2)) + 1))) +
                     x_nearest[0]);
@@ -82,7 +82,7 @@ int gridValue(nav_msgs::OccupancyGrid& mapData, std::vector<float> Xp) {
 
 int ObstacleFree(std::vector<float> xnear, std::vector<float>& xnew,
                  nav_msgs::OccupancyGrid mapsub) {
-  float rez = float(mapsub.info.resolution) * .2;
+  float rez = float(mapsub.info.resolution) * .2;// 根据网格分辨率设置步长
   float stepz = int(ceil(Norm(xnew, xnear)) / rez);
   std::vector<float> xi = xnear;
   int obs = 0;
