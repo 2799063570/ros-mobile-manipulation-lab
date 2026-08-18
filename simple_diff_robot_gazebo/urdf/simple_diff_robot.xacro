@@ -73,7 +73,7 @@
       <parent link="base_link"/>
       <child link="${side}_wheel_link"/>
       <origin xyz="0 ${y} 0" rpy="${pi / 2.0} 0 0"/>
-      <axis xyz="0 0 1"/>
+      <axis xyz="0 0 -1"/>
       <dynamics damping="0.05" friction="0.0"/>
     </joint>
   </xacro:macro>
@@ -103,6 +103,27 @@
     <origin xyz="${caster_x} 0 ${caster_radius - wheel_radius}"/>
   </joint>
 
+  <link name="caster_link2">
+    <visual>
+      <geometry><sphere radius="${caster_radius}"/></geometry>
+      <material name="silver"/>
+    </visual>
+    <collision>
+      <geometry><sphere radius="${caster_radius}"/></geometry>
+    </collision>
+    <inertial>
+      <mass value="${caster_mass}"/>
+      <inertia ixx="${0.4 * caster_mass * caster_radius * caster_radius}" ixy="0" ixz="0"
+               iyy="${0.4 * caster_mass * caster_radius * caster_radius}" iyz="0"
+               izz="${0.4 * caster_mass * caster_radius * caster_radius}"/>
+    </inertial>
+  </link>
+  <joint name="caster_joint2" type="fixed">
+    <parent link="base_link"/>
+    <child link="caster_link2"/>
+    <origin xyz="${-caster_x} 0 ${caster_radius - wheel_radius}"/>
+  </joint>
+
   <!-- 2D lidar, mounted above the chassis. -->
   <link name="laser_link">
     <visual><geometry><cylinder radius="0.045" length="0.035"/></geometry><material name="black"/></visual>
@@ -122,7 +143,7 @@
   </link>
   <joint name="camera_joint" type="fixed">
     <parent link="base_link"/><child link="camera_link"/>
-    <origin xyz="${base_length / 2.0 - 0.025} 0 ${base_height + 0.06}"/>
+    <origin xyz="${base_length / 2.0 - 0.025} 0 ${base_height}"/>
   </joint>
   <link name="camera_optical_frame"/>
   <joint name="camera_optical_joint" type="fixed">
@@ -141,7 +162,11 @@
     <material>Gazebo/Grey</material>
     <mu1>0.001</mu1><mu2>0.001</mu2>
   </gazebo>
-
+  <gazebo reference="caster_link2">
+    <material>Gazebo/Grey</material>
+    <mu1>0.001</mu1>
+    <mu2>0.001</mu2>
+  </gazebo>
   <gazebo reference="laser_link">
     <sensor type="ray" name="lidar">
       <visualize>true</visualize><update_rate>10</update_rate>
