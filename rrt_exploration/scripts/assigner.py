@@ -78,14 +78,15 @@ def node():
     # rospy.Subscriber('/odom', Odometry, odomCallBack)
     # ---------------------------------------------------------------------------------------------------------------
 
-    # wait if no frontier is received yet
+    # wait if no frontier is received yet  等待前沿节点订阅更新
     while len(frontiers) < 1:
         pass
     centroids = copy(frontiers)
-    # wait if map is not received yet
+    # wait if map is not received yet  等待地图数据订阅更新
     while (len(mapData.data) < 1):
         pass
 
+    # 初始化：给机器人发送当前位置
     robots = []
     if len(namespace) > 0:
         for i in range(0, n_robots):
@@ -100,7 +101,7 @@ def node():
     while not rospy.is_shutdown():
         centroids = copy(frontiers)
         # -------------------------------------------------------------------------
-        # Get information gain for each frontier point
+        # Get information gain for each frontier point  计算每个前沿节点对应的信息增益
         infoGain = []
         for ip in range(0, len(centroids)):
             infoGain.append(
