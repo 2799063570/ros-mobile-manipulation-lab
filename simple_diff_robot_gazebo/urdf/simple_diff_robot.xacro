@@ -153,10 +153,10 @@
 
   <gazebo reference="base_link"><material>Gazebo/Blue</material></gazebo>
   <gazebo reference="left_wheel_link">
-    <material>Gazebo/Black</material><mu1>1.0</mu1><mu2>1.0</mu2>
+    <material>Gazebo/Black</material><mu1>2.0</mu1><mu2>2.0</mu2>
   </gazebo>
   <gazebo reference="right_wheel_link">
-    <material>Gazebo/Black</material><mu1>1.0</mu1><mu2>1.0</mu2>
+    <material>Gazebo/Black</material><mu1>2.0</mu1><mu2>2.0</mu2>
   </gazebo>
   <gazebo reference="caster_link">
     <material>Gazebo/Grey</material>
@@ -211,8 +211,10 @@
       <odometryTopic>odom</odometryTopic>
       <odometryFrame>odom</odometryFrame>
       <robotBaseFrame>base_footprint</robotBaseFrame>
-      <!-- Encoder odometry is more realistic for learning SLAM than Gazebo world ground truth. -->
-      <odometrySource>encoder</odometrySource>
+      <!-- Demo/navigation mode: world ground-truth odometry keeps the local costmap and
+           laser perfectly aligned (no encoder drift). For learning SLAM on realistic
+           odometry, switch back to: <odometrySource>encoder</odometrySource> -->
+      <odometrySource>world</odometrySource>
       <publishOdomTF>true</publishOdomTF>
       <publishWheelTF>false</publishWheelTF>
       <publishWheelJointState>true</publishWheelJointState>

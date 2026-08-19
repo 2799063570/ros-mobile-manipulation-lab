@@ -115,6 +115,20 @@ rostopic info /cmd_vel
 rosservice call /move_base/clear_costmaps
 ```
 
+## 9.1 导航时局部地图与雷达出现旋转偏移
+
+现象：转弯/旋转过程中，RViz 里 local costmap 与 LaserScan 的角度逐渐错开，直线行驶不明显。
+
+原因：local costmap 建在 `odom` 帧并随时间累积障碍物，使用的是**每一帧当时的 TF**；LaserScan 是实时数据，用**当前** TF 显示。当 odom 航向发生漂移（编码器里程计误差 / 车轮打滑 / TF 延迟）时，历史栅格停在原位，实时雷达被"更新更偏"的 TF 放过去，就出现旋转错位。AMCL 只修正 `map→odom`，管不到 odom 帧内的 local costmap。
+
+本仓库为演示模式已做如下处理（见 `urdf/simple_diff_robot.xacro` 与 `config/dwa_local_planner.yaml`）：
+
+- `<odometrySource>world</odometrySource>`：里程计改用 Gazebo 真值，消除编码器漂移（根治）；
+- 驱动轮摩擦 `mu1/mu2` 提高到 `2.0`：减少打滑；
+- DWA `acc_lim_x: 0.4`、`acc_lim_theta: 1.0`、`max_vel_theta: 1.0`：运动更平滑。
+
+若想恢复"更贴近真实机器人的编码器里程计"（用于学习 SLAM），把 xacro 中 `odometrySource` 改回 `encoder` 并降低轮子摩擦即可；届时轻微的局部地图/雷达角度错位属正常现象。
+
 ## 10. 当前验证边界
 
 仓库中的 XML、Xacro、YAML 和 RViz 配置可进行静态语法检查；完整物理效果和插件兼容性仍需在 Ubuntu 18.04、ROS Melodic 与对应 Gazebo 版本中启动验证。
