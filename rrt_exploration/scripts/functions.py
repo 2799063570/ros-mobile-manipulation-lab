@@ -147,11 +147,11 @@ def checkAround(mapData, point, r):
 
 def discount(mapData, assigned_pt, centroids, infoGain, r):
     index = index_of_point(mapData, assigned_pt)
-    r_region = int(r / mapData.info.resolution)
-    init_index = index - r_region * (mapData.info.width + 1)
+    r_region = int(r / mapData.info.resolution)  # 附近的栅各数目
+    init_index = index - r_region * (mapData.info.width + 1)  # 第一行第一个点
     for n in range(0, 2 * r_region + 1):
-        start = n * mapData.info.width + init_index
-        end = start + 2 * r_region
+        start = n * mapData.info.width + init_index     # 遍历 每行的第一个点
+        end = start + 2 * r_region      # 遍历 每行的最后一个点
         limit = ((start / mapData.info.width) + 2) * mapData.info.width
         for i in range(start, end + 1):
             if (i >= 0 and i < limit and i < len(mapData.data)):
