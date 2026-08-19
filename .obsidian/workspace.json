@@ -188,8 +188,9 @@
       "bases:新建数据库": false
     }
   },
-  "active": "91d8cfefc3ce4327",
+  "active": "a150057187af3e48",
   "lastOpenFiles": [
+    "simple_diff_robot_gazebo/urdf/simple_diff_robot.xacro~RFa11651c.TMP",
     "WHEELTEC-Obsidian/功能包/rrt_exploration.md",
     "WHEELTEC-Obsidian/功能包/wheeltec_robot_rc.md"
   ]

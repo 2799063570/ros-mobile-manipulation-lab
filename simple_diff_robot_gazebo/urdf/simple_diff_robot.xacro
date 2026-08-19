@@ -213,7 +213,7 @@
       <robotBaseFrame>base_footprint</robotBaseFrame>
       <!-- Demo/navigation mode: world ground-truth odometry keeps the local costmap and
            laser perfectly aligned (no encoder drift). NOTE: do NOT combine this with
-           high wheel friction -- with mu 2.0 the robot physically wedges against
+           high wheel friction: with mu 2.0 the robot physically wedges against
            obstacles and, because world odom no longer masks the stall with drift,
            DWA reports "failed to produce path" and recovery cannot free it.
            For learning SLAM on realistic odometry, switch back to:
