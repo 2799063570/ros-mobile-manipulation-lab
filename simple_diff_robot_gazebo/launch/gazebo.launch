@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <launch>
-  <arg name="world" default="$(find simple_diff_robot_gazebo)/worlds/training.world"/>
+  <arg name="world" default="$(find simple_diff_robot_gazebo)/worlds/zlab_map.world"/>
   <arg name="gui" default="true"/>
   <arg name="paused" default="false"/>
   <arg name="x" default="0.0"/>
@@ -20,6 +20,7 @@
 
   <node pkg="gazebo_ros" type="spawn_model" name="spawn_simple_diff_robot"
         args="-urdf -param robot_description -model simple_diff_robot -x $(arg x) -y $(arg y) -z $(arg z)"
+         respawn="false"
         output="screen"/>
 
   <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher">
