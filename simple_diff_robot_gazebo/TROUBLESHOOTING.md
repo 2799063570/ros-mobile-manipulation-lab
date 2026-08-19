@@ -121,13 +121,27 @@ rosservice call /move_base/clear_costmaps
 
 原因：local costmap 建在 `odom` 帧并随时间累积障碍物，使用的是**每一帧当时的 TF**；LaserScan 是实时数据，用**当前** TF 显示。当 odom 航向发生漂移（编码器里程计误差 / 车轮打滑 / TF 延迟）时，历史栅格停在原位，实时雷达被"更新更偏"的 TF 放过去，就出现旋转错位。AMCL 只修正 `map→odom`，管不到 odom 帧内的 local costmap。
 
-本仓库为演示模式已做如下处理（见 `urdf/simple_diff_robot.xacro` 与 `config/dwa_local_planner.yaml`）：
+演示模式的处理（`urdf/simple_diff_robot.xacro`）：
 
-- `<odometrySource>world</odometrySource>`：里程计改用 Gazebo 真值，消除编码器漂移（根治）；
-- 驱动轮摩擦 `mu1/mu2` 提高到 `2.0`：减少打滑；
-- DWA `acc_lim_x: 0.4`、`acc_lim_theta: 1.0`、`max_vel_theta: 1.0`：运动更平滑。
+- `<odometrySource>world</odometrySource>`：里程计改用 Gazebo 真值，消除编码器漂移（根治）。
+- 驱动轮摩擦保持 `mu1/mu2 = 1.0`：**不要**提高到 2.0。摩擦过高会让机器人顶到障碍时无法打滑脱身而物理卡死；配合 world 真值里程计（不再用漂移掩盖卡死），会表现为 DWA 反复 `failed to produce path`、rotate recovery 也救不回来。
 
-若想恢复"更贴近真实机器人的编码器里程计"（用于学习 SLAM），把 xacro 中 `odometrySource` 改回 `encoder` 并降低轮子摩擦即可；届时轻微的局部地图/雷达角度错位属正常现象。
+若改回"更贴近真实机器人的编码器里程计"（用于学习 SLAM）：把 xacro 中 `odometrySource` 改回 `encoder` 即可；届时轻微的局部地图/雷达角度错位属正常现象。
+
+### DWA 反复 failed to produce path（改配置后导航突然卡死）排查阶梯
+
+按以下顺序逐级回退，每步重启导航验证：
+
+1. 先把轮子摩擦恢复 `1.0`、DWA 加速度恢复 `acc_lim_x: 1.0 / acc_lim_theta: 2.0 / max_vel_theta: 1.2`（已恢复到默认）。
+2. 仍失败 → 把 `odometrySource` 改回 `encoder`（此时即原始配置，此前验证可导航）。若恢复，说明问题出在 world 里程计与该版本 gazebo_ros_diff_drive 的兼容性，保留 encoder 即可。
+3. 连原始配置都失败 → 与环境无关、是定位/地图问题：RViz 用 **2D Pose Estimate** 重新给初始位姿，检查 `/map` 与激光是否重合、目标点是否可到达：
+
+```bash
+rosrun tf tf_echo map base_footprint
+rosrun tf tf_echo odom base_footprint
+rosrun rqt_tf_tree rqt_tf_tree
+rosservice call /move_base/clear_costmaps
+```
 
 ## 10. 当前验证边界
 
