@@ -190,6 +190,12 @@
   },
   "active": "a150057187af3e48",
   "lastOpenFiles": [
+    "turn_on_wheeltec_robot/map/WHEELTEC_end.yaml",
+    "simple_diff_robot_gazebo/worlds/zlab_test/model.sdf",
+    "simple_diff_robot_gazebo/worlds/zlab_test/model.config",
+    "simple_diff_robot_gazebo/worlds/zlab_test",
+    "simple_diff_robot_gazebo/worlds/zlab_map.world",
+    "simple_diff_robot_gazebo/launch/mapping_nav.launch",
     "simple_diff_robot_gazebo/urdf/simple_diff_robot.xacro~RFa11651c.TMP",
     "WHEELTEC-Obsidian/功能包/rrt_exploration.md",
     "WHEELTEC-Obsidian/功能包/wheeltec_robot_rc.md"
