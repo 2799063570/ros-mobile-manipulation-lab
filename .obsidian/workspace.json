@@ -190,6 +190,7 @@
   },
   "active": "a150057187af3e48",
   "lastOpenFiles": [
+    "simple_diff_robot_gazebo/rviz/mapping_nav.rviz",
     "wheeltec_multi/scripts/listen_tfodom.py",
     "wheeltec_multi/scripts/send_tfodom.py",
     "turn_on_wheeltec_robot/map/WHEELTEC_end.yaml",

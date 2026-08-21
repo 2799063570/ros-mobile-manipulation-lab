@@ -18,6 +18,7 @@ class PoseSetter(rospy.SubscribeListener):
 
         self.slave_x = rospy.get_param('~slave_x')
         self.slave_y = rospy.get_param('~slave_y')
+        self.frame_id = rospy.get_param('~frame_id', 'map')
 
     def peer_subscribe(self, topic_name, topic_publish, peer_publish):
         p = PoseWithCovarianceStamped()
@@ -25,7 +26,8 @@ class PoseSetter(rospy.SubscribeListener):
         position_x = self.pose[0] + self.slave_x
         position_y = self.pose[1] + self.slave_y
 
-
+        p.header.frame_id = self.frame_id
+        p.header.stamp = self.stamp if self.stamp != rospy.Time() else rospy.Time.now()
         p.pose.pose.position.x = position_x
         p.pose.pose.position.y = position_y
         (p.pose.pose.orientation.x,
@@ -34,10 +36,12 @@ class PoseSetter(rospy.SubscribeListener):
          p.pose.pose.orientation.w) = PyKDL.Rotation.RPY(0, 0, self.pose[2]).GetQuaternion()
         p.pose.covariance[6*0+0] = 0.5 * 0.5
         p.pose.covariance[6*1+1] = 0.5 * 0.5
-        p.pose.covariance[6*3+3] = math.pi/12.0 * math.pi/12.0
+        p.pose.covariance[6*5+5] = math.pi/12.0 * math.pi/12.0
         # wait for the desired publish time
         while rospy.get_rostime() < self.publish_time:
             rospy.sleep(0.01)
+        rospy.loginfo("Publishing initial pose in %s: [%.3f, %.3f, %.3f]",
+                      self.frame_id, position_x, position_y, self.pose[2])
         peer_publish(p)
 
 

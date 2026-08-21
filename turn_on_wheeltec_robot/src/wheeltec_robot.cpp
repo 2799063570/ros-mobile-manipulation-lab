@@ -39,6 +39,76 @@ float turn_on_robot::Odom_Trans(uint8_t Data_High,uint8_t Data_Low)
   data_return   =  (transition_16 / 1000)+(transition_16 % 1000)*0.001; // The speed unit is changed from mm/s to m/s //速度单位从mm/s转换为m/s
   return data_return;
 }
+
+bool turn_on_robot::Open_Serial()
+{
+  last_reconnect_attempt = ros::Time::now();
+  try
+  {
+    if (Stm32_Serial.isOpen())
+      Stm32_Serial.close();
+    Stm32_Serial.setPort(usart_port_name);
+    Stm32_Serial.setBaudrate(serial_baud_rate);
+    serial::Timeout timeout = serial::Timeout::simpleTimeout(serial_timeout_ms);
+    Stm32_Serial.setTimeout(timeout);
+    Stm32_Serial.open();
+    if (Stm32_Serial.isOpen())
+    {
+      ROS_INFO_STREAM("wheeltec_robot serial port opened: " << usart_port_name);
+      // Never resume an old chassis command after reconnecting.
+      Send_Stop_Command();
+      _Last_Time = ros::Time();
+      return true;
+    }
+  }
+  catch (const std::exception& e)
+  {
+    ROS_ERROR_STREAM("Unable to open serial port " << usart_port_name << ": " << e.what());
+  }
+  return false;
+}
+
+void turn_on_robot::Send_Stop_Command()
+{
+  Send_Data.tx[0] = FRAME_HEADER;
+  Send_Data.tx[1] = 0;
+  Send_Data.tx[2] = 0;
+  Send_Data.tx[3] = Send_Data.tx[4] = 0;
+  Send_Data.tx[5] = Send_Data.tx[6] = 0;
+  Send_Data.tx[7] = Send_Data.tx[8] = 0;
+  Send_Data.tx[9] = Check_Sum(9, SEND_DATA_CHECK);
+  Send_Data.tx[10] = FRAME_TAIL;
+
+  if (!Stm32_Serial.isOpen())
+    return;
+  try
+  {
+    Stm32_Serial.write(Send_Data.tx, sizeof(Send_Data.tx));
+  }
+  catch (const std::exception& e)
+  {
+    ROS_ERROR_STREAM("Unable to send emergency stop through serial port: " << e.what());
+  }
+}
+
+void turn_on_robot::Handle_Serial_Failure(const string& operation, const string& reason)
+{
+  ROS_ERROR_STREAM("Serial " << operation << " failed: " << reason
+                   << ". Stopping and reconnecting.");
+  Robot_Vel.X = Robot_Vel.Y = Robot_Vel.Z = 0.0;
+  Send_Stop_Command();
+  try
+  {
+    if (Stm32_Serial.isOpen())
+      Stm32_Serial.close();
+  }
+  catch (const std::exception& e)
+  {
+    ROS_WARN_STREAM("Unable to close failed serial port: " << e.what());
+  }
+  _Last_Time = ros::Time();
+}
+
 /**************************************
 Date: January 28, 2021
 Function: The speed topic subscription Callback function, according to the subscribed instructions through the serial port command control of the lower computer
@@ -47,6 +117,14 @@ Function: The speed topic subscription Callback function, according to the subsc
 void turn_on_robot::Cmd_Vel_Callback(const geometry_msgs::Twist &twist_aux)
 {
   short  transition;  //intermediate variable //中间变量
+
+  last_cmd_vel_time = ros::Time::now();
+  cmd_vel_timed_out = false;
+  if (!Stm32_Serial.isOpen())
+  {
+    ROS_WARN_THROTTLE(1.0, "Ignoring cmd_vel while serial port is disconnected");
+    return;
+  }
 
   Send_Data.tx[0]=FRAME_HEADER; //frame head 0x7B //帧头0X7B
   Send_Data.tx[1] = 0; //set aside //预留位
@@ -79,9 +157,9 @@ void turn_on_robot::Cmd_Vel_Callback(const geometry_msgs::Twist &twist_aux)
   {
     Stm32_Serial.write(Send_Data.tx,sizeof (Send_Data.tx)); //Sends data to the downloader via serial port //通过串口向下位机发送数据 
   }
-  catch (serial::IOException& e)   
+  catch (const std::exception& e)
   {
-    ROS_ERROR_STREAM("Unable to send data through serial port"); //If sending data fails, an error message is printed //如果发送数据失败，打印错误信息
+    Handle_Serial_Failure("write", e.what());
   }
 }
 /**************************************
@@ -326,7 +404,9 @@ bool turn_on_robot::Get_Sensor_Data_New()
   short transition_16=0; //Intermediate variable //中间变量
   uint8_t i=0,check=0, error=1,Receive_Data_Pr[1]; //Temporary variable to save the data of the lower machine //临时变量，保存下位机数据
   static int count; //Static variable for counting //静态变量，用于计数
-  Stm32_Serial.read(Receive_Data_Pr,sizeof(Receive_Data_Pr)); //Read the data sent by the lower computer through the serial port //通过串口读取下位机发送过来的数据
+  const size_t bytes_read = Stm32_Serial.read(Receive_Data_Pr,sizeof(Receive_Data_Pr)); //Read the data sent by the lower computer through the serial port //通过串口读取下位机发送过来的数据
+  if (bytes_read != sizeof(Receive_Data_Pr))
+    return false;
 
   /*//View the received raw data directly and debug it for use//直接查看接收到的原始数据，调试使用
   ROS_INFO("%x-%x-%x-%x-%x-%x-%x-%x-%x-%x-%x-%x-%x-%x-%x-%x-%x-%x-%x-%x-%x-%x-%x-%x",
@@ -415,9 +495,32 @@ Function: Loop access to the lower computer data and issue topics
 ***************************************/
 void turn_on_robot::Control()
 {
+  ros::Rate disconnected_rate(20.0);
   while(ros::ok())
   {
-    if (true == Get_Sensor_Data_New()) //The serial port reads and verifies the data sent by the lower computer, and then the data is converted to international units
+    if (!Stm32_Serial.isOpen())
+    {
+      const ros::Time now = ros::Time::now();
+      if (last_reconnect_attempt.isZero() ||
+          (now - last_reconnect_attempt).toSec() >= serial_reconnect_interval)
+        Open_Serial();
+      ros::spinOnce();
+      disconnected_rate.sleep();
+      continue;
+    }
+
+    bool sensor_data_ready = false;
+    try
+    {
+      sensor_data_ready = Get_Sensor_Data_New();
+    }
+    catch (const std::exception& e)
+    {
+      Handle_Serial_Failure("read", e.what());
+      continue;
+    }
+
+    if (sensor_data_ready) //The serial port reads and verifies the data sent by the lower computer, and then the data is converted to international units
                                        //通过串口读取并校验下位机发送过来的数据，然后数据转换为国际单位
     {
       _Now = ros::Time::now();
@@ -454,6 +557,16 @@ void turn_on_robot::Control()
     }
     
     ros::spinOnce();   //The loop waits for the callback function //循环等待回调函数
+
+    // Stop the chassis if all cmd_vel publishers disappear. This protects
+    // against a controller crash while the serial connection is still alive.
+    if (!cmd_vel_timed_out && !last_cmd_vel_time.isZero() &&
+        (ros::Time::now() - last_cmd_vel_time).toSec() > cmd_vel_timeout)
+    {
+      ROS_WARN("cmd_vel timed out; sending a zero-velocity command");
+      Send_Stop_Command();
+      cmd_vel_timed_out = true;
+    }
     }
 }
 /**************************************
@@ -461,7 +574,10 @@ Date: January 28, 2021
 Function: Constructor, executed only once, for initialization
 功能: 构造函数, 只执行一次，用于初始化
 ***************************************/
-turn_on_robot::turn_on_robot():Sampling_Time(0),Power_voltage(0)
+turn_on_robot::turn_on_robot()
+  : Sampling_Time(0), Power_voltage(0), serial_timeout_ms(200),
+    serial_reconnect_interval(1.0), cmd_vel_timeout(0.5),
+    cmd_vel_timed_out(true)
 {
   //Clear the data
   //清空数据
@@ -476,6 +592,9 @@ turn_on_robot::turn_on_robot():Sampling_Time(0),Power_voltage(0)
   //private_nh.param()入口参数分别对应：参数服务器上的名称  参数变量名  初始值
   private_nh.param<std::string>("usart_port_name",  usart_port_name,  "/dev/wheeltec_controller"); //Fixed serial port number //固定串口号
   private_nh.param<int>        ("serial_baud_rate", serial_baud_rate, 115200); //Communicate baud rate 115200 to the lower machine //和下位机通信波特率115200
+  private_nh.param<int>        ("serial_timeout_ms", serial_timeout_ms, 200);
+  private_nh.param<double>     ("serial_reconnect_interval", serial_reconnect_interval, 1.0);
+  private_nh.param<double>     ("cmd_vel_timeout", cmd_vel_timeout, 0.5);
   private_nh.param<std::string>("odom_frame_id",    odom_frame_id,    "odom_combined");      //The odometer topic corresponds to the parent TF coordinate //里程计话题对应父TF坐标
   private_nh.param<std::string>("robot_frame_id",   robot_frame_id,   "base_footprint"); //The odometer topic corresponds to sub-TF coordinates //里程计话题对应子TF坐标
   private_nh.param<std::string>("gyro_frame_id",    gyro_frame_id,    "gyro_link"); //IMU topics correspond to TF coordinates //IMU话题对应TF坐标
@@ -497,24 +616,11 @@ turn_on_robot::turn_on_robot():Sampling_Time(0),Power_voltage(0)
   Cmd_Vel_Sub     = n.subscribe("cmd_vel",     100, &turn_on_robot::Cmd_Vel_Callback, this); 
 
   ROS_INFO_STREAM("Data ready"); //Prompt message //提示信息
-  
-  try
-  { 
-    //Attempts to initialize and open the serial port //尝试初始化与开启串口
-    Stm32_Serial.setPort(usart_port_name); //Select the serial port number to enable //选择要开启的串口号
-    Stm32_Serial.setBaudrate(serial_baud_rate); //Set the baud rate //设置波特率
-    serial::Timeout _time = serial::Timeout::simpleTimeout(2000); //Timeout //超时等待
-    Stm32_Serial.setTimeout(_time);
-    Stm32_Serial.open(); //Open the serial port //开启串口
-  }
-  catch (serial::IOException& e)
-  {
-    ROS_ERROR_STREAM("wheeltec_robot can not open serial port,Please check the serial port cable! "); //If opening the serial port fails, an error message is printed //如果开启串口失败，打印错误信息
-  }
-  if(Stm32_Serial.isOpen())
-  {
-    ROS_INFO_STREAM("wheeltec_robot serial port opened"); //Serial port opened successfully //串口开启成功提示
-  }
+
+  serial_timeout_ms = std::max(1, serial_timeout_ms);
+  serial_reconnect_interval = std::max(0.1, serial_reconnect_interval);
+  cmd_vel_timeout = std::max(0.1, cmd_vel_timeout);
+  Open_Serial();
 }
 /**************************************
 Date: January 28, 2021
@@ -523,33 +629,15 @@ Function: Destructor, executed only once and called by the system when an object
 ***************************************/
 turn_on_robot::~turn_on_robot()
 {
-  //Sends the stop motion command to the lower machine before the turn_on_robot object ends
-  //对象turn_on_robot结束前向下位机发送停止运动命令
-  Send_Data.tx[0]=FRAME_HEADER;
-  Send_Data.tx[1] = 0;  
-  Send_Data.tx[2] = 0; 
-
-  //The target velocity of the X-axis of the robot //机器人X轴的目标线速度 
-  Send_Data.tx[4] = 0;     
-  Send_Data.tx[3] = 0;  
-
-  //The target velocity of the Y-axis of the robot //机器人Y轴的目标线速度 
-  Send_Data.tx[6] = 0;
-  Send_Data.tx[5] = 0;  
-
-  //The target velocity of the Z-axis of the robot //机器人Z轴的目标角速度 
-  Send_Data.tx[8] = 0;  
-  Send_Data.tx[7] = 0;    
-  Send_Data.tx[9]=Check_Sum(9,SEND_DATA_CHECK); //Check the bits for the Check_Sum function //校验位，规则参见Check_Sum函数
-  Send_Data.tx[10]=FRAME_TAIL; 
+  Send_Stop_Command();
   try
   {
-    Stm32_Serial.write(Send_Data.tx,sizeof (Send_Data.tx)); //Send data to the serial port //向串口发数据  
+    if (Stm32_Serial.isOpen())
+      Stm32_Serial.close();
   }
-  catch (serial::IOException& e)   
+  catch (const std::exception& e)
   {
-    ROS_ERROR_STREAM("Unable to send data through serial port"); //If sending data fails, an error message is printed //如果发送数据失败,打印错误信息
+    ROS_WARN_STREAM("Unable to close serial port during shutdown: " << e.what());
   }
-  Stm32_Serial.close(); //Close the serial port //关闭串口  
   ROS_INFO_STREAM("Shutting down"); //Prompt message //提示信息
 }

@@ -53,6 +53,7 @@
 	<node name="pose_setter" pkg="wheeltec_multi" type="set_pose.py" args="0 0 0" output="screen" >
 		<param name='slave_x'    type='double' value='$(arg slave_x)'  />
 		<param name='slave_y'    type='double' value='$(arg slave_y)'  />
+		<param name='frame_id' type='string' value='map' />
 	</node>
 <!-- 定位 -->
 

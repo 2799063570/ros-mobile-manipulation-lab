@@ -3,6 +3,8 @@
 #define __WHEELTEC_ROBOT_H_
 
 #include "ros/ros.h"
+#include <algorithm>
+#include <exception>
 #include <iostream>
 #include <string.h>
 #include <string> 
@@ -142,7 +144,10 @@ class turn_on_robot
 		ros::Subscriber Cmd_Vel_Sub; //Initialize the topic subscriber //初始化话题订阅者
 		//The speed topic subscribes to the callback function
 		//速度话题订阅回调函数
-		void Cmd_Vel_Callback(const geometry_msgs::Twist &twist_aux);              
+		void Cmd_Vel_Callback(const geometry_msgs::Twist &twist_aux);
+		bool Open_Serial();
+		void Handle_Serial_Failure(const string& operation, const string& reason);
+		void Send_Stop_Command();
 
 		ros::Publisher odom_publisher, imu_publisher, voltage_publisher; //Initialize the topic publisher //初始化话题发布者
 		void Publish_Odom();      //Pub the speedometer topic //发布里程计话题
@@ -159,6 +164,10 @@ class turn_on_robot
 
         string usart_port_name, robot_frame_id, gyro_frame_id, odom_frame_id; //Define the related variables //定义相关变量
         int serial_baud_rate;      //Serial communication baud rate //串口通信波特率
+		int serial_timeout_ms;
+		double serial_reconnect_interval, cmd_vel_timeout;
+		ros::Time last_reconnect_attempt, last_cmd_vel_time;
+		bool cmd_vel_timed_out;
         RECEIVE_DATA Receive_Data; //The serial port receives the data structure //串口接收数据结构体
         SEND_DATA Send_Data;       //The serial port sends the data structure //串口发送数据结构体
 
