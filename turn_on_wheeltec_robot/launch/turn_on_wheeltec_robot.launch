@@ -24,11 +24,13 @@
   <!--是否使用cartographer建图算法 此处默认不使用-->
   <arg name="is_cartographer"  default="false"/>
   <arg name="odom_frame_id"  default="odom_combined"/>
+  <arg name="usart_port_name" default="/dev/wheeltec_controller"/>
 
   <group unless="$(eval (car_mode=='mini_mec_moveit_six' or car_mode=='mini_4wd_moveit_six') and if_voice==true)" >
   <!-- turn on base_serial 开启底层单片机的控制节点  -->
   <include file="$(find turn_on_wheeltec_robot)/launch/include/base_serial.launch" unless="$(arg repeat)">
     <arg name="odom_frame_id"  value="$(arg odom_frame_id)"/>
+    <arg name="usart_port_name" value="$(arg usart_port_name)"/>
   </include>
   </group>
 

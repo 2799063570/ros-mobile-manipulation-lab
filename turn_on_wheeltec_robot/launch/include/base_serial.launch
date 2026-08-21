@@ -2,10 +2,11 @@
   <!--打开节点wheeltec_robot，初始化串口等操作-->
   <arg name="smoother"  default="false"/> <!-- 是否开启速度平滑功能 -->
   <arg name="odom_frame_id"  default="odom_combined"/> <!-- 设置里程计话题起点TF坐标 -->
+  <arg name="usart_port_name" default="/dev/wheeltec_controller"/> <!-- 使用 udev 稳定别名，避免 ttyACM 编号变化 -->
   <arg name="use_FDI_IMU_GNSS"  default="false"/> <!-- 是否使用飞迪系的惯导、GNSS/RTK模块，默认false：使用小车控制板板载的IMU芯片 -->
  
   <node pkg="turn_on_wheeltec_robot" type="wheeltec_robot_node" name="wheeltec_robot" output="screen" respawn="false">
-    <param name="usart_port_name"    type="string" value="/dev/ttyACM0"/>  
+    <param name="usart_port_name" type="string" value="$(arg usart_port_name)"/>
     <param name="serial_baud_rate"   type="int"    value="115200"/>
     <param name="serial_timeout_ms" type="int" value="200"/>
     <param name="serial_reconnect_interval" type="double" value="1.0"/>
