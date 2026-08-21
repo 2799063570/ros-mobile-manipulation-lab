@@ -3,7 +3,7 @@
     <arg name="car_mode"  default="mini_mec" 
        doc="opt: mini_akm,mini_mec,mini_4wd,mini_mec_control"/> 
     <!--是否开启导航功能，在导航相关文件中开启，此处默认不开启-->
-    <arg name="gazebo_navigation" default="false"/>
+    <arg name="gazebo_navigation" default="true"/>
     <!--是否为谷歌建图，在建图相关文件中开启，此处默认不开启-->
     <arg name="is_cartographer" default="false"/>
     
