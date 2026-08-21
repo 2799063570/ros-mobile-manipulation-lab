@@ -2,28 +2,35 @@
 <launch>
 <!-- +参数设+ -->
 	<!-- 从机的期望跟随坐标  以主车为坐标原点  -->
-	<arg name="slave_x" value="-0.8"/> 		<!-- slave_x为从车（跟随者）的期望x坐标，主车前方为正方向，单位：m  -->
-	<arg name="slave_y" value="0.8"/> 		<!-- slave_y为从车（跟随者）的期望y坐标，主车左方为正方向，单位：m  -->
+	<arg name="slave_x" default="-0.8"/> 		<!-- slave_x为从车（跟随者）的期望x坐标，主车前方为正方向，单位：m  -->
+	<arg name="slave_y" default="0.8"/> 		<!-- slave_y为从车（跟随者）的期望y坐标，主车左方为正方向，单位：m  -->
 
 	<!-- 编队模式选择  1：主车自转，从车围绕主车运动型    2：主车自转，从车原地自转型（从车模仿主车运动）-->
 	<!-- akm小车推荐使用编队模式2，非akm小车两种模式皆可 -->
 	<!-- 编队模式1下，主车角速度不宜过大 -->
-	<arg name="multi_mode" value="2" />
-	<!-- false: original differential/Ackermann controller; true: mecanum controller -->
-	<arg name="use_mecanum_controller" default="false" />
+	<arg name="multi_mode" default="2" />
+	<!-- 麦轮底盘默认使用全向控制器；差速/Ackermann 底盘可显式设为 false。 -->
+	<arg name="use_mecanum_controller" default="true" />
 
 	<!-- 是否开启避障功能 true / false默认开启-->
-	<arg name="avoidance" value="true"/>
+	<arg name="avoidance" default="true"/>
 
-	<arg name="max_vel_x" value="0.8" /> 		<!-- 从车最大线速度限制（绝对值） -->  
-	<arg name="min_vel_x" value="0.05" /> 	<!-- 从车最小线速度限制（绝对值） -->
-	<arg name="max_vel_theta" value="0.8" /> 	<!-- 从车最大角速度限制（绝对值） -->  
-	<arg name="min_vel_theta" value="0.05" /> <!-- 从车最小角速度限制（绝对值） -->
+	<arg name="max_vel_x" default="0.8" /> <!-- 从车最大线速度限制（绝对值） -->
+	<arg name="min_vel_x" default="0.05" /> 	<!-- 从车最小线速度限制（绝对值） -->
+	<arg name="max_vel_theta" default="0.8" /> <!-- 从车最大角速度限制（绝对值） -->
+	<arg name="min_vel_theta" default="0.05" /> <!-- 从车最小角速度限制（绝对值） -->
 	<arg name="mecanum_max_vel_y" default="0.8" />
 	<arg name="mecanum_max_linear_vel" default="0.8" />
 	<arg name="mecanum_acc_lim" default="0.5" />
 	<arg name="mecanum_decel_lim" default="0.8" />
 	<arg name="mecanum_leader_timeout" default="0.4" />
+	<arg name="mecanum_k_x" default="1.0" />
+	<arg name="mecanum_k_y" default="1.0" />
+	<arg name="mecanum_k_yaw" default="1.0" />
+	<arg name="mecanum_position_tolerance" default="0.03" />
+	<arg name="mecanum_yaw_tolerance" default="0.03" />
+	<arg name="mecanum_prediction_horizon" default="0.15" />
+	<arg name="mecanum_control_rate" default="20.0" />
 <!-- +参数设置+ -->
 
 <!-- 定位 -->
@@ -56,11 +63,15 @@
 			<param name="deltaDist" value="0.2" type="double" />
 		</node>
 		<node pkg="wheeltec_multi" type="multi_avoidance" name="multi_avoidance" output="screen" > <!-- 发布速度信息 -->
+			<param name="holonomic" type="bool" value="$(arg use_mecanum_controller)" />
+			<param name="control_rate" type="double" value="$(arg mecanum_control_rate)" />
 			<param name="avoidance_kv" type="double" value="0.4" /> 		<!-- 修正从车线速度的参数，参数越大，障碍物对从车减速作用越强 -->
 			<param name="avoidance_kw" type="double" value="0.4" /> 		<!-- 修正从车角速度的参数，参数越大，调节从车角度，使车头偏离障碍物的作用越强 -->
 			<param name="safe_distence" type="double" value="0.4" /> 		<!-- 安全距离界限 -->
 			<param name="danger_distence" type="double" value="0.2" /> 		<!-- 危险距离界限 -->
-			<param name="max_vel_x" value="$(arg max_vel_x)" /> 		<!-- 从车最大线速度限制（绝对值） -->  
+			<param name="max_vel_x" value="$(arg max_vel_x)" /> <!-- 从车最大线速度限制（绝对值） -->
+			<param name="max_vel_y" value="$(arg mecanum_max_vel_y)" />
+			<param name="max_linear_vel" value="$(arg mecanum_max_linear_vel)" />
 			<param name="min_vel_x" value="$(arg min_vel_x)" /> 	<!-- 从车最小线速度限制（绝对值） -->
 			<param name="max_vel_theta" value="$(arg max_vel_theta)" /> 	<!-- 从车最大角速度限制（绝对值） -->  
 			<param name="min_vel_theta" value="$(arg min_vel_theta)" /> <!-- 从车最小角速度限制（绝对值） --> 
@@ -88,11 +99,12 @@
 		<param name="min_vel_theta" value="$(arg min_vel_theta)" /> <!-- 从车最小角速度限制（绝对值） --> 
 	</node>
 	<node if="$(arg use_mecanum_controller)" pkg="wheeltec_multi" type="slave_tf_listener_mecanum" name="slave_tf_listener_mecanum" output="screen" >
+		<param name="multi_mode" type="int" value="$(arg multi_mode)" />
 		<param name="slave_x" type="double" value="$(arg slave_x)" />
 		<param name="slave_y" type="double" value="$(arg slave_y)" />
-		<param name="k_x" type="double" value="1.0" />
-		<param name="k_y" type="double" value="1.0" />
-		<param name="k_yaw" type="double" value="1.0" />
+		<param name="k_x" type="double" value="$(arg mecanum_k_x)" />
+		<param name="k_y" type="double" value="$(arg mecanum_k_y)" />
+		<param name="k_yaw" type="double" value="$(arg mecanum_k_yaw)" />
 		<param name="max_vel_x" value="$(arg max_vel_x)" />
 		<param name="max_vel_y" value="$(arg mecanum_max_vel_y)" />
 		<param name="max_linear_vel" value="$(arg mecanum_max_linear_vel)" />
@@ -107,8 +119,11 @@
 		<param name="decel_lim_y" type="double" value="$(arg mecanum_decel_lim)" />
 		<param name="decel_lim_theta" type="double" value="1.5" />
 		<param name="leader_timeout" type="double" value="$(arg mecanum_leader_timeout)" />
+		<param name="prediction_horizon" type="double" value="$(arg mecanum_prediction_horizon)" />
+		<param name="position_tolerance" type="double" value="$(arg mecanum_position_tolerance)" />
+		<param name="yaw_tolerance" type="double" value="$(arg mecanum_yaw_tolerance)" />
 		<param name="tf_timeout" type="double" value="0.2" />
-		<param name="control_rate" type="double" value="20.0" />
+		<param name="control_rate" type="double" value="$(arg mecanum_control_rate)" />
 		<remap from="cmd_vel_ori" to="cmd_vel" if="$(eval avoidance == false)"/>
 	</node>
 <!-- 从车编队 -->

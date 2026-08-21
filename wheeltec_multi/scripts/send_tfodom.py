@@ -1,54 +1,64 @@
 #!/usr/bin/env python
 # coding=utf-8
-# 主车发送主车坐标以及主车速度给从车
+"""广播主车在 map 中的位姿以及 base_link 坐标系速度。"""
 
-import math
-import rospy
 import socket
-import sys
 import struct
+
+import rospy
 import tf
-from numpy import array
+from nav_msgs.msg import Odometry
 
-from geometry_msgs.msg import TransformStamped
-from nav_msgs.msg import Odometry  
 
-odom_vx = 0
-odom_vy = 0
-odom_az = 0
+leader_vx = 0.0
+leader_vy = 0.0
+leader_wz = 0.0
+
 
 def odom_callback(msg):
-	global odom_vx,odom_vy,odom_az
-	odom_vx = msg.twist.twist.linear.x
-	odom_vy = msg.twist.twist.linear.y
-	odom_az = msg.twist.twist.angular.z
-	print(odom_vx,odom_vy,odom_az)
+    global leader_vx, leader_vy, leader_wz
+    leader_vx = msg.twist.twist.linear.x
+    leader_vy = msg.twist.twist.linear.y
+    leader_wz = msg.twist.twist.angular.z
 
-def publishOdom():
-	global odom_vx,odom_vy,odom_az
-	rospy.init_node('send_tfodom')
-	rospy.Subscriber('odom',Odometry,odom_callback)
-	listener = tf.TransformListener()
-	soc=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
-	soc.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)#udp 广播
-	network = '<broadcast>'
-	rate = rospy.Rate(15.0)
-	while not rospy.is_shutdown():
-		try:
-			(trans,rot) = listener.lookupTransform("map","base_link",rospy.Time(0))
-		except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-			#print("i cannt reciver")
-			rospy.Duration(1.0)
-			continue
-		(roll,pitch,yaw) = tf.transformations.euler_from_quaternion(rot)
-		send_data = struct.pack("ffffff",trans[0],trans[1],yaw,odom_vx,odom_vy,odom_az)
-		soc.sendto(send_data, (network,10000))
-		print(trans[0],trans[1],yaw,odom_vx,odom_vy,odom_az)
-		rate.sleep()
+
+def publish_odom():
+    rospy.init_node('send_tfodom')
+    rospy.Subscriber('odom', Odometry, odom_callback, queue_size=1)
+
+    broadcast_rate = max(1.0, rospy.get_param('~broadcast_rate', 30.0))
+    map_frame = rospy.get_param('~map_frame', 'map')
+    base_frame = rospy.get_param('~base_frame', 'base_link')
+    udp_port = rospy.get_param('~udp_port', 10000)
+    packet_format = '<6f'
+
+    listener = tf.TransformListener()
+    udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    rate = rospy.Rate(broadcast_rate)
+
+    try:
+        while not rospy.is_shutdown():
+            try:
+                trans, rotation = listener.lookupTransform(
+                    map_frame, base_frame, rospy.Time(0))
+                yaw = tf.transformations.euler_from_quaternion(rotation)[2]
+                packet = struct.pack(packet_format, trans[0], trans[1], yaw,
+                                     leader_vx, leader_vy, leader_wz)
+                udp_socket.sendto(packet, ('<broadcast>', udp_port))
+                rospy.logdebug_throttle(
+                    1.0, 'leader pose=(%.3f, %.3f, %.3f), velocity=(%.3f, %.3f, %.3f)',
+                    trans[0], trans[1], yaw, leader_vx, leader_vy, leader_wz)
+            except (tf.LookupException, tf.ConnectivityException,
+                    tf.ExtrapolationException) as exc:
+                rospy.logwarn_throttle(1.0, 'leader TF unavailable: %s', str(exc))
+            rate.sleep()
+    finally:
+        udp_socket.close()
+
 
 if __name__ == '__main__':
     try:
-        publishOdom()
+        publish_odom()
     except rospy.ROSInterruptException:
-	soc.close()
         pass

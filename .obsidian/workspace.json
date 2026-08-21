@@ -190,6 +190,8 @@
   },
   "active": "a150057187af3e48",
   "lastOpenFiles": [
+    "wheeltec_multi/scripts/listen_tfodom.py",
+    "wheeltec_multi/scripts/send_tfodom.py",
     "turn_on_wheeltec_robot/map/WHEELTEC_end.yaml",
     "simple_diff_robot_gazebo/worlds/zlab_test/model.sdf",
     "simple_diff_robot_gazebo/worlds/zlab_test/model.config",

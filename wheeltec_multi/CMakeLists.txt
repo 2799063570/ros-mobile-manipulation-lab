@@ -248,8 +248,18 @@ target_link_libraries(slave_tf_listener_mecanum ${catkin_LIBRARIES})
 
 ## Mark executable scripts (Python etc.) for installation
 install(PROGRAMS
-  scripts/turtlebot_teleop_key
+  scripts/listen_tfodom.py
+  scripts/send_tfodom.py
+  scripts/set_pose.py
+  scripts/turtlebot_teleop_key.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
+install(TARGETS
+  multi_avoidance
+  slave_tf_listener
+  slave_tf_listener_mecanum
+  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
 ## Mark all other useful stuff for installation

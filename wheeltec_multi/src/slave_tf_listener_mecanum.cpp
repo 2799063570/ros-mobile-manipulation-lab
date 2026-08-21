@@ -41,6 +41,7 @@ public:
       leader_vx_(0.0), leader_vy_(0.0), leader_wz_(0.0),
       current_vx_(0.0), current_vy_(0.0), current_wz_(0.0)
   {
+    private_nh_.param("multi_mode", multi_mode_, 2);
     private_nh_.param("slave_x", slave_x_, -0.8);
     private_nh_.param("slave_y", slave_y_, 0.8);
     private_nh_.param("k_x", k_x_, 1.0);
@@ -60,6 +61,9 @@ public:
     private_nh_.param("decel_lim_y", decel_lim_y_, 0.8);
     private_nh_.param("decel_lim_theta", decel_lim_theta_, 1.5);
     private_nh_.param("leader_timeout", leader_timeout_, 0.4);
+    private_nh_.param("prediction_horizon", prediction_horizon_, 0.15);
+    private_nh_.param("position_tolerance", position_tolerance_, 0.03);
+    private_nh_.param("yaw_tolerance", yaw_tolerance_, 0.03);
     private_nh_.param("tf_timeout", tf_timeout_, 0.2);
     private_nh_.param("control_rate", control_rate_, 20.0);
     private_nh_.param<std::string>("map_frame", map_frame_, "map");
@@ -67,11 +71,20 @@ public:
 
     control_rate_ = std::max(1.0, control_rate_);
     leader_timeout_ = std::max(0.0, leader_timeout_);
+    prediction_horizon_ = std::max(0.0, prediction_horizon_);
+    position_tolerance_ = std::max(0.0, position_tolerance_);
+    yaw_tolerance_ = std::max(0.0, yaw_tolerance_);
     tf_timeout_ = std::max(0.0, tf_timeout_);
+    if (multi_mode_ != 1 && multi_mode_ != 2)
+    {
+      ROS_WARN("Invalid multi_mode=%d; using mode 2", multi_mode_);
+      multi_mode_ = 2;
+    }
 
     cmd_pub_ = nh_.advertise<geometry_msgs::Twist>("cmd_vel_ori", 10);
     leader_sub_ = nh_.subscribe("/multfodom", 1, &MecanumFollower::leaderCallback, this);
     last_loop_time_ = ros::Time::now();
+    ROS_INFO("Mecanum formation controller enabled (mode=%d)", multi_mode_);
   }
 
   ~MecanumFollower()
@@ -117,13 +130,33 @@ public:
       const double follower_y = map_to_base.getOrigin().y();
       const double follower_yaw = tf::getYaw(map_to_base.getRotation());
 
-      // Launch convention: slave_x is forward and slave_y is left of leader.
-      const double offset_map_x = std::cos(leader_yaw_) * slave_x_
-                                - std::sin(leader_yaw_) * slave_y_;
-      const double offset_map_y = std::sin(leader_yaw_) * slave_x_
-                                + std::cos(leader_yaw_) * slave_y_;
-      const double target_x = leader_x_ + offset_map_x;
-      const double target_y = leader_y_ + offset_map_y;
+      // Extrapolate the 15 Hz UDP leader state between packets. The horizon
+      // prevents a stale packet from being projected too far into the future.
+      const double packet_age = std::max(0.0, (now - last_leader_time_).toSec());
+      const double prediction_dt = std::min(packet_age, prediction_horizon_);
+      const double prediction_yaw = leader_yaw_ + 0.5 * leader_wz_ * prediction_dt;
+      const double leader_map_vx = leader_vx_ * std::cos(prediction_yaw)
+                                 - leader_vy_ * std::sin(prediction_yaw);
+      const double leader_map_vy = leader_vx_ * std::sin(prediction_yaw)
+                                 + leader_vy_ * std::cos(prediction_yaw);
+      const double predicted_leader_x = leader_x_ + leader_map_vx * prediction_dt;
+      const double predicted_leader_y = leader_y_ + leader_map_vy * prediction_dt;
+      const double predicted_leader_yaw = normalizeAngle(
+          leader_yaw_ + leader_wz_ * prediction_dt);
+
+      // slave_x is forward and slave_y is left. Mode 1 rotates the formation
+      // with the leader; mode 2 keeps the positional offset fixed in map.
+      double offset_map_x = slave_x_;
+      double offset_map_y = slave_y_;
+      if (multi_mode_ == 1)
+      {
+        offset_map_x = std::cos(predicted_leader_yaw) * slave_x_
+                     - std::sin(predicted_leader_yaw) * slave_y_;
+        offset_map_y = std::sin(predicted_leader_yaw) * slave_x_
+                     + std::cos(predicted_leader_yaw) * slave_y_;
+      }
+      const double target_x = predicted_leader_x + offset_map_x;
+      const double target_y = predicted_leader_y + offset_map_y;
       const double error_map_x = target_x - follower_x;
       const double error_map_y = target_y - follower_y;
       const double error_body_x = std::cos(follower_yaw) * error_map_x
@@ -131,21 +164,31 @@ public:
       const double error_body_y = -std::sin(follower_yaw) * error_map_x
                                 + std::cos(follower_yaw) * error_map_y;
 
-      // Desired-point velocity = leader velocity + angular velocity cross offset.
-      const double feedforward_map_x = leader_vx_ * std::cos(leader_yaw_)
-                                     - leader_vy_ * std::sin(leader_yaw_)
-                                     - leader_wz_ * offset_map_y;
-      const double feedforward_map_y = leader_vx_ * std::sin(leader_yaw_)
-                                     + leader_vy_ * std::cos(leader_yaw_)
-                                     + leader_wz_ * offset_map_x;
+      // In mode 1, the rotating formation point also has omega cross offset
+      // velocity. In mode 2, only the leader translational feed-forward applies.
+      double feedforward_map_x = leader_map_vx;
+      double feedforward_map_y = leader_map_vy;
+      if (multi_mode_ == 1)
+      {
+        feedforward_map_x -= leader_wz_ * offset_map_y;
+        feedforward_map_y += leader_wz_ * offset_map_x;
+      }
       const double feedforward_body_x = std::cos(follower_yaw) * feedforward_map_x
                                       + std::sin(follower_yaw) * feedforward_map_y;
       const double feedforward_body_y = -std::sin(follower_yaw) * feedforward_map_x
                                       + std::cos(follower_yaw) * feedforward_map_y;
 
-      double target_vx = feedforward_body_x + k_x_ * error_body_x;
-      double target_vy = feedforward_body_y + k_y_ * error_body_y;
-      double target_wz = leader_wz_ + k_yaw_ * normalizeAngle(leader_yaw_ - follower_yaw);
+      const double controlled_error_x = std::fabs(error_body_x) > position_tolerance_
+                                      ? error_body_x : 0.0;
+      const double controlled_error_y = std::fabs(error_body_y) > position_tolerance_
+                                      ? error_body_y : 0.0;
+      const double raw_yaw_error = normalizeAngle(predicted_leader_yaw - follower_yaw);
+      const double controlled_yaw_error = std::fabs(raw_yaw_error) > yaw_tolerance_
+                                        ? raw_yaw_error : 0.0;
+
+      double target_vx = feedforward_body_x + k_x_ * controlled_error_x;
+      double target_vy = feedforward_body_y + k_y_ * controlled_error_y;
+      double target_wz = leader_wz_ + k_yaw_ * controlled_yaw_error;
 
       target_vx = clampAbs(target_vx, max_vel_x_);
       target_vy = clampAbs(target_vy, max_vel_y_);
@@ -174,6 +217,10 @@ public:
       cmd.linear.y = current_vy_;
       cmd.angular.z = current_wz_;
       cmd_pub_.publish(cmd);
+      ROS_INFO_THROTTLE(1.0,
+                        "formation error body=(%.3f, %.3f, %.3f), cmd=(%.3f, %.3f, %.3f)",
+                        error_body_x, error_body_y, raw_yaw_error,
+                        current_vx_, current_vy_, current_wz_);
       rate.sleep();
     }
   }
@@ -232,12 +279,14 @@ private:
   ros::Time last_leader_time_, last_loop_time_;
   double leader_x_, leader_y_, leader_yaw_, leader_vx_, leader_vy_, leader_wz_;
   double current_vx_, current_vy_, current_wz_;
+  int multi_mode_;
   double slave_x_, slave_y_, k_x_, k_y_, k_yaw_;
   double max_vel_x_, max_vel_y_, max_vel_theta_, max_linear_vel_;
   double min_vel_x_, min_vel_y_, min_vel_theta_;
   double acc_lim_x_, acc_lim_y_, acc_lim_theta_;
   double decel_lim_x_, decel_lim_y_, decel_lim_theta_;
-  double leader_timeout_, tf_timeout_, control_rate_;
+  double leader_timeout_, prediction_horizon_, position_tolerance_, yaw_tolerance_;
+  double tf_timeout_, control_rate_;
   std::string map_frame_, base_frame_;
 };
 

@@ -27,9 +27,13 @@ double danger_angular;
 double avoidance_kv;
 double avoidance_kw;
 double max_vel_x;
+double max_vel_y;
+double max_linear_vel;
 double min_vel_x;
 double max_vel_theta;
 double min_vel_theta;
+bool holonomic;
+double control_rate;
 
 /**************************************************************************
 函数功能：sub回调函数
@@ -91,11 +95,15 @@ int main(int argc, char** argv)
 	private_nh.param<double>("avoidance_kv", avoidance_kv,0.2);
 	private_nh.param<double>("avoidance_kw", avoidance_kw,0.3);
 	private_nh.param<double>("max_vel_x", max_vel_x,1.5);
+	private_nh.param<double>("max_vel_y", max_vel_y,1.5);
+	private_nh.param<double>("max_linear_vel", max_linear_vel,1.5);
 	private_nh.param<double>("min_vel_x", min_vel_x,0.05);
 	private_nh.param<double>("max_vel_theta", max_vel_theta,1.5);
 	private_nh.param<double>("min_vel_theta", min_vel_theta,0.05);
+	private_nh.param<bool>("holonomic", holonomic,false);
+	private_nh.param<double>("control_rate", control_rate,20.0);
 
-	double rate2 = 10;    //频率10Hz
+	double rate2 = fmax(1.0, control_rate);
 	ros::Rate loopRate2(rate2);
 
  
@@ -103,7 +111,32 @@ int main(int argc, char** argv)
 	{
 		ros::spinOnce();
 		avoidance_kw = fabs(avoidance_kw);	// 角速度避障系数 先设置成正数
-		if(distance1<safe_distence && distance1>danger_distence)		//障碍物在安全距离和危险距离时，调整速度角度避让障碍物
+		cmd_vel_msg = cmd_vel_data;
+		if (holonomic)
+		{
+			// 麦轮无需先转动车头：直接在底盘坐标系叠加远离障碍物的二维速度。
+			// dis_angleX: 前方为 0，右侧为正；ROS linear.y 左侧为正。
+			if (distance1 < safe_distence)
+			{
+				const double distance_span = fmax(0.001, safe_distence - danger_distence);
+				const double proximity = fmax(0.0, fmin(1.0,
+					(safe_distence - distance1) / distance_span));
+				const double repulsion = avoidance_kv * proximity;
+				if (distance1 <= danger_distence)
+				{
+					// 危险区优先脱离障碍物，暂时放弃编队平移和航向跟随。
+					cmd_vel_msg.linear.x = -avoidance_kv * cos(dis_angleX);
+					cmd_vel_msg.linear.y =  avoidance_kv * sin(dis_angleX);
+					cmd_vel_msg.angular.z = 0.0;
+				}
+				else
+				{
+					cmd_vel_msg.linear.x -= repulsion * cos(dis_angleX);
+					cmd_vel_msg.linear.y += repulsion * sin(dis_angleX);
+				}
+			}
+		}
+		else if(distance1<safe_distence && distance1>danger_distence)		//障碍物在安全距离和危险距离时，调整速度角度避让障碍物
 		{
 			printf("distance1= %f\n",distance1);
 			cmd_vel_msg.linear.x = cmd_vel_data.linear.x - fabs(cmd_vel_data.linear.x)*avoidance_kv*cos(dis_angleX)/distance1;//原始速度，减去一个后退的速度
@@ -112,17 +145,12 @@ int main(int argc, char** argv)
 			cmd_vel_msg.angular.z = cmd_vel_data.angular.z + avoidance_kw*cos(dis_angleX)/distance1;
 
 		}
-		else if(distance1<danger_distence)				//障碍物在危险距离之内时，以远离障碍物为主
+		else if(!holonomic && distance1<danger_distence)				//障碍物在危险距离之内时，以远离障碍物为主
 		{
 			printf("distance1= %f\n",distance1);
 			cmd_vel_msg.linear.x =  - avoidance_kv*cos(dis_angleX);
 			if(dis_angleX<0)avoidance_kw=-avoidance_kw;
 			cmd_vel_msg.angular.z = avoidance_kw*cos(dis_angleX);
-		}
-		else										//其他情况直接输出原始速度
-		{
-			cmd_vel_msg.linear.x = cmd_vel_data.linear.x;
-			cmd_vel_msg.angular.z = cmd_vel_data.angular.z;
 		}
 
 		//速度限制
@@ -132,6 +160,19 @@ int main(int argc, char** argv)
 			cmd_vel_msg.linear.x=-max_vel_x;
 		if(fabs(cmd_vel_msg.linear.x) < min_vel_x)
 			cmd_vel_msg.linear.x=0;
+		if(cmd_vel_msg.linear.y > max_vel_y)
+			cmd_vel_msg.linear.y=max_vel_y;
+		else if(cmd_vel_msg.linear.y < -max_vel_y)
+			cmd_vel_msg.linear.y=-max_vel_y;
+		if(fabs(cmd_vel_msg.linear.y) < min_vel_x)
+			cmd_vel_msg.linear.y=0;
+		const double linear_speed = hypot(cmd_vel_msg.linear.x, cmd_vel_msg.linear.y);
+		if(max_linear_vel > 0.0 && linear_speed > max_linear_vel)
+		{
+			const double scale = max_linear_vel / linear_speed;
+			cmd_vel_msg.linear.x *= scale;
+			cmd_vel_msg.linear.y *= scale;
+		}
 		if(cmd_vel_msg.angular.z > max_vel_theta)
 			cmd_vel_msg.angular.z=max_vel_theta;
 		else if(cmd_vel_msg.angular.z < -max_vel_theta)
@@ -139,9 +180,6 @@ int main(int argc, char** argv)
 		if(fabs(cmd_vel_msg.angular.z) < min_vel_theta)
 			cmd_vel_msg.angular.z=0;
 
-		// Preserve mecanum lateral velocity. The existing obstacle-avoidance
-		// algorithm still modifies only forward speed and yaw rate.
-		cmd_vel_msg.linear.y = distance1 < danger_distence ? 0.0 : cmd_vel_data.linear.y;
 		cmd_vel_Pub.publish(cmd_vel_msg);
 		ros::spinOnce();
 		loopRate2.sleep();
