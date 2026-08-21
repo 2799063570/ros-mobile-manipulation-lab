@@ -3,7 +3,8 @@
 <launch>
   <arg name="eta" value="0.5"/>
   <arg name="Geta" value="2.0"/>
-  <arg name="plan_service" default="/move_base/GlobalPlanner/make_plan"/>
+  <!--/move_base/GlobalPlanner/make_plan-->
+  <arg name="plan_service" default="/move_base/NavfnROS/make_plan"/>
   <param name="namespace_init_count" value="1"/>
   <node pkg="rrt_exploration" type="global_rrt_detector" name="global_detector" output="screen">
     <param name="eta" value="$(arg Geta)"/>
