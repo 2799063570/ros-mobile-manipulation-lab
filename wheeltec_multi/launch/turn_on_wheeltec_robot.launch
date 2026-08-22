@@ -2,6 +2,10 @@
   <arg name="slave_robot"             default=""/>
   <arg name="slave_x"/>
   <arg name="slave_y"/>
+  <arg name="set_initial_pose" default="false"/>
+  <arg name="initial_x" default="0.0"/>
+  <arg name="initial_y" default="0.0"/>
+  <arg name="initial_yaw" default="0.0"/>
   <arg name="car_mode"  default="mini_mec" 
        doc="opt: mini_akm,senior_akm,top_akm_bs,top_akm_dl,
                  mini_mec,senior_mec_bs,senior_mec_dl,top_mec_bs,top_mec_dl,senior_mec_EightDrive,top_mec_EightDrive,
@@ -16,10 +20,10 @@
   <!-- 是否为akm系列车型 在多机编队中需要进行判断，控制小车运动方式-->
   <param if="$(eval car_mode=='mini_akm' or car_mode=='senior_akm' or car_mode=='top_akm_bs' or car_mode=='top_akm_dl')" name="/if_akm_yes_or_no" value="yes"/>
 
-  <!-- 多机编队的从机位姿初始化-->
-  <node name="pose_setter" pkg="wheeltec_multi" type="set_pose.py" args="0 0 0" output="screen" >
-    <param name='slave_x'    type='double' value='$(arg slave_x)'  />
-    <param name='slave_y'    type='double' value='$(arg slave_y)'  />
+  <!-- 从车真实初始位姿，不能使用期望编队偏置代替。 -->
+  <node if="$(arg set_initial_pose)" name="pose_setter" pkg="wheeltec_multi" type="set_pose.py"
+        args="$(arg initial_x) $(arg initial_y) $(arg initial_yaw)" output="screen" >
+    <param name='frame_id' type='string' value='map'/>
   </node>
   
   <!-- turn on lidar开启雷达  -->

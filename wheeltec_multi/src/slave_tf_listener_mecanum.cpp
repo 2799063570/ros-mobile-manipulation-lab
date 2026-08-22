@@ -3,6 +3,7 @@
 #include <string>
 
 #include <geometry_msgs/Twist.h>
+#include <geometry_msgs/PoseWithCovarianceStamped.h>
 #include <ros/ros.h>
 #include <std_msgs/Float32MultiArray.h>
 #include <tf/transform_listener.h>
@@ -37,6 +38,7 @@ class MecanumFollower
 public:
   MecanumFollower()
     : nh_(), private_nh_("~"), leader_received_(false),
+      localization_initialized_(false), require_initial_pose_(true),
       leader_x_(0.0), leader_y_(0.0), leader_yaw_(0.0),
       leader_vx_(0.0), leader_vy_(0.0), leader_wz_(0.0),
       current_vx_(0.0), current_vy_(0.0), current_wz_(0.0)
@@ -66,6 +68,7 @@ public:
     private_nh_.param("yaw_tolerance", yaw_tolerance_, 0.03);
     private_nh_.param("tf_timeout", tf_timeout_, 0.2);
     private_nh_.param("control_rate", control_rate_, 20.0);
+    private_nh_.param("require_initial_pose", require_initial_pose_, true);
     private_nh_.param<std::string>("map_frame", map_frame_, "map");
     private_nh_.param<std::string>("base_frame", base_frame_, "base_link");
 
@@ -83,6 +86,8 @@ public:
 
     cmd_pub_ = nh_.advertise<geometry_msgs::Twist>("cmd_vel_ori", 10);
     leader_sub_ = nh_.subscribe("/multfodom", 1, &MecanumFollower::leaderCallback, this);
+    initial_pose_sub_ = nh_.subscribe("/initialpose", 1,
+                                     &MecanumFollower::initialPoseCallback, this);
     last_loop_time_ = ros::Time::now();
     ROS_INFO("Mecanum formation controller enabled (mode=%d)", multi_mode_);
   }
@@ -107,6 +112,13 @@ public:
       if (!leader_received_ || (now - last_leader_time_).toSec() > leader_timeout_)
       {
         stopImmediately("leader /multfodom timeout");
+        rate.sleep();
+        continue;
+      }
+
+      if (require_initial_pose_ && !localization_initialized_)
+      {
+        stopImmediately("waiting for an explicit /initialpose");
         rate.sleep();
         continue;
       }
@@ -226,6 +238,18 @@ public:
   }
 
 private:
+  void initialPoseCallback(const geometry_msgs::PoseWithCovarianceStamped::ConstPtr& msg)
+  {
+    if (msg->header.frame_id.empty())
+    {
+      ROS_WARN_THROTTLE(1.0, "Ignoring /initialpose with an empty frame_id");
+      return;
+    }
+    localization_initialized_ = true;
+    ROS_INFO("Follower localization initialized from /initialpose in frame %s",
+             msg->header.frame_id.c_str());
+  }
+
   void leaderCallback(const std_msgs::Float32MultiArray::ConstPtr& msg)
   {
     if (msg->data.size() < 6)
@@ -273,9 +297,9 @@ private:
 
   ros::NodeHandle nh_, private_nh_;
   ros::Publisher cmd_pub_;
-  ros::Subscriber leader_sub_;
+  ros::Subscriber leader_sub_, initial_pose_sub_;
   tf::TransformListener listener_;
-  bool leader_received_;
+  bool leader_received_, localization_initialized_, require_initial_pose_;
   ros::Time last_leader_time_, last_loop_time_;
   double leader_x_, leader_y_, leader_yaw_, leader_vx_, leader_vy_, leader_wz_;
   double current_vx_, current_vy_, current_wz_;

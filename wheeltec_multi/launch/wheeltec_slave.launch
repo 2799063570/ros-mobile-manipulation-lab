@@ -32,6 +32,12 @@
 	<arg name="mecanum_prediction_horizon" default="0.15" />
 	<arg name="mecanum_control_rate" default="20.0" />
 	<arg name="usart_port_name" default="/dev/wheeltec_controller" />
+	<!-- 从车在共享地图中的真实初始位姿；与期望编队偏置 slave_x/slave_y 相互独立。 -->
+	<arg name="set_initial_pose" default="false" />
+	<arg name="initial_x" default="0.0" />
+	<arg name="initial_y" default="0.0" />
+	<arg name="initial_yaw" default="0.0" />
+	<arg name="require_initial_pose" default="true" />
 <!-- +参数设置+ -->
 
 <!-- 定位 -->
@@ -51,10 +57,9 @@
 	 <!-- 开启用于导航的自适应蒙特卡洛定位amcl-->
 	 <include file="$(find turn_on_wheeltec_robot)/launch/include/amcl.launch" />
 
-	 <!-- 多机编队的从机位姿初始化-->
-	<node name="pose_setter" pkg="wheeltec_multi" type="set_pose.py" args="0 0 0" output="screen" >
-		<param name='slave_x'    type='double' value='$(arg slave_x)'  />
-		<param name='slave_y'    type='double' value='$(arg slave_y)'  />
+	 <!-- 仅在已知真实地图坐标时自动初始化；否则使用 RViz 的 2D Pose Estimate。 -->
+	<node if="$(arg set_initial_pose)" name="pose_setter" pkg="wheeltec_multi" type="set_pose.py"
+	      args="$(arg initial_x) $(arg initial_y) $(arg initial_yaw)" output="screen" >
 		<param name='frame_id' type='string' value='map' />
 	</node>
 <!-- 定位 -->
@@ -127,6 +132,7 @@
 		<param name="yaw_tolerance" type="double" value="$(arg mecanum_yaw_tolerance)" />
 		<param name="tf_timeout" type="double" value="0.2" />
 		<param name="control_rate" type="double" value="$(arg mecanum_control_rate)" />
+		<param name="require_initial_pose" type="bool" value="$(arg require_initial_pose)" />
 		<remap from="cmd_vel_ori" to="cmd_vel" if="$(eval avoidance == false)"/>
 	</node>
 <!-- 从车编队 -->

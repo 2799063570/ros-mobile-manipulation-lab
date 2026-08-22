@@ -13,18 +13,13 @@ class PoseSetter(rospy.SubscribeListener):
         self.stamp = stamp
         self.publish_time = publish_time
 
-        global position_x
-        global position_y
-
-        self.slave_x = rospy.get_param('~slave_x')
-        self.slave_y = rospy.get_param('~slave_y')
         self.frame_id = rospy.get_param('~frame_id', 'map')
 
     def peer_subscribe(self, topic_name, topic_publish, peer_publish):
         p = PoseWithCovarianceStamped()
-        #从车的初始位姿
-        position_x = self.pose[0] + self.slave_x
-        position_y = self.pose[1] + self.slave_y
+        # 这里必须是从车在地图中的真实初始位姿，不能使用期望编队偏置。
+        position_x = self.pose[0]
+        position_y = self.pose[1]
 
         p.header.frame_id = self.frame_id
         p.header.stamp = self.stamp if self.stamp != rospy.Time() else rospy.Time.now()
@@ -46,7 +41,7 @@ class PoseSetter(rospy.SubscribeListener):
 
 
 if __name__ == '__main__':
-    pose = map(float, rospy.myargv()[1:4])
+    pose = list(map(float, rospy.myargv()[1:4]))
     t_stamp = rospy.Time()
     t_publish = rospy.Time()
     if len(rospy.myargv()) > 4:
