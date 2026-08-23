@@ -1,6 +1,6 @@
 controller_manager_ns: aubo_i5/controller_manager
 controller_list:
-  - name: aubo_i5/aubo_i5_controller      # 原来是 aubo_i5_controller
+  - name: aubo_i5/aubo_i5_controller
     action_ns: follow_joint_trajectory
     type: FollowJointTrajectory
     default: true
@@ -11,3 +11,10 @@ controller_list:
       - wrist1_joint
       - wrist2_joint
       - wrist3_joint
+  - name: aubo_i5/gripper_controller
+    action_ns: follow_joint_trajectory
+    type: FollowJointTrajectory
+    default: true
+    joints:
+      - joint1
+      - joint2

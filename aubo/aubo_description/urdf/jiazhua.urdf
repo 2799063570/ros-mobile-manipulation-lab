@@ -57,10 +57,18 @@
       </geometry>
     </collision>
   </link>
-  <joint name="joint1" type="fixed">
+  <!--
+    The two fingers rotate about their local Y axes.  Because the finger joint
+    frames have opposite yaw angles, equal positive joint commands produce a
+    symmetric closing motion.
+  -->
+  <joint name="joint1" type="revolute">
     <origin xyz="0 -0.029 0.0892076231496363" rpy="0 -0.228448582107719 1.5707963267949" />
     <parent  link="gripper_base_link" />
     <child link="Link1" />
+    <axis xyz="0 1 0" />
+    <limit lower="0.0" upper="0.55" effort="20.0" velocity="1.0" />
+    <dynamics damping="0.15" friction="0.05" />
   </joint>
   <link name="Link2">
     <inertial>
@@ -90,10 +98,13 @@
       </geometry>
     </collision>
   </link>
-  <joint name="joint2" type="fixed">
+  <joint name="joint2" type="revolute">
     <origin xyz="0 0.029 0.0892076231496363" rpy="0 -0.252554771757915 -1.5707963267949" />
     <parent link="gripper_base_link" />
     <child link="Link2" />
+    <axis xyz="0 1 0" />
+    <limit lower="0.0" upper="0.55" effort="20.0" velocity="1.0" />
+    <dynamics damping="0.15" friction="0.05" />
   </joint>
 
   <joint name="gripper_joint" type="fixed">
@@ -102,4 +113,26 @@
       <child link="gripper_link"/>
   </joint>
   <link name="gripper_link" />
+
+  <!-- ros_control transmissions used by Gazebo and compatible hardware interfaces. -->
+  <transmission name="joint1_trans">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="joint1">
+      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="joint1_motor">
+      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
+  <transmission name="joint2_trans">
+    <type>transmission_interface/SimpleTransmission</type>
+    <joint name="joint2">
+      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+    </joint>
+    <actuator name="joint2_motor">
+      <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+      <mechanicalReduction>1</mechanicalReduction>
+    </actuator>
+  </transmission>
 </robot>

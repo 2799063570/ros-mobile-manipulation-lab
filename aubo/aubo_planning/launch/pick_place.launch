@@ -1,0 +1,25 @@
+<launch>
+  <!-- Set start_demo=false when a Gazebo/real-robot MoveIt stack is already running. -->
+  <arg name="start_demo" default="true" />
+  <arg name="use_rviz" default="true" />
+  <arg name="object_x" default="0.45" />
+  <arg name="object_y" default="-0.15" />
+  <arg name="object_z" default="0.15" />
+  <arg name="place_x" default="0.45" />
+  <arg name="place_y" default="0.15" />
+  <arg name="place_z" default="0.15" />
+
+  <include if="$(arg start_demo)" file="$(find aubo_moveit_config)/launch/demo.launch">
+    <arg name="use_rviz" value="$(arg use_rviz)" />
+  </include>
+
+  <node name="pick_place_demo" pkg="aubo_planning" type="pick_place_demo"
+        output="screen" required="true">
+    <param name="object_x" value="$(arg object_x)" />
+    <param name="object_y" value="$(arg object_y)" />
+    <param name="object_z" value="$(arg object_z)" />
+    <param name="place_x" value="$(arg place_x)" />
+    <param name="place_y" value="$(arg place_y)" />
+    <param name="place_z" value="$(arg place_z)" />
+  </node>
+</launch>

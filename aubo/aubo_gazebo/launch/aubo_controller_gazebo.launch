@@ -6,6 +6,6 @@
         <!-- 启动控制器：spawn 完成后会自行退出，不能设为 required -->
         <node name="controller_spawner" pkg="controller_manager" type="spawner"
               respawn="false" output="screen"
-              args="joint_state_controller aubo_i5_controller"/>
+              args="joint_state_controller aubo_i5_controller gripper_controller"/>
     </group>
 </launch>

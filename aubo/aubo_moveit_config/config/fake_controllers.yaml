@@ -8,6 +8,13 @@ controller_list:
       - wrist1_joint
       - wrist2_joint
       - wrist3_joint
+  - name: fake_gripper_controller
+    type: $(arg fake_execution_type)
+    joints:
+      - joint1
+      - joint2
 initial:  # Define initial robot poses.
   - group: aubo_i5
     pose: zero
+  - group: gripper
+    pose: open

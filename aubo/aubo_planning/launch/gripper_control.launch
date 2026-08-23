@@ -1,0 +1,15 @@
+<launch>
+  <!-- Set start_demo=false when move_group and controllers are already running. -->
+  <arg name="start_demo" default="true" />
+  <arg name="use_rviz" default="true" />
+  <arg name="command" default="cycle" />
+
+  <include if="$(arg start_demo)" file="$(find aubo_moveit_config)/launch/demo.launch">
+    <arg name="use_rviz" value="$(arg use_rviz)" />
+  </include>
+
+  <node name="gripper_control_demo" pkg="aubo_planning" type="gripper_control_demo"
+        output="screen" required="true">
+    <param name="command" value="$(arg command)" />
+  </node>
+</launch>
