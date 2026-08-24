@@ -33,6 +33,13 @@ gripper_motion_time: 2.5
 # 闭合时方块会阻挡手指到达命令位置，因此夹持动作使用较宽的位置容差。
 gripper_contact_tolerance: 0.30
 
+# Gazebo 小物体接触容易在抬升时丢失；闭合后临时固定，张开后解除。
+use_grasp_attachment: true
+grasp_attach_topic: /sorting/grasp/attach
+grasp_detach_topic: /sorting/grasp/detach
+grasp_status_topic: /sorting/grasp/status
+grasp_attachment_timeout: 3.0
+
 sort_colors: [red, green, blue]
 place_targets:
   red: [0.46, -0.24]

@@ -72,6 +72,21 @@ class ColorSortingTask(object):
         self.gripper_contact_tolerance = float(
             rospy.get_param("~gripper_contact_tolerance", 0.30)
         )
+        self.use_grasp_attachment = bool(
+            rospy.get_param("~use_grasp_attachment", True)
+        )
+        self.grasp_attach_topic = rospy.get_param(
+            "~grasp_attach_topic", "/sorting/grasp/attach"
+        )
+        self.grasp_detach_topic = rospy.get_param(
+            "~grasp_detach_topic", "/sorting/grasp/detach"
+        )
+        self.grasp_status_topic = rospy.get_param(
+            "~grasp_status_topic", "/sorting/grasp/status"
+        )
+        self.grasp_attachment_timeout = float(
+            rospy.get_param("~grasp_attachment_timeout", 3.0)
+        )
         self.sort_colors = rospy.get_param("~sort_colors", ["red", "green", "blue"])
         self.place_targets = rospy.get_param("~place_targets")
         self.detection_timeout = float(rospy.get_param("~detection_timeout", 15.0))
@@ -98,6 +113,9 @@ class ColorSortingTask(object):
 
         self._detections = None
         self._detections_wall_time = 0.0
+        self._grasp_status = ""
+        self._grasp_status_sequence = 0
+        self._attached_model = ""
         self._data_lock = threading.Lock()
         self._operation_lock = threading.Lock()
         self._busy = True
@@ -116,6 +134,18 @@ class ColorSortingTask(object):
             DetectedObjectArray,
             self._detection_callback,
             queue_size=2,
+        )
+        self._grasp_attach_publisher = rospy.Publisher(
+            self.grasp_attach_topic, String, queue_size=1
+        )
+        self._grasp_detach_publisher = rospy.Publisher(
+            self.grasp_detach_topic, String, queue_size=1
+        )
+        self._grasp_status_subscriber = rospy.Subscriber(
+            self.grasp_status_topic,
+            String,
+            self._grasp_status_callback,
+            queue_size=5,
         )
 
         self.scene = moveit_commander.PlanningSceneInterface()
@@ -164,6 +194,62 @@ class ColorSortingTask(object):
             counts.append("{}:{}".format(color, count))
         self._detection_summary_publisher.publish(String(data="  ".join(counts)))
 
+    def _grasp_status_callback(self, message):
+        with self._data_lock:
+            self._grasp_status = message.data
+            self._grasp_status_sequence += 1
+
+    def _wait_for_grasp_plugin(self):
+        if not self.use_grasp_attachment:
+            return True
+        deadline = time.time() + self.grasp_attachment_timeout
+        while not rospy.is_shutdown() and time.time() < deadline:
+            with self._data_lock:
+                status = self._grasp_status
+            if status == "ready" or status.startswith("detached:"):
+                rospy.loginfo("Gazebo grasp attachment plugin is ready")
+                return True
+            if status.startswith("error:"):
+                rospy.logerr("Gazebo grasp plugin reported: %s", status)
+                return False
+            rospy.sleep(0.05)
+        rospy.logerr(
+            "No status received from Gazebo grasp plugin on %s",
+            self.grasp_status_topic,
+        )
+        return False
+
+    def _set_grasp_attachment(self, model_name, attach):
+        if not self.use_grasp_attachment:
+            return True
+        expected = ("attached:" if attach else "detached:") + model_name
+        publisher = (
+            self._grasp_attach_publisher if attach else self._grasp_detach_publisher
+        )
+        with self._data_lock:
+            initial_sequence = self._grasp_status_sequence
+        publisher.publish(String(data=model_name))
+        deadline = time.time() + self.grasp_attachment_timeout
+        while not rospy.is_shutdown() and time.time() < deadline:
+            with self._data_lock:
+                status = self._grasp_status
+                sequence = self._grasp_status_sequence
+            if sequence > initial_sequence and status == expected:
+                self._attached_model = model_name if attach else ""
+                rospy.loginfo("Gazebo grasp status: %s", status)
+                return True
+            if sequence > initial_sequence and status.startswith("error:"):
+                rospy.logerr("Gazebo grasp plugin reported: %s", status)
+                return False
+            rospy.sleep(0.02)
+        rospy.logerr("Timed out waiting for Gazebo grasp status '%s'", expected)
+        return False
+
+    def _release_attached_object_no_wait(self):
+        if self.use_grasp_attachment and self._attached_model:
+            self._grasp_detach_publisher.publish(String(data=self._attached_model))
+            self._attached_model = ""
+
     def _verify_loaded_upper_arm_limit(self):
         """Confirm that Gazebo and MoveIt received the second-axis limit."""
         expected_lower = -1.0471976
@@ -211,6 +297,10 @@ class ColorSortingTask(object):
             self._busy = False
             self._publish_state("ERROR", "loaded upperArm_joint limit is not +/-60 deg")
             return
+        if not self._wait_for_grasp_plugin():
+            self._busy = False
+            self._publish_state("ERROR", "Gazebo grasp plugin unavailable")
+            return
         self._publish_state("INITIALIZING", "waiting for gripper action")
         if not self.gripper_client.wait_for_server(
             rospy.Duration(self.gripper_server_timeout)
@@ -250,6 +340,8 @@ class ColorSortingTask(object):
                 rospy.logerr("Sorting operation failed: %s", str(error))
                 self._publish_state("ERROR", str(error))
             finally:
+                if not success:
+                    self._release_attached_object_no_wait()
                 with self._operation_lock:
                     self._busy = False
                 if self._stop_requested.is_set():
@@ -284,6 +376,7 @@ class ColorSortingTask(object):
         self._stop_requested.set()
         self.gripper_client.cancel_all_goals()
         self.arm.stop()
+        self._release_attached_object_no_wait()
         return TriggerResponse(success=True, message="stop requested")
 
     def _open_service(self, _request):
@@ -503,7 +596,11 @@ class ColorSortingTask(object):
         return True
 
     def _open_operation(self):
-        return self._command_gripper(self.gripper_open)
+        if not self._command_gripper(self.gripper_open):
+            return False
+        if self._attached_model:
+            return self._set_grasp_attachment(self._attached_model, False)
+        return True
 
     def _home_operation(self):
         self._observation_ready = False
@@ -536,6 +633,9 @@ class ColorSortingTask(object):
             return False
         if not self._command_gripper(self.gripper_closed):
             return False
+        object_model_name = "{}_block".format(color)
+        if not self._set_grasp_attachment(object_model_name, True):
+            return False
         rospy.sleep(0.5)
         if not self._cartesian_to(
             self._pose(object_x, object_y, travel_z), color + " lift"
@@ -558,6 +658,8 @@ class ColorSortingTask(object):
         ):
             return False
         if not self._command_gripper(self.gripper_open):
+            return False
+        if not self._set_grasp_attachment(object_model_name, False):
             return False
         rospy.sleep(0.5)
         return self._cartesian_to(

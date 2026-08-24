@@ -1,6 +1,19 @@
 <?xml version="1.0"?>
 <sdf version="1.6">
   <world name="aubo_color_sorting">
+    <!-- Contact-assisted grasping for small blocks. -->
+    <plugin name="aubo_mobile_sorting_grasp"
+            filename="libaubo_mobile_sorting_grasp_plugin.so">
+      <robot_model>aubo_mobile_robot</robot_model>
+      <!-- wrist3_Link is guaranteed to survive URDF fixed-joint lumping; the
+           fixed gripper base has the same pose in this model. -->
+      <palm_link>wrist3_Link</palm_link>
+      <object_link>block_link</object_link>
+      <max_attach_distance>0.18</max_attach_distance>
+      <attach_topic>/sorting/grasp/attach</attach_topic>
+      <detach_topic>/sorting/grasp/detach</detach_topic>
+      <status_topic>/sorting/grasp/status</status_topic>
+    </plugin>
     <include><uri>model://ground_plane</uri></include>
     <include><uri>model://sun</uri></include>
 

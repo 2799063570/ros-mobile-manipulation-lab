@@ -141,6 +141,22 @@ rosservice call /sorting/home
 因此闭合目标会将 `path_tolerance` 显式设为禁用（ROS 消息中的 `-1`），同时保留
 最终位置容差。这样不会再因正常接触返回 `PATH_TOLERANCE_VIOLATED (-4)`。
 
+## Gazebo 抓取固定插件
+
+仅依赖摩擦力时，小尺寸方块可能在抬升瞬间丢失接触。包内提供
+`libaubo_mobile_sorting_grasp_plugin.so`：夹爪闭合后，分拣节点通过
+`/sorting/grasp/attach` 通知 Gazebo，在末端的 `wrist3_Link`（与固定夹爪基座同位姿）
+和对应颜色方块之间创建临时固定关节；到放置点张开夹爪后，再通过
+`/sorting/grasp/detach` 解除。插件状态
+发布在 `/sorting/grasp/status`，正常启动时应首先看到 `ready`。
+
+这个插件不替代视觉定位或运动规划。只有机械臂已经移动到识别出的方块位置并完成
+夹爪闭合后才会固定方块，因此仍能暴露相机坐标或抓取位姿明显错误的问题。
+
+插件是本包的一部分，不需要安装第三方 link-attacher，但新增 C++ 库后必须重新运行
+`catkin_make --force-cmake` 并重新 `source devel/setup.bash`。如果插件没有成功加载，
+分拣节点会进入 `ERROR | Gazebo grasp plugin unavailable`，不会假装抓取成功。
+
 分拣世界中的红、绿、蓝方块不是仅用于显示的模型：每个方块均启用重力，且
 `kinematic=false`，并设置了碰撞体、质量和惯量。方块与夹爪手指的接触面使用较高
 摩擦系数（`mu1/mu2=20.0`）、接触刚度和阻尼；每个方块最多保留 `20` 个接触点。
