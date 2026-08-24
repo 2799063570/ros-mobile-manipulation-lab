@@ -12,7 +12,8 @@ aubo_mobile_robot/
 ├── aubo_mobile_navigation/     # 建图、定位与 move_base 导航
 ├── aubo_mobile_control/        # 键盘控制及导航/机械臂协同
 ├── aubo_mobile_perception/     # 基于 OpenCV 的手部相机目标定位
-└── aubo_mobile_sorting/        # Gazebo 视觉抓取与颜色分拣
+├── aubo_mobile_sorting/        # Gazebo 视觉抓取与颜色分拣
+└── aubo_mobile_nav_sorting/    # 建图、导航到工位并自动分拣的场景任务
 ```
 
 ## 后续推荐结构

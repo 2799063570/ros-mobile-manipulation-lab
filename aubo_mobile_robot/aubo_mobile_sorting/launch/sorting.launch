@@ -3,9 +3,11 @@
   <!-- Robot, controllers and move_group must already be running. -->
   <arg name="start_perception" default="true"/>
   <arg name="start_task" default="true"/>
+  <arg name="config" default="$(find aubo_mobile_sorting)/config/sorting.yaml"/>
   <arg name="debug_view" default="true"/>
   <arg name="auto_move_to_observation" default="true"/>
   <arg name="auto_start" default="false"/>
+  <arg name="use_grasp_attachment" default="true"/>
 
   <group if="$(arg start_perception)">
     <include file="$(find aubo_mobile_perception)/launch/color_detector.launch"/>
@@ -13,9 +15,10 @@
 
   <node if="$(arg start_task)" pkg="aubo_mobile_sorting" type="color_sorting_task.py"
         name="color_sorting_task" output="screen">
-    <rosparam file="$(find aubo_mobile_sorting)/config/sorting.yaml" command="load"/>
+    <rosparam file="$(arg config)" command="load"/>
     <param name="auto_move_to_observation" value="$(arg auto_move_to_observation)"/>
     <param name="auto_start" value="$(arg auto_start)"/>
+    <param name="use_grasp_attachment" value="$(arg use_grasp_attachment)"/>
   </node>
 
   <node if="$(arg debug_view)" pkg="image_view" type="image_view"
