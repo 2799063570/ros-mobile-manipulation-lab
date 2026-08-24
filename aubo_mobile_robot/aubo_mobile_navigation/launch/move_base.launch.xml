@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<launch>
+  <node pkg="move_base" type="move_base" name="move_base"
+        clear_params="true" output="screen">
+    <rosparam file="$(find aubo_mobile_navigation)/config/costmap_common.yaml"
+              command="load" ns="global_costmap"/>
+    <rosparam file="$(find aubo_mobile_navigation)/config/costmap_common.yaml"
+              command="load" ns="local_costmap"/>
+    <rosparam file="$(find aubo_mobile_navigation)/config/global_costmap.yaml" command="load"/>
+    <rosparam file="$(find aubo_mobile_navigation)/config/local_costmap.yaml" command="load"/>
+    <rosparam file="$(find aubo_mobile_navigation)/config/dwa_local_planner.yaml" command="load"/>
+    <rosparam file="$(find aubo_mobile_navigation)/config/move_base.yaml" command="load"/>
+  </node>
+</launch>

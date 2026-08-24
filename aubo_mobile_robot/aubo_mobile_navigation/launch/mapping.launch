@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- The robot/Gazebo must already be running. -->
+  <arg name="rviz" default="true"/>
+
+  <include file="$(find aubo_mobile_navigation)/launch/scan_merger.launch"/>
+
+  <node pkg="gmapping" type="slam_gmapping" name="slam_gmapping" output="screen">
+    <rosparam file="$(find aubo_mobile_navigation)/config/gmapping.yaml" command="load"/>
+    <remap from="scan" to="/scan"/>
+  </node>
+
+  <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz"
+        args="-d $(find aubo_mobile_navigation)/rviz/mapping.rviz"/>
+</launch>

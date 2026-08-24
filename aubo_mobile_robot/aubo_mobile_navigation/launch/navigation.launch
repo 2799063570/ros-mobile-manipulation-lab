@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- The robot/Gazebo must already be running and map_file must exist. -->
+  <arg name="map_file" default="$(find aubo_mobile_navigation)/maps/map.yaml"/>
+  <arg name="rviz" default="true"/>
+
+  <include file="$(find aubo_mobile_navigation)/launch/scan_merger.launch"/>
+
+  <node pkg="map_server" type="map_server" name="map_server"
+        args="$(arg map_file)" output="screen"/>
+
+  <node pkg="amcl" type="amcl" name="amcl" clear_params="true" output="screen">
+    <rosparam file="$(find aubo_mobile_navigation)/config/amcl.yaml" command="load"/>
+    <remap from="scan" to="/scan"/>
+  </node>
+
+  <include file="$(find aubo_mobile_navigation)/launch/move_base.launch.xml"/>
+
+  <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz"
+        args="-d $(find aubo_mobile_navigation)/rviz/navigation.rviz"/>
+</launch>

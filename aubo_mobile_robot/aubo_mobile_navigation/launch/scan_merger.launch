@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="front_scan" default="/front/scan"/>
+  <arg name="rear_scan" default="/rear/scan"/>
+  <arg name="output_scan" default="/scan"/>
+  <arg name="target_frame" default="base_footprint"/>
+
+  <node pkg="aubo_mobile_navigation" type="dual_laser_merger.py"
+        name="dual_laser_merger" output="screen">
+    <param name="front_topic" value="$(arg front_scan)"/>
+    <param name="rear_topic" value="$(arg rear_scan)"/>
+    <param name="output_topic" value="$(arg output_scan)"/>
+    <param name="target_frame" value="$(arg target_frame)"/>
+    <param name="publish_rate" value="15.0"/>
+    <param name="samples" value="720"/>
+    <param name="range_min" value="0.12"/>
+    <param name="range_max" value="20.0"/>
+    <param name="max_scan_age" value="0.5"/>
+    <param name="require_both_scans" value="true"/>
+  </node>
+</launch>

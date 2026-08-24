@@ -1,0 +1,24 @@
+robot_radius: 0.40
+footprint_padding: 0.02
+transform_tolerance: 0.5
+
+obstacle_layer:
+  enabled: true
+  obstacle_range: 6.0
+  raytrace_range: 8.0
+  max_obstacle_height: 2.0
+  observation_sources: merged_laser
+  merged_laser:
+    sensor_frame: base_footprint
+    data_type: LaserScan
+    topic: /scan
+    expected_update_rate: 0.15
+    observation_persistence: 0.0
+    inf_is_valid: true
+    marking: true
+    clearing: true
+
+inflation_layer:
+  enabled: true
+  inflation_radius: 0.65
+  cost_scaling_factor: 3.5

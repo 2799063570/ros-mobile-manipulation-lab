@@ -1,0 +1,101 @@
+Panels:
+  - Class: rviz/Displays
+    Name: Displays
+  - Class: rviz/Tool Properties
+    Name: Tool Properties
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Alpha: 0.5
+      Cell Size: 1
+      Class: rviz/Grid
+      Color: 160; 160; 164
+      Enabled: true
+      Name: Grid
+      Plane: XY
+      Reference Frame: <Fixed Frame>
+    - Class: rviz/RobotModel
+      Collision Enabled: false
+      Enabled: true
+      Name: RobotModel
+      Robot Description: robot_description
+      Visual Enabled: true
+    - Alpha: 0.7
+      Class: rviz/Map
+      Color Scheme: map
+      Enabled: true
+      Name: Map
+      Topic: /map
+    - Class: rviz/LaserScan
+      Color: 255; 0; 0
+      Enabled: true
+      Name: Merged Scan
+      Size (m): 0.03
+      Style: Points
+      Topic: /scan
+    - Alpha: 0.7
+      Class: rviz/Map
+      Color Scheme: costmap
+      Enabled: true
+      Name: Global Costmap
+      Topic: /move_base/global_costmap/costmap
+    - Alpha: 0.7
+      Class: rviz/Map
+      Color Scheme: costmap
+      Enabled: true
+      Name: Local Costmap
+      Topic: /move_base/local_costmap/costmap
+    - Alpha: 1
+      Buffer Length: 1
+      Class: rviz/Path
+      Color: 0; 255; 0
+      Enabled: true
+      Head Diameter: 0.3
+      Head Length: 0.2
+      Length: 0.3
+      Line Style: Lines
+      Line Width: 0.03
+      Name: Global Plan
+      Topic: /move_base/NavfnROS/plan
+    - Alpha: 1
+      Buffer Length: 1
+      Class: rviz/Path
+      Color: 255; 170; 0
+      Enabled: true
+      Head Diameter: 0.3
+      Head Length: 0.2
+      Length: 0.3
+      Line Style: Lines
+      Line Width: 0.03
+      Name: Local Plan
+      Topic: /move_base/DWAPlannerROS/local_plan
+  Global Options:
+    Background Color: 48; 48; 48
+    Fixed Frame: map
+    Frame Rate: 30
+  Name: root
+Tools:
+  - Class: rviz/Interact
+  - Class: rviz/MoveCamera
+  - Class: rviz/Select
+  - Class: rviz/FocusCamera
+  - Class: rviz/Measure
+  - Class: rviz/SetInitialPose
+    Topic: /initialpose
+  - Class: rviz/SetGoal
+    Topic: /move_base_simple/goal
+  - Class: rviz/PublishPoint
+    Topic: /clicked_point
+Value: true
+Views:
+  Current:
+    Class: rviz/Orbit
+    Distance: 12
+    Focal Point:
+      X: 0
+      Y: 0
+      Z: 0
+    Name: Current View
+    Pitch: 1.2
+    Target Frame: <Fixed Frame>
+    Yaw: 0.8
