@@ -122,15 +122,27 @@ rosservice call /sorting/home
 朝向桌面。只有将 `observation_named_target` 设为空字符串时，程序才会改用
 `observation_pose` 的在线笛卡尔逆解。
 
-为减少机械臂向桌子后侧大角度扫动，`shoulder_joint` 在共享 URDF 以及纯机械臂、
-移动机械臂两套 MoveIt 配置中均限制为 `-50°～+50°`（`±0.8726646 rad`）。
-4 cm 方块对应的默认夹爪闭合位置为 `gripper_closed: 0.42`，夹爪开合时间为
-`gripper_motion_time: 2.5` 秒，避免手指快速闭合时穿过或弹飞方块。
+`shoulder_joint` 是从 `base_link` 出发的第一可动关节，保持原始范围；第二个可动
+关节是 `upperArm_joint`。为减少机械臂上下摆动时与桌面碰撞，`upperArm_joint` 在
+共享 URDF 以及纯机械臂、移动机械臂两套 MoveIt 配置中均限制为
+`-60°～+60°`（`±1.0471976 rad`）。
+4 cm 方块约在夹爪关节 `0.24 rad` 时接触。默认闭合位置设为
+`gripper_closed: 0.28`，只保留少量预紧量；旧值 `0.42` 会要求手指继续压入方块约
+16 mm，容易导致控制器失败、接触抖动或方块弹飞。夹爪开合时间为
+`gripper_motion_time: 2.5` 秒。
+
+`tcp_link` 与 `gripper_link` 现在重合在手指有效接触高度。这样将 TCP 规划到方块
+中心时，手指会夹住方块侧面，而不是只搭在方块顶边。
 
 分拣世界中的红、绿、蓝方块不是仅用于显示的模型：每个方块均启用重力，且
 `kinematic=false`，并设置了碰撞体、质量和惯量。方块与夹爪手指的接触面使用较高
-摩擦系数（`mu1/mu2=5.0`）、接触刚度和阻尼；每个方块最多保留 `20` 个接触点。
+摩擦系数（`mu1/mu2=20.0`）、接触刚度和阻尼；每个方块最多保留 `20` 个接触点。
 修改这些物理参数后必须完全退出并重新启动 Gazebo，已生成的旧模型不会自动更新。
+
+分拣节点启动时还会同时读取 `/robot_description` 和
+`/robot_description_planning/joint_limits/upperArm_joint`。只有两者都确认为
+`-60°～+60°` 才允许开始分拣；如果 Ubuntu 加载了旧包，RViz 面板会进入 `ERROR`，
+终端会打印实际读取到的上下限。
 
 ## 调试方法
 

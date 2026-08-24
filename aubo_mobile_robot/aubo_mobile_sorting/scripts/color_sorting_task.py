@@ -8,6 +8,7 @@ import math
 import sys
 import threading
 import time
+import xml.etree.ElementTree as ElementTree
 
 import actionlib
 import moveit_commander
@@ -57,7 +58,7 @@ class ColorSortingTask(object):
         )
 
         self.gripper_open = float(rospy.get_param("~gripper_open", 0.0))
-        self.gripper_closed = float(rospy.get_param("~gripper_closed", 0.42))
+        self.gripper_closed = float(rospy.get_param("~gripper_closed", 0.28))
         self.gripper_motion_time = float(
             rospy.get_param("~gripper_motion_time", 2.5)
         )
@@ -83,6 +84,7 @@ class ColorSortingTask(object):
             rospy.get_param("~auto_move_to_observation", True)
         )
         self.auto_start = bool(rospy.get_param("~auto_start", False))
+        self._robot_limits_valid = self._verify_loaded_upper_arm_limit()
 
         self._detections = None
         self._detections_wall_time = 0.0
@@ -152,7 +154,53 @@ class ColorSortingTask(object):
             counts.append("{}:{}".format(color, count))
         self._detection_summary_publisher.publish(String(data="  ".join(counts)))
 
+    def _verify_loaded_upper_arm_limit(self):
+        """Confirm that Gazebo and MoveIt received the second-axis limit."""
+        expected_lower = -1.0471976
+        expected_upper = 1.0471976
+        tolerance = 1.0e-5
+        try:
+            description = rospy.get_param("/robot_description")
+            root = ElementTree.fromstring(description)
+            upper_arm = next(
+                joint
+                for joint in root.findall("joint")
+                if joint.get("name") == "upperArm_joint"
+            )
+            limit = upper_arm.find("limit")
+            urdf_lower = float(limit.get("lower"))
+            urdf_upper = float(limit.get("upper"))
+            planning_ns = (
+                "/robot_description_planning/joint_limits/upperArm_joint/"
+            )
+            moveit_lower = float(rospy.get_param(planning_ns + "min_position"))
+            moveit_upper = float(rospy.get_param(planning_ns + "max_position"))
+        except (KeyError, StopIteration, TypeError, ValueError, ElementTree.ParseError) as error:
+            rospy.logerr("Unable to verify upperArm_joint limits: %s", str(error))
+            return False
+
+        rospy.loginfo(
+            "Loaded upperArm_joint limits: URDF [%.6f, %.6f], MoveIt [%.6f, %.6f] rad",
+            urdf_lower,
+            urdf_upper,
+            moveit_lower,
+            moveit_upper,
+        )
+        values = (urdf_lower, urdf_upper, moveit_lower, moveit_upper)
+        expected = (expected_lower, expected_upper, expected_lower, expected_upper)
+        if any(abs(value - target) > tolerance for value, target in zip(values, expected)):
+            rospy.logerr(
+                "Stale robot model detected; expected upperArm_joint limits "
+                "[-1.047198, 1.047198] rad (-60 ... 60 deg)"
+            )
+            return False
+        return True
+
     def _initialize(self):
+        if not self._robot_limits_valid:
+            self._busy = False
+            self._publish_state("ERROR", "loaded upperArm_joint limit is not +/-60 deg")
+            return
         self._publish_state("INITIALIZING", "waiting for gripper action")
         if not self.gripper_client.wait_for_server(
             rospy.Duration(self.gripper_server_timeout)

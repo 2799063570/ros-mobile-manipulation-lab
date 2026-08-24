@@ -117,7 +117,10 @@
   <!-- Tool centre point between and slightly in front of the fingertips.
        Keep gripper_link for compatibility and use tcp_link as the MoveIt tip. -->
   <joint name="tcp_joint" type="fixed">
-      <origin xyz="0 0 0.025" rpy="0 0 0"/>
+      <!-- Keep the TCP inside the useful finger contact band.  The previous
+           extra 25 mm offset put the fingertips on only the top edge of a
+           40 mm sorting block when the TCP was commanded to its centre. -->
+      <origin xyz="0 0 0" rpy="0 0 0"/>
       <parent link="gripper_link"/>
       <child link="tcp_link"/>
   </joint>
@@ -125,16 +128,16 @@
 
   <!-- Contact parameters for grasping lightweight objects in Gazebo. -->
   <gazebo reference="Link1">
-    <mu1>5.0</mu1>
-    <mu2>5.0</mu2>
+    <mu1>20.0</mu1>
+    <mu2>20.0</mu2>
     <kp>1000000</kp>
     <kd>100</kd>
     <minDepth>0.002</minDepth>
     <maxVel>0.01</maxVel>
   </gazebo>
   <gazebo reference="Link2">
-    <mu1>5.0</mu1>
-    <mu2>5.0</mu2>
+    <mu1>20.0</mu1>
+    <mu2>20.0</mu2>
     <kp>1000000</kp>
     <kd>100</kd>
     <minDepth>0.002</minDepth>

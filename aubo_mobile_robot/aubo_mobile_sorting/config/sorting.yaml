@@ -25,7 +25,8 @@ cartesian_step: 0.01
 minimum_cartesian_fraction: 0.90
 
 gripper_open: 0.0
-gripper_closed: 0.42
+# 4 cm 方块约在 0.24 rad 开始接触；0.28 rad 提供少量夹持预紧量。
+gripper_closed: 0.28
 gripper_motion_time: 2.5
 
 sort_colors: [red, green, blue]
