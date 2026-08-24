@@ -6,7 +6,7 @@
   <arg name="rviz" default="true"/>
   <arg name="debug_view" default="false"/>
   <arg name="paused" default="false"/>
-  <arg name="auto_start" default="false"/>
+  <arg name="auto_start" default="true"/>
   <arg name="goal_x" default="2.15"/>
   <arg name="goal_y" default="0.0"/>
   <arg name="goal_yaw" default="0.0"/>
