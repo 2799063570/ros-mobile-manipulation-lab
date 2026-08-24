@@ -47,8 +47,10 @@ roslaunch aubo_planning pick_place.launch \
 - 两个关节使用同一正方向命令；两侧关节坐标系的镜像朝向使手指对称闭合。
 - 真机运行前应低速标定零位、闭合角和最大无干涉角，并同步修改
   `jiazhua.urdf`、`aubo_i5.srdf` 以及抓取程序的 `gripper_closed` 参数。
-- `grasp_offset_z` 默认为 `0.12 m`，表示俯抓时物体中心到
-  `gripper_base_link` 的竖直距离；若更换指尖或 TCP，需要同步标定该值。
+- MoveIt 和抓取示例使用 `tcp_link` 作为末端链接；它位于
+  `gripper_base_link` 局部 Z 轴前方 `0.145 m`，约在指尖中心稍外侧。
+- `grasp_offset_z` 默认为 `0.12 m`，表示俯抓时物体中心到 TCP 目标位姿的
+  竖直偏移；若更换指尖或 TCP，需要同步标定该值。
 - 当前仓库已配置 ros_control transmission、Gazebo 控制器和 MoveIt 控制器映射。
   真机驱动仍须把 `joint1`、`joint2` 注册为 PositionJointInterface，并把轨迹命令
   转换为实际夹爪电机协议；仅有 YAML 配置不会自动驱动物理电机。

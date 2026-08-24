@@ -114,6 +114,15 @@
   </joint>
   <link name="gripper_link" />
 
+  <!-- Tool centre point between and slightly in front of the fingertips.
+       Keep gripper_link for compatibility and use tcp_link as the MoveIt tip. -->
+  <joint name="tcp_joint" type="fixed">
+      <origin xyz="0 0 0.025" rpy="0 0 0"/>
+      <parent link="gripper_link"/>
+      <child link="tcp_link"/>
+  </joint>
+  <link name="tcp_link" />
+
   <!-- ros_control transmissions used by Gazebo and compatible hardware interfaces. -->
   <transmission name="joint1_trans">
     <type>transmission_interface/SimpleTransmission</type>

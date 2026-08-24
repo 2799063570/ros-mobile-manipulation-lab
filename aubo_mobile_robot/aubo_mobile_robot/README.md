@@ -97,7 +97,8 @@ In the assistant, choose **Create New MoveIt Configuration Package**, browse to
    child link `base_footprint`. This lets MoveIt track the mobile base pose but
    does not make MoveIt drive the differential base.
 3. Create arm group `aubo_i5` as a kinematic chain from `base_link` to
-   `gripper_link`, using the KDL solver.
+   `tcp_link`, using the KDL solver. `tcp_link` is the grasp tool centre point;
+   keep `gripper_link` only as the compatible intermediate frame.
 4. Create gripper group `gripper` from joints `joint1` and `joint2`.
 5. Add end effector `aubo_gripper`: group `gripper`, parent link
    `gripper_base_link`, parent group `aubo_i5`.

@@ -94,7 +94,7 @@ int main(int argc, char** argv)
   std::string object_id;
   std::string table_id;
   private_nh.param<std::string>("planning_frame", planning_frame, "base_link");
-  private_nh.param<std::string>("end_effector_link", end_effector_link, "gripper_link");
+  private_nh.param<std::string>("end_effector_link", end_effector_link, "tcp_link");
   private_nh.param<std::string>("object_id", object_id, "pick_object");
   private_nh.param<std::string>("table_id", table_id, "work_table");
 
