@@ -45,6 +45,25 @@ roslaunch aubo_mobile_control nav_arm_coordinator.launch \
   pre_navigation_target:=down post_navigation_target:=up
 ```
 
+默认使用 launch 参数中的目标。此模式下，组合 launch 会拦截 RViz 的 2D Nav Goal，
+避免它绕过协调器并抢占当前任务：
+
+```bash
+roslaunch aubo_mobile_control navigation_arm.launch \
+  goal_source:=launch goal_x:=1.0 goal_y:=0.5 goal_yaw:=1.57
+```
+
+需要在 RViz 中交互选择导航目标时，使用 `rviz` 模式。协调器会先让机械臂进入
+导航姿态，然后等待一次 **2D Nav Goal**，并在导航成功后执行后续机械臂动作：
+
+```bash
+roslaunch aubo_mobile_control navigation_arm.launch \
+  goal_source:=rviz goal_wait_timeout:=0.0
+```
+
+`goal_wait_timeout:=0.0` 表示一直等待。设为正数时，超过指定秒数仍未收到 RViz
+目标，协调器会结束当前任务，但不会关闭导航、MoveIt 或 RViz。
+
 机器人或 Gazebo 已经运行，需要同时启动地图导航和 MoveIt 时：
 
 ```bash

@@ -7,6 +7,9 @@
   <arg name="goal_x" default="1.0"/>
   <arg name="goal_y" default="0.0"/>
   <arg name="goal_yaw" default="0.0"/>
+  <arg name="goal_source" default="launch"/>
+  <arg name="rviz_goal_topic" default="/nav_arm_coordinator/goal"/>
+  <arg name="goal_wait_timeout" default="0.0"/>
   <arg name="pre_navigation_target" default="down"/>
   <arg name="post_navigation_target" default="up"/>
 
@@ -21,6 +24,9 @@
     <arg name="goal_x" value="$(arg goal_x)"/>
     <arg name="goal_y" value="$(arg goal_y)"/>
     <arg name="goal_yaw" value="$(arg goal_yaw)"/>
+    <arg name="goal_source" value="$(arg goal_source)"/>
+    <arg name="rviz_goal_topic" value="$(arg rviz_goal_topic)"/>
+    <arg name="goal_wait_timeout" value="$(arg goal_wait_timeout)"/>
     <arg name="pre_navigation_target" value="$(arg pre_navigation_target)"/>
     <arg name="post_navigation_target" value="$(arg post_navigation_target)"/>
   </include>

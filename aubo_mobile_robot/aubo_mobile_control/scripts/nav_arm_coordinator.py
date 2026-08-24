@@ -5,6 +5,8 @@ from __future__ import print_function
 
 import math
 import sys
+import threading
+import time
 
 import actionlib
 import moveit_commander
@@ -23,6 +25,11 @@ class NavigationArmCoordinator(object):
         self.end_effector_link = rospy.get_param("~end_effector_link", "tcp_link")
         self.navigation_action = rospy.get_param("~navigation_action", "/move_base")
         self.navigation_frame = rospy.get_param("~navigation_frame", "map")
+        self.goal_source = rospy.get_param("~goal_source", "launch").strip().lower()
+        self.rviz_goal_topic = rospy.get_param(
+            "~rviz_goal_topic", "/nav_arm_coordinator/goal"
+        )
+        self.goal_wait_timeout = float(rospy.get_param("~goal_wait_timeout", 0.0))
         self.pre_navigation_target = rospy.get_param("~pre_navigation_target", "down")
         self.arm_target_type = rospy.get_param("~arm_target_type", "named")
         self.post_navigation_target = rospy.get_param("~post_navigation_target", "up")
@@ -38,6 +45,23 @@ class NavigationArmCoordinator(object):
         self.goal_y = float(rospy.get_param("~goal_y", 0.0))
         self.goal_yaw = float(rospy.get_param("~goal_yaw", 0.0))
 
+        if self.goal_source not in ("launch", "rviz"):
+            raise ValueError(
+                "Unsupported goal_source '%s'; use 'launch' or 'rviz'"
+                % self.goal_source
+            )
+
+        self.rviz_goal = None
+        self.rviz_goal_event = threading.Event()
+        self.rviz_goal_subscriber = None
+        if self.goal_source == "rviz":
+            self.rviz_goal_subscriber = rospy.Subscriber(
+                self.rviz_goal_topic,
+                PoseStamped,
+                self._rviz_goal_callback,
+                queue_size=1,
+            )
+
         self.arm = moveit_commander.MoveGroupCommander(self.group_name)
         self.arm.set_end_effector_link(self.end_effector_link)
         self.arm.set_planning_time(self.arm_planning_time)
@@ -48,6 +72,10 @@ class NavigationArmCoordinator(object):
         self.navigation_client = actionlib.SimpleActionClient(
             self.navigation_action, MoveBaseAction
         )
+
+    def _rviz_goal_callback(self, target):
+        self.rviz_goal = target
+        self.rviz_goal_event.set()
 
     def _move_arm_to_named_target(self, target_name):
         if not target_name:
@@ -103,22 +131,52 @@ class NavigationArmCoordinator(object):
             rospy.logerr("Failed to plan or execute arm pose target")
         return success
 
-    def _navigate(self):
-        rospy.loginfo("Waiting for navigation action %s", self.navigation_action)
-        if not self.navigation_client.wait_for_server(rospy.Duration(self.server_timeout)):
-            rospy.logerr("Navigation action server was not available")
-            return False
+    def _get_navigation_target(self):
+        if self.goal_source == "rviz":
+            rospy.loginfo(
+                "Waiting for an RViz 2D Nav Goal on %s", self.rviz_goal_topic
+            )
+            deadline = None
+            if self.goal_wait_timeout > 0.0:
+                deadline = time.time() + self.goal_wait_timeout
+
+            while not self.rviz_goal_event.wait(0.2):
+                if rospy.is_shutdown():
+                    return None
+                if deadline is not None and time.time() >= deadline:
+                    rospy.logerr(
+                        "Timed out waiting %.1f seconds for an RViz navigation goal",
+                        self.goal_wait_timeout,
+                    )
+                    return None
+
+            target = self.rviz_goal
+            if not target.header.frame_id:
+                rospy.logerr("RViz navigation goal has an empty frame_id")
+                return None
+
+            # This coordinator intentionally executes one navigation/arm task.
+            # Stop accepting later RViz clicks so they cannot alter the task.
+            self.rviz_goal_subscriber.unregister()
+
+            rospy.loginfo(
+                "Received RViz navigation goal in %s: x=%.3f y=%.3f",
+                target.header.frame_id,
+                target.pose.position.x,
+                target.pose.position.y,
+            )
+            return target
 
         quaternion = quaternion_from_euler(0.0, 0.0, self.goal_yaw)
-        goal = MoveBaseGoal()
-        goal.target_pose.header.stamp = rospy.Time.now()
-        goal.target_pose.header.frame_id = self.navigation_frame
-        goal.target_pose.pose.position.x = self.goal_x
-        goal.target_pose.pose.position.y = self.goal_y
-        goal.target_pose.pose.orientation.x = quaternion[0]
-        goal.target_pose.pose.orientation.y = quaternion[1]
-        goal.target_pose.pose.orientation.z = quaternion[2]
-        goal.target_pose.pose.orientation.w = quaternion[3]
+        target = PoseStamped()
+        target.header.stamp = rospy.Time.now()
+        target.header.frame_id = self.navigation_frame
+        target.pose.position.x = self.goal_x
+        target.pose.position.y = self.goal_y
+        target.pose.orientation.x = quaternion[0]
+        target.pose.orientation.y = quaternion[1]
+        target.pose.orientation.z = quaternion[2]
+        target.pose.orientation.w = quaternion[3]
 
         rospy.loginfo(
             "Navigating in %s to x=%.3f y=%.3f yaw=%.3f",
@@ -127,6 +185,21 @@ class NavigationArmCoordinator(object):
             self.goal_y,
             self.goal_yaw,
         )
+
+        return target
+
+    def _navigate(self):
+        target = self._get_navigation_target()
+        if target is None:
+            return False
+
+        rospy.loginfo("Waiting for navigation action %s", self.navigation_action)
+        if not self.navigation_client.wait_for_server(rospy.Duration(self.server_timeout)):
+            rospy.logerr("Navigation action server was not available")
+            return False
+
+        goal = MoveBaseGoal()
+        goal.target_pose = target
         self.navigation_client.send_goal(goal)
         finished = self.navigation_client.wait_for_result(
             rospy.Duration(self.navigation_timeout)
@@ -138,7 +211,23 @@ class NavigationArmCoordinator(object):
 
         state = self.navigation_client.get_state()
         if state != GoalStatus.SUCCEEDED:
-            rospy.logerr("Navigation failed with action state %d", state)
+            state_name = {
+                GoalStatus.PENDING: "PENDING",
+                GoalStatus.ACTIVE: "ACTIVE",
+                GoalStatus.PREEMPTED: "PREEMPTED",
+                GoalStatus.SUCCEEDED: "SUCCEEDED",
+                GoalStatus.ABORTED: "ABORTED",
+                GoalStatus.REJECTED: "REJECTED",
+                GoalStatus.PREEMPTING: "PREEMPTING",
+                GoalStatus.RECALLING: "RECALLING",
+                GoalStatus.RECALLED: "RECALLED",
+                GoalStatus.LOST: "LOST",
+            }.get(state, "UNKNOWN")
+            rospy.logerr(
+                "Navigation did not succeed: %s (action state %d)",
+                state_name,
+                state,
+            )
             return False
 
         rospy.loginfo("Navigation goal reached")
