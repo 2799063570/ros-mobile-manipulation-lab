@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
 <launch>
   <!-- Run SLAM and move_base against the live map; the robot must already run. -->
-  <arg name="rviz" default="true"/>
+  <arg name="rviz" default="false"/>
 
   <include file="$(find aubo_mobile_navigation)/launch/mapping.launch">
-    <arg name="rviz" value="false"/>
+    <arg name="rviz" value="true"/>
   </include>
   <include file="$(find aubo_mobile_navigation)/launch/move_base.launch.xml"/>
 

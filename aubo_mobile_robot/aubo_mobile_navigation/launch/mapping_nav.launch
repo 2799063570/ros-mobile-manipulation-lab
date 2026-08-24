@@ -30,5 +30,5 @@
   <include file="$(find aubo_mobile_navigation)/launch/move_base.launch.xml"/>
 
   <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz"
-        args="-d $(find aubo_mobile_navigation)/rviz/navigation.rviz"/>
+        args="-d $(find aubo_mobile_navigation)/rviz/mapping.rviz"/>
 </launch>
