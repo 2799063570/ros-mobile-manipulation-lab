@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="world" default="$(find aubo_mobile_robot)/worlds/empty.world"/>
+  <arg name="gui" default="true"/>
+  <arg name="paused" default="false"/>
+  <arg name="x" default="0.0"/>
+  <arg name="y" default="0.0"/>
+  <arg name="z" default="0.02"/>
+
+  <param name="robot_description"
+         command="$(find xacro)/xacro --inorder $(find aubo_mobile_robot)/urdf/aubo_mobile_robot.xacro standalone:=false robot_namespace:=/"/>
+
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="world_name" value="$(arg world)"/>
+    <arg name="gui" value="$(arg gui)"/>
+    <arg name="paused" value="$(arg paused)"/>
+    <arg name="use_sim_time" value="true"/>
+  </include>
+
+  <node pkg="gazebo_ros" type="spawn_model" name="spawn_aubo_mobile_robot"
+        args="-urdf -param robot_description -model aubo_mobile_robot -x $(arg x) -y $(arg y) -z $(arg z)"
+        respawn="false" output="screen"/>
+
+  <node pkg="robot_state_publisher" type="robot_state_publisher"
+        name="robot_state_publisher" output="screen">
+    <param name="publish_frequency" value="50.0"/>
+  </node>
+
+  <rosparam file="$(find aubo_mobile_robot)/config/controllers.yaml" command="load"/>
+  <node name="controller_spawner" pkg="controller_manager" type="spawner"
+        respawn="false" output="screen"
+        args="joint_state_controller aubo_i5_controller gripper_controller"/>
+</launch>

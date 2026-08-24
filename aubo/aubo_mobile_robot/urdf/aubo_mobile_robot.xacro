@@ -1,0 +1,341 @@
+<?xml version="1.0"?>
+<robot name="aubo_mobile_robot" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:arg name="aubo_description_path" default="$(find aubo_description)"/>
+
+  <!-- Mobile base geometry (metres, kilograms). -->
+  <xacro:property name="base_radius" value="0.34"/>
+  <xacro:property name="base_height" value="0.18"/>
+  <xacro:property name="base_mass" value="60.0"/>
+  <xacro:property name="wheel_radius" value="0.10"/>
+  <xacro:property name="wheel_width" value="0.06"/>
+  <xacro:property name="wheel_separation" value="0.62"/>
+  <xacro:property name="wheel_mass" value="1.2"/>
+  <xacro:property name="caster_radius" value="0.04"/>
+  <xacro:property name="caster_x" value="0.23"/>
+  <xacro:property name="caster_mass" value="0.20"/>
+
+  <material name="mobile_blue">
+    <color rgba="0.08 0.30 0.68 1"/>
+  </material>
+  <material name="mobile_dark">
+    <color rgba="0.025 0.03 0.04 1"/>
+  </material>
+  <material name="mobile_silver">
+    <color rgba="0.68 0.71 0.75 1"/>
+  </material>
+  <material name="sensor_black">
+    <color rgba="0.02 0.02 0.02 1"/>
+  </material>
+
+  <!-- base_footprint lies on the ground; the mobile base frame is at wheel axle height. -->
+  <link name="base_footprint"/>
+  <joint name="mobile_base_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="mobile_base_link"/>
+    <origin xyz="0 0 ${wheel_radius}" rpy="0 0 0"/>
+  </joint>
+
+  <link name="mobile_base_link">
+    <visual>
+      <origin xyz="0 0 ${base_height / 2.0 - wheel_radius / 2.0}" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="${base_radius}" length="${base_height}"/>
+      </geometry>
+      <material name="mobile_blue"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 ${base_height / 2.0 - wheel_radius / 2.0}" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="${base_radius}" length="${base_height}"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="0 0 ${base_height / 2.0 - wheel_radius / 2.0}" rpy="0 0 0"/>
+      <mass value="${base_mass}"/>
+      <inertia
+        ixx="${base_mass * (3.0 * base_radius * base_radius + base_height * base_height) / 12.0}"
+        ixy="0" ixz="0"
+        iyy="${base_mass * (3.0 * base_radius * base_radius + base_height * base_height) / 12.0}"
+        iyz="0"
+        izz="${base_mass * base_radius * base_radius / 2.0}"/>
+    </inertial>
+  </link>
+
+  <xacro:macro name="drive_wheel" params="side y axis_sign">
+    <link name="${side}_wheel_link">
+      <visual>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+        <material name="mobile_dark"/>
+      </visual>
+      <collision>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <mass value="${wheel_mass}"/>
+        <inertia
+          ixx="${wheel_mass * (3.0 * wheel_radius * wheel_radius + wheel_width * wheel_width) / 12.0}"
+          ixy="0" ixz="0"
+          iyy="${wheel_mass * (3.0 * wheel_radius * wheel_radius + wheel_width * wheel_width) / 12.0}"
+          iyz="0"
+          izz="${wheel_mass * wheel_radius * wheel_radius / 2.0}"/>
+      </inertial>
+    </link>
+    <joint name="${side}_wheel_joint" type="continuous">
+      <parent link="mobile_base_link"/>
+      <child link="${side}_wheel_link"/>
+      <origin xyz="0 ${y} 0" rpy="${pi / 2.0} 0 0"/>
+      <axis xyz="0 0 ${axis_sign}"/>
+      <dynamics damping="0.08" friction="0.0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:drive_wheel side="left" y="${wheel_separation / 2.0}" axis_sign="-1"/>
+  <xacro:drive_wheel side="right" y="${-wheel_separation / 2.0}" axis_sign="-1"/>
+
+  <xacro:macro name="support_caster" params="name x">
+    <link name="${name}_caster_link">
+      <visual>
+        <geometry>
+          <sphere radius="${caster_radius}"/>
+        </geometry>
+        <material name="mobile_silver"/>
+      </visual>
+      <collision>
+        <geometry>
+          <sphere radius="${caster_radius}"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <mass value="${caster_mass}"/>
+        <inertia
+          ixx="${0.4 * caster_mass * caster_radius * caster_radius}" ixy="0" ixz="0"
+          iyy="${0.4 * caster_mass * caster_radius * caster_radius}" iyz="0"
+          izz="${0.4 * caster_mass * caster_radius * caster_radius}"/>
+      </inertial>
+    </link>
+    <joint name="${name}_caster_joint" type="fixed">
+      <parent link="mobile_base_link"/>
+      <child link="${name}_caster_link"/>
+      <origin xyz="${x} 0 ${caster_radius - wheel_radius}" rpy="0 0 0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:support_caster name="front" x="${caster_x}"/>
+  <xacro:support_caster name="rear" x="${-caster_x}"/>
+
+  <!-- Low pedestal on the circular chassis. -->
+  <link name="arm_mount_link">
+    <visual>
+      <origin xyz="0 0 0.04" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.15" length="0.08"/>
+      </geometry>
+      <material name="mobile_silver"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.04" rpy="0 0 0"/>
+      <geometry>
+        <cylinder radius="0.15" length="0.08"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="0 0 0.04" rpy="0 0 0"/>
+      <mass value="4.0"/>
+      <inertia ixx="0.008" ixy="0" ixz="0" iyy="0.008" iyz="0" izz="0.045"/>
+    </inertial>
+  </link>
+  <joint name="arm_mount_joint" type="fixed">
+    <parent link="mobile_base_link"/>
+    <child link="arm_mount_link"/>
+    <origin xyz="0 0 0.13" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Reuse the original AUBO i5 and gripper models without duplicating meshes. -->
+  <xacro:include filename="$(arg aubo_description_path)/urdf/arm.xacro"/>
+  <xacro:include filename="$(arg aubo_description_path)/urdf/jiazhua.urdf"/>
+
+  <joint name="aubo_base_joint" type="fixed">
+    <parent link="arm_mount_link"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 0.08" rpy="0 0 0"/>
+  </joint>
+
+  <joint name="ee_link_joint" type="fixed">
+    <parent link="wrist3_Link"/>
+    <child link="gripper_base_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Two complementary 180-degree lidars, one facing forward and one backward. -->
+  <xacro:macro name="planar_lidar" params="name x yaw topic">
+    <link name="${name}_laser_link">
+      <visual>
+        <geometry>
+          <cylinder radius="0.045" length="0.04"/>
+        </geometry>
+        <material name="sensor_black"/>
+      </visual>
+      <collision>
+        <geometry>
+          <cylinder radius="0.045" length="0.04"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <mass value="0.15"/>
+        <inertia ixx="0.00007" ixy="0" ixz="0" iyy="0.00007" iyz="0" izz="0.00015"/>
+      </inertial>
+    </link>
+    <joint name="${name}_laser_joint" type="fixed">
+      <parent link="mobile_base_link"/>
+      <child link="${name}_laser_link"/>
+      <origin xyz="${x} 0 0.17" rpy="0 0 ${yaw}"/>
+    </joint>
+    <gazebo reference="${name}_laser_link">
+      <material>Gazebo/Black</material>
+      <sensor type="ray" name="${name}_lidar">
+        <always_on>true</always_on>
+        <visualize>false</visualize>
+        <update_rate>15</update_rate>
+        <ray>
+          <scan>
+            <horizontal>
+              <samples>540</samples>
+              <resolution>1</resolution>
+              <min_angle>-${pi / 2.0}</min_angle>
+              <max_angle>${pi / 2.0}</max_angle>
+            </horizontal>
+          </scan>
+          <range>
+            <min>0.12</min>
+            <max>20.0</max>
+            <resolution>0.01</resolution>
+          </range>
+          <noise>
+            <type>gaussian</type>
+            <mean>0.0</mean>
+            <stddev>0.005</stddev>
+          </noise>
+        </ray>
+        <plugin name="${name}_gazebo_ros_laser" filename="libgazebo_ros_laser.so">
+          <topicName>${topic}</topicName>
+          <frameName>${name}_laser_link</frameName>
+        </plugin>
+      </sensor>
+    </gazebo>
+  </xacro:macro>
+
+  <xacro:planar_lidar name="front" x="0.27" yaw="0" topic="front/scan"/>
+  <xacro:planar_lidar name="rear" x="-0.27" yaw="${pi}" topic="rear/scan"/>
+
+  <!-- Camera mounted beside the hand; optical frame follows REP-103. -->
+  <link name="hand_camera_link">
+    <visual>
+      <geometry>
+        <box size="0.055 0.040 0.035"/>
+      </geometry>
+      <material name="mobile_silver"/>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.055 0.040 0.035"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.10"/>
+      <inertia ixx="0.000022" ixy="0" ixz="0" iyy="0.000035" iyz="0" izz="0.000039"/>
+    </inertial>
+  </link>
+  <joint name="hand_camera_joint" type="fixed">
+    <parent link="gripper_base_link"/>
+    <child link="hand_camera_link"/>
+    <origin xyz="0.055 0 0.045" rpy="0 0 0"/>
+  </joint>
+  <link name="hand_camera_optical_frame"/>
+  <joint name="hand_camera_optical_joint" type="fixed">
+    <parent link="hand_camera_link"/>
+    <child link="hand_camera_optical_frame"/>
+    <origin xyz="0.03 0 0" rpy="${-pi / 2.0} 0 ${-pi / 2.0}"/>
+  </joint>
+
+  <gazebo reference="hand_camera_link">
+    <material>Gazebo/Grey</material>
+    <sensor type="camera" name="hand_camera">
+      <always_on>true</always_on>
+      <visualize>false</visualize>
+      <update_rate>20</update_rate>
+      <camera name="hand_camera_sensor">
+        <horizontal_fov>1.047</horizontal_fov>
+        <image>
+          <width>640</width>
+          <height>480</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.05</near>
+          <far>20.0</far>
+        </clip>
+      </camera>
+      <plugin name="hand_gazebo_ros_camera" filename="libgazebo_ros_camera.so">
+        <cameraName>hand_camera</cameraName>
+        <imageTopicName>image_raw</imageTopicName>
+        <cameraInfoTopicName>camera_info</cameraInfoTopicName>
+        <frameName>hand_camera_optical_frame</frameName>
+      </plugin>
+    </sensor>
+  </gazebo>
+
+  <gazebo reference="mobile_base_link">
+    <material>Gazebo/Blue</material>
+  </gazebo>
+  <gazebo reference="arm_mount_link">
+    <material>Gazebo/Grey</material>
+  </gazebo>
+  <gazebo reference="left_wheel_link">
+    <material>Gazebo/Black</material>
+    <mu1>1.5</mu1>
+    <mu2>1.5</mu2>
+  </gazebo>
+  <gazebo reference="right_wheel_link">
+    <material>Gazebo/Black</material>
+    <mu1>1.5</mu1>
+    <mu2>1.5</mu2>
+  </gazebo>
+  <gazebo reference="front_caster_link">
+    <material>Gazebo/Grey</material>
+    <mu1>0.001</mu1>
+    <mu2>0.001</mu2>
+  </gazebo>
+  <gazebo reference="rear_caster_link">
+    <material>Gazebo/Grey</material>
+    <mu1>0.001</mu1>
+    <mu2>0.001</mu2>
+  </gazebo>
+
+  <gazebo>
+    <plugin name="mobile_base_diff_drive" filename="libgazebo_ros_diff_drive.so">
+      <legacyMode>false</legacyMode>
+      <alwaysOn>true</alwaysOn>
+      <updateRate>50</updateRate>
+      <leftJoint>left_wheel_joint</leftJoint>
+      <rightJoint>right_wheel_joint</rightJoint>
+      <wheelSeparation>${wheel_separation}</wheelSeparation>
+      <wheelDiameter>${2.0 * wheel_radius}</wheelDiameter>
+      <wheelAcceleration>0.8</wheelAcceleration>
+      <wheelTorque>40</wheelTorque>
+      <commandTopic>cmd_vel</commandTopic>
+      <odometryTopic>odom</odometryTopic>
+      <odometryFrame>odom</odometryFrame>
+      <robotBaseFrame>base_footprint</robotBaseFrame>
+      <odometrySource>encoder</odometrySource>
+      <publishOdomTF>true</publishOdomTF>
+      <publishWheelTF>false</publishWheelTF>
+      <publishWheelJointState>true</publishWheelJointState>
+    </plugin>
+  </gazebo>
+
+</robot>

@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>aubo_mobile_robot</name>
+  <version>0.1.0</version>
+  <description>A circular differential-drive mobile manipulator with an AUBO i5 arm, dual lidars and a hand camera.</description>
+
+  <maintainer email="wheeltec-client@todo.todo">wheeltec-client</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <exec_depend>aubo_description</exec_depend>
+  <exec_depend>controller_manager</exec_depend>
+  <exec_depend>gazebo_plugins</exec_depend>
+  <exec_depend>gazebo_ros</exec_depend>
+  <exec_depend>gazebo_ros_control</exec_depend>
+  <exec_depend>joint_state_controller</exec_depend>
+  <exec_depend>joint_state_publisher</exec_depend>
+  <exec_depend>joint_state_publisher_gui</exec_depend>
+  <exec_depend>position_controllers</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>rviz</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>trajectory_msgs</exec_depend>
+  <exec_depend>urdf</exec_depend>
+  <exec_depend>xacro</exec_depend>
+
+  <export/>
+</package>

@@ -1,6 +1,11 @@
 <?xml version="1.0"?>
 <robot name="aubo_i5" xmlns:xacro="http://ros.org/wiki/xacro">
 
+ <!-- Keep the original stand-alone behaviour by default.  Composite robots can
+      disable the world joint and place ros_control in another namespace. -->
+    <xacro:arg name="standalone" default="true"/>
+    <xacro:arg name="robot_namespace" default="/aubo_i5"/>
+
  <!-- Defining the colors used in this robot -->
     <material name="Black">
         <color rgba="0 0 0 1"/>
@@ -344,13 +349,15 @@
 -->
 
  <!-- /////////////////////////////////   world   ////////////////////////////////////// -->
-  <link name="world" />
+  <xacro:if value="$(arg standalone)">
+    <link name="world" />
 
-  <joint name="world_joint" type="fixed">
-    <parent link="world" />
-    <child link ="base_link" />
-    <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0" />
-  </joint>
+    <joint name="world_joint" type="fixed">
+      <parent link="world" />
+      <child link ="base_link" />
+      <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0" />
+    </joint>
+  </xacro:if>
 
  <!-- /////////////////////////////////   jawasm1   ////////////////////////////////////// 
   <xacro:robotiq_85_gripper prefix="" parent="tool" >
@@ -392,7 +399,7 @@
   <!-- ros_control plugin -->
   <gazebo>
       <plugin name="gazebo_ros_control" filename="libgazebo_ros_control.so">
-          <robotNamespace>/aubo_i5</robotNamespace>
+          <robotNamespace>$(arg robot_namespace)</robotNamespace>
 	        <robotSimType>gazebo_ros_control/DefaultRobotHWSim</robotSimType>
           <legacyModeNS>true</legacyModeNS>
       </plugin>

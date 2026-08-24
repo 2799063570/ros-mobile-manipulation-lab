@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="gui" default="true"/>
+
+  <param name="robot_description"
+         command="$(find xacro)/xacro --inorder $(find aubo_mobile_robot)/urdf/aubo_mobile_robot.xacro standalone:=false robot_namespace:=/"/>
+
+  <node unless="$(arg gui)" pkg="joint_state_publisher" type="joint_state_publisher"
+        name="joint_state_publisher"/>
+  <node if="$(arg gui)" pkg="joint_state_publisher_gui" type="joint_state_publisher_gui"
+        name="joint_state_publisher_gui"/>
+  <node pkg="robot_state_publisher" type="robot_state_publisher"
+        name="robot_state_publisher"/>
+  <node pkg="rviz" type="rviz" name="rviz" required="true"
+        args="-d $(find aubo_description)/config/urdf.rviz"/>
+</launch>
