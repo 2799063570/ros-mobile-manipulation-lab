@@ -59,7 +59,7 @@ class ColorSortingTask(object):
         self.gripper_open = float(rospy.get_param("~gripper_open", 0.0))
         self.gripper_closed = float(rospy.get_param("~gripper_closed", 0.42))
         self.gripper_motion_time = float(
-            rospy.get_param("~gripper_motion_time", 1.5)
+            rospy.get_param("~gripper_motion_time", 2.5)
         )
         self.sort_colors = rospy.get_param("~sort_colors", ["red", "green", "blue"])
         self.place_targets = rospy.get_param("~place_targets")

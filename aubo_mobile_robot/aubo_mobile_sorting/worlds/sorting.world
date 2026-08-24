@@ -48,10 +48,16 @@
     <model name="red_block">
       <pose>0.58 -0.12 0.470 0 0 0</pose>
       <link name="block_link">
+        <gravity>true</gravity>
+        <kinematic>false</kinematic>
         <inertial><mass>0.04</mass><inertia><ixx>0.000011</ixx><iyy>0.000011</iyy><izz>0.000011</izz></inertia></inertial>
         <collision name="collision">
+          <max_contacts>20</max_contacts>
           <geometry><box><size>0.04 0.04 0.04</size></box></geometry>
-          <surface><friction><ode><mu>2.0</mu><mu2>2.0</mu2></ode></friction></surface>
+          <surface>
+            <friction><ode><mu>5.0</mu><mu2>5.0</mu2></ode></friction>
+            <contact><ode><kp>1000000</kp><kd>100</kd><max_vel>0.01</max_vel><min_depth>0.001</min_depth></ode></contact>
+          </surface>
         </collision>
         <visual name="visual"><geometry><box><size>0.04 0.04 0.04</size></box></geometry>
           <material><ambient>0.8 0.02 0.02 1</ambient><diffuse>1 0.02 0.02 1</diffuse></material>
@@ -62,10 +68,16 @@
     <model name="green_block">
       <pose>0.66 0 0.470 0 0 0</pose>
       <link name="block_link">
+        <gravity>true</gravity>
+        <kinematic>false</kinematic>
         <inertial><mass>0.04</mass><inertia><ixx>0.000011</ixx><iyy>0.000011</iyy><izz>0.000011</izz></inertia></inertial>
         <collision name="collision">
+          <max_contacts>20</max_contacts>
           <geometry><box><size>0.04 0.04 0.04</size></box></geometry>
-          <surface><friction><ode><mu>2.0</mu><mu2>2.0</mu2></ode></friction></surface>
+          <surface>
+            <friction><ode><mu>5.0</mu><mu2>5.0</mu2></ode></friction>
+            <contact><ode><kp>1000000</kp><kd>100</kd><max_vel>0.01</max_vel><min_depth>0.001</min_depth></ode></contact>
+          </surface>
         </collision>
         <visual name="visual"><geometry><box><size>0.04 0.04 0.04</size></box></geometry>
           <material><ambient>0.02 0.8 0.02 1</ambient><diffuse>0.02 1 0.02 1</diffuse></material>
@@ -76,10 +88,16 @@
     <model name="blue_block">
       <pose>0.58 0.12 0.470 0 0 0</pose>
       <link name="block_link">
+        <gravity>true</gravity>
+        <kinematic>false</kinematic>
         <inertial><mass>0.04</mass><inertia><ixx>0.000011</ixx><iyy>0.000011</iyy><izz>0.000011</izz></inertia></inertial>
         <collision name="collision">
+          <max_contacts>20</max_contacts>
           <geometry><box><size>0.04 0.04 0.04</size></box></geometry>
-          <surface><friction><ode><mu>2.0</mu><mu2>2.0</mu2></ode></friction></surface>
+          <surface>
+            <friction><ode><mu>5.0</mu><mu2>5.0</mu2></ode></friction>
+            <contact><ode><kp>1000000</kp><kd>100</kd><max_vel>0.01</max_vel><min_depth>0.001</min_depth></ode></contact>
+          </surface>
         </collision>
         <visual name="visual"><geometry><box><size>0.04 0.04 0.04</size></box></geometry>
           <material><ambient>0.02 0.02 0.8 1</ambient><diffuse>0.02 0.02 1 1</diffuse></material>
