@@ -38,7 +38,13 @@ class ColorObjectDetector(object):
         self.position_offset_y = float(rospy.get_param("~position_offset_y", 0.0))
         self.kernel_size = int(rospy.get_param("~morphology_kernel", 5))
         self.target_frame = rospy.get_param("~target_frame", "base_link")
-        self.table_z = float(rospy.get_param("~table_z", 0.12))
+        self.table_z = float(rospy.get_param("~table_z", 0.14))
+        self.projection_plane_z = float(
+            rospy.get_param("~projection_plane_z", self.table_z + 0.05)
+        )
+        self.object_center_z = float(
+            rospy.get_param("~object_center_z", self.table_z + 0.025)
+        )
         self.min_x = float(rospy.get_param("~workspace_min_x", 0.40))
         self.max_x = float(rospy.get_param("~workspace_max_x", 0.82))
         self.min_y = float(rospy.get_param("~workspace_min_y", -0.22))
@@ -69,10 +75,11 @@ class ColorObjectDetector(object):
         )
 
         rospy.loginfo(
-            "OpenCV detector: %s -> %s on z=%.3f in %s",
+            "OpenCV detector: %s -> %s, projection z=%.3f, object z=%.3f in %s",
             self.image_topic,
             self.detections_topic,
-            self.table_z,
+            self.projection_plane_z,
+            self.object_center_z,
             self.target_frame,
         )
 
@@ -111,7 +118,7 @@ class ColorObjectDetector(object):
 
         if abs(ray_target[2]) < 1.0e-6:
             return None
-        scale = (self.table_z - origin[2]) / ray_target[2]
+        scale = (self.projection_plane_z - origin[2]) / ray_target[2]
         if scale <= 0.0:
             return None
 
@@ -122,6 +129,9 @@ class ColorObjectDetector(object):
             return None
         if not (self.min_y <= point[1] <= self.max_y):
             return None
+        # X/Y come from the visible top surface; publish the physical object
+        # centre height so the pose has an unambiguous geometric meaning.
+        point[2] = self.object_center_z
         return point
 
     def _mask_for_color(self, hsv_image, color_config):

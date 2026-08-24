@@ -190,6 +190,7 @@
   },
   "active": "91d8cfefc3ce4327",
   "lastOpenFiles": [
+    "aubo_mobile_robot/aubo_mobile_moveit_config/config/aubo_mobile_sort.rviz",
     "aubo_mobile_robot/aubo_mobile_sorting/plugin_description.xml",
     "aubo_mobile_robot/aubo_mobile_sorting/src/sorting_panel.cpp",
     "aubo_mobile_robot/aubo_mobile_sorting/src",
@@ -207,7 +208,6 @@
     "aubo_mobile_robot/aubo_mobile_sorting/launch/sorting_gazebo.launch",
     "aubo_mobile_robot/aubo_mobile_sorting/launch/sorting.launch",
     "aubo_mobile_robot/aubo_mobile_sorting/launch",
-    "aubo_mobile_robot/aubo_mobile_sorting/worlds/sorting.world",
     "aubo/aubo_mobile_robot/README.md",
     "WHEELTEC-Obsidian/04-系统数据流.md",
     "WHEELTEC-Obsidian/03-运行与调试手册.md",

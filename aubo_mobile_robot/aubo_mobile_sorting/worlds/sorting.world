@@ -4,8 +4,10 @@
     <include><uri>model://ground_plane</uri></include>
     <include><uri>model://sun</uri></include>
 
-    <!-- Robot arm base is at world z=0.33 when the robot is spawned at z=0.02.
-         The table top is therefore z=0.12 in the arm's base_link frame. -->
+    <!-- After gravity settles the wheels on the ground, base_footprint is at
+         world z=0 and the arm base_link is at z=0.31.  The table top at
+         world z=0.45 is therefore z=0.14 in base_link.  The spawn z=0.02 is
+         only initial ground clearance and is not a permanent TF offset. -->
     <model name="sorting_table">
       <static>true</static>
       <pose>0.80 0 0.25 0 0 0</pose>
@@ -25,19 +27,19 @@
 
     <!-- Visual-only sorting pads: blocks still rest on the common table plane. -->
     <model name="red_pad">
-      <static>true</static><pose>0.50 -0.32 0.452 0 0 0</pose>
+      <static>true</static><pose>0.46 -0.24 0.452 0 0 0</pose>
       <link name="link"><visual name="visual"><geometry><box><size>0.14 0.14 0.004</size></box></geometry>
         <material><ambient>0.45 0.02 0.02 1</ambient><diffuse>0.8 0.03 0.03 1</diffuse></material>
       </visual></link>
     </model>
     <model name="green_pad">
-      <static>true</static><pose>0.65 -0.32 0.452 0 0 0</pose>
+      <static>true</static><pose>0.60 -0.24 0.452 0 0 0</pose>
       <link name="link"><visual name="visual"><geometry><box><size>0.14 0.14 0.004</size></box></geometry>
         <material><ambient>0.02 0.40 0.02 1</ambient><diffuse>0.03 0.8 0.03 1</diffuse></material>
       </visual></link>
     </model>
     <model name="blue_pad">
-      <static>true</static><pose>0.50 0.32 0.452 0 0 0</pose>
+      <static>true</static><pose>0.46 0.24 0.452 0 0 0</pose>
       <link name="link"><visual name="visual"><geometry><box><size>0.14 0.14 0.004</size></box></geometry>
         <material><ambient>0.02 0.02 0.45 1</ambient><diffuse>0.03 0.03 0.8 1</diffuse></material>
       </visual></link>

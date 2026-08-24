@@ -19,14 +19,18 @@ max_contour_area: 8000.0
 max_aspect_ratio: 1.6
 morphology_kernel: 5
 
-# Plane and valid pick region expressed in target_frame (base_link).
+# 所有高度均在 target_frame（base_link）下表达。
 target_frame: base_link
-table_z: 0.12
+table_z: 0.14
+# 图像看到的是方块顶面；X/Y 射线应与顶面而不是桌面求交。
+projection_plane_z: 0.19
+# DetectedObject.pose 发布方块几何中心高度。
+object_center_z: 0.165
 workspace_min_x: 0.40
 workspace_max_x: 0.82
 workspace_min_y: -0.22
 workspace_max_y: 0.22
 
-# Gazebo 固定观察姿态下的平面投影标定值。图像中的三个方块均表现为 X +3 cm。
-position_offset_x: -0.03
+# 模型坐标修正后不再使用经验补偿；只在实测仍有固定误差时微调。
+position_offset_x: 0.0
 position_offset_y: 0.0

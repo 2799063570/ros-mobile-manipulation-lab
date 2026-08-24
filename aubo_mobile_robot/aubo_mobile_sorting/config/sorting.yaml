@@ -4,8 +4,8 @@ target_frame: base_link
 detections_topic: /sorting/detections
 gripper_action: /gripper_controller/follow_joint_trajectory
 
-table_z: 0.12
-table_center: [0.80, 0.0, -0.08]
+table_z: 0.14
+table_center: [0.80, 0.0, -0.06]
 table_size: [0.80, 1.20, 0.40]
 object_height: 0.05
 scene_update_timeout: 10.0
@@ -30,12 +30,16 @@ gripper_motion_time: 1.5
 
 sort_colors: [red, green, blue]
 place_targets:
-  red: [0.50, -0.32]
-  green: [0.65, -0.32]
-  blue: [0.50, 0.32]
+  red: [0.46, -0.24]
+  green: [0.60, -0.24]
+  blue: [0.46, 0.24]
 
 detection_timeout: 15.0
+detection_samples: 8
 detection_settle_time: 1.0
+# 感知坐标已经在 colors.yaml 中完成基础标定；剩余夹爪中心误差在这里微调。
+grasp_offset_x: 0.0
+grasp_offset_y: 0.0
 moveit_server_timeout: 30.0
 gripper_server_timeout: 30.0
 planning_time: 12.0

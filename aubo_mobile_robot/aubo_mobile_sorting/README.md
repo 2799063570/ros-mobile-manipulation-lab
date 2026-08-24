@@ -89,14 +89,19 @@ rosservice call /sorting/home
 ## 场景尺寸与坐标
 
 - Gazebo 桌面世界坐标高度：`z=0.45 m`
-- 机器人生成后 `base_link` 的世界坐标高度：`z=0.33 m`
-- 桌面在 `base_link` 坐标系下的高度：`table_z=0.12 m`
+- 机器人落地后 `base_link` 的世界坐标高度：`z=0.31 m`
+- 桌面在 `base_link` 坐标系下的高度：`table_z=0.14 m`
 - 方块尺寸：`0.05 × 0.05 × 0.05 m`
+- 方块中心高度：`z=0.165 m`；可见顶面高度：`z=0.19 m`
 - MoveIt 末端：`tcp_link`
 - 抓取时 TCP 的 Z 轴朝向桌面
 
 桌面高度、机器人生成高度和感知参数必须保持一致，否则识别坐标会出现系统性
 偏差。
+
+启动文件中的 `z=0.02 m` 只是防止模型生成时嵌入地面的初始间隙。机器人受重力
+落地后，坐标计算使用 `base_footprint z=0`，不能把该生成间隙继续计入
+`base_link` 高度。
 
 分拣节点在允许机械臂运动前会将 `sorting_table` 加入 MoveIt PlanningScene，并
 持续查询 `get_known_object_names()`。只有规划场景确认收到桌子后才会移动到观察
@@ -108,6 +113,10 @@ rosservice call /sorting/home
   识别工作区域
 - `aubo_mobile_sorting/config/sorting.yaml`：观察位姿、抓取高度、夹爪开合量、
   自动观察/自动开始开关、运动速度和各颜色放置位置
+
+抓取前默认对连续 `8` 帧同色目标坐标求平均，减少单帧轮廓中心抖动。基础相机
+偏差在感知包 `colors.yaml` 中校准；如果夹爪中心仍有少量固定误差，可通过
+`grasp_offset_x` 和 `grasp_offset_y` 微调，无需修改相机模型。
 
 默认优先使用 MoveIt 命名姿态 `observe`，它把手部相机移动到方块上方并使光轴
 朝向桌面。只有将 `observation_named_target` 设为空字符串时，程序才会改用

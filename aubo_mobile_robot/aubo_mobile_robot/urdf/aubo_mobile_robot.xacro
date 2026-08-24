@@ -354,6 +354,9 @@
   <gazebo reference="hand_camera_link">
     <material>Gazebo/Grey</material>
     <sensor type="camera" name="hand_camera">
+      <!-- Keep the Gazebo pinhole at the same +X offset as
+           hand_camera_optical_frame in the URDF TF tree. -->
+      <pose>0.03 0 0 0 0 0</pose>
       <always_on>true</always_on>
       <visualize>false</visualize>
       <update_rate>20</update_rate>

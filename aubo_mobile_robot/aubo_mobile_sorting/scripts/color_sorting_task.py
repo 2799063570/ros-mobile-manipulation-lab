@@ -37,8 +37,8 @@ class ColorSortingTask(object):
             "~gripper_action", "/gripper_controller/follow_joint_trajectory"
         )
 
-        self.table_z = float(rospy.get_param("~table_z", 0.12))
-        self.table_center = rospy.get_param("~table_center", [0.80, 0.0, -0.08])
+        self.table_z = float(rospy.get_param("~table_z", 0.14))
+        self.table_center = rospy.get_param("~table_center", [0.80, 0.0, -0.06])
         self.table_size = rospy.get_param("~table_size", [0.80, 1.20, 0.40])
         self.object_height = float(rospy.get_param("~object_height", 0.05))
         self.grasp_rpy = rospy.get_param("~grasp_rpy", [math.pi, 0.0, 0.0])
@@ -64,9 +64,14 @@ class ColorSortingTask(object):
         self.sort_colors = rospy.get_param("~sort_colors", ["red", "green", "blue"])
         self.place_targets = rospy.get_param("~place_targets")
         self.detection_timeout = float(rospy.get_param("~detection_timeout", 15.0))
+        self.detection_samples = max(
+            1, int(rospy.get_param("~detection_samples", 8))
+        )
         self.detection_settle_time = float(
             rospy.get_param("~detection_settle_time", 1.0)
         )
+        self.grasp_offset_x = float(rospy.get_param("~grasp_offset_x", 0.0))
+        self.grasp_offset_y = float(rospy.get_param("~grasp_offset_y", 0.0))
         self.gripper_server_timeout = float(
             rospy.get_param("~gripper_server_timeout", 30.0)
         )
@@ -345,16 +350,38 @@ class ColorSortingTask(object):
 
     def _wait_for_object(self, color, not_before):
         deadline = time.time() + self.detection_timeout
+        samples = []
+        last_receipt_time = not_before
         while not rospy.is_shutdown() and time.time() < deadline:
             if self._stop_requested.is_set():
                 return None
             with self._data_lock:
                 detections = self._detections
                 receipt_time = self._detections_wall_time
-            if detections is not None and receipt_time >= not_before:
+            if detections is not None and receipt_time > last_receipt_time:
+                last_receipt_time = receipt_time
                 candidates = [item for item in detections.objects if item.color == color]
                 if candidates:
-                    return max(candidates, key=lambda item: item.contour_area)
+                    samples.append(max(candidates, key=lambda item: item.contour_area))
+                    if len(samples) >= self.detection_samples:
+                        detected = copy.deepcopy(samples[-1])
+                        detected.pose.position.x = sum(
+                            item.pose.position.x for item in samples
+                        ) / float(len(samples))
+                        detected.pose.position.y = sum(
+                            item.pose.position.y for item in samples
+                        ) / float(len(samples))
+                        detected.pose.position.z = sum(
+                            item.pose.position.z for item in samples
+                        ) / float(len(samples))
+                        rospy.loginfo(
+                            "Averaged %d '%s' detections at [%.3f, %.3f]",
+                            len(samples),
+                            color,
+                            detected.pose.position.x,
+                            detected.pose.position.y,
+                        )
+                        return detected
             rospy.sleep(0.1)
         rospy.logerr(
             "No fresh '%s' object detected within %.1f seconds",
@@ -396,8 +423,8 @@ class ColorSortingTask(object):
 
     def _pick_and_place(self, detected):
         color = detected.color
-        object_x = detected.pose.position.x
-        object_y = detected.pose.position.y
+        object_x = detected.pose.position.x + self.grasp_offset_x
+        object_y = detected.pose.position.y + self.grasp_offset_y
         grasp_z = self.table_z + 0.5 * self.object_height
         travel_z = self.table_z + self.lift_height
 
