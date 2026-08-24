@@ -7,7 +7,7 @@ gripper_action: /gripper_controller/follow_joint_trajectory
 table_z: 0.14
 table_center: [0.80, 0.0, -0.06]
 table_size: [0.80, 1.20, 0.40]
-object_height: 0.05
+object_height: 0.04
 scene_update_timeout: 10.0
 
 # roll=pi 时 TCP 的 +Z 朝下，手部相机光轴与 TCP 的 +Z 方向一致。
@@ -20,12 +20,12 @@ auto_move_to_observation: true
 auto_start: false
 pregrasp_height: 0.25
 lift_height: 0.30
-place_clearance: 0.025
+place_clearance: 0.02
 cartesian_step: 0.01
 minimum_cartesian_fraction: 0.90
 
 gripper_open: 0.0
-gripper_closed: 0.35
+gripper_closed: 0.42
 gripper_motion_time: 1.5
 
 sort_colors: [red, green, blue]

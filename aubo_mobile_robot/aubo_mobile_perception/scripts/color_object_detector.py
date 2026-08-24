@@ -39,11 +39,16 @@ class ColorObjectDetector(object):
         self.kernel_size = int(rospy.get_param("~morphology_kernel", 5))
         self.target_frame = rospy.get_param("~target_frame", "base_link")
         self.table_z = float(rospy.get_param("~table_z", 0.14))
+        self.object_height = float(rospy.get_param("~object_height", 0.04))
         self.projection_plane_z = float(
-            rospy.get_param("~projection_plane_z", self.table_z + 0.05)
+            rospy.get_param(
+                "~projection_plane_z", self.table_z + self.object_height
+            )
         )
         self.object_center_z = float(
-            rospy.get_param("~object_center_z", self.table_z + 0.025)
+            rospy.get_param(
+                "~object_center_z", self.table_z + 0.5 * self.object_height
+            )
         )
         self.min_x = float(rospy.get_param("~workspace_min_x", 0.40))
         self.max_x = float(rospy.get_param("~workspace_max_x", 0.82))

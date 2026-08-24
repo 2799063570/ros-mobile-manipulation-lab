@@ -48,6 +48,7 @@ ROS Melodic 默认使用 Python 2，运行环境需要安装 `python-opencv`、`
 - 最小和最大轮廓面积
 - 最大轮廓长宽比，用于排除画面边缘的分类色块
 - `table_z` 桌面在 `base_link` 下的高度
+- `object_height` 当前抓取物体高度
 - `projection_plane_z` 图像射线使用的方块顶面高度
 - `object_center_z` 检测位姿发布的方块中心高度
 - 允许抓取的 X、Y 工作范围

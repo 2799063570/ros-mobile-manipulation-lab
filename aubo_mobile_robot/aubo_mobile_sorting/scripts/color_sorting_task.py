@@ -40,7 +40,7 @@ class ColorSortingTask(object):
         self.table_z = float(rospy.get_param("~table_z", 0.14))
         self.table_center = rospy.get_param("~table_center", [0.80, 0.0, -0.06])
         self.table_size = rospy.get_param("~table_size", [0.80, 1.20, 0.40])
-        self.object_height = float(rospy.get_param("~object_height", 0.05))
+        self.object_height = float(rospy.get_param("~object_height", 0.04))
         self.grasp_rpy = rospy.get_param("~grasp_rpy", [math.pi, 0.0, 0.0])
         self.observation_pose = rospy.get_param(
             "~observation_pose", [0.58, 0.0, 0.62]
@@ -50,14 +50,14 @@ class ColorSortingTask(object):
         )
         self.pregrasp_height = float(rospy.get_param("~pregrasp_height", 0.25))
         self.lift_height = float(rospy.get_param("~lift_height", 0.30))
-        self.place_clearance = float(rospy.get_param("~place_clearance", 0.025))
+        self.place_clearance = float(rospy.get_param("~place_clearance", 0.02))
         self.cartesian_step = float(rospy.get_param("~cartesian_step", 0.01))
         self.minimum_cartesian_fraction = float(
             rospy.get_param("~minimum_cartesian_fraction", 0.90)
         )
 
         self.gripper_open = float(rospy.get_param("~gripper_open", 0.0))
-        self.gripper_closed = float(rospy.get_param("~gripper_closed", 0.35))
+        self.gripper_closed = float(rospy.get_param("~gripper_closed", 0.42))
         self.gripper_motion_time = float(
             rospy.get_param("~gripper_motion_time", 1.5)
         )

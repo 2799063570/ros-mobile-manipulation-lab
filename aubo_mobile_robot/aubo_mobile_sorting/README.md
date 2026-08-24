@@ -91,8 +91,8 @@ rosservice call /sorting/home
 - Gazebo 桌面世界坐标高度：`z=0.45 m`
 - 机器人落地后 `base_link` 的世界坐标高度：`z=0.31 m`
 - 桌面在 `base_link` 坐标系下的高度：`table_z=0.14 m`
-- 方块尺寸：`0.05 × 0.05 × 0.05 m`
-- 方块中心高度：`z=0.165 m`；可见顶面高度：`z=0.19 m`
+- 方块尺寸：`0.04 × 0.04 × 0.04 m`，三块均以 `yaw=0` 水平摆正
+- 方块中心高度：`z=0.16 m`；可见顶面高度：`z=0.18 m`
 - MoveIt 末端：`tcp_link`
 - 抓取时 TCP 的 Z 轴朝向桌面
 
@@ -121,6 +121,10 @@ rosservice call /sorting/home
 默认优先使用 MoveIt 命名姿态 `observe`，它把手部相机移动到方块上方并使光轴
 朝向桌面。只有将 `observation_named_target` 设为空字符串时，程序才会改用
 `observation_pose` 的在线笛卡尔逆解。
+
+为减少机械臂向桌子后侧大角度扫动，`shoulder_joint` 在共享 URDF 以及纯机械臂、
+移动机械臂两套 MoveIt 配置中均限制为 `-80°～+80°`（`±1.3962634 rad`）。
+4 cm 方块对应的默认夹爪闭合位置为 `gripper_closed: 0.42`。
 
 ## 调试方法
 

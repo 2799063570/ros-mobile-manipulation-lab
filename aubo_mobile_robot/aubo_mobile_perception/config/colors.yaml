@@ -22,10 +22,11 @@ morphology_kernel: 5
 # 所有高度均在 target_frame（base_link）下表达。
 target_frame: base_link
 table_z: 0.14
+object_height: 0.04
 # 图像看到的是方块顶面；X/Y 射线应与顶面而不是桌面求交。
-projection_plane_z: 0.19
+projection_plane_z: 0.18
 # DetectedObject.pose 发布方块几何中心高度。
-object_center_z: 0.165
+object_center_z: 0.16
 workspace_min_x: 0.40
 workspace_max_x: 0.82
 workspace_min_y: -0.22

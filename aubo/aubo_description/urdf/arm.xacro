@@ -167,7 +167,9 @@
     <parent link="base_link" />
     <child link="shoulder_Link" />
     <axis xyz="0 0 1" />
-    <limit lower="-3.04" upper="3.04" effort="300" velocity="100" />
+    <!-- Keep the shoulder away from the table-side rear sweep:
+         -90 deg + 10 deg <= q <= 90 deg - 10 deg. -->
+    <limit lower="-1.3962634" upper="1.3962634" effort="300" velocity="100" />
   </joint>
 
 
