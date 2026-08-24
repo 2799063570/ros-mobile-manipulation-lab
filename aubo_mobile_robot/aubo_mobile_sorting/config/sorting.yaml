@@ -8,6 +8,8 @@ table_z: 0.14
 table_center: [0.80, 0.0, -0.06]
 table_size: [0.80, 1.20, 0.40]
 object_height: 0.04
+# TCP 对准物体中心后再上移 1 cm，避免指尖与桌面发生接触。
+grasp_height_offset: 0.01
 scene_update_timeout: 10.0
 
 # roll=pi 时 TCP 的 +Z 朝下，手部相机光轴与 TCP 的 +Z 方向一致。

@@ -46,6 +46,9 @@ class ColorSortingTask(object):
         self.table_center = rospy.get_param("~table_center", [0.80, 0.0, -0.06])
         self.table_size = rospy.get_param("~table_size", [0.80, 1.20, 0.40])
         self.object_height = float(rospy.get_param("~object_height", 0.04))
+        self.grasp_height_offset = float(
+            rospy.get_param("~grasp_height_offset", 0.01)
+        )
         self.grasp_rpy = rospy.get_param("~grasp_rpy", [math.pi, 0.0, 0.0])
         self.observation_pose = rospy.get_param(
             "~observation_pose", [0.58, 0.0, 0.62]
@@ -372,11 +375,18 @@ class ColorSortingTask(object):
         for joint_name in goal.trajectory.joint_names:
             path_tolerance = JointTolerance()
             path_tolerance.name = joint_name
-            path_tolerance.position = position_tolerance
+            # A contact-closing motion cannot follow a free-space trajectory
+            # after the fingers touch the object.  In control_msgs, -1 erases
+            # the controller's default tolerance for this goal.
+            path_tolerance.position = -1.0 if closing else position_tolerance
+            path_tolerance.velocity = -1.0 if closing else 0.0
+            path_tolerance.acceleration = -1.0 if closing else 0.0
             goal.path_tolerance.append(path_tolerance)
             goal_tolerance = JointTolerance()
             goal_tolerance.name = joint_name
             goal_tolerance.position = position_tolerance
+            goal_tolerance.velocity = -1.0 if closing else 0.0
+            goal_tolerance.acceleration = -1.0 if closing else 0.0
             goal.goal_tolerance.append(goal_tolerance)
         goal.goal_time_tolerance = rospy.Duration(3.0)
 
@@ -503,7 +513,11 @@ class ColorSortingTask(object):
         color = detected.color
         object_x = detected.pose.position.x + self.grasp_offset_x
         object_y = detected.pose.position.y + self.grasp_offset_y
-        grasp_z = self.table_z + 0.5 * self.object_height
+        grasp_z = (
+            self.table_z
+            + 0.5 * self.object_height
+            + self.grasp_height_offset
+        )
         travel_z = self.table_z + self.lift_height
 
         rospy.loginfo(
