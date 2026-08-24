@@ -1,6 +1,11 @@
 <?xml version="1.0"?>
 <robot name="aubo_mobile_robot" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
+  <!-- Composite-model defaults.  Declaring these before arm.xacro is included
+       keeps the AUBO base attached only to arm_mount_link, even when tools such
+       as MoveIt Setup Assistant invoke this Xacro without extra arguments. -->
+  <xacro:arg name="standalone" default="false"/>
+  <xacro:arg name="robot_namespace" default="/"/>
   <xacro:arg name="aubo_description_path" default="$(find aubo_description)"/>
 
   <!-- Mobile base geometry (metres, kilograms). -->
@@ -173,6 +178,45 @@
 
   <!-- Two complementary 180-degree lidars, one facing forward and one backward. -->
   <xacro:macro name="planar_lidar" params="name x yaw topic">
+    <link name="${name}_laser_mount_link">
+      <!-- A round foot and short post visibly connect the lidar to the chassis. -->
+      <visual>
+        <origin xyz="0 0 0.004" rpy="0 0 0"/>
+        <geometry>
+          <cylinder radius="0.055" length="0.008"/>
+        </geometry>
+        <material name="mobile_silver"/>
+      </visual>
+      <visual>
+        <origin xyz="0 0 0.018" rpy="0 0 0"/>
+        <geometry>
+          <cylinder radius="0.014" length="0.028"/>
+        </geometry>
+        <material name="mobile_silver"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0.004" rpy="0 0 0"/>
+        <geometry>
+          <cylinder radius="0.055" length="0.008"/>
+        </geometry>
+      </collision>
+      <collision>
+        <origin xyz="0 0 0.018" rpy="0 0 0"/>
+        <geometry>
+          <cylinder radius="0.014" length="0.028"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <origin xyz="0 0 0.010" rpy="0 0 0"/>
+        <mass value="0.10"/>
+        <inertia ixx="0.00004" ixy="0" ixz="0" iyy="0.00004" iyz="0" izz="0.00008"/>
+      </inertial>
+    </link>
+    <joint name="${name}_laser_mount_joint" type="fixed">
+      <parent link="mobile_base_link"/>
+      <child link="${name}_laser_mount_link"/>
+      <origin xyz="${x} 0 0.13" rpy="0 0 ${yaw}"/>
+    </joint>
     <link name="${name}_laser_link">
       <visual>
         <geometry>
@@ -191,10 +235,13 @@
       </inertial>
     </link>
     <joint name="${name}_laser_joint" type="fixed">
-      <parent link="mobile_base_link"/>
+      <parent link="${name}_laser_mount_link"/>
       <child link="${name}_laser_link"/>
-      <origin xyz="${x} 0 0.17" rpy="0 0 ${yaw}"/>
+      <origin xyz="0 0 0.04" rpy="0 0 0"/>
     </joint>
+    <gazebo reference="${name}_laser_mount_link">
+      <material>Gazebo/Grey</material>
+    </gazebo>
     <gazebo reference="${name}_laser_link">
       <material>Gazebo/Black</material>
       <sensor type="ray" name="${name}_lidar">
@@ -233,6 +280,46 @@
   <xacro:planar_lidar name="rear" x="-0.27" yaw="${pi}" topic="rear/scan"/>
 
   <!-- Camera mounted beside the hand; optical frame follows REP-103. -->
+  <link name="hand_camera_mount_link">
+    <!-- Two bars form an L bracket from the gripper body to the side camera. -->
+    <visual>
+      <origin xyz="0 -0.035 0.055" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.024 0.070 0.012"/>
+      </geometry>
+      <material name="mobile_dark"/>
+    </visual>
+    <visual>
+      <origin xyz="0.020 -0.070 0.055" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.040 0.024 0.012"/>
+      </geometry>
+      <material name="mobile_dark"/>
+    </visual>
+    <collision>
+      <origin xyz="0 -0.035 0.055" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.024 0.070 0.012"/>
+      </geometry>
+    </collision>
+    <collision>
+      <origin xyz="0.020 -0.070 0.055" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.040 0.024 0.012"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="0.010 -0.050 0.055" rpy="0 0 0"/>
+      <mass value="0.12"/>
+      <inertia ixx="0.000066" ixy="0" ixz="0" iyy="0.000018" iyz="0" izz="0.000080"/>
+    </inertial>
+  </link>
+  <joint name="hand_camera_mount_joint" type="fixed">
+    <parent link="gripper_base_link"/>
+    <child link="hand_camera_mount_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
+
   <link name="hand_camera_link">
     <visual>
       <geometry>
@@ -251,9 +338,9 @@
     </inertial>
   </link>
   <joint name="hand_camera_joint" type="fixed">
-    <parent link="gripper_base_link"/>
+    <parent link="hand_camera_mount_link"/>
     <child link="hand_camera_link"/>
-    <origin xyz="0.055 0 0.045" rpy="0 0 0"/>
+    <origin xyz="0.040 -0.070 0.055" rpy="0 0 0"/>
   </joint>
   <link name="hand_camera_optical_frame"/>
   <joint name="hand_camera_optical_joint" type="fixed">
@@ -287,6 +374,9 @@
         <frameName>hand_camera_optical_frame</frameName>
       </plugin>
     </sensor>
+  </gazebo>
+  <gazebo reference="hand_camera_mount_link">
+    <material>Gazebo/Black</material>
   </gazebo>
 
   <gazebo reference="mobile_base_link">

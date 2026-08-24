@@ -3,7 +3,7 @@
   <arg name="gui" default="true"/>
 
   <param name="robot_description"
-         command="$(find xacro)/xacro --inorder $(find aubo_mobile_robot)/urdf/aubo_mobile_robot.xacro standalone:=false robot_namespace:=/"/>
+         command="$(find xacro)/xacro --inorder $(find aubo_mobile_robot)/urdf/aubo_mobile_robot.xacro"/>
 
   <node unless="$(arg gui)" pkg="joint_state_publisher" type="joint_state_publisher"
         name="joint_state_publisher"/>
