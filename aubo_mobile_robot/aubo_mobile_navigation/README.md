@@ -1,116 +1,107 @@
-# AUBO mobile navigation
+# AUBO 移动机器人导航
 
-ROS 1 mapping, localization and navigation for the circular AUBO mobile
-manipulator. The package is designed for the frames and topics published by
-`aubo_mobile_robot`.
+该 ROS 1 功能包用于圆形 AUBO 移动机械臂的建图、定位和导航，坐标系及话题与
+`aubo_mobile_robot` 核心模型保持一致。
 
-## Data flow
+## 数据流
 
 ```text
 /front/scan ─┐
-             ├─ dual_laser_merger ─ /scan ─ GMapping or AMCL + move_base
+             ├─ dual_laser_merger ─ /scan ─ GMapping 或 AMCL + move_base
 /rear/scan  ─┘
 
-odom ───────── differential-drive plugin
-map -> odom ── GMapping while mapping, AMCL while navigating a saved map
+odom ───────── 差速底盘 Gazebo 插件
+map -> odom ── 建图时由 GMapping 发布，加载地图导航时由 AMCL 发布
 ```
 
-The merger transforms both scans into `base_footprint` before producing a
-720-sample, 360-degree `/scan`. It accounts for the front/rear sensor offsets
-and orientations rather than simply concatenating the two range arrays.
+雷达合并节点先将前后扫描变换到 `base_footprint`，再生成包含 720 个采样点的
+360° `/scan`。该过程会考虑两个雷达的安装位置和方向，并非直接拼接距离数组。
 
-## Build
+## 编译
 
-From the catkin workspace root:
+在 catkin 工作空间根目录执行：
 
 ```bash
 catkin_make
 source devel/setup.bash
 ```
 
-Keep the arm in a folded/home pose before driving. The configured `0.40 m`
-navigation radius covers the folded robot, not a fully extended arm.
+底盘行驶前应将机械臂收回到折叠或 `home` 姿态。导航参数中的 `0.40 m` 机器人
+半径只覆盖收拢后的机器人，不覆盖完全伸展的机械臂。
 
-Do not run the fake-controller `aubo_mobile_moveit_config/demo.launch` together
-with navigation: that demo publishes a static `odom -> base_footprint` transform,
-which conflicts with differential-drive odometry. For combined arm and base
-simulation, use the Gazebo/real-controller MoveIt launch path instead.
+不要同时运行导航和使用假控制器的 `aubo_mobile_moveit_config/demo.launch`。
+该演示会发布静态 `odom -> base_footprint`，与差速底盘里程计冲突。底盘与机械臂
+联合仿真时，应使用 Gazebo 真实控制器版本的 MoveIt 启动文件。
 
-## Mapping in Gazebo
+## Gazebo 建图
 
-Start the robot, scan merger, GMapping and RViz together:
+同时启动机器人、双雷达合并、GMapping 和 RViz：
 
 ```bash
 roslaunch aubo_mobile_navigation mapping_gazebo.launch
 ```
 
-Pass another world when required:
+指定其他 Gazebo 场景：
 
 ```bash
 roslaunch aubo_mobile_navigation mapping_gazebo.launch \
   world:=/absolute/path/to/site.world
 ```
 
-Drive the base by publishing `/cmd_vel`. If `teleop_twist_keyboard` is
-installed, one option is:
+通过 `/cmd_vel` 控制底盘探索环境，也可以运行本项目的键盘节点：
 
 ```bash
-rosrun teleop_twist_keyboard teleop_twist_keyboard.py \
-  _speed:=0.20 _turn:=0.60
+rosrun aubo_mobile_control keyboard_teleop.py
 ```
 
-When the map is complete, save it:
+建图结束后保存地图：
 
 ```bash
 roslaunch aubo_mobile_navigation map_saver.launch
 ```
 
-This creates `maps/map.yaml` and `maps/map.pgm`. An absolute writable path can
-also be supplied:
+默认生成 `maps/map.yaml` 和 `maps/map.pgm`。也可以指定绝对路径：
 
 ```bash
 roslaunch aubo_mobile_navigation map_saver.launch \
   map_name:=/absolute/writable/path/site_map
 ```
 
-## Navigation with a saved map
+## 使用已有地图导航
 
-Start Gazebo, map server, AMCL, move_base, scan merger and RViz:
+同时启动 Gazebo、地图服务器、AMCL、move_base、雷达合并和 RViz：
 
 ```bash
 roslaunch aubo_mobile_navigation navigation_gazebo.launch \
   map_file:=$(rospack find aubo_mobile_navigation)/maps/map.yaml
 ```
 
-In RViz:
+在 RViz 中：
 
-1. Use **2D Pose Estimate** to initialize AMCL.
-2. Use **2D Nav Goal** to send a goal.
+1. 使用 **2D Pose Estimate** 设置 AMCL 初始位姿。
+2. 使用 **2D Nav Goal** 发送导航目标。
 
-For a real robot or when Gazebo is already running, omit the simulator:
+真实机器人或 Gazebo 已经运行时，不再启动仿真器：
 
 ```bash
 roslaunch aubo_mobile_navigation navigation.launch \
   map_file:=/absolute/path/to/map.yaml
 ```
 
-To navigate while building a live map, first start the robot and then run:
+需要边建图边运行 move_base 时，先启动机器人，再执行：
 
 ```bash
 roslaunch aubo_mobile_navigation mapping_navigation.launch
 ```
 
-To start Gazebo, GMapping and move_base together—matching the structure of the
-reference `simple_diff_robot_gazebo/launch/mapping_nav.launch`—run:
+按照参考工程 `simple_diff_robot_gazebo/launch/mapping_nav.launch` 的结构，同时
+启动 Gazebo、GMapping 和 move_base：
 
 ```bash
 roslaunch aubo_mobile_navigation mapping_nav.launch
 ```
 
-Run `rosrun aubo_mobile_control keyboard_teleop.py` from another interactive
-terminal to explore the environment.
-
-## Checks
+## 检查命令
 
 ```bash
 rostopic hz /front/scan
@@ -121,11 +112,11 @@ rostopic echo -n 1 /map
 rostopic echo -n 1 /move_base/status
 ```
 
-Expected TF ownership:
+正常情况下 TF 发布关系为：
 
-- the differential-drive plugin publishes `odom -> base_footprint`;
-- GMapping publishes `map -> odom` during mapping;
-- AMCL publishes `map -> odom` during saved-map navigation.
+- 差速底盘插件发布 `odom -> base_footprint`
+- 建图时 GMapping 发布 `map -> odom`
+- 加载已有地图导航时 AMCL 发布 `map -> odom`
 
-Never run GMapping and AMCL together because both would try to own the same
-`map -> odom` transform.
+不要同时运行 GMapping 和 AMCL，否则二者会同时尝试发布 `map -> odom`，产生
+TF 冲突。

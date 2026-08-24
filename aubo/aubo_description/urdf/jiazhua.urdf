@@ -123,6 +123,24 @@
   </joint>
   <link name="tcp_link" />
 
+  <!-- Contact parameters for grasping lightweight objects in Gazebo. -->
+  <gazebo reference="Link1">
+    <mu1>2.0</mu1>
+    <mu2>2.0</mu2>
+    <kp>100000</kp>
+    <kd>10</kd>
+    <minDepth>0.001</minDepth>
+    <maxVel>0.05</maxVel>
+  </gazebo>
+  <gazebo reference="Link2">
+    <mu1>2.0</mu1>
+    <mu2>2.0</mu2>
+    <kp>100000</kp>
+    <kd>10</kd>
+    <minDepth>0.001</minDepth>
+    <maxVel>0.05</maxVel>
+  </gazebo>
+
   <!-- ros_control transmissions used by Gazebo and compatible hardware interfaces. -->
   <transmission name="joint1_trans">
     <type>transmission_interface/SimpleTransmission</type>

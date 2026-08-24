@@ -340,7 +340,9 @@
   <joint name="hand_camera_joint" type="fixed">
     <parent link="hand_camera_mount_link"/>
     <child link="hand_camera_link"/>
-    <origin xyz="0.040 -0.070 0.055" rpy="0 0 0"/>
+    <!-- Gazebo cameras look along local +X. Rotate +X onto the gripper's +Z
+         approach axis so a downward grasp pose also looks at the table. -->
+    <origin xyz="0.040 -0.070 0.055" rpy="0 ${-pi / 2.0} 0"/>
   </joint>
   <link name="hand_camera_optical_frame"/>
   <joint name="hand_camera_optical_joint" type="fixed">

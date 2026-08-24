@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="world" default="$(find aubo_mobile_sorting)/worlds/sorting.world"/>
+  <arg name="gui" default="true"/>
+  <arg name="rviz" default="true"/>
+  <arg name="debug_view" default="true"/>
+  <arg name="paused" default="false"/>
+
+  <include file="$(find aubo_mobile_robot)/launch/gazebo.launch">
+    <arg name="world" value="$(arg world)"/>
+    <arg name="gui" value="$(arg gui)"/>
+    <arg name="paused" value="$(arg paused)"/>
+    <arg name="x" value="0.0"/>
+    <arg name="y" value="0.0"/>
+    <arg name="z" value="0.02"/>
+  </include>
+
+  <!-- Use Gazebo trajectory controllers and the live odom -> base_footprint TF. -->
+  <include file="$(find aubo_mobile_moveit_config)/launch/move_group.launch">
+    <arg name="allow_trajectory_execution" value="true"/>
+    <arg name="fake_execution" value="false"/>
+    <arg name="load_robot_description" value="false"/>
+  </include>
+
+  <include file="$(find aubo_mobile_sorting)/launch/sorting.launch">
+    <arg name="debug_view" value="$(arg debug_view)"/>
+  </include>
+
+  <include if="$(arg rviz)" file="$(find aubo_mobile_moveit_config)/launch/moveit_rviz.launch">
+    <arg name="rviz_config" value="$(find aubo_mobile_moveit_config)/launch/moveit.rviz"/>
+  </include>
+</launch>

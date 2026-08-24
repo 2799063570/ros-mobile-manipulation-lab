@@ -1,5 +1,4 @@
-# Maps
+# 地图文件
 
-Run `map_saver.launch` after mapping. By default it creates `map.pgm` and
-`map.yaml` in this directory. Commit site maps only when they are intended to be
-shared with the project.
+完成建图后运行 `map_saver.launch`。默认会在本目录生成 `map.pgm` 和
+`map.yaml`。只有需要在项目中共享的场地地图才建议提交到版本库。

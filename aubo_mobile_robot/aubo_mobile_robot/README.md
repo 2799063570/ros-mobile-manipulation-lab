@@ -1,45 +1,45 @@
-# AUBO mobile manipulator
+# AUBO 差速移动机械臂
 
-This ROS 1 package combines the existing AUBO i5 model with a circular
-differential-drive base for Gazebo Classic.
+该 ROS 1 功能包将已有的 AUBO i5 机械臂模型与圆形差速底盘组合，用于 Gazebo
+Classic 仿真。
 
-## Model
+## 机器人模型
 
-- 0.68 m diameter circular chassis, two powered wheels and two passive supports
-- AUBO i5 arm and the existing two-finger gripper from `aubo_description`
-- front lidar: `front_laser_link`, topic `/front/scan`, forward 180 degrees
-- rear lidar: `rear_laser_link`, topic `/rear/scan`, rearward 180 degrees
-- hand RGB camera: `hand_camera_optical_frame`, topics
-  `/hand_camera/image_raw` and `/hand_camera/camera_info`
-- visible collision-enabled mounting posts for both lidars and a side-mounted
-  L bracket for the hand camera
-- differential drive command: `/cmd_vel`
-- wheel odometry: `/odom` and TF `odom -> base_footprint`
-- arm trajectory action: `/aubo_i5_controller/follow_joint_trajectory`
-- gripper trajectory action: `/gripper_controller/follow_joint_trajectory`
+- 直径 `0.68 m` 的圆形底盘、两个驱动轮和两个被动支撑轮
+- 复用 `aubo_description` 中的 AUBO i5 机械臂和双指夹爪
+- 前雷达：`front_laser_link`，话题 `/front/scan`，扫描前方 180°
+- 后雷达：`rear_laser_link`，话题 `/rear/scan`，扫描后方 180°
+- 手部 RGB 相机：`hand_camera_optical_frame`
+- 相机话题：`/hand_camera/image_raw` 和 `/hand_camera/camera_info`
+- 两个雷达带有可见且参与碰撞计算的安装支柱
+- 手部相机通过 L 形支架连接在夹爪侧面
+- 相机光轴与夹爪接近方向一致，TCP 朝下时相机同时观察桌面
+- 底盘速度指令：`/cmd_vel`
+- 轮式里程计：`/odom`，并发布 TF `odom -> base_footprint`
+- 机械臂轨迹接口：`/aubo_i5_controller/follow_joint_trajectory`
+- 夹爪轨迹接口：`/gripper_controller/follow_joint_trajectory`
 
-The two lidar scans are deliberately separate so that downstream navigation can
-either use them independently or merge them with the scan-merger package chosen
-for the target robot.
+前后雷达保留为两个独立的扫描话题。导航功能可以分别使用，也可以通过激光
+雷达合并节点生成统一的 `/scan`。
 
-## Run in Gazebo
+## 启动 Gazebo
 
-Build and source the catkin workspace, then run:
+完成 catkin 工作空间编译并加载环境后执行：
 
 ```bash
 roslaunch aubo_mobile_robot gazebo.launch
 ```
 
-Drive the base from another terminal:
+在另一个终端发送底盘速度：
 
 ```bash
 rostopic pub -r 10 /cmd_vel geometry_msgs/Twist \
   '{linear: {x: 0.15}, angular: {z: 0.0}}'
 ```
 
-Stop it with `Ctrl-C`, then publish a zero command if necessary.
+按 `Ctrl-C` 停止持续发布，必要时再发送一次零速度指令。
 
-Send a simple arm pose:
+发送简单的机械臂关节轨迹：
 
 ```bash
 rostopic pub -1 /aubo_i5_controller/command trajectory_msgs/JointTrajectory \
@@ -49,7 +49,7 @@ points:
   time_from_start: {secs: 4}"
 ```
 
-Close both gripper fingers:
+闭合双指夹爪：
 
 ```bash
 rostopic pub -1 /gripper_controller/command trajectory_msgs/JointTrajectory \
@@ -59,13 +59,13 @@ points:
   time_from_start: {secs: 2}"
 ```
 
-To inspect only the kinematic model in RViz:
+只在 RViz 中检查运动学模型：
 
 ```bash
 roslaunch aubo_mobile_robot display.launch
 ```
 
-## Useful checks
+## 常用检查命令
 
 ```bash
 rostopic echo /front/scan
@@ -75,41 +75,37 @@ rostopic echo /odom
 rosservice call /controller_manager/list_controllers
 ```
 
-The original stand-alone AUBO launch files still work as before. The small
-change in `aubo_description/urdf/arm.xacro` only makes its world joint and
-ros_control namespace configurable; both retain their original defaults.
+原有的独立 AUBO 机械臂启动文件仍可继续使用。对
+`aubo_description/urdf/arm.xacro` 的调整只是让世界关节和 ros_control 命名空间
+可以配置，并保留了原来的默认值。
 
-## MoveIt Setup Assistant
+## 配置 MoveIt Setup Assistant
 
-Create a separate `aubo_mobile_moveit_config` package instead of overwriting the
-existing arm-only `aubo_moveit_config` package:
+不要覆盖原来的纯机械臂 `aubo_moveit_config`，应单独生成
+`aubo_mobile_moveit_config`：
 
 ```bash
 roslaunch moveit_setup_assistant setup_assistant.launch
 ```
 
-In the assistant, choose **Create New MoveIt Configuration Package**, browse to
-`aubo_mobile_robot/urdf/aubo_mobile_robot.xacro`, and use these settings:
+选择 **Create New MoveIt Configuration Package**，加载
+`aubo_mobile_robot/urdf/aubo_mobile_robot.xacro`，然后按以下方式设置：
 
-1. Generate the self-collision matrix with a high sampling density. Review
-   arm-to-chassis pairs carefully; do not disable a pair that can collide.
-2. Add a planar virtual joint named `world_joint`, with parent frame `odom` and
-   child link `base_footprint`. This lets MoveIt track the mobile base pose but
-   does not make MoveIt drive the differential base.
-3. Create arm group `aubo_i5` as a kinematic chain from `base_link` to
-   `tcp_link`, using the KDL solver. `tcp_link` is the grasp tool centre point;
-   keep `gripper_link` only as the compatible intermediate frame.
-4. Create gripper group `gripper` from joints `joint1` and `joint2`.
-5. Add end effector `aubo_gripper`: group `gripper`, parent link
-   `gripper_base_link`, parent group `aubo_i5`.
-6. Mark `left_wheel_joint` and `right_wheel_joint` as passive joints. Navigation
-   owns `/cmd_vel`; arm planning should not include either wheel joint.
-7. Add useful poses such as arm `zero`/`home` and gripper `open`/`closed`.
-8. Use `/aubo_i5_controller` for the six arm joints and
-   `/gripper_controller` for `joint1` and `joint2`.
-9. Generate the package beside the inner robot package, inside the common
-   collection directory: `aubo_mobile_robot/aubo_mobile_moveit_config`.
+1. 使用较高采样密度生成自碰撞矩阵，重点检查机械臂与底盘的碰撞对。
+2. 添加平面虚拟关节 `world_joint`：父坐标系为 `odom`，子链接为
+   `base_footprint`。该关节用于跟踪底盘位姿，不负责驱动差速底盘。
+3. 创建机械臂规划组 `aubo_i5`，运动链从 `base_link` 到 `tcp_link`，运动学
+   求解器选择 KDL。`tcp_link` 是抓取工具中心，`gripper_link` 仅作为兼容链接。
+4. 创建夹爪规划组 `gripper`，包含 `joint1` 和 `joint2`。
+5. 添加末端执行器 `aubo_gripper`：末端组为 `gripper`，父链接为
+   `gripper_base_link`，父规划组为 `aubo_i5`。
+6. 将 `left_wheel_joint` 和 `right_wheel_joint` 标记为被动关节。导航通过
+   `/cmd_vel` 管理底盘，机械臂规划组不应包含车轮关节。
+7. 添加机械臂 `zero`、`home`、`down` 以及夹爪 `open`、`closed` 等常用姿态。
+8. 六个机械臂关节使用 `/aubo_i5_controller`，夹爪关节使用
+   `/gripper_controller`。
+9. 将新配置包生成到集合目录中，与核心机器人包平行：
+   `aubo_mobile_robot/aubo_mobile_moveit_config`。
 
-The current hand camera is RGB-only, so leave the 3D perception section empty.
-Configure an OctoMap sensor there only after changing the hand sensor to a depth
-camera or adding a point-cloud source.
+当前手部相机只有 RGB 图像，因此 MoveIt 的三维感知部分暂时留空。更换为深度
+相机或增加点云来源后，再配置 OctoMap 传感器插件。

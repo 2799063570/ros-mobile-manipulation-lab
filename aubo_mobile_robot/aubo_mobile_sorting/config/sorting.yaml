@@ -1,0 +1,38 @@
+planning_group: aubo_i5
+end_effector_link: tcp_link
+target_frame: base_link
+detections_topic: /sorting/detections
+gripper_action: /gripper_controller/follow_joint_trajectory
+
+table_z: 0.12
+table_center: [0.80, 0.0, -0.08]
+table_size: [0.80, 1.20, 0.40]
+object_height: 0.05
+
+# TCP +Z points downward for roll=pi. The hand camera was aligned with TCP +Z.
+grasp_rpy: [3.141592653589793, 0.0, 0.0]
+observation_pose: [0.58, 0.0, 0.62]
+pregrasp_height: 0.25
+lift_height: 0.30
+place_clearance: 0.025
+cartesian_step: 0.01
+minimum_cartesian_fraction: 0.90
+
+gripper_open: 0.0
+gripper_closed: 0.35
+gripper_motion_time: 1.5
+
+sort_colors: [red, green, blue]
+place_targets:
+  red: [0.50, -0.32]
+  green: [0.65, -0.32]
+  blue: [0.50, 0.32]
+
+detection_timeout: 15.0
+detection_settle_time: 1.0
+moveit_server_timeout: 30.0
+gripper_server_timeout: 30.0
+planning_time: 12.0
+velocity_scaling: 0.15
+acceleration_scaling: 0.15
+finish_named_target: down

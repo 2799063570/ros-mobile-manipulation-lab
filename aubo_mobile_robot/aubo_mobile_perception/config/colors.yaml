@@ -1,0 +1,26 @@
+colors:
+  red:
+    ranges:
+      - {lower: [0, 110, 70], upper: [12, 255, 255]}
+      - {lower: [168, 110, 70], upper: [179, 255, 255]}
+    draw_bgr: [0, 0, 255]
+  green:
+    ranges:
+      - {lower: [38, 70, 55], upper: [88, 255, 255]}
+    draw_bgr: [0, 255, 0]
+  blue:
+    ranges:
+      - {lower: [95, 90, 55], upper: [132, 255, 255]}
+    draw_bgr: [255, 0, 0]
+
+min_contour_area: 180.0
+max_contour_area: 8000.0
+morphology_kernel: 5
+
+# Plane and valid pick region expressed in target_frame (base_link).
+target_frame: base_link
+table_z: 0.12
+workspace_min_x: 0.40
+workspace_max_x: 0.82
+workspace_min_y: -0.22
+workspace_max_y: 0.22
