@@ -1,0 +1,23 @@
+# 分拣工位在 map 坐标系中的停靠位姿。机器人朝向 +X，工作台中心在其前方 0.8 m。
+navigation_frame: map
+sorting_goal: [2.15, 0.0, 0.0]
+
+# 导航与任务容错。
+navigation_action: /move_base
+navigation_timeout: 180.0
+navigation_retries: 1
+server_timeout: 45.0
+sorting_initialization_timeout: 60.0
+sorting_operation_timeout: 300.0
+startup_delay: 3.0
+
+# 导航前收起机械臂；到站后复用 aubo_mobile_sorting 的观察与分拣服务。
+home_before_navigation: true
+sorting_state_topic: /sorting/state
+sorting_home_service: /sorting/home
+sorting_observe_service: /sorting/move_to_observation
+sorting_start_service: /sorting/start
+sorting_stop_service: /sorting/stop
+
+# true：系统就绪后自动执行一次；false：等待 /nav_sorting/start。
+auto_start: false

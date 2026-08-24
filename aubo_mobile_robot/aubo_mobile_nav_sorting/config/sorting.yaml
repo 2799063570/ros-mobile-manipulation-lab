@@ -1,0 +1,53 @@
+# nav_sorting.world 在 x=2.15 m 停靠；以下均为停靠后的 base_link 坐标。
+planning_group: aubo_i5
+end_effector_link: tcp_link
+target_frame: base_link
+detections_topic: /sorting/detections
+gripper_action: /gripper_controller/follow_joint_trajectory
+
+table_z: 0.14
+table_center: [0.85, 0.0, -0.06]
+table_size: [0.80, 1.20, 0.40]
+object_height: 0.04
+grasp_height_offset: 0.01
+scene_update_timeout: 10.0
+
+grasp_rpy: [3.141592653589793, 0.0, 0.0]
+observation_pose: [0.63, 0.0, 0.62]
+observation_named_target: observe
+auto_move_to_observation: false
+auto_start: false
+pregrasp_height: 0.25
+lift_height: 0.30
+place_clearance: 0.02
+cartesian_step: 0.01
+minimum_cartesian_fraction: 0.90
+
+gripper_open: 0.0
+gripper_closed: 0.28
+gripper_motion_time: 2.5
+gripper_contact_tolerance: 0.30
+
+use_grasp_attachment: true
+grasp_attach_topic: /sorting/grasp/attach
+grasp_detach_topic: /sorting/grasp/detach
+grasp_status_topic: /sorting/grasp/status
+grasp_attachment_timeout: 3.0
+
+sort_colors: [red, green, blue]
+place_targets:
+  red: [0.51, -0.24]
+  green: [0.65, -0.24]
+  blue: [0.51, 0.24]
+
+detection_timeout: 15.0
+detection_samples: 8
+detection_settle_time: 1.0
+grasp_offset_x: 0.0
+grasp_offset_y: 0.0
+moveit_server_timeout: 30.0
+gripper_server_timeout: 30.0
+planning_time: 12.0
+velocity_scaling: 0.15
+acceleration_scaling: 0.15
+finish_named_target: down
