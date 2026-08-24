@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- move_base, move_group, robot controllers and localization must already run. -->
+  <arg name="goal_x" default="1.0"/>
+  <arg name="goal_y" default="0.0"/>
+  <arg name="goal_yaw" default="0.0"/>
+  <arg name="pre_navigation_target" default="down"/>
+  <arg name="post_navigation_target" default="up"/>
+  <arg name="arm_target_type" default="named"/>
+  <arg name="navigation_timeout" default="180.0"/>
+
+  <node pkg="aubo_mobile_control" type="nav_arm_coordinator.py"
+        name="nav_arm_coordinator" output="screen" required="true">
+    <param name="planning_group" value="aubo_i5"/>
+    <param name="end_effector_link" value="tcp_link"/>
+    <param name="navigation_action" value="/move_base"/>
+    <param name="navigation_frame" value="map"/>
+    <param name="goal_x" value="$(arg goal_x)"/>
+    <param name="goal_y" value="$(arg goal_y)"/>
+    <param name="goal_yaw" value="$(arg goal_yaw)"/>
+    <param name="pre_navigation_target" value="$(arg pre_navigation_target)"/>
+    <param name="post_navigation_target" value="$(arg post_navigation_target)"/>
+    <param name="arm_target_type" value="$(arg arm_target_type)"/>
+    <param name="navigation_timeout" value="$(arg navigation_timeout)"/>
+    <param name="startup_delay" value="2.0"/>
+    <param name="arm_planning_time" value="10.0"/>
+    <param name="velocity_scaling" value="0.20"/>
+    <param name="acceleration_scaling" value="0.20"/>
+  </node>
+</launch>

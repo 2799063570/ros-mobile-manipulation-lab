@@ -100,6 +100,16 @@ To navigate while building a live map, first start the robot and then run:
 roslaunch aubo_mobile_navigation mapping_navigation.launch
 ```
 
+To start Gazebo, GMapping and move_base together—matching the structure of the
+reference `simple_diff_robot_gazebo/launch/mapping_nav.launch`—run:
+
+```bash
+roslaunch aubo_mobile_navigation mapping_nav.launch
+```
+
+Run `rosrun aubo_mobile_control keyboard_teleop.py` from another interactive
+terminal to explore the environment.
+
 ## Checks
 
 ```bash

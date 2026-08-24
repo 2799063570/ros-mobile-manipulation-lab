@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="cmd_vel_topic" default="/cmd_vel"/>
+  <arg name="linear_speed" default="0.20"/>
+  <arg name="angular_speed" default="0.60"/>
+  <arg name="command_timeout" default="0.45"/>
+
+  <node pkg="aubo_mobile_control" type="keyboard_teleop.py"
+        name="aubo_mobile_keyboard_teleop" output="screen" required="true">
+    <param name="cmd_vel_topic" value="$(arg cmd_vel_topic)"/>
+    <param name="linear_speed" value="$(arg linear_speed)"/>
+    <param name="angular_speed" value="$(arg angular_speed)"/>
+    <param name="command_timeout" value="$(arg command_timeout)"/>
+    <param name="speed_step" value="0.05"/>
+    <param name="max_linear_speed" value="0.40"/>
+    <param name="max_angular_speed" value="1.00"/>
+    <param name="publish_rate" value="20.0"/>
+  </node>
+</launch>

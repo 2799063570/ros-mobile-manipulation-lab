@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Robot/Gazebo and ros_control must already run. -->
+  <arg name="map_file" default="$(find aubo_mobile_navigation)/maps/map.yaml"/>
+  <arg name="rviz" default="true"/>
+  <arg name="start_navigation" default="true"/>
+  <arg name="start_moveit" default="true"/>
+  <arg name="goal_x" default="1.0"/>
+  <arg name="goal_y" default="0.0"/>
+  <arg name="goal_yaw" default="0.0"/>
+  <arg name="pre_navigation_target" default="down"/>
+  <arg name="post_navigation_target" default="up"/>
+
+  <group if="$(arg start_navigation)">
+    <include file="$(find aubo_mobile_navigation)/launch/navigation.launch">
+      <arg name="map_file" value="$(arg map_file)"/>
+      <arg name="rviz" value="$(arg rviz)"/>
+    </include>
+  </group>
+
+  <!-- Use real Gazebo/robot trajectory controllers; do not start a fake demo. -->
+  <group if="$(arg start_moveit)">
+    <include file="$(find aubo_mobile_moveit_config)/launch/move_group.launch">
+      <arg name="allow_trajectory_execution" value="true"/>
+      <arg name="fake_execution" value="false"/>
+      <arg name="load_robot_description" value="false"/>
+    </include>
+  </group>
+
+  <include file="$(find aubo_mobile_control)/launch/nav_arm_coordinator.launch">
+    <arg name="goal_x" value="$(arg goal_x)"/>
+    <arg name="goal_y" value="$(arg goal_y)"/>
+    <arg name="goal_yaw" value="$(arg goal_yaw)"/>
+    <arg name="pre_navigation_target" value="$(arg pre_navigation_target)"/>
+    <arg name="post_navigation_target" value="$(arg post_navigation_target)"/>
+  </include>
+</launch>

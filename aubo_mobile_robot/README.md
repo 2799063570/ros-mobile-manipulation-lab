@@ -10,7 +10,8 @@ Current layout:
 aubo_mobile_robot/
 ├── aubo_mobile_robot/          # robot Xacro, Gazebo, sensors and controllers
 ├── aubo_mobile_moveit_config/  # MoveIt planning configuration
-└── aubo_mobile_navigation/     # mapping, localization and move_base
+├── aubo_mobile_navigation/     # mapping, localization and move_base
+└── aubo_mobile_control/        # keyboard and navigation/arm coordination
 ```
 
 Recommended future layout:
