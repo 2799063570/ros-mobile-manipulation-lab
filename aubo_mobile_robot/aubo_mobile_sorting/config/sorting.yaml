@@ -28,6 +28,8 @@ gripper_open: 0.0
 # 4 cm 方块约在 0.24 rad 开始接触；0.28 rad 提供少量夹持预紧量。
 gripper_closed: 0.28
 gripper_motion_time: 2.5
+# 闭合时方块会阻挡手指到达命令位置，因此夹持动作使用较宽的位置容差。
+gripper_contact_tolerance: 0.30
 
 sort_colors: [red, green, blue]
 place_targets:

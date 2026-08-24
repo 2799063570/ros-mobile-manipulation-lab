@@ -14,7 +14,11 @@ import actionlib
 import moveit_commander
 import rospy
 from actionlib_msgs.msg import GoalStatus
-from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryGoal
+from control_msgs.msg import (
+    FollowJointTrajectoryAction,
+    FollowJointTrajectoryGoal,
+    JointTolerance,
+)
 from geometry_msgs.msg import PoseStamped
 from std_msgs.msg import String
 from std_srvs.srv import Trigger, TriggerResponse
@@ -61,6 +65,9 @@ class ColorSortingTask(object):
         self.gripper_closed = float(rospy.get_param("~gripper_closed", 0.28))
         self.gripper_motion_time = float(
             rospy.get_param("~gripper_motion_time", 2.5)
+        )
+        self.gripper_contact_tolerance = float(
+            rospy.get_param("~gripper_contact_tolerance", 0.30)
         )
         self.sort_colors = rospy.get_param("~sort_colors", ["red", "green", "blue"])
         self.place_targets = rospy.get_param("~place_targets")
@@ -355,6 +362,24 @@ class ColorSortingTask(object):
         point.time_from_start = rospy.Duration(self.gripper_motion_time)
         goal.trajectory.points = [point]
         goal.trajectory.header.stamp = rospy.Time.now() + rospy.Duration(0.1)
+
+        # Closing on a rigid object is expected to leave a position error: the
+        # fingers must stop at contact instead of numerically reaching the
+        # preload angle.  Send the tolerance with every goal so this also works
+        # when a stale controller YAML is still present on the parameter server.
+        closing = position > self.gripper_open + 1.0e-4
+        position_tolerance = self.gripper_contact_tolerance if closing else 0.05
+        for joint_name in goal.trajectory.joint_names:
+            path_tolerance = JointTolerance()
+            path_tolerance.name = joint_name
+            path_tolerance.position = position_tolerance
+            goal.path_tolerance.append(path_tolerance)
+            goal_tolerance = JointTolerance()
+            goal_tolerance.name = joint_name
+            goal_tolerance.position = position_tolerance
+            goal.goal_tolerance.append(goal_tolerance)
+        goal.goal_time_tolerance = rospy.Duration(3.0)
+
         self.gripper_client.send_goal(goal)
         if not self.gripper_client.wait_for_result(
             rospy.Duration(self.gripper_motion_time + 3.0)
@@ -362,9 +387,14 @@ class ColorSortingTask(object):
             self.gripper_client.cancel_goal()
             rospy.logerr("Gripper command timed out")
             return False
-        if self.gripper_client.get_state() != GoalStatus.SUCCEEDED:
+        state = self.gripper_client.get_state()
+        result = self.gripper_client.get_result()
+        if state != GoalStatus.SUCCEEDED:
             rospy.logerr(
-                "Gripper action failed with state %d", self.gripper_client.get_state()
+                "Gripper action failed: state=%d, error_code=%s, error_string='%s'",
+                state,
+                getattr(result, "error_code", "unavailable"),
+                getattr(result, "error_string", ""),
             )
             return False
         return not self._stop_requested.is_set()

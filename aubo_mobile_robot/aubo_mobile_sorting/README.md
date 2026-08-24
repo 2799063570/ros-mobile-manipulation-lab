@@ -129,7 +129,9 @@ rosservice call /sorting/home
 4 cm 方块约在夹爪关节 `0.24 rad` 时接触。默认闭合位置设为
 `gripper_closed: 0.28`，只保留少量预紧量；旧值 `0.42` 会要求手指继续压入方块约
 16 mm，容易导致控制器失败、接触抖动或方块弹飞。夹爪开合时间为
-`gripper_motion_time: 2.5` 秒。
+`gripper_motion_time: 2.5` 秒。闭合目标还会携带
+`gripper_contact_tolerance: 0.30`，使手指被实体方块挡住时被视为正常夹持，而不是
+因无法严格到达预紧角度而返回 action 状态 `ABORTED`。
 
 `tcp_link` 与 `gripper_link` 现在重合在手指有效接触高度。这样将 TCP 规划到方块
 中心时，手指会夹住方块侧面，而不是只搭在方块顶边。

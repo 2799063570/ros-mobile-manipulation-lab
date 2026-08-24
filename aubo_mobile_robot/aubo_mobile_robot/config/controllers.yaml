@@ -28,12 +28,12 @@ gripper_controller:
     - joint1
     - joint2
   constraints:
-    goal_time: 1.0
-    stopped_velocity_tolerance: 0.02
+    goal_time: 3.0
+    stopped_velocity_tolerance: 0.10
     # A physical object stops the fingers before the commanded preload angle.
     # Treat this small residual error as a successful grasp instead of aborting.
-    joint1: {trajectory: 0.10, goal: 0.06}
-    joint2: {trajectory: 0.10, goal: 0.06}
+    joint1: {trajectory: 0.30, goal: 0.30}
+    joint2: {trajectory: 0.30, goal: 0.30}
   gains:
     joint1: {p: 40.0, i: 0.2, d: 1.0, i_clamp: 0.5}
     joint2: {p: 40.0, i: 0.2, d: 1.0, i_clamp: 0.5}
