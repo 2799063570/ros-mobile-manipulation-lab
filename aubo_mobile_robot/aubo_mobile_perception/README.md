@@ -35,6 +35,10 @@ rostopic echo /sorting/detections
 rosrun image_view image_view image:=/sorting/debug_image
 ```
 
+ROS Melodic 默认使用 Python 2，运行环境需要安装 `python-opencv`、`python-numpy`
+和 `ros-melodic-cv-bridge`。添加或修改本功能包的自定义消息后，必须重新执行
+`catkin_make` 并重新加载 `devel/setup.bash`。
+
 ## 参数调整
 
 识别参数位于 `config/colors.yaml`，主要包括：

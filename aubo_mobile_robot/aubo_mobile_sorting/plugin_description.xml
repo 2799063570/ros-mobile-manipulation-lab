@@ -1,0 +1,7 @@
+<library path="lib/libaubo_mobile_sorting_panel">
+  <class name="aubo_mobile_sorting/SortingPanel"
+         type="aubo_mobile_sorting::SortingPanel"
+         base_class_type="rviz::Panel">
+    <description>AUBO 视觉抓取分拣流程控制面板。</description>
+  </class>
+</library>

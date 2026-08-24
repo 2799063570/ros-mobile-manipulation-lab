@@ -9,9 +9,14 @@ table_center: [0.80, 0.0, -0.08]
 table_size: [0.80, 1.20, 0.40]
 object_height: 0.05
 
-# TCP +Z points downward for roll=pi. The hand camera was aligned with TCP +Z.
+# roll=pi 时 TCP 的 +Z 朝下，手部相机光轴与 TCP 的 +Z 方向一致。
 grasp_rpy: [3.141592653589793, 0.0, 0.0]
 observation_pose: [0.58, 0.0, 0.62]
+# 非空时优先使用 MoveIt 命名姿态；为空时使用上面的笛卡尔观察位姿。
+observation_named_target: observe
+auto_move_to_observation: true
+# 默认等待 RViz 面板发出开始命令，不在启动后立即抓取。
+auto_start: false
 pregrasp_height: 0.25
 lift_height: 0.30
 place_clearance: 0.025

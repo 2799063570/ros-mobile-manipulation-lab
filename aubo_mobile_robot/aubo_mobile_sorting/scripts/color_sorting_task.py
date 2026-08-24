@@ -15,6 +15,8 @@ import rospy
 from actionlib_msgs.msg import GoalStatus
 from control_msgs.msg import FollowJointTrajectoryAction, FollowJointTrajectoryGoal
 from geometry_msgs.msg import PoseStamped
+from std_msgs.msg import String
+from std_srvs.srv import Trigger, TriggerResponse
 from tf.transformations import quaternion_from_euler
 from trajectory_msgs.msg import JointTrajectoryPoint
 
@@ -22,6 +24,8 @@ from aubo_mobile_perception.msg import DetectedObjectArray
 
 
 class ColorSortingTask(object):
+    """Service-controlled camera observation and color sorting state machine."""
+
     def __init__(self):
         self.group_name = rospy.get_param("~planning_group", "aubo_i5")
         self.end_effector_link = rospy.get_param("~end_effector_link", "tcp_link")
@@ -40,6 +44,9 @@ class ColorSortingTask(object):
         self.grasp_rpy = rospy.get_param("~grasp_rpy", [math.pi, 0.0, 0.0])
         self.observation_pose = rospy.get_param(
             "~observation_pose", [0.58, 0.0, 0.62]
+        )
+        self.observation_named_target = rospy.get_param(
+            "~observation_named_target", ""
         )
         self.pregrasp_height = float(rospy.get_param("~pregrasp_height", 0.25))
         self.lift_height = float(rospy.get_param("~lift_height", 0.30))
@@ -64,10 +71,26 @@ class ColorSortingTask(object):
             rospy.get_param("~gripper_server_timeout", 30.0)
         )
         self.finish_named_target = rospy.get_param("~finish_named_target", "down")
+        self.auto_move_to_observation = bool(
+            rospy.get_param("~auto_move_to_observation", True)
+        )
+        self.auto_start = bool(rospy.get_param("~auto_start", False))
 
         self._detections = None
         self._detections_wall_time = 0.0
-        self._lock = threading.Lock()
+        self._data_lock = threading.Lock()
+        self._operation_lock = threading.Lock()
+        self._busy = True
+        self._initialized = False
+        self._observation_ready = False
+        self._stop_requested = threading.Event()
+
+        self._state_publisher = rospy.Publisher(
+            "/sorting/state", String, queue_size=1, latch=True
+        )
+        self._detection_summary_publisher = rospy.Publisher(
+            "/sorting/detection_summary", String, queue_size=1, latch=True
+        )
         self._subscriber = rospy.Subscriber(
             self.detections_topic,
             DetectedObjectArray,
@@ -92,10 +115,115 @@ class ColorSortingTask(object):
             self.gripper_action_name, FollowJointTrajectoryAction
         )
 
+        self._services = [
+            rospy.Service("/sorting/move_to_observation", Trigger, self._observe_service),
+            rospy.Service("/sorting/start", Trigger, self._start_service),
+            rospy.Service("/sorting/stop", Trigger, self._stop_service),
+            rospy.Service("/sorting/open_gripper", Trigger, self._open_service),
+            rospy.Service("/sorting/home", Trigger, self._home_service),
+        ]
+        self._publish_state("INITIALIZING", "waiting for Gazebo controllers")
+
+    def start(self):
+        worker = threading.Thread(target=self._initialize)
+        worker.daemon = True
+        worker.start()
+
+    def _publish_state(self, state, detail=""):
+        message = state if not detail else "{} | {}".format(state, detail)
+        self._state_publisher.publish(String(data=message))
+        rospy.loginfo("Sorting state: %s", message)
+
     def _detection_callback(self, message):
-        with self._lock:
+        with self._data_lock:
             self._detections = message
             self._detections_wall_time = time.time()
+        counts = []
+        for color in self.sort_colors:
+            count = sum(1 for item in message.objects if item.color == color)
+            counts.append("{}:{}".format(color, count))
+        self._detection_summary_publisher.publish(String(data="  ".join(counts)))
+
+    def _initialize(self):
+        self._publish_state("INITIALIZING", "waiting for gripper action")
+        if not self.gripper_client.wait_for_server(
+            rospy.Duration(self.gripper_server_timeout)
+        ):
+            self._busy = False
+            self._publish_state("ERROR", "gripper action server unavailable")
+            return
+
+        self._add_table_collision()
+        self._initialized = True
+        self._busy = False
+        self._publish_state("IDLE", "controllers ready")
+
+        if self.auto_move_to_observation:
+            self._start_operation("OBSERVING", self._initial_observation_operation)
+        elif self.auto_start:
+            self._start_operation("SORTING", self._sorting_operation)
+
+    def _start_operation(self, state, operation):
+        with self._operation_lock:
+            if self._busy:
+                return False, "another operation is running"
+            if not self._initialized:
+                return False, "sorting node is not initialized"
+            self._busy = True
+            self._stop_requested.clear()
+
+        def worker():
+            success = False
+            self._publish_state(state)
+            try:
+                success = bool(operation())
+            except Exception as error:
+                rospy.logerr("Sorting operation failed: %s", str(error))
+                self._publish_state("ERROR", str(error))
+            finally:
+                with self._operation_lock:
+                    self._busy = False
+                if self._stop_requested.is_set():
+                    self._observation_ready = False
+                    self._publish_state("STOPPED", "operation cancelled")
+                elif success:
+                    self._publish_state("READY", "waiting for panel command")
+                else:
+                    self._publish_state("ERROR", "operation failed")
+
+        thread = threading.Thread(target=worker)
+        thread.daemon = True
+        thread.start()
+        return True, "command accepted"
+
+    def _observe_service(self, _request):
+        success, message = self._start_operation(
+            "OBSERVING", self._observation_operation
+        )
+        return TriggerResponse(success=success, message=message)
+
+    def _start_service(self, _request):
+        if not self._observation_ready:
+            return TriggerResponse(
+                success=False,
+                message="move to observation pose and confirm detections first",
+            )
+        success, message = self._start_operation("SORTING", self._sorting_operation)
+        return TriggerResponse(success=success, message=message)
+
+    def _stop_service(self, _request):
+        self._stop_requested.set()
+        self.gripper_client.cancel_all_goals()
+        self.arm.stop()
+        return TriggerResponse(success=True, message="stop requested")
+
+    def _open_service(self, _request):
+        success, message = self._start_operation("OPENING", self._open_operation)
+        return TriggerResponse(success=success, message=message)
+
+    def _home_service(self, _request):
+        success, message = self._start_operation("HOMING", self._home_operation)
+        return TriggerResponse(success=success, message=message)
 
     def _pose(self, x, y, z):
         pose = PoseStamped()
@@ -116,6 +244,8 @@ class ColorSortingTask(object):
         return pose
 
     def _move_to_pose(self, pose, description):
+        if self._stop_requested.is_set():
+            return False
         rospy.loginfo("Planning arm to %s", description)
         self.arm.set_pose_target(pose, self.end_effector_link)
         success = bool(self.arm.go(wait=True))
@@ -123,11 +253,13 @@ class ColorSortingTask(object):
         self.arm.clear_pose_targets()
         if not success:
             rospy.logerr("MoveIt failed to reach %s", description)
-        return success
+        return success and not self._stop_requested.is_set()
 
     def _move_named(self, target):
         if not target:
             return True
+        if self._stop_requested.is_set():
+            return False
         if target not in self.arm.get_named_targets():
             rospy.logerr("Unknown arm named target '%s'", target)
             return False
@@ -135,9 +267,11 @@ class ColorSortingTask(object):
         self.arm.set_named_target(target)
         success = bool(self.arm.go(wait=True))
         self.arm.stop()
-        return success
+        return success and not self._stop_requested.is_set()
 
     def _cartesian_to(self, target_pose, description):
+        if self._stop_requested.is_set():
+            return False
         waypoint = copy.deepcopy(target_pose.pose)
         plan, fraction = self.arm.compute_cartesian_path(
             [waypoint], self.cartesian_step, 0.0, True
@@ -150,9 +284,11 @@ class ColorSortingTask(object):
         self.arm.stop()
         if not success:
             rospy.logerr("Failed to execute Cartesian path to %s", description)
-        return success
+        return success and not self._stop_requested.is_set()
 
     def _command_gripper(self, position):
+        if self._stop_requested.is_set():
+            return False
         goal = FollowJointTrajectoryGoal()
         goal.trajectory.joint_names = ["joint1", "joint2"]
         point = JointTrajectoryPoint()
@@ -168,9 +304,11 @@ class ColorSortingTask(object):
             rospy.logerr("Gripper command timed out")
             return False
         if self.gripper_client.get_state() != GoalStatus.SUCCEEDED:
-            rospy.logerr("Gripper action failed with state %d", self.gripper_client.get_state())
+            rospy.logerr(
+                "Gripper action failed with state %d", self.gripper_client.get_state()
+            )
             return False
-        return True
+        return not self._stop_requested.is_set()
 
     def _add_table_collision(self):
         table_pose = PoseStamped()
@@ -190,7 +328,9 @@ class ColorSortingTask(object):
     def _wait_for_object(self, color, not_before):
         deadline = time.time() + self.detection_timeout
         while not rospy.is_shutdown() and time.time() < deadline:
-            with self._lock:
+            if self._stop_requested.is_set():
+                return None
+            with self._data_lock:
                 detections = self._detections
                 receipt_time = self._detections_wall_time
             if detections is not None and receipt_time >= not_before:
@@ -198,15 +338,43 @@ class ColorSortingTask(object):
                 if candidates:
                     return max(candidates, key=lambda item: item.contour_area)
             rospy.sleep(0.1)
-        rospy.logerr("No fresh '%s' object detected within %.1f seconds", color, self.detection_timeout)
+        rospy.logerr(
+            "No fresh '%s' object detected within %.1f seconds",
+            color,
+            self.detection_timeout,
+        )
         return None
 
     def _observation(self):
-        pose = self._pose(*self.observation_pose)
-        if not self._move_to_pose(pose, "camera observation pose"):
+        self._observation_ready = False
+        if self.observation_named_target:
+            success = self._move_named(self.observation_named_target)
+        else:
+            success = self._move_to_pose(
+                self._pose(*self.observation_pose), "camera observation pose"
+            )
+        if not success:
             return False
         rospy.sleep(self.detection_settle_time)
+        self._observation_ready = True
         return True
+
+    def _observation_operation(self):
+        return self._observation()
+
+    def _initial_observation_operation(self):
+        if not self._observation():
+            return False
+        if self.auto_start:
+            return self._sorting_operation()
+        return True
+
+    def _open_operation(self):
+        return self._command_gripper(self.gripper_open)
+
+    def _home_operation(self):
+        self._observation_ready = False
+        return self._move_named(self.finish_named_target)
 
     def _pick_and_place(self, detected):
         color = detected.color
@@ -259,29 +427,27 @@ class ColorSortingTask(object):
             self._pose(place_x, place_y, travel_z), color + " retreat"
         )
 
-    def run(self):
-        rospy.loginfo("Waiting for gripper action %s", self.gripper_action_name)
-        if not self.gripper_client.wait_for_server(
-            rospy.Duration(self.gripper_server_timeout)
-        ):
-            rospy.logerr("Gripper action server is unavailable")
-            return False
-
-        self._add_table_collision()
-        if not self._observation():
-            return False
-
-        for color in self.sort_colors:
+    def _sorting_operation(self):
+        for index, color in enumerate(self.sort_colors):
+            if self._stop_requested.is_set():
+                return False
             detection_start = time.time()
+            self._publish_state("DETECTING", color)
             detected = self._wait_for_object(color, detection_start)
             if detected is None:
                 return False
+            self._observation_ready = False
+            self._publish_state("PICKING", color)
             if not self._pick_and_place(detected):
                 return False
-            if color != self.sort_colors[-1] and not self._observation():
-                return False
+            if index < len(self.sort_colors) - 1:
+                self._publish_state("OBSERVING", "next object")
+                if not self._observation():
+                    return False
 
+        self._observation_ready = False
         if self.finish_named_target:
+            self._publish_state("HOMING", self.finish_named_target)
             return self._move_named(self.finish_named_target)
         return True
 
@@ -289,15 +455,16 @@ class ColorSortingTask(object):
 def main():
     moveit_commander.roscpp_initialize(sys.argv)
     rospy.init_node("color_sorting_task")
-    exit_code = 1
     try:
         task = ColorSortingTask()
-        exit_code = 0 if task.run() else 1
+        task.start()
+        rospy.spin()
     except Exception as error:
-        rospy.logerr("Color sorting task failed: %s", str(error))
+        rospy.logfatal("Color sorting task failed: %s", str(error))
+        return 1
     finally:
         moveit_commander.roscpp_shutdown()
-    return exit_code
+    return 0
 
 
 if __name__ == "__main__":

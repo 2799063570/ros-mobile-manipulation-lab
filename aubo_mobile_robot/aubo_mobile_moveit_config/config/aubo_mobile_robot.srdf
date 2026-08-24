@@ -41,6 +41,15 @@
         <joint name="wrist2_joint" value="1.8979" />
         <joint name="wrist3_joint" value="0" />
     </group_state>
+    <!-- Hand camera is centred above the sorting blocks and points down. -->
+    <group_state name="observe" group="aubo_i5">
+        <joint name="foreArm_joint" value="0.06780" />
+        <joint name="shoulder_joint" value="0.08648" />
+        <joint name="upperArm_joint" value="-0.54623" />
+        <joint name="wrist1_joint" value="-0.91058" />
+        <joint name="wrist2_joint" value="1.58105" />
+        <joint name="wrist3_joint" value="1.82491" />
+    </group_state>
     <!--END EFFECTOR: Purpose: Represent information about an end effector.-->
     <end_effector name="aubo_gripper" parent_link="gripper_base_link" group="gripper" parent_group="aubo_i5" />
     <!--VIRTUAL JOINT: Purpose: this element defines a virtual joint between a robot link and an external frame of reference (considered fixed with respect to the robot)-->
