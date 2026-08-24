@@ -98,6 +98,10 @@ rosservice call /sorting/home
 桌面高度、机器人生成高度和感知参数必须保持一致，否则识别坐标会出现系统性
 偏差。
 
+分拣节点在允许机械臂运动前会将 `sorting_table` 加入 MoveIt PlanningScene，并
+持续查询 `get_known_object_names()`。只有规划场景确认收到桌子后才会移动到观察
+位；超过 `scene_update_timeout` 仍未收到确认时，节点进入 `ERROR`，不会执行轨迹。
+
 ## 参数文件
 
 - `aubo_mobile_perception/config/colors.yaml`：HSV 范围、轮廓面积、桌面高度和

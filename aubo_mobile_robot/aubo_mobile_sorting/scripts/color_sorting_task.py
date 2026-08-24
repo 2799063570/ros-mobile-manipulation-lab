@@ -71,6 +71,9 @@ class ColorSortingTask(object):
             rospy.get_param("~gripper_server_timeout", 30.0)
         )
         self.finish_named_target = rospy.get_param("~finish_named_target", "down")
+        self.scene_update_timeout = float(
+            rospy.get_param("~scene_update_timeout", 10.0)
+        )
         self.auto_move_to_observation = bool(
             rospy.get_param("~auto_move_to_observation", True)
         )
@@ -153,7 +156,10 @@ class ColorSortingTask(object):
             self._publish_state("ERROR", "gripper action server unavailable")
             return
 
-        self._add_table_collision()
+        if not self._add_table_collision():
+            self._busy = False
+            self._publish_state("ERROR", "sorting table missing from planning scene")
+            return
         self._initialized = True
         self._busy = False
         self._publish_state("IDLE", "controllers ready")
@@ -311,6 +317,7 @@ class ColorSortingTask(object):
         return not self._stop_requested.is_set()
 
     def _add_table_collision(self):
+        object_name = "sorting_table"
         table_pose = PoseStamped()
         table_pose.header.frame_id = self.target_frame
         table_pose.pose.orientation.w = 1.0
@@ -318,12 +325,23 @@ class ColorSortingTask(object):
         table_pose.pose.position.y = float(self.table_center[1])
         table_pose.pose.position.z = float(self.table_center[2])
         self.scene.add_box(
-            "sorting_table",
+            object_name,
             table_pose,
             size=tuple(float(value) for value in self.table_size),
         )
-        rospy.sleep(1.0)
-        self.arm.set_support_surface_name("sorting_table")
+        deadline = time.time() + self.scene_update_timeout
+        while not rospy.is_shutdown() and time.time() < deadline:
+            if object_name in self.scene.get_known_object_names():
+                self.arm.set_support_surface_name(object_name)
+                rospy.loginfo("Sorting table confirmed in MoveIt planning scene")
+                return True
+            rospy.sleep(0.1)
+        rospy.logerr(
+            "MoveIt planning scene did not acknowledge '%s' within %.1f seconds",
+            object_name,
+            self.scene_update_timeout,
+        )
+        return False
 
     def _wait_for_object(self, color, not_before):
         deadline = time.time() + self.detection_timeout

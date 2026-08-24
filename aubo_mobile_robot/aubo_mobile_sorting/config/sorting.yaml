@@ -8,6 +8,7 @@ table_z: 0.12
 table_center: [0.80, 0.0, -0.08]
 table_size: [0.80, 1.20, 0.40]
 object_height: 0.05
+scene_update_timeout: 10.0
 
 # roll=pi 时 TCP 的 +Z 朝下，手部相机光轴与 TCP 的 +Z 方向一致。
 grasp_rpy: [3.141592653589793, 0.0, 0.0]
