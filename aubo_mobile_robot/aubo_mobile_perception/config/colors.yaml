@@ -15,6 +15,8 @@ colors:
 
 min_contour_area: 180.0
 max_contour_area: 8000.0
+# 过滤画面边缘被截断的细长分类色块，只保留接近方形的抓取目标。
+max_aspect_ratio: 1.6
 morphology_kernel: 5
 
 # Plane and valid pick region expressed in target_frame (base_link).
@@ -24,3 +26,7 @@ workspace_min_x: 0.40
 workspace_max_x: 0.82
 workspace_min_y: -0.22
 workspace_max_y: 0.22
+
+# Gazebo 固定观察姿态下的平面投影标定值。图像中的三个方块均表现为 X +3 cm。
+position_offset_x: -0.03
+position_offset_y: 0.0

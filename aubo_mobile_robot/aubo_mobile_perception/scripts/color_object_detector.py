@@ -33,6 +33,9 @@ class ColorObjectDetector(object):
         self.colors = rospy.get_param("~colors")
         self.min_area = float(rospy.get_param("~min_contour_area", 180.0))
         self.max_area = float(rospy.get_param("~max_contour_area", 8000.0))
+        self.max_aspect_ratio = float(rospy.get_param("~max_aspect_ratio", 1.6))
+        self.position_offset_x = float(rospy.get_param("~position_offset_x", 0.0))
+        self.position_offset_y = float(rospy.get_param("~position_offset_y", 0.0))
         self.kernel_size = int(rospy.get_param("~morphology_kernel", 5))
         self.target_frame = rospy.get_param("~target_frame", "base_link")
         self.table_z = float(rospy.get_param("~table_z", 0.12))
@@ -113,6 +116,8 @@ class ColorObjectDetector(object):
             return None
 
         point = origin + scale * ray_target
+        point[0] += self.position_offset_x
+        point[1] += self.position_offset_y
         if not (self.min_x <= point[0] <= self.max_x):
             return None
         if not (self.min_y <= point[1] <= self.max_y):
@@ -157,6 +162,12 @@ class ColorObjectDetector(object):
                 area = float(cv2.contourArea(contour))
                 if area < self.min_area or area > self.max_area:
                     continue
+                x, y, width, height = cv2.boundingRect(contour)
+                short_side = float(min(width, height))
+                if short_side <= 0.0:
+                    continue
+                if float(max(width, height)) / short_side > self.max_aspect_ratio:
+                    continue
                 moments = cv2.moments(contour)
                 if abs(moments["m00"]) < 1.0e-6:
                     continue
@@ -179,7 +190,6 @@ class ColorObjectDetector(object):
                 detected.pixel_y = pixel_y
                 output.objects.append(detected)
 
-                x, y, width, height = cv2.boundingRect(contour)
                 cv2.rectangle(debug_image, (x, y), (x + width, y + height), draw_color, 2)
                 label = "{} ({:.2f}, {:.2f})".format(color_name, point[0], point[1])
                 cv2.putText(
