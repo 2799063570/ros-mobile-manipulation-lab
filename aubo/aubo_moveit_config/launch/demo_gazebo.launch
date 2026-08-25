@@ -25,7 +25,9 @@
   <arg name="gazebo_gui" default="true"/>
   <arg name="paused" default="false"/>
   <!-- By default, use the urdf location provided from the package -->
-  <arg name="urdf_path" default="$(find aubo_description)/urdf/aubo_i5.xacro"/>
+  <arg name="urdf_path" default="$(find aubo_description)/urdf/aubo_i5_with_camera.xacro"/>
+  <arg name="robot_xacro" default="aubo_i5_with_camera.xacro"/>
+  <arg name="robot_srdf" default="aubo_i5_with_camera.srdf"/>
 
   <!-- launch the gazebo simulator and spawn the robot -->
   <include file="$(find aubo_moveit_config)/launch/gazebo.launch" >
@@ -57,6 +59,8 @@
     <arg name="info" value="true"/>
     <arg name="debug" value="$(arg debug)"/>
     <arg name="load_robot_description" value="$(arg load_robot_description)"/>
+    <arg name="robot_xacro" value="$(arg robot_xacro)"/>
+    <arg name="robot_srdf" value="$(arg robot_srdf)"/>
   </include>
 
   <!-- Run Rviz and load the default config to see the state of the move_group node -->

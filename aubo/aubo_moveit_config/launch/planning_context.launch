@@ -4,12 +4,16 @@
 
   <!-- The name of the parameter under which the URDF is loaded -->
   <arg name="robot_description" default="robot_description"/>
+  <arg name="robot_xacro" default="aubo_i5.xacro"/>
+  <arg name="robot_srdf" default="aubo_i5.srdf"/>
 
   <!-- Load universal robot description format (URDF) -->
-  <param if="$(arg load_robot_description)" name="$(arg robot_description)" command="xacro  '$(find aubo_description)/urdf/aubo_i5.xacro'"/>
+  <param if="$(arg load_robot_description)" name="$(arg robot_description)"
+         command="xacro --inorder '$(find aubo_description)/urdf/$(arg robot_xacro)'"/>
 
   <!-- The semantic description that corresponds to the URDF -->
-  <param name="$(arg robot_description)_semantic" textfile="$(find aubo_moveit_config)/config/aubo_i5.srdf" />
+  <param name="$(arg robot_description)_semantic"
+         textfile="$(find aubo_moveit_config)/config/$(arg robot_srdf)" />
 
   <!-- Load updated joint limits (override information from URDF) -->
   <group ns="$(arg robot_description)_planning">

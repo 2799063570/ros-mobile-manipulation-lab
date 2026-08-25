@@ -8,11 +8,15 @@
   <arg name="control_frequency" default="250.0"/>
   <arg name="load_robot_description" default="true"/>
   <arg name="require_real_robot" default="true"/>
+  <arg name="robot_xacro" default="aubo_i5_with_camera.xacro"/>
+  <arg name="robot_srdf" default="aubo_i5_with_camera.srdf"/>
 
   <param name="/aubo_driver/server_host" value="$(arg robot_ip)"/>
   <include if="$(arg load_robot_description)"
            file="$(find aubo_moveit_config)/launch/planning_context.launch">
     <arg name="load_robot_description" value="true"/>
+    <arg name="robot_xacro" value="$(arg robot_xacro)"/>
+    <arg name="robot_srdf" value="$(arg robot_srdf)"/>
   </include>
 
   <group ns="aubo_i5">
@@ -42,4 +46,3 @@
           output="screen" args="joint_state_controller aubo_i5_controller"/>
   </group>
 </launch>
-

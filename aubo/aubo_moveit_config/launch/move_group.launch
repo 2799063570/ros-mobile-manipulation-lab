@@ -40,9 +40,13 @@
   -->
 
   <arg name="load_robot_description" default="true" />
+  <arg name="robot_xacro" default="aubo_i5.xacro" />
+  <arg name="robot_srdf" default="aubo_i5.srdf" />
   <!-- load URDF, SRDF and joint_limits configuration -->
   <include file="$(find aubo_moveit_config)/launch/planning_context.launch">
     <arg name="load_robot_description" value="$(arg load_robot_description)" />
+    <arg name="robot_xacro" value="$(arg robot_xacro)" />
+    <arg name="robot_srdf" value="$(arg robot_srdf)" />
   </include>
 
   <!-- Planning Functionality -->

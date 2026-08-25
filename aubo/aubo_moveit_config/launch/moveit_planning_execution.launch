@@ -3,9 +3,13 @@
  # publish the current configuration of the robot (simulated or real)
  # and the current state of the world as seen by the planner
  <arg name="use_sensor_manager" default="false" />
+ <arg name="robot_xacro" default="aubo_i5.xacro" />
+ <arg name="robot_srdf" default="aubo_i5.srdf" />
  <include file="$(find aubo_moveit_config)/launch/move_group.launch">
   <arg name="publish_monitored_planning_scene" value="true" />
   <arg name="use_sensor_manager" value="$(arg use_sensor_manager)" />
+  <arg name="robot_xacro" value="$(arg robot_xacro)" />
+  <arg name="robot_srdf" value="$(arg robot_srdf)" />
  </include>
 
  # The visualization component of MoveIt!

@@ -71,3 +71,16 @@ Important topics/actions:
 
 Parameters such as `server_port`, credentials, collision class, command smoothing,
 and control frequency are exposed by `aubo_control.launch` rather than hard-coded.
+
+The real-robot launch uses `aubo_i5_with_camera.xacro` by default. To load the
+arm without the hand camera, pass:
+
+```bash
+roslaunch aubo_ros_control aubo_real_bringup.launch \
+  robot_ip:=192.168.1.2 \
+  robot_xacro:=aubo_i5.xacro robot_srdf:=aubo_i5.srdf
+```
+
+The URDF camera plugin produces images only in Gazebo. On the real robot, start
+the physical camera driver separately and use `hand_camera_optical_frame` as its
+calibrated optical frame.

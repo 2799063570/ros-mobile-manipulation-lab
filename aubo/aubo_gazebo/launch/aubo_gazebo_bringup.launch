@@ -21,7 +21,10 @@
 
     <!-- moveit launch file -->
     <group if="$(arg include_moveit)">
-        <include file="$(find aubo_moveit_config)/launch/moveit_planning_execution.launch" />
+        <include file="$(find aubo_moveit_config)/launch/moveit_planning_execution.launch">
+            <arg name="robot_xacro" value="aubo_i5_with_camera.xacro" />
+            <arg name="robot_srdf" value="aubo_i5_with_camera.srdf" />
+        </include>
     </group>
 
 </launch>
