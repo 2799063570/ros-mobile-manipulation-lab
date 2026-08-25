@@ -14,7 +14,7 @@
 
  # The visualization component of MoveIt!
  <include file="$(find aubo_moveit_config)/launch/moveit_rviz.launch">
-  <arg name="rviz_config" value="true" />
+  <arg name="rviz_config" value="" />
  </include>
 
   <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher">
