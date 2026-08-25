@@ -1,0 +1,38 @@
+# OpenCV HSV detector configuration. The public output contract is a standard
+# PoseStamped, so a future Torch/YOLO node can replace this detector unchanged.
+color_topic: /camera/color/image_raw
+aligned_depth_topic: /camera/aligned_depth_to_color/image_raw
+camera_info_topic: /camera/color/camera_info
+target_pose_topic: /visual_servo/target_pose
+debug_image_topic: /visual_servo/debug_image
+target_label_topic: /visual_servo/target_label
+
+target_label: red              # empty string accepts every configured color
+selection_policy: largest      # largest | image_center | nearest
+minimum_contour_area: 180.0
+maximum_contour_area: 50000.0
+maximum_aspect_ratio: 2.5
+morphology_kernel: 5
+depth_mask_erosion: 3
+minimum_depth: 0.10
+maximum_depth: 2.50
+depth_scale_16u: 0.001         # RealSense 16UC1 millimetres -> metres
+position_filter_alpha: 0.35    # 1.0=no filtering; lower values reduce depth jitter
+filter_reset_timeout: 0.50
+sync_queue_size: 8
+sync_slop: 0.08
+
+colors:
+  red:
+    ranges:
+      - {lower: [0, 110, 70], upper: [12, 255, 255]}
+      - {lower: [168, 110, 70], upper: [179, 255, 255]}
+    draw_bgr: [0, 0, 255]
+  green:
+    ranges:
+      - {lower: [38, 70, 55], upper: [88, 255, 255]}
+    draw_bgr: [0, 255, 0]
+  blue:
+    ranges:
+      - {lower: [95, 90, 55], upper: [132, 255, 255]}
+    draw_bgr: [255, 0, 0]

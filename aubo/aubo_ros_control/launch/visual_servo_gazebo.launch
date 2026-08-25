@@ -3,10 +3,14 @@
   <arg name="gui" default="true"/>
   <arg name="target_topic" default="/visual_servo/target_pose"/>
   <arg name="loss_strategy" default="coast_then_open"/>
+  <arg name="target_label" default="red"/>
+  <arg name="start_perception" default="true"/>
+  <arg name="debug_view" default="true"/>
 
   <!-- Loads the eye-in-hand model, Gazebo and robot_state_publisher. -->
   <include file="$(find aubo_gazebo)/launch/aubo_world_gazebo.launch">
     <arg name="gui" value="$(arg gui)"/>
+    <arg name="world_name" value="$(find aubo_ros_control)/worlds/visual_servo.world"/>
   </include>
 
   <group ns="aubo_i5">
@@ -34,5 +38,16 @@
        /aubo_i5/wrist3_position_controller/command]
     </rosparam>
   </node>
-</launch>
 
+  <node if="$(arg start_perception)" name="color_visual_target"
+        pkg="aubo_ros_control" type="color_visual_target_node.py" output="screen">
+    <rosparam file="$(find aubo_ros_control)/config/color_visual_target.yaml"
+              command="load"/>
+    <param name="target_label" value="$(arg target_label)"/>
+    <param name="target_pose_topic" value="$(arg target_topic)"/>
+  </node>
+  <node if="$(arg debug_view)" name="visual_servo_debug_view"
+        pkg="image_view" type="image_view" output="screen">
+    <remap from="image" to="/visual_servo/debug_image"/>
+  </node>
+</launch>

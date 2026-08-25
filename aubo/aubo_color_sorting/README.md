@@ -47,7 +47,7 @@ roslaunch aubo_color_sorting sorting_gazebo.launch \
 
 | 接口 | 用途 |
 | --- | --- |
-| `/hand_camera/image_raw` | 腕部相机原始图像 |
+| `/camera/color/image_raw` | 腕部 RealSense 彩色图像 |
 | `/sorting/debug_image` | 带颜色框和坐标的调试图像 |
 | `/sorting/detections` | 目标颜色及 `base_link` 坐标 |
 | `/sorting/state` | 状态机状态 |

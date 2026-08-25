@@ -4,6 +4,18 @@
   <arg name="target_topic" default="/visual_servo/target_pose"/>
   <arg name="loss_strategy" default="coast_then_open"/>
   <arg name="load_robot_description" default="true"/>
+  <arg name="start_realsense" default="true"/>
+  <arg name="start_perception" default="true"/>
+  <arg name="target_label" default="red"/>
+
+  <include if="$(arg start_realsense)"
+           file="$(find realsense2_camera)/launch/rs_camera.launch">
+    <arg name="enable_color" value="true"/>
+    <arg name="enable_depth" value="true"/>
+    <arg name="align_depth" value="true"/>
+    <!-- Robot URDF owns the eye-in-hand TF tree and calibrated mount. -->
+    <arg name="publish_tf" value="false"/>
+  </include>
 
   <include if="$(arg load_robot_description)"
            file="$(find aubo_moveit_config)/launch/planning_context.launch">
@@ -26,5 +38,13 @@
     <param name="target_topic" value="$(arg target_topic)"/>
     <param name="joint_states_topic" value="/joint_states"/>
     <param name="loss_strategy" value="$(arg loss_strategy)"/>
+  </node>
+
+  <node if="$(arg start_perception)" name="color_visual_target"
+        pkg="aubo_ros_control" type="color_visual_target_node.py" output="screen">
+    <rosparam file="$(find aubo_ros_control)/config/color_visual_target.yaml"
+              command="load"/>
+    <param name="target_label" value="$(arg target_label)"/>
+    <param name="target_pose_topic" value="$(arg target_topic)"/>
   </node>
 </launch>

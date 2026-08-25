@@ -20,9 +20,9 @@ class ColorObjectDetector(object):
     """Detect HSV blobs and intersect their camera rays with a known table plane."""
 
     def __init__(self):
-        self.image_topic = rospy.get_param("~image_topic", "/hand_camera/image_raw")
+        self.image_topic = rospy.get_param("~image_topic", "/camera/color/image_raw")
         self.camera_info_topic = rospy.get_param(
-            "~camera_info_topic", "/hand_camera/camera_info"
+            "~camera_info_topic", "/camera/color/camera_info"
         )
         self.detections_topic = rospy.get_param(
             "~detections_topic", "/sorting/detections"

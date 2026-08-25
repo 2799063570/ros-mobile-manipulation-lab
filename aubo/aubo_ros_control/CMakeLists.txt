@@ -7,8 +7,10 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   hardware_interface
   kdl_parser
+  message_filters
   orocos_kdl
   roscpp
+  rospy
   roslib
   sensor_msgs
   std_msgs
@@ -45,7 +47,8 @@ catkin_package(
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME}
   CATKIN_DEPENDS aubo_sdk controller_manager geometry_msgs hardware_interface
-    kdl_parser orocos_kdl roscpp roslib sensor_msgs std_msgs tf2_geometry_msgs tf2_ros
+    kdl_parser message_filters orocos_kdl roscpp rospy roslib sensor_msgs std_msgs
+    tf2_geometry_msgs tf2_ros
 )
 
 add_library(${PROJECT_NAME} src/aubo_hardware_interface.cpp)
@@ -93,7 +96,11 @@ install(TARGETS ${PROJECT_NAME} aubo_hw_node eye_in_hand_visual_servo_node
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 install(DIRECTORY include/${PROJECT_NAME}/
   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION})
-install(DIRECTORY config launch
+catkin_install_python(PROGRAMS
+  scripts/color_visual_target_node.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+
+install(DIRECTORY config launch worlds
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
 install(FILES VISUAL_SERVO.md
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})

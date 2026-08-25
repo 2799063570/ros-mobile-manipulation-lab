@@ -23,6 +23,8 @@ joint_limits:
     has_acceleration_limits: false
     max_acceleration: 0
   upperArm_joint:
+    # Global task safety limit: -60 deg ... +60 deg. Keep this synchronized
+    # with aubo_description/urdf/arm.xacro and visual-servo integration limits.
     has_position_limits: true
     min_position: -1.0471976
     max_position: 1.0471976

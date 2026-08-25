@@ -491,7 +491,7 @@ private:
   {
     private_nh_.param<std::string>("backend", backend_, "gazebo");
     private_nh_.param<std::string>("base_link", base_link_, "base_link");
-    private_nh_.param<std::string>("camera_link", camera_link_, "hand_camera_optical_frame");
+    private_nh_.param<std::string>("camera_link", camera_link_, "camera_color_optical_frame");
     private_nh_.param<std::string>("target_topic", target_topic_, "/visual_servo/target_pose");
     private_nh_.param<std::string>("joint_states_topic", joint_states_topic_, "/joint_states");
     private_nh_.param<std::string>("loss_strategy", loss_strategy_, "coast_then_open");

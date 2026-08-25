@@ -22,7 +22,7 @@ Gazebo 与真机共用视觉误差、雅可比逆解、限制器和目标丢失�
 /visual_servo/target_pose   geometry_msgs/PoseStamped
 ```
 
-推荐检测器直接发布到 `hand_camera_optical_frame`。光学坐标约定为 `+Z` 向前、`+X` 向右、`+Y` 向下。若消息使用其他 TF 坐标系，节点会先变换到相机光学坐标系。没有 `frame_id` 时按相机光学坐标系处理。真机必须把 `hand_camera_joint` / `hand_camera_optical_joint` 更新为实际手眼标定外参；Gazebo 模型中的安装尺寸不能直接当作真机标定结果。
+推荐检测器直接发布到 `camera_color_optical_frame`。光学坐标约定为 `+Z` 向前、`+X` 向右、`+Y` 向下。若消息使用其他 TF 坐标系，节点会先变换到相机光学坐标系。没有 `frame_id` 时按相机光学坐标系处理。真机必须把相机安装关节更新为实际手眼标定外参；Gazebo 模型中的安装尺寸不能直接当作真机标定结果。
 
 `desired_target_position: [0, 0, 0.35]` 表示期望目标保持在图像中心前方 35 cm。目标必须来自实时观测，不能把旧位姿持续加新时间戳重新发布，否则节点无法判断目标已经丢失。
 
@@ -46,7 +46,7 @@ roslaunch aubo_ros_control visual_servo_gazebo.launch
 
 ```bash
 rostopic pub -r 20 /visual_servo/target_pose geometry_msgs/PoseStamped \
-  "header: {frame_id: 'hand_camera_optical_frame'}
+  "header: {frame_id: 'camera_color_optical_frame'}
    pose: {position: {x: 0.08, y: 0.0, z: 0.55},
           orientation: {w: 1.0}}"
 ```
@@ -58,6 +58,18 @@ rostopic pub -r 20 /visual_servo/target_pose geometry_msgs/PoseStamped \
 ```bash
 roslaunch aubo_ros_control visual_servo_real.launch robot_ip:=192.168.1.2
 ```
+
+默认会启动 RealSense 的彩色流、深度流和深度到彩色对齐，并运行
+`color_visual_target_node.py`。仿真和真机使用相同话题：
+
+```text
+/camera/color/image_raw
+/camera/color/camera_info
+/camera/aligned_depth_to_color/image_raw
+```
+
+OpenCV 前端在颜色轮廓内部取有效深度中值并发布
+`/visual_servo/target_pose (geometry_msgs/PoseStamped)`。这是感知与控制之间的稳定接口；未来 Torch/YOLO 节点只需发布相同的相机系 `PoseStamped`，无需修改视觉伺服控制器。检测或深度无效时不得重复发布旧位姿。
 
 节点建立三条独立 SDK 连接：控制模式、状态读取、MAC 缓冲下发。输出线程从本地有界队列取点，对每个点再次做有限值、速度和加速度检查，再通过 `robotServiceSetRobotPosData2Canbus()` 批量送入控制柜。控制柜目标缓冲默认约为 10 个六轴点（约 50 ms），在抗调度抖动与目标丢失响应之间折中。SDK 模式由本节点独占；运行时不要再启动其他会接管机械臂或进入 TCP2CANBUS 的节点。
 

@@ -1,7 +1,7 @@
 # Shared PBVS, integration and target-loss settings for Gazebo and the robot.
 # Units: position=m, joint angle=rad, velocity=rad/s, acceleration=rad/s^2.
 base_link: base_link
-camera_link: hand_camera_optical_frame
+camera_link: camera_color_optical_frame
 target_topic: /visual_servo/target_pose
 joint_states_topic: /joint_states
 control_rate: 100.0

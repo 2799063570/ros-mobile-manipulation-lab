@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <robot name="aubo_hand_camera" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-  <!-- Eye-in-hand RGB camera adapted from the mobile manipulator model.
+  <!-- Eye-in-hand RGB-D camera with RealSense-compatible ROS topic names.
        Camera optical conventions: +Z forward, +X right, +Y down. -->
   <xacro:macro name="aubo_hand_camera" params="parent_link">
     <link name="hand_camera_mount_link">
@@ -64,17 +64,50 @@
       <origin xyz="0.03 0 0" rpy="-1.57079632679 0 -1.57079632679"/>
     </joint>
 
+    <!-- Standard RealSense frame aliases.  Keep the old hand_camera frame for
+         compatibility with the sorting package while new code uses these. -->
+    <link name="camera_link"/>
+    <joint name="camera_link_joint" type="fixed">
+      <parent link="hand_camera_link"/>
+      <child link="camera_link"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </joint>
+    <link name="camera_color_frame"/>
+    <joint name="camera_color_joint" type="fixed">
+      <parent link="camera_link"/>
+      <child link="camera_color_frame"/>
+      <origin xyz="0.03 0 0" rpy="0 0 0"/>
+    </joint>
+    <link name="camera_color_optical_frame"/>
+    <joint name="camera_color_optical_joint" type="fixed">
+      <parent link="camera_color_frame"/>
+      <child link="camera_color_optical_frame"/>
+      <origin xyz="0 0 0" rpy="-1.57079632679 0 -1.57079632679"/>
+    </joint>
+    <link name="camera_depth_frame"/>
+    <joint name="camera_depth_joint" type="fixed">
+      <parent link="camera_link"/>
+      <child link="camera_depth_frame"/>
+      <origin xyz="0.03 0 0" rpy="0 0 0"/>
+    </joint>
+    <link name="camera_depth_optical_frame"/>
+    <joint name="camera_depth_optical_joint" type="fixed">
+      <parent link="camera_depth_frame"/>
+      <child link="camera_depth_optical_frame"/>
+      <origin xyz="0 0 0" rpy="-1.57079632679 0 -1.57079632679"/>
+    </joint>
+
     <gazebo reference="hand_camera_mount_link">
       <material>Gazebo/Black</material>
     </gazebo>
     <gazebo reference="hand_camera_link">
       <material>Gazebo/Grey</material>
-      <sensor type="camera" name="hand_camera">
+      <sensor type="depth" name="hand_realsense">
         <pose>0.03 0 0 0 0 0</pose>
         <always_on>true</always_on>
         <visualize>false</visualize>
         <update_rate>20</update_rate>
-        <camera name="hand_camera_sensor">
+        <camera name="hand_realsense_sensor">
           <horizontal_fov>1.047</horizontal_fov>
           <image>
             <width>640</width>
@@ -83,14 +116,29 @@
           </image>
           <clip><near>0.05</near><far>20.0</far></clip>
         </camera>
-        <plugin name="hand_gazebo_ros_camera" filename="libgazebo_ros_camera.so">
-          <cameraName>hand_camera</cameraName>
-          <imageTopicName>image_raw</imageTopicName>
-          <cameraInfoTopicName>camera_info</cameraInfoTopicName>
-          <frameName>hand_camera_optical_frame</frameName>
+        <plugin name="hand_gazebo_realsense" filename="libgazebo_ros_openni_kinect.so">
+          <robotNamespace>/</robotNamespace>
+          <cameraName>camera</cameraName>
+          <alwaysOn>true</alwaysOn>
+          <updateRate>20.0</updateRate>
+          <imageTopicName>color/image_raw</imageTopicName>
+          <cameraInfoTopicName>color/camera_info</cameraInfoTopicName>
+          <!-- The simulated depth sensor shares the color optical centre, so
+               its depth image is already aligned to the color image. -->
+          <depthImageTopicName>aligned_depth_to_color/image_raw</depthImageTopicName>
+          <depthImageCameraInfoTopicName>aligned_depth_to_color/camera_info</depthImageCameraInfoTopicName>
+          <pointCloudTopicName>depth/color/points</pointCloudTopicName>
+          <frameName>camera_color_optical_frame</frameName>
+          <baseline>0.05</baseline>
+          <pointCloudCutoff>0.08</pointCloudCutoff>
+          <pointCloudCutoffMax>4.0</pointCloudCutoffMax>
+          <distortion_k1>0.0</distortion_k1>
+          <distortion_k2>0.0</distortion_k2>
+          <distortion_k3>0.0</distortion_k3>
+          <distortion_t1>0.0</distortion_t1>
+          <distortion_t2>0.0</distortion_t2>
         </plugin>
       </sensor>
     </gazebo>
   </xacro:macro>
 </robot>
-

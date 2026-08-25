@@ -81,6 +81,7 @@ roslaunch aubo_ros_control aubo_real_bringup.launch \
   robot_xacro:=aubo_i5.xacro robot_srdf:=aubo_i5.srdf
 ```
 
-The URDF camera plugin produces images only in Gazebo. On the real robot, start
-the physical camera driver separately and use `hand_camera_optical_frame` as its
-calibrated optical frame.
+The visual-servo launch files use the same RealSense-style RGB-D topics in
+Gazebo and on hardware. `visual_servo_real.launch` can start the physical
+RealSense driver with aligned depth; the robot URDF owns the calibrated mount TF
+and the common optical frame is `camera_color_optical_frame`.

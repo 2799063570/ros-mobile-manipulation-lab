@@ -6,12 +6,13 @@ We will add the aubo_i10 package soon.
 
 ## AUBO i5 hand camera
 
-`urdf/aubo_i5_with_camera.xacro` adds an eye-in-hand RGB camera beside the
-gripper, based on the mobile manipulator model. Its TF chain is:
+`urdf/aubo_i5_with_camera.xacro` adds an eye-in-hand RGB-D camera beside the
+gripper with RealSense-compatible topic and frame names. Its main TF chain is:
 
 ```text
-gripper_base_link -> hand_camera_mount_link -> hand_camera_link
-                  -> hand_camera_optical_frame
+gripper_base_link -> hand_camera_mount_link -> hand_camera_link -> camera_link
+                  -> camera_color_frame -> camera_color_optical_frame
+                  -> camera_depth_frame -> camera_depth_optical_frame
 ```
 
 Display the model with:
@@ -23,13 +24,15 @@ roslaunch aubo_description arm_with_camera_display.launch
 In Gazebo the camera publishes:
 
 ```text
-/hand_camera/image_raw
-/hand_camera/camera_info
+/camera/color/image_raw
+/camera/color/camera_info
+/camera/aligned_depth_to_color/image_raw
+/camera/depth/color/points
 ```
 
-For a physical camera, this URDF provides the mounting and optical TF only. The
-camera vendor driver must publish the actual image and camera-info topics, and
-its frame must be configured as `hand_camera_optical_frame`.
+For a physical camera, the RealSense driver publishes the actual streams. The
+robot URDF owns the calibrated eye-in-hand TF, so launch the driver with
+`publish_tf:=false` and use `camera_color_optical_frame` for aligned RGB-D data.
 
 
 
