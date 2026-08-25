@@ -31,6 +31,6 @@
   </include>
 
   <include if="$(arg rviz)" file="$(find aubo_mobile_moveit_config)/launch/moveit_rviz.launch">
-    <arg name="rviz_config" value="$(find aubo_mobile_moveit_config)/launch/moveit.rviz"/>
+    <arg name="rviz_config" value="$(find aubo_mobile_moveit_config)/launch/aubo_mobile_sort.rviz"/>
   </include>
 </launch>
