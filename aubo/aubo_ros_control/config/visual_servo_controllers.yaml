@@ -1,0 +1,32 @@
+# Six independent position controllers used only by the Gazebo visual-servo
+# backend.  Do not start aubo_i5_controller at the same time: both claim the
+# same PositionJointInterface resources.
+joint_state_controller:
+  type: joint_state_controller/JointStateController
+  publish_rate: 100
+
+shoulder_position_controller:
+  type: position_controllers/JointPositionController
+  joint: shoulder_joint
+  pid: {p: 120.0, i: 0.2, d: 2.0, i_clamp: 1.0}
+upper_arm_position_controller:
+  type: position_controllers/JointPositionController
+  joint: upperArm_joint
+  pid: {p: 120.0, i: 0.2, d: 2.0, i_clamp: 1.0}
+fore_arm_position_controller:
+  type: position_controllers/JointPositionController
+  joint: foreArm_joint
+  pid: {p: 100.0, i: 0.2, d: 1.5, i_clamp: 1.0}
+wrist1_position_controller:
+  type: position_controllers/JointPositionController
+  joint: wrist1_joint
+  pid: {p: 60.0, i: 0.1, d: 1.0, i_clamp: 0.5}
+wrist2_position_controller:
+  type: position_controllers/JointPositionController
+  joint: wrist2_joint
+  pid: {p: 60.0, i: 0.1, d: 1.0, i_clamp: 0.5}
+wrist3_position_controller:
+  type: position_controllers/JointPositionController
+  joint: wrist3_joint
+  pid: {p: 40.0, i: 0.1, d: 0.8, i_clamp: 0.5}
+

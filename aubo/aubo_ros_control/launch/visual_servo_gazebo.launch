@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="gui" default="true"/>
+  <arg name="target_topic" default="/visual_servo/target_pose"/>
+  <arg name="loss_strategy" default="coast_then_open"/>
+
+  <!-- Loads the eye-in-hand model, Gazebo and robot_state_publisher. -->
+  <include file="$(find aubo_gazebo)/launch/aubo_world_gazebo.launch">
+    <arg name="gui" value="$(arg gui)"/>
+  </include>
+
+  <group ns="aubo_i5">
+    <rosparam file="$(find aubo_ros_control)/config/visual_servo_controllers.yaml"
+              command="load"/>
+    <node name="visual_servo_controller_spawner" pkg="controller_manager"
+          type="spawner" output="screen"
+          args="joint_state_controller shoulder_position_controller upper_arm_position_controller fore_arm_position_controller wrist1_position_controller wrist2_position_controller wrist3_position_controller"/>
+  </group>
+
+  <node name="eye_in_hand_visual_servo" pkg="aubo_ros_control"
+        type="eye_in_hand_visual_servo_node" output="screen" required="true">
+    <rosparam file="$(find aubo_ros_control)/config/eye_in_hand_visual_servo.yaml"
+              command="load"/>
+    <param name="backend" value="gazebo"/>
+    <param name="target_topic" value="$(arg target_topic)"/>
+    <param name="joint_states_topic" value="/aubo_i5/joint_states"/>
+    <param name="loss_strategy" value="$(arg loss_strategy)"/>
+    <rosparam param="gazebo_command_topics">
+      [/aubo_i5/shoulder_position_controller/command,
+       /aubo_i5/upper_arm_position_controller/command,
+       /aubo_i5/fore_arm_position_controller/command,
+       /aubo_i5/wrist1_position_controller/command,
+       /aubo_i5/wrist2_position_controller/command,
+       /aubo_i5/wrist3_position_controller/command]
+    </rosparam>
+  </node>
+</launch>
+
