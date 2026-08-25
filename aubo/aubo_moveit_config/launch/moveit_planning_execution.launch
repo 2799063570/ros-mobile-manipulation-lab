@@ -5,6 +5,7 @@
  <arg name="use_sensor_manager" default="false" />
  <arg name="robot_xacro" default="aubo_i5.xacro" />
  <arg name="robot_srdf" default="aubo_i5.srdf" />
+ <arg name="rviz_config" default="$(find aubo_moveit_config)/launch/moveit.rviz" />
  <include file="$(find aubo_moveit_config)/launch/move_group.launch">
   <arg name="publish_monitored_planning_scene" value="true" />
   <arg name="use_sensor_manager" value="$(arg use_sensor_manager)" />
@@ -14,7 +15,7 @@
 
  # The visualization component of MoveIt!
  <include file="$(find aubo_moveit_config)/launch/moveit_rviz.launch">
-  <arg name="rviz_config" value="" />
+  <arg name="rviz_config" value="$(arg rviz_config)" />
  </include>
 
   <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher">
