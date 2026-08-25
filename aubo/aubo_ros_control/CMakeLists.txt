@@ -8,7 +8,6 @@ find_package(catkin REQUIRED COMPONENTS
   hardware_interface
   kdl_parser
   message_filters
-  orocos_kdl
   roscpp
   rospy
   roslib
@@ -19,6 +18,7 @@ find_package(catkin REQUIRED COMPONENTS
 )
 find_package(Threads REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(orocos_kdl REQUIRED)
 
 set(AUBO_SDK_ROOT "${PROJECT_SOURCE_DIR}/../aubo_sdk")
 set(AUBO_SDK_INCLUDE_DIR "${AUBO_SDK_ROOT}/include/aubo_driver")
@@ -47,8 +47,9 @@ catkin_package(
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME}
   CATKIN_DEPENDS aubo_sdk controller_manager geometry_msgs hardware_interface
-    kdl_parser message_filters orocos_kdl roscpp rospy roslib sensor_msgs std_msgs
+    kdl_parser message_filters roscpp rospy roslib sensor_msgs std_msgs
     tf2_geometry_msgs tf2_ros
+  DEPENDS orocos_kdl
 )
 
 add_library(${PROJECT_NAME} src/aubo_hardware_interface.cpp)
@@ -80,10 +81,12 @@ target_include_directories(eye_in_hand_visual_servo_node PRIVATE
   include
   ${catkin_INCLUDE_DIRS}
   ${AUBO_SDK_INCLUDE_DIR}
+  ${orocos_kdl_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR})
 target_link_libraries(eye_in_hand_visual_servo_node
   ${catkin_LIBRARIES}
+  ${orocos_kdl_LIBRARIES}
   ${AUBO_SDK_LIB}
   Threads::Threads)
 set_target_properties(eye_in_hand_visual_servo_node PROPERTIES
