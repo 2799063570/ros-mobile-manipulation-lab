@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="world" default="$(find aubo_color_sorting)/worlds/sorting.world"/>
+  <arg name="gui" default="true"/>
+  <arg name="rviz" default="true"/>
+  <arg name="debug_view" default="true"/>
+  <arg name="paused" default="false"/>
+  <arg name="auto_move_to_observation" default="true"/>
+  <arg name="auto_start" default="false"/>
+
+  <!-- Fixed-base AUBO i5; no mobile-base model or odometry is loaded. -->
+  <include file="$(find aubo_gazebo)/launch/aubo_world_gazebo.launch">
+    <arg name="world_name" value="$(arg world)"/>
+    <arg name="gui" value="$(arg gui)"/>
+    <arg name="paused" value="$(arg paused)"/>
+    <arg name="x_pos" value="0.0"/>
+    <arg name="y_pos" value="0.0"/>
+    <arg name="z_pos" value="0.0"/>
+  </include>
+
+  <include file="$(find aubo_gazebo)/launch/aubo_controller_gazebo.launch"/>
+
+  <!-- Hardware joint states are namespaced by gazebo_ros_control. -->
+  <node name="aubo_joint_state_relay" pkg="joint_state_publisher"
+        type="joint_state_publisher" output="screen">
+    <rosparam param="source_list">[/aubo_i5/joint_states]</rosparam>
+  </node>
+
+  <include file="$(find aubo_moveit_config)/launch/move_group.launch">
+    <arg name="allow_trajectory_execution" value="true"/>
+    <arg name="fake_execution" value="false"/>
+    <arg name="load_robot_description" value="false"/>
+    <arg name="robot_xacro" value="aubo_i5_with_camera.xacro"/>
+    <arg name="robot_srdf" value="aubo_i5_with_camera.srdf"/>
+  </include>
+
+  <include file="$(find aubo_color_sorting)/launch/sorting.launch">
+    <arg name="debug_view" value="$(arg debug_view)"/>
+    <arg name="auto_move_to_observation" value="$(arg auto_move_to_observation)"/>
+    <arg name="auto_start" value="$(arg auto_start)"/>
+  </include>
+
+  <include if="$(arg rviz)" file="$(find aubo_moveit_config)/launch/moveit_rviz.launch">
+    <arg name="rviz_config" value="$(find aubo_moveit_config)/launch/moveit.rviz"/>
+  </include>
+</launch>

@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Robot controllers and move_group must already be running. -->
+  <arg name="start_perception" default="true"/>
+  <arg name="start_task" default="true"/>
+  <arg name="debug_view" default="true"/>
+  <arg name="auto_move_to_observation" default="true"/>
+  <arg name="auto_start" default="false"/>
+  <arg name="use_grasp_attachment" default="true"/>
+
+  <node if="$(arg start_perception)" pkg="aubo_color_sorting"
+        type="color_object_detector.py" name="color_object_detector" output="screen">
+    <rosparam file="$(find aubo_color_sorting)/config/colors.yaml" command="load"/>
+    <param name="image_topic" value="/hand_camera/image_raw"/>
+    <param name="camera_info_topic" value="/hand_camera/camera_info"/>
+    <param name="detections_topic" value="/sorting/detections"/>
+    <param name="debug_image_topic" value="/sorting/debug_image"/>
+  </node>
+
+  <node if="$(arg start_task)" pkg="aubo_color_sorting"
+        type="color_sorting_task.py" name="color_sorting_task" output="screen">
+    <rosparam file="$(find aubo_color_sorting)/config/sorting.yaml" command="load"/>
+    <param name="auto_move_to_observation" value="$(arg auto_move_to_observation)"/>
+    <param name="auto_start" value="$(arg auto_start)"/>
+    <param name="use_grasp_attachment" value="$(arg use_grasp_attachment)"/>
+  </node>
+
+  <node if="$(arg debug_view)" pkg="image_view" type="image_view"
+        name="sorting_debug_view" output="screen">
+    <remap from="image" to="/sorting/debug_image"/>
+  </node>
+</launch>
+

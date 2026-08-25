@@ -67,6 +67,7 @@ aubo_mobile_robot
 - `aubo_gazebo`：Gazebo 仿真和 `ros_control` 控制器；
 - `aubo_moveit_config`：MoveIt 运动规划配置；
 - `aubo_planning`：夹爪控制、抓取和放置示例；
+- `aubo_color_sorting`：固定底座机械臂的腕部相机颜色识别、抓取和分类放置；
 - `aubo_sdk`：AUBO 官方 SDK 头文件、运行库、只读连接测试和受保护运动示例；
 - `aubo_ros_control`：真实机械臂 `RobotHW` 接口、轨迹控制器及 MoveIt 实机启动入口。
 
@@ -189,6 +190,20 @@ roslaunch aubo_ros_control aubo_real_bringup.launch robot_ip:=192.168.1.2
 实机接口说明、安全前置条件及状态只读模式见
 [`aubo_ros_control/README.md`](aubo/aubo_ros_control/README.md)。
 
+### 固定机械臂：颜色抓取分拣
+
+该场景不加载移动底盘，使用高 `0.10 m` 的低桌面，并将 `upperArm_joint` 的模型与
+MoveIt 位置限制统一为 `-60°` 到 `60°`：
+
+```bash
+roslaunch aubo_color_sorting sorting_gazebo.launch
+rosservice call /sorting/start
+```
+
+默认不会自动开始抓取；可先在 RViz 和 `/sorting/debug_image` 中检查轨迹与识别结果。
+完整参数和真实机械臂接入方式见
+[`aubo_color_sorting/README.md`](aubo/aubo_color_sorting/README.md)。
+
 ### 复合机器人：基础仿真
 
 ```bash
@@ -302,6 +317,7 @@ map → odom → base_footprint → base_link → AUBO links → tcp_link
 - [自研差速机器人](simple_diff_robot_gazebo/README.md)
 - [AUBO 机械臂规划示例](aubo/aubo_planning/README.md)
 - [AUBO SDK 与真实机械臂控制](aubo/aubo_ros_control/README.md)
+- [AUBO 固定机械臂颜色抓取分拣](aubo/aubo_color_sorting/README.md)
 - [AUBO 复合移动机器人概览](aubo_mobile_robot/README.md)
 - [复合机器人模型与仿真](aubo_mobile_robot/aubo_mobile_robot/README.md)
 - [建图、定位与导航](aubo_mobile_robot/aubo_mobile_navigation/README.md)

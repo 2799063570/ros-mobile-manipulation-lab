@@ -1,0 +1,60 @@
+planning_group: aubo_i5
+end_effector_link: tcp_link
+target_frame: base_link
+detections_topic: /sorting/detections
+gripper_action: /aubo_i5/gripper_controller/follow_joint_trajectory
+
+table_z: 0.10
+table_center: [0.70, 0.0, 0.0]
+table_size: [0.70, 1.00, 0.20]
+object_height: 0.04
+# TCP 对准物体中心后再上移 1 cm，避免指尖与桌面发生接触。
+grasp_height_offset: 0.01
+scene_update_timeout: 10.0
+
+# roll=pi 时 TCP 的 +Z 朝下，手部相机光轴与 TCP 的 +Z 方向一致。
+grasp_rpy: [3.141592653589793, 0.0, 0.0]
+observation_pose: [0.58, 0.0, 0.58]
+# 非空时优先使用 MoveIt 命名姿态；为空时使用上面的笛卡尔观察位姿。
+observation_named_target: observe
+auto_move_to_observation: true
+# 默认等待 /sorting/start 服务命令，不在启动后立即抓取。
+auto_start: false
+pregrasp_height: 0.22
+lift_height: 0.28
+place_clearance: 0.02
+cartesian_step: 0.01
+minimum_cartesian_fraction: 0.90
+
+gripper_open: 0.0
+# 4 cm 方块约在 0.24 rad 开始接触；0.28 rad 提供少量夹持预紧量。
+gripper_closed: 0.28
+gripper_motion_time: 2.5
+# 闭合时方块会阻挡手指到达命令位置，因此夹持动作使用较宽的位置容差。
+gripper_contact_tolerance: 0.30
+
+# Gazebo 小物体接触容易在抬升时丢失；闭合后临时固定，张开后解除。
+use_grasp_attachment: true
+grasp_attach_topic: /sorting/grasp/attach
+grasp_detach_topic: /sorting/grasp/detach
+grasp_status_topic: /sorting/grasp/status
+grasp_attachment_timeout: 3.0
+
+sort_colors: [red, green, blue]
+place_targets:
+  red: [0.44, -0.25]
+  green: [0.58, -0.25]
+  blue: [0.44, 0.25]
+
+detection_timeout: 15.0
+detection_samples: 8
+detection_settle_time: 1.0
+# 感知坐标已经在 colors.yaml 中完成基础标定；剩余夹爪中心误差在这里微调。
+grasp_offset_x: 0.0
+grasp_offset_y: 0.0
+moveit_server_timeout: 30.0
+gripper_server_timeout: 30.0
+planning_time: 12.0
+velocity_scaling: 0.15
+acceleration_scaling: 0.15
+finish_named_target: down
