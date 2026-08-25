@@ -1,0 +1,26 @@
+joint_state_controller:
+  type: joint_state_controller/JointStateController
+  publish_rate: 50
+
+aubo_i5_controller:
+  type: position_controllers/JointTrajectoryController
+  joints:
+    - shoulder_joint
+    - upperArm_joint
+    - foreArm_joint
+    - wrist1_joint
+    - wrist2_joint
+    - wrist3_joint
+  constraints:
+    goal_time: 2.0
+    stopped_velocity_tolerance: 0.05
+    shoulder_joint: {trajectory: 0.1, goal: 0.05}
+    upperArm_joint:  {trajectory: 0.1, goal: 0.05}
+    foreArm_joint:   {trajectory: 0.1, goal: 0.05}
+    wrist1_joint:    {trajectory: 0.1, goal: 0.05}
+    wrist2_joint:    {trajectory: 0.1, goal: 0.05}
+    wrist3_joint:    {trajectory: 0.1, goal: 0.05}
+  state_publish_rate: 25
+  action_monitor_rate: 20
+  stop_trajectory_duration: 0.5
+

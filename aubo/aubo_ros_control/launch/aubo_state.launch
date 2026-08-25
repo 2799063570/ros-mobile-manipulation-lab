@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="robot_ip" default="192.168.1.2"/>
+  <arg name="server_port" default="8899"/>
+  <group ns="aubo_i5">
+    <rosparam file="$(find aubo_ros_control)/config/controllers.yaml" command="load"/>
+    <node name="aubo_hw_node" pkg="aubo_ros_control" type="aubo_hw_node"
+          output="screen" required="true">
+      <env name="LD_LIBRARY_PATH"
+           value="$(find aubo_sdk)/lib/lib64/aubocontroller:$(find aubo_sdk)/lib/lib64/log4cplus:$(find aubo_sdk)/lib/lib64/config:$(optenv LD_LIBRARY_PATH)"/>
+      <param name="server_host" value="$(arg robot_ip)"/>
+      <param name="server_port" value="$(arg server_port)"/>
+      <param name="enable_motion_control" value="false"/>
+      <param name="require_real_robot" value="false"/>
+    </node>
+    <node name="controller_spawner" pkg="controller_manager" type="spawner"
+          output="screen" args="joint_state_controller"/>
+  </group>
+</launch>

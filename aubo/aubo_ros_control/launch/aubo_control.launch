@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="robot_ip" default="192.168.1.2"/>
+  <arg name="server_port" default="8899"/>
+  <arg name="username" default="aubo"/>
+  <arg name="password" default="123456"/>
+  <arg name="collision_class" default="6"/>
+  <arg name="control_frequency" default="250.0"/>
+  <arg name="load_robot_description" default="true"/>
+  <arg name="require_real_robot" default="true"/>
+
+  <param name="/aubo_driver/server_host" value="$(arg robot_ip)"/>
+  <include if="$(arg load_robot_description)"
+           file="$(find aubo_moveit_config)/launch/planning_context.launch">
+    <arg name="load_robot_description" value="true"/>
+  </include>
+
+  <group ns="aubo_i5">
+    <rosparam file="$(find aubo_ros_control)/config/controllers.yaml" command="load"/>
+    <node name="aubo_hw_node" pkg="aubo_ros_control" type="aubo_hw_node"
+          output="screen" required="true">
+      <env name="LD_LIBRARY_PATH"
+           value="$(find aubo_sdk)/lib/lib64/aubocontroller:$(find aubo_sdk)/lib/lib64/log4cplus:$(find aubo_sdk)/lib/lib64/config:$(optenv LD_LIBRARY_PATH)"/>
+      <param name="server_host" value="$(arg robot_ip)"/>
+      <param name="server_port" value="$(arg server_port)"/>
+      <param name="username" value="$(arg username)"/>
+      <param name="password" value="$(arg password)"/>
+      <param name="collision_class" value="$(arg collision_class)"/>
+      <param name="control_frequency" value="$(arg control_frequency)"/>
+      <param name="require_real_robot" value="$(arg require_real_robot)"/>
+      <param name="enable_motion_control" value="true"/>
+      <param name="enable_command_smoothing" value="true"/>
+      <param name="command_filter_alpha" value="0.25"/>
+      <param name="command_deadband" value="0.0005"/>
+      <param name="max_command_step_scale" value="1.0"/>
+      <rosparam param="joint_names">
+        [shoulder_joint, upperArm_joint, foreArm_joint,
+         wrist1_joint, wrist2_joint, wrist3_joint]
+      </rosparam>
+    </node>
+    <node name="controller_spawner" pkg="controller_manager" type="spawner"
+          output="screen" args="joint_state_controller aubo_i5_controller"/>
+  </group>
+</launch>
+

@@ -66,7 +66,9 @@ aubo_mobile_robot
 - `aubo_description`：机械臂、双指夹爪及相机模型；
 - `aubo_gazebo`：Gazebo 仿真和 `ros_control` 控制器；
 - `aubo_moveit_config`：MoveIt 运动规划配置；
-- `aubo_planning`：夹爪控制、抓取和放置示例。
+- `aubo_planning`：夹爪控制、抓取和放置示例；
+- `aubo_sdk`：AUBO 官方 SDK 头文件、运行库、只读连接测试和受保护运动示例；
+- `aubo_ros_control`：真实机械臂 `RobotHW` 接口、轨迹控制器及 MoveIt 实机启动入口。
 
 该部分覆盖从机器人描述、关节轨迹控制到运动规划和末端夹爪操作的基本流程。
 
@@ -176,6 +178,16 @@ roslaunch simple_diff_robot_gazebo rrt_exploration.launch
 roslaunch aubo_planning gripper_control.launch command:=cycle
 roslaunch aubo_planning pick_place.launch
 ```
+
+真实机械臂建议先运行只读 SDK 检查，再启动实机控制：
+
+```bash
+rosrun aubo_sdk sdk_test 192.168.1.2
+roslaunch aubo_ros_control aubo_real_bringup.launch robot_ip:=192.168.1.2
+```
+
+实机接口说明、安全前置条件及状态只读模式见
+[`aubo_ros_control/README.md`](aubo/aubo_ros_control/README.md)。
 
 ### 复合机器人：基础仿真
 
@@ -289,6 +301,7 @@ map → odom → base_footprint → base_link → AUBO links → tcp_link
 
 - [自研差速机器人](simple_diff_robot_gazebo/README.md)
 - [AUBO 机械臂规划示例](aubo/aubo_planning/README.md)
+- [AUBO SDK 与真实机械臂控制](aubo/aubo_ros_control/README.md)
 - [AUBO 复合移动机器人概览](aubo_mobile_robot/README.md)
 - [复合机器人模型与仿真](aubo_mobile_robot/aubo_mobile_robot/README.md)
 - [建图、定位与导航](aubo_mobile_robot/aubo_mobile_navigation/README.md)

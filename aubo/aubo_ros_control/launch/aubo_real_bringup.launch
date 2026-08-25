@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="robot_ip" default="192.168.1.2"/>
+  <arg name="use_rviz" default="true"/>
+
+  <include file="$(find aubo_ros_control)/launch/aubo_control.launch">
+    <arg name="robot_ip" value="$(arg robot_ip)"/>
+    <arg name="load_robot_description" value="true"/>
+    <arg name="require_real_robot" value="true"/>
+  </include>
+
+  <node name="robot_state_publisher" pkg="robot_state_publisher"
+        type="robot_state_publisher" output="screen"/>
+
+  <!-- MoveIt and robot_state_publisher consume /joint_states; the hardware
+       controller publishes inside /aubo_i5. Merge it into the global topic. -->
+  <node name="aubo_joint_state_relay" pkg="joint_state_publisher"
+        type="joint_state_publisher" output="screen">
+    <rosparam param="source_list">[/aubo_i5/joint_states]</rosparam>
+  </node>
+
+  <include file="$(find aubo_moveit_config)/launch/move_group.launch">
+    <arg name="load_robot_description" value="false"/>
+    <arg name="allow_trajectory_execution" value="true"/>
+    <arg name="fake_execution" value="false"/>
+  </include>
+
+  <include if="$(arg use_rviz)"
+           file="$(find aubo_moveit_config)/launch/moveit_rviz.launch">
+    <arg name="rviz_config" value="$(find aubo_moveit_config)/launch/moveit.rviz"/>
+  </include>
+</launch>

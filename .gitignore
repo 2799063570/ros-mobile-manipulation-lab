@@ -10,5 +10,6 @@ simple_diff_robot_gazebo/maps/*.yaml
 build/
 devel/
 logs/
+aubo/aubo_sdk/logfiles/
 *.py[cod]
 __pycache__/
