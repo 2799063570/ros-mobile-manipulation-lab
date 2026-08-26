@@ -5,8 +5,10 @@ detections_topic: /sorting/detections
 gripper_action: /gripper_controller/follow_joint_trajectory
 
 table_z: 0.14
+table_frame: base_link
 table_center: [0.80, 0.0, -0.06]
 table_size: [0.80, 1.20, 0.40]
+table_collision_margin: 0.0
 object_height: 0.04
 # TCP 对准物体中心后再上移 1 cm，避免指尖与桌面发生接触。
 grasp_height_offset: 0.01

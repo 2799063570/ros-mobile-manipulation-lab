@@ -13,6 +13,7 @@ import xml.etree.ElementTree as ElementTree
 import actionlib
 import moveit_commander
 import rospy
+import tf
 from actionlib_msgs.msg import GoalStatus
 from control_msgs.msg import (
     FollowJointTrajectoryAction,
@@ -43,8 +44,12 @@ class ColorSortingTask(object):
         )
 
         self.table_z = float(rospy.get_param("~table_z", 0.14))
+        self.table_frame = rospy.get_param("~table_frame", self.target_frame)
         self.table_center = rospy.get_param("~table_center", [0.80, 0.0, -0.06])
         self.table_size = rospy.get_param("~table_size", [0.80, 1.20, 0.40])
+        self.table_collision_margin = max(
+            0.0, float(rospy.get_param("~table_collision_margin", 0.0))
+        )
         self.object_height = float(rospy.get_param("~object_height", 0.04))
         self.grasp_height_offset = float(
             rospy.get_param("~grasp_height_offset", 0.01)
@@ -152,6 +157,8 @@ class ColorSortingTask(object):
         self.arm = moveit_commander.MoveGroupCommander(self.group_name)
         self.arm.set_end_effector_link(self.end_effector_link)
         self.arm.set_pose_reference_frame(self.target_frame)
+        self.planning_frame = self.arm.get_planning_frame()
+        self.tf_listener = tf.TransformListener()
         self.arm.set_planning_time(float(rospy.get_param("~planning_time", 12.0)))
         self.arm.set_num_planning_attempts(10)
         self.arm.set_max_velocity_scaling_factor(
@@ -505,21 +512,70 @@ class ColorSortingTask(object):
     def _add_table_collision(self):
         object_name = "sorting_table"
         table_pose = PoseStamped()
-        table_pose.header.frame_id = self.target_frame
+        table_pose.header.frame_id = self.table_frame
+        table_pose.header.stamp = rospy.Time(0)
         table_pose.pose.orientation.w = 1.0
         table_pose.pose.position.x = float(self.table_center[0])
         table_pose.pose.position.y = float(self.table_center[1])
         table_pose.pose.position.z = float(self.table_center[2])
+
+        try:
+            if self.table_frame != self.planning_frame:
+                self.tf_listener.waitForTransform(
+                    self.planning_frame,
+                    self.table_frame,
+                    rospy.Time(0),
+                    rospy.Duration(self.scene_update_timeout),
+                )
+                table_pose = self.tf_listener.transformPose(
+                    self.planning_frame, table_pose
+                )
+        except (tf.Exception, tf.LookupException, tf.ConnectivityException,
+                tf.ExtrapolationException) as error:
+            rospy.logerr(
+                "Cannot transform sorting table from %s to %s: %s",
+                self.table_frame,
+                self.planning_frame,
+                str(error),
+            )
+            return False
+
+        # Recreate the object so an existing entry cannot make the update wait
+        # return before the new pose has reached move_group.
+        if object_name in self.scene.get_known_object_names():
+            self.scene.remove_world_object(object_name)
+            removal_deadline = time.time() + self.scene_update_timeout
+            while not rospy.is_shutdown() and time.time() < removal_deadline:
+                if object_name not in self.scene.get_known_object_names():
+                    break
+                rospy.sleep(0.05)
+            if object_name in self.scene.get_known_object_names():
+                rospy.logerr("MoveIt did not remove stale sorting table")
+                return False
+
+        padded_size = [float(value) for value in self.table_size]
+        padded_size[0] += 2.0 * self.table_collision_margin
+        padded_size[1] += 2.0 * self.table_collision_margin
         self.scene.add_box(
             object_name,
             table_pose,
-            size=tuple(float(value) for value in self.table_size),
+            size=tuple(padded_size),
         )
         deadline = time.time() + self.scene_update_timeout
         while not rospy.is_shutdown() and time.time() < deadline:
             if object_name in self.scene.get_known_object_names():
                 self.arm.set_support_surface_name(object_name)
-                rospy.loginfo("Sorting table confirmed in MoveIt planning scene")
+                rospy.loginfo(
+                    "Sorting table confirmed in MoveIt planning scene: frame=%s, "
+                    "position=[%.3f, %.3f, %.3f], size=[%.3f, %.3f, %.3f]",
+                    table_pose.header.frame_id,
+                    table_pose.pose.position.x,
+                    table_pose.pose.position.y,
+                    table_pose.pose.position.z,
+                    padded_size[0],
+                    padded_size[1],
+                    padded_size[2],
+                )
                 return True
             rospy.sleep(0.1)
         rospy.logerr(
@@ -573,6 +629,10 @@ class ColorSortingTask(object):
 
     def _observation(self):
         self._observation_ready = False
+        # The mobile base has moved since initialization. Refresh the static
+        # table in the planning frame before planning out of transport pose.
+        if not self._add_table_collision():
+            return False
         if self.observation_named_target:
             success = self._move_named(self.observation_named_target)
         else:
