@@ -93,6 +93,7 @@ class ColorSortingTask(object):
             rospy.get_param("~grasp_attachment_timeout", 3.0)
         )
         self.sort_colors = rospy.get_param("~sort_colors", ["red", "green", "blue"])
+        self.place_frame = rospy.get_param("~place_frame", self.target_frame)
         self.place_targets = rospy.get_param("~place_targets")
         self.detection_timeout = float(rospy.get_param("~detection_timeout", 15.0))
         self.detection_samples = max(
@@ -100,6 +101,12 @@ class ColorSortingTask(object):
         )
         self.detection_settle_time = float(
             rospy.get_param("~detection_settle_time", 1.0)
+        )
+        self.verify_observation_detections = bool(
+            rospy.get_param("~verify_observation_detections", False)
+        )
+        self.observation_verification_timeout = float(
+            rospy.get_param("~observation_verification_timeout", 4.0)
         )
         self.grasp_offset_x = float(rospy.get_param("~grasp_offset_x", 0.0))
         self.grasp_offset_y = float(rospy.get_param("~grasp_offset_y", 0.0))
@@ -412,6 +419,36 @@ class ColorSortingTask(object):
         pose.pose.orientation.w = quaternion[3]
         return pose
 
+    def _xy_in_target_frame(self, source_frame, xy):
+        if source_frame == self.target_frame:
+            return float(xy[0]), float(xy[1])
+        source_pose = PoseStamped()
+        source_pose.header.frame_id = source_frame
+        source_pose.header.stamp = rospy.Time(0)
+        source_pose.pose.position.x = float(xy[0])
+        source_pose.pose.position.y = float(xy[1])
+        source_pose.pose.orientation.w = 1.0
+        try:
+            self.tf_listener.waitForTransform(
+                self.target_frame,
+                source_frame,
+                rospy.Time(0),
+                rospy.Duration(self.scene_update_timeout),
+            )
+            target_pose = self.tf_listener.transformPose(
+                self.target_frame, source_pose
+            )
+            return target_pose.pose.position.x, target_pose.pose.position.y
+        except (tf.Exception, tf.LookupException, tf.ConnectivityException,
+                tf.ExtrapolationException) as error:
+            rospy.logerr(
+                "Cannot transform place target from %s to %s: %s",
+                source_frame,
+                self.target_frame,
+                str(error),
+            )
+            return None
+
     def _move_to_pose(self, pose, description):
         if self._stop_requested.is_set():
             return False
@@ -646,10 +683,16 @@ class ColorSortingTask(object):
         return True
 
     def _observation_operation(self):
-        return self._observation()
+        if not self._observation():
+            return False
+        if self.verify_observation_detections:
+            if not self._verify_visible_colors():
+                self._observation_ready = False
+                return False
+        return True
 
     def _initial_observation_operation(self):
-        if not self._observation():
+        if not self._observation_operation():
             return False
         if self.auto_start:
             return self._sorting_operation()
@@ -665,6 +708,31 @@ class ColorSortingTask(object):
     def _home_operation(self):
         self._observation_ready = False
         return self._move_named(self.finish_named_target)
+
+    def _verify_visible_colors(self):
+        required = set(str(color) for color in self.sort_colors)
+        not_before = time.time()
+        deadline = not_before + self.observation_verification_timeout
+        while not rospy.is_shutdown() and time.time() < deadline:
+            if self._stop_requested.is_set():
+                return False
+            with self._data_lock:
+                detections = self._detections
+                receipt_time = self._detections_wall_time
+            if detections is not None and receipt_time > not_before:
+                visible = set(str(item.color) for item in detections.objects)
+                if required.issubset(visible):
+                    rospy.loginfo(
+                        "Observation verified all colors: %s",
+                        ", ".join(sorted(required)),
+                    )
+                    return True
+            rospy.sleep(0.1)
+        rospy.logwarn(
+            "Observation pose did not show all required colors within %.1f seconds",
+            self.observation_verification_timeout,
+        )
+        return False
 
     def _pick_and_place(self, detected):
         color = detected.color
@@ -705,9 +773,12 @@ class ColorSortingTask(object):
         if color not in self.place_targets:
             rospy.logerr("No place target configured for color '%s'", color)
             return False
-        place_xy = self.place_targets[color]
-        place_x = float(place_xy[0])
-        place_y = float(place_xy[1])
+        place_xy = self._xy_in_target_frame(
+            self.place_frame, self.place_targets[color]
+        )
+        if place_xy is None:
+            return False
+        place_x, place_y = place_xy
         if not self._move_to_pose(
             self._pose(place_x, place_y, travel_z), color + " pre-place"
         ):

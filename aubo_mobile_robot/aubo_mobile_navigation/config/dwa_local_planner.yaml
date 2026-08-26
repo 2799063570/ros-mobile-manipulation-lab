@@ -19,9 +19,9 @@ DWAPlannerROS:
 
   # Stop close enough that the blocks remain inside both the camera view and
   # the detector workspace. The base approaches from -X, so it normally stops
-  # near x=2.08 for the x=2.15 workstation goal, leaving table clearance.
-  xy_goal_tolerance: 0.07
-  yaw_goal_tolerance: 0.10
+  # near the requested fine-dock pose while retaining table clearance.
+  xy_goal_tolerance: 0.04
+  yaw_goal_tolerance: 0.06
   latch_xy_goal_tolerance: true
   holonomic_robot: false
 

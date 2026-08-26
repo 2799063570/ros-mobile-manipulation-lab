@@ -43,6 +43,7 @@ grasp_status_topic: /sorting/grasp/status
 grasp_attachment_timeout: 3.0
 
 sort_colors: [red, green, blue]
+place_frame: base_link
 place_targets:
   red: [0.46, -0.24]
   green: [0.60, -0.24]
@@ -51,6 +52,8 @@ place_targets:
 detection_timeout: 15.0
 detection_samples: 8
 detection_settle_time: 1.0
+verify_observation_detections: false
+observation_verification_timeout: 4.0
 # 感知坐标已经在 colors.yaml 中完成基础标定；剩余夹爪中心误差在这里微调。
 grasp_offset_x: 0.0
 grasp_offset_y: 0.0

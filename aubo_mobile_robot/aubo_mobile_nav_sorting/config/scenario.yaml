@@ -2,6 +2,28 @@
 navigation_frame: map
 sorting_goal: [2.15, 0.0, 0.0]
 
+# 近场协同停靠：先停在桌前安全位置，再从候选位姿中选择同时满足底盘间距、
+# 相机中心和检测工作区的方案。每次精停后由 MoveIt 与实际检测共同验证；失败时
+# 自动收臂并尝试下一个候选。
+near_field_enabled: true
+pre_dock_goal: [1.85, 0.0, 0.0]
+near_field_candidate_x: [2.16, 2.10, 2.06]
+near_field_candidate_y: [0.0, -0.08, 0.08]
+near_field_candidate_yaw: [0.0, -0.08, 0.08]
+near_field_max_candidates: 6
+
+# map 坐标下的桌子包围盒、三个方块中心，以及底盘中心到桌边的最小距离。
+near_field_table: [3.00, 0.0, 0.80, 1.20]
+near_field_workpieces:
+  - [2.78, -0.12]
+  - [2.86, 0.0]
+  - [2.78, 0.12]
+near_field_base_clearance: 0.40
+
+# 检测程序在 base_link 下允许的范围，以及 observe 相机中心射线落点。
+near_field_detector_workspace: [0.40, 0.82, -0.22, 0.22]
+near_field_camera_target: [0.62, 0.0]
+
 # 导航与任务容错。
 navigation_action: /move_base
 navigation_timeout: 180.0
@@ -11,7 +33,7 @@ sorting_initialization_timeout: 60.0
 sorting_operation_timeout: 300.0
 startup_delay: 3.0
 
-# 导航前收起机械臂；到站后复用 aubo_mobile_sorting 的观察与分拣服务。
+# 导航前收起机械臂；精停后复用 aubo_mobile_sorting 的观察与分拣服务。
 home_before_navigation: true
 sorting_state_topic: /sorting/state
 sorting_home_service: /sorting/home

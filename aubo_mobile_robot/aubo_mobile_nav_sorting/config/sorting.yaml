@@ -41,14 +41,19 @@ grasp_status_topic: /sorting/grasp/status
 grasp_attachment_timeout: 3.0
 
 sort_colors: [red, green, blue]
+# Static pad centres in map coordinates. They are transformed into base_link at
+# execution time, so fine-docking y/yaw adjustments do not offset placement.
+place_frame: map
 place_targets:
-  red: [0.51, -0.24]
-  green: [0.65, -0.24]
-  blue: [0.51, 0.24]
+  red: [2.66, -0.24]
+  green: [2.80, -0.24]
+  blue: [2.66, 0.24]
 
 detection_timeout: 15.0
 detection_samples: 8
 detection_settle_time: 1.0
+verify_observation_detections: true
+observation_verification_timeout: 4.0
 grasp_offset_x: 0.0
 grasp_offset_y: 0.0
 moveit_server_timeout: 30.0
