@@ -50,4 +50,6 @@ gripper_server_timeout: 30.0
 planning_time: 12.0
 velocity_scaling: 0.15
 acceleration_scaling: 0.15
-finish_named_target: down
+# Navigation mission calls /sorting/home before move_base starts. Keep the arm
+# in its compact A-shaped configuration while travelling.
+finish_named_target: transport

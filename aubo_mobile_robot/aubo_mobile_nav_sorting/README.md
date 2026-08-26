@@ -3,7 +3,7 @@
 该功能包把已有模块组合成一个完整场景：
 
 ```text
-机械臂收回 down 安全姿态
+机械臂收回 transport（A 形折叠）运输姿态
 → move_base 导航到分拣工位
 → 机械臂进入相机观察位
 → 复用 aubo_mobile_sorting 完成红、绿、蓝方块分拣
