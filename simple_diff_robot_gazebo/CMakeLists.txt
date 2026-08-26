@@ -7,6 +7,7 @@ catkin_package()
 
 catkin_install_python(PROGRAMS
   scripts/keyboard_teleop.py
+  scripts/single_obstacle_driver.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

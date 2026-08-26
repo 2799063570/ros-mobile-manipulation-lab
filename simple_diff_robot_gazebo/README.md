@@ -1,5 +1,20 @@
 # simple_diff_robot_gazebo
 
+## 单障碍物自动绕行
+
+下面的命令会启动一个封闭 Gazebo 场地。小车从左侧出发，沿三个相对航点从红色障碍物下方绕行，最后停在右侧绿色圆形标记处：
+
+```bash
+roslaunch simple_diff_robot_gazebo single_obstacle_demo.launch
+```
+
+节点同时读取 `/scan`；当前方小于 0.42 m 时会停止直行并执行安全转向。若只想加载环境并手动控制，可使用：
+
+```bash
+roslaunch simple_diff_robot_gazebo single_obstacle_demo.launch auto_start:=false
+roslaunch simple_diff_robot_gazebo teleop.launch
+```
+
 一个用于 ROS1 Melodic + Gazebo 的简洁差速移动机器人：左右两个驱动轮、一个低摩擦球形万向支撑轮、二维激光雷达和 RGB 相机，并包含 Gmapping 建图与 Navigation Stack 导航。
 
 ## 数据接口

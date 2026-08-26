@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="gui" default="true"/>
+  <arg name="paused" default="false"/>
+  <arg name="auto_start" default="true"/>
+
+  <include file="$(find simple_diff_robot_gazebo)/launch/gazebo.launch">
+    <arg name="world" value="$(find simple_diff_robot_gazebo)/worlds/single_obstacle.world"/>
+    <arg name="gui" value="$(arg gui)"/>
+    <arg name="paused" value="$(arg paused)"/>
+    <arg name="x" value="-2.5"/>
+    <arg name="y" value="0.0"/>
+  </include>
+
+  <node if="$(arg auto_start)" pkg="simple_diff_robot_gazebo"
+        type="single_obstacle_driver.py" name="single_obstacle_driver" output="screen">
+    <param name="linear_speed" value="0.32"/>
+    <param name="angular_speed" value="0.9"/>
+    <param name="goal_tolerance" value="0.12"/>
+    <param name="stop_distance" value="0.42"/>
+    <!-- Coordinates are relative to the robot's initial pose. -->
+    <rosparam param="waypoints">[[1.3, -1.2], [3.7, -1.2], [5.0, 0.0]]</rosparam>
+  </node>
+</launch>
