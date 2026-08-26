@@ -1,5 +1,7 @@
-robot_radius: 0.40
-footprint_padding: 0.02
+# The simulated chassis radius is 0.34 m. Keep 0.02 m total clearance
+# without making the workstation docking pose effectively unreachable.
+robot_radius: 0.35
+footprint_padding: 0.01
 transform_tolerance: 0.5
 
 obstacle_layer:
@@ -12,7 +14,9 @@ obstacle_layer:
     sensor_frame: base_footprint
     data_type: LaserScan
     topic: /scan
-    expected_update_rate: 0.15
+    # The merged scan is nominally 15 Hz, but Gazebo can occasionally miss
+    # several timer cycles while MoveIt and navigation are running together.
+    expected_update_rate: 0.30
     observation_persistence: 0.0
     inf_is_valid: true
     marking: true
@@ -20,5 +24,5 @@ obstacle_layer:
 
 inflation_layer:
   enabled: true
-  inflation_radius: 0.65
+  inflation_radius: 0.50
   cost_scaling_factor: 3.5
