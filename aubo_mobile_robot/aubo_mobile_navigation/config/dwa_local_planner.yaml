@@ -2,9 +2,9 @@ DWAPlannerROS:
   max_vel_x: 0.30
   min_vel_x: 0.0
   max_vel_trans: 0.30
-  min_vel_trans: 0.05
+  min_vel_trans: 0.02
   max_vel_theta: 0.80
-  min_vel_theta: 0.15
+  min_vel_theta: 0.08
 
   acc_lim_x: 0.50
   acc_lim_y: 0.0
@@ -17,10 +17,11 @@ DWAPlannerROS:
   sim_granularity: 0.025
   angular_sim_granularity: 0.025
 
-  # The workstation approach is intentionally tight. Accept the pose once the
-  # base is close enough for camera-based object localization and arm sorting.
-  xy_goal_tolerance: 0.25
-  yaw_goal_tolerance: 0.20
+  # Stop close enough that the blocks remain inside both the camera view and
+  # the detector workspace. The base approaches from -X, so it normally stops
+  # near x=2.08 for the x=2.15 workstation goal, leaving table clearance.
+  xy_goal_tolerance: 0.07
+  yaw_goal_tolerance: 0.10
   latch_xy_goal_tolerance: true
   holonomic_robot: false
 

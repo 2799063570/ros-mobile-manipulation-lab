@@ -79,6 +79,8 @@ rostopic echo /sorting/state
 到达工位后，任务会先调用 `/sorting/move_to_observation`，机械臂从
 `transport` 运输姿态移动到 `observe` 相机观察姿态，再开始检测。仿真手部相机
 使用 90° 水平视场，检测节点从 `/hand_camera/camera_info` 实时读取相机内参。
+底盘和机械臂采用安全的分阶段协同：机械臂折叠后底盘精确停靠，底盘完全停止并
+刷新桌子碰撞物后，机械臂才展开；两者不会同时运动。
 
 ## 4. 修改新场景
 
