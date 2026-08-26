@@ -33,13 +33,15 @@
         <joint name="wrist2_joint" value="1.5956" />
         <joint name="wrist3_joint" value="0" />
     </group_state>
-    <!-- Compact A-shaped pose used while the mobile base is travelling. -->
+    <!-- Low, compact A-shaped pose used while the mobile base is travelling.
+         The upper arm rises inward, the forearm folds back toward the chassis,
+         and the wrist/gripper remain near the centre of the circular base. -->
     <group_state name="transport" group="aubo_i5">
-        <joint name="foreArm_joint" value="1.6292" />
+        <joint name="foreArm_joint" value="2.65" />
         <joint name="shoulder_joint" value="0" />
-        <joint name="upperArm_joint" value="0" />
-        <joint name="wrist1_joint" value="0" />
-        <joint name="wrist2_joint" value="1.6628" />
+        <joint name="upperArm_joint" value="-0.60" />
+        <joint name="wrist1_joint" value="-2.00" />
+        <joint name="wrist2_joint" value="-2.70" />
         <joint name="wrist3_joint" value="0" />
     </group_state>
     <group_state name="up" group="aubo_i5">

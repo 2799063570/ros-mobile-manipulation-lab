@@ -3,7 +3,7 @@
 该功能包把已有模块组合成一个完整场景：
 
 ```text
-机械臂收回 transport（A 形折叠）运输姿态
+机械臂收回 transport（低重心 A 形折叠）运输姿态
 → move_base 导航到分拣工位
 → 机械臂进入相机观察位
 → 复用 aubo_mobile_sorting 完成红、绿、蓝方块分拣
@@ -75,6 +75,10 @@ rostopic echo /sorting/state
 
 任务状态依次为 `STOWING_ARM`、`NAVIGATING`、`AT_WORKSTATION`、
 `SORTING`、`SUCCEEDED`；失败时为 `FAILED`。
+
+到达工位后，任务会先调用 `/sorting/move_to_observation`，机械臂从
+`transport` 运输姿态移动到 `observe` 相机观察姿态，再开始检测。仿真手部相机
+使用 90° 水平视场，检测节点从 `/hand_camera/camera_info` 实时读取相机内参。
 
 ## 4. 修改新场景
 

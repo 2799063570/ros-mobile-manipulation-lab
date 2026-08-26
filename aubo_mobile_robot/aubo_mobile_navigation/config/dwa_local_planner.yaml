@@ -17,8 +17,10 @@ DWAPlannerROS:
   sim_granularity: 0.025
   angular_sim_granularity: 0.025
 
-  xy_goal_tolerance: 0.15
-  yaw_goal_tolerance: 0.15
+  # The workstation approach is intentionally tight. Accept the pose once the
+  # base is close enough for camera-based object localization and arm sorting.
+  xy_goal_tolerance: 0.25
+  yaw_goal_tolerance: 0.20
   latch_xy_goal_tolerance: true
   holonomic_robot: false
 
