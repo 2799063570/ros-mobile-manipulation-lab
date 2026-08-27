@@ -31,7 +31,7 @@
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
 
-#include "AuboRobotMetaType.h"
+#include <aubo_driver/AuboRobotMetaType.h>
 #include <aubo_driver/serviceinterface.h>
 
 #include <algorithm>
