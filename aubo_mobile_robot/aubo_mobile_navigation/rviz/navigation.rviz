@@ -26,6 +26,8 @@ Panels:
     Name: Time
     SyncMode: 0
     SyncSource: LaserScan
+  - Class: aubo_mobile_nav_sorting/NavSortingPanel
+    Name: 导航抓取分拣
 Preferences:
   PromptSaveOnExit: true
 Toolbars:

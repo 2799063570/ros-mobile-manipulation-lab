@@ -10,10 +10,13 @@ import time
 import actionlib
 import rospy
 from actionlib_msgs.msg import GoalStatus
+from dynamic_reconfigure.server import Server
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from std_msgs.msg import String
 from std_srvs.srv import Empty, Trigger, TriggerResponse
 from tf.transformations import quaternion_from_euler
+
+from aubo_mobile_nav_sorting.cfg import NavSortingConfig
 
 
 class NavigationSortingMission(object):
@@ -130,6 +133,14 @@ class NavigationSortingMission(object):
         self._busy = False
         self._stop_requested = threading.Event()
 
+        # dynamic_reconfigure uses scalar parameters. Seed those parameters from
+        # the list-based scenario file before constructing the server so launch
+        # overrides and YAML remain the source of the initial values.
+        self._seed_dynamic_parameters()
+        self.dynamic_server = Server(
+            NavSortingConfig, self._reconfigure_callback
+        )
+
         self.state_publisher = rospy.Publisher(
             "/nav_sorting/state", String, queue_size=1, latch=True
         )
@@ -162,6 +173,85 @@ class NavigationSortingMission(object):
         if len(values) != 3:
             raise ValueError("{} must be [x, y, yaw]".format(parameter))
         return values
+
+    def _seed_dynamic_parameters(self):
+        initial_values = {
+            "goal_x": self.goal_x,
+            "goal_y": self.goal_y,
+            "goal_yaw": self.goal_yaw,
+            "pre_dock_x": self.pre_dock_goal[0],
+            "pre_dock_y": self.pre_dock_goal[1],
+            "pre_dock_yaw": self.pre_dock_goal[2],
+        }
+        for name, value in initial_values.items():
+            parameter = "~" + name
+            if not rospy.has_param(parameter):
+                rospy.set_param(parameter, value)
+
+    def _current_dynamic_values(self):
+        return {
+            "goal_x": self.goal_x,
+            "goal_y": self.goal_y,
+            "goal_yaw": self.goal_yaw,
+            "near_field_enabled": self.near_field_enabled,
+            "pre_dock_x": self.pre_dock_goal[0],
+            "pre_dock_y": self.pre_dock_goal[1],
+            "pre_dock_yaw": self.pre_dock_goal[2],
+            "near_field_base_clearance": self.base_clearance,
+            "near_field_max_candidates": self.near_field_max_candidates,
+            "navigation_timeout": self.navigation_timeout,
+            "navigation_retries": self.navigation_retries,
+            "server_timeout": self.server_timeout,
+            "sorting_initialization_timeout": self.initialization_timeout,
+            "sorting_operation_timeout": self.operation_timeout,
+            "home_before_navigation": self.home_before_navigation,
+        }
+
+    def _reconfigure_callback(self, config, _level):
+        with self._condition:
+            if self._busy:
+                # A mission is a single safety-critical transaction. Reject
+                # mid-run changes so its target and timeout policy stay stable.
+                for name, value in self._current_dynamic_values().items():
+                    config[name] = value
+                rospy.logwarn_throttle(
+                    2.0,
+                    "nav_sorting parameters cannot change while a mission is running",
+                )
+                return config
+
+            self.goal_x = float(config["goal_x"])
+            self.goal_y = float(config["goal_y"])
+            self.goal_yaw = float(config["goal_yaw"])
+            self.near_field_enabled = bool(config["near_field_enabled"])
+            self.pre_dock_goal = [
+                float(config["pre_dock_x"]),
+                float(config["pre_dock_y"]),
+                float(config["pre_dock_yaw"]),
+            ]
+            self.base_clearance = float(config["near_field_base_clearance"])
+            self.near_field_max_candidates = int(
+                config["near_field_max_candidates"]
+            )
+            self.navigation_timeout = float(config["navigation_timeout"])
+            self.navigation_retries = int(config["navigation_retries"])
+            self.server_timeout = float(config["server_timeout"])
+            self.initialization_timeout = float(
+                config["sorting_initialization_timeout"]
+            )
+            self.operation_timeout = float(config["sorting_operation_timeout"])
+            self.home_before_navigation = bool(config["home_before_navigation"])
+        rospy.loginfo(
+            "Updated nav_sorting parameters: goal=[%.3f, %.3f, %.3f], "
+            "near_field=%s, navigation_timeout=%.1f, retries=%d",
+            self.goal_x,
+            self.goal_y,
+            self.goal_yaw,
+            self.near_field_enabled,
+            self.navigation_timeout,
+            self.navigation_retries,
+        )
+        return config
 
     def _publish_state(self, state, detail=""):
         message = state if not detail else "{} | {}".format(state, detail)

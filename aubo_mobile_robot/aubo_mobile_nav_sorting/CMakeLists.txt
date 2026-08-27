@@ -1,9 +1,43 @@
 cmake_minimum_required(VERSION 3.0.2)
 project(aubo_mobile_nav_sorting)
 
-find_package(catkin REQUIRED)
+set(CMAKE_AUTOMOC ON)
+find_package(catkin REQUIRED COMPONENTS
+  dynamic_reconfigure
+  pluginlib
+  roscpp
+  rviz
+  std_msgs
+  std_srvs
+)
+find_package(Qt5 REQUIRED COMPONENTS Widgets)
 
-catkin_package()
+generate_dynamic_reconfigure_options(
+  cfg/NavSorting.cfg
+)
+
+catkin_package(
+  LIBRARIES aubo_mobile_nav_sorting_panel
+  CATKIN_DEPENDS dynamic_reconfigure pluginlib roscpp rviz std_msgs std_srvs
+)
+
+include_directories(
+  include
+  ${catkin_INCLUDE_DIRS}
+)
+
+add_library(aubo_mobile_nav_sorting_panel
+  include/aubo_mobile_nav_sorting/nav_sorting_panel.h
+  src/nav_sorting_panel.cpp
+)
+add_dependencies(aubo_mobile_nav_sorting_panel
+  ${PROJECT_NAME}_gencfg
+  ${catkin_EXPORTED_TARGETS}
+)
+target_link_libraries(aubo_mobile_nav_sorting_panel
+  ${catkin_LIBRARIES}
+  Qt5::Widgets
+)
 
 catkin_install_python(PROGRAMS
   scripts/publish_initial_pose.py
@@ -11,10 +45,20 @@ catkin_install_python(PROGRAMS
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
-install(DIRECTORY config launch maps worlds
+install(DIRECTORY cfg config launch maps worlds
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
 
-install(FILES README.md
+install(TARGETS aubo_mobile_nav_sorting_panel
+  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
+install(DIRECTORY include/${PROJECT_NAME}/
+  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+)
+
+install(FILES README.md plugin_description.xml
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )

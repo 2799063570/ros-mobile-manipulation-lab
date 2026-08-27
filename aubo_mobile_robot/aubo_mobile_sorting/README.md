@@ -1,7 +1,8 @@
 # AUBO 移动机器人 Gazebo 视觉抓取分拣
 
-该功能包组合手部相机、OpenCV、MoveIt 和 Gazebo 夹爪控制器，实现红、绿、蓝
-三种方块的自动识别、抓取和分类放置。
+该功能包保存移动平台的分拣参数、Gazebo 场景、RViz 面板和启动入口，并组合
+`aubo_perception`、`aubo_sorting_core` 与 `aubo_gazebo_plugins`，实现红、绿、蓝
+三种方块的自动识别、抓取和分类放置。通用算法不再复制到本包。
 
 ## 编译与启动
 
@@ -12,16 +13,18 @@ catkin_make --force-cmake \
   -DCATKIN_WHITELIST_PACKAGES="aubo_perception;aubo_sorting_core;aubo_gazebo_plugins;aubo_mobile_perception;aubo_mobile_sorting" \
   -j2
 source devel/setup.bash
-roslaunch aubo_mobile_sorting sorting_gazebo.launch
+roslaunch aubo_mobile_bringup simulation.launch mode:=sorting
 ```
+
+调试本模块时，原入口 `roslaunch aubo_mobile_sorting sorting_gazebo.launch` 仍可使用。
 
 该启动文件会同时运行：
 
 - `worlds/sorting.world` 分拣场景和复合机器人
 - AUBO 机械臂及夹爪轨迹控制器
 - 使用 Gazebo 真实控制器执行轨迹的 `move_group`
-- OpenCV 颜色识别和标注图像发布节点
-- 等待面板命令的红、绿、蓝分拣状态机
+- `aubo_perception` 提供的颜色识别和标注图像发布节点
+- `aubo_sorting_core` 提供的红、绿、蓝分拣状态机
 - 带“AUBO 视觉分拣”控制面板的 RViz 和图像调试窗口
 
 不需要图形窗口时可以执行：
@@ -114,6 +117,10 @@ rosservice call /sorting/home
 - `aubo_mobile_sorting/config/sorting.yaml`：观察位姿、抓取高度、夹爪开合量、
   自动观察/自动开始开关、运动速度和各颜色放置位置
 
+参数属于场景包，但读取参数和执行动作的代码属于通用包。新增移动平台参数时应先
+判断它是否为平台差异：平台差异写入本包 YAML；通用状态和运动逻辑修改
+`aubo_sorting_core`，视觉算法修改 `aubo_perception`。
+
 抓取前默认对连续 `8` 帧同色目标坐标求平均，减少单帧轮廓中心抖动。基础相机
 偏差在感知包 `colors.yaml` 中校准；如果夹爪中心仍有少量固定误差，可通过
 `grasp_offset_x` 和 `grasp_offset_y` 微调，无需修改相机模型。
@@ -153,8 +160,8 @@ rosservice call /sorting/home
 这个插件不替代视觉定位或运动规划。只有机械臂已经移动到识别出的方块位置并完成
 夹爪闭合后才会固定方块，因此仍能暴露相机坐标或抓取位姿明显错误的问题。
 
-插件由 `aubo_gazebo_plugins` 提供，不需要安装第三方 link-attacher；修改插件后必须重新运行
-`catkin_make --force-cmake` 并重新 `source devel/setup.bash`。如果插件没有成功加载，
+插件由 `aubo_gazebo_plugins` 提供，不需要安装第三方 link-attacher；修改插件后
+必须重新运行 `catkin_make --force-cmake` 并重新 `source devel/setup.bash`。如果插件没有成功加载，
 分拣节点会进入 `ERROR | Gazebo grasp plugin unavailable`，不会假装抓取成功。
 
 分拣世界中的红、绿、蓝方块不是仅用于显示的模型：每个方块均启用重力，且

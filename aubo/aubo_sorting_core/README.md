@@ -5,3 +5,28 @@
 
 请从 `aubo_color_sorting` 或 `aubo_mobile_sorting` 的 launch 文件启动，不要直接
 启动核心脚本。
+
+## 输入与输出
+
+- 订阅 `/sorting/detections`，类型为
+  `aubo_perception/DetectedObjectArray`；
+- 连接 MoveIt 的 `aubo_i5` 规划组和平台配置的夹爪轨迹 action；
+- 发布 `/sorting/state` 与 `/sorting/detection_summary`；
+- 提供 `/sorting/move_to_observation`、`/sorting/prepare_work`、
+  `/sorting/start`、`/sorting/stop`、`/sorting/open_gripper` 和 `/sorting/home`。
+
+`prepare_work` 主要供移动机器人到达工位后的任务编排使用，固定平台通常不调用。
+
+## 参数边界
+
+以下差异必须由场景 YAML 提供，不能写进核心包：
+
+- `gripper_action`、规划组和末端链接；
+- `table_frame`、桌面碰撞体和目标坐标系；
+- 观察、运输、工作准备及结束姿态；
+- 抓取高度、放置点、速度和加速度；
+- 是否启用 Gazebo 抓取辅助插件。
+
+固定平台加载 `aubo_color_sorting/config/sorting.yaml`，移动平台加载
+`aubo_mobile_sorting/config/sorting.yaml`；导航分拣场景可用
+`aubo_mobile_nav_sorting/config/sorting.yaml` 覆盖移动平台默认值。

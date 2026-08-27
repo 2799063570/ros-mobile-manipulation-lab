@@ -1,0 +1,7 @@
+<library path="lib/libaubo_visual_servo_panel">
+  <class name="aubo_ros_control/VisualServoPanel"
+         type="aubo_ros_control::VisualServoPanel"
+         base_class_type="rviz::Panel">
+    <description>AUBO 眼在手上视觉伺服流程控制面板。</description>
+  </class>
+</library>

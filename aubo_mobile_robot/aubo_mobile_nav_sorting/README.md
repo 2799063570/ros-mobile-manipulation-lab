@@ -6,13 +6,15 @@
 机械臂收回 transport（低重心 A 形折叠）运输姿态
 → move_base 导航到分拣工位
 → 机械臂进入相机观察位
-→ 复用 aubo_mobile_sorting 完成红、绿、蓝方块分拣
+→ 通过 aubo_mobile_sorting 场景入口调用通用分拣核心
 → 发布最终任务结果
 ```
 
-底层建图、导航、MoveIt、视觉和抓取逻辑仍分别由
-`aubo_mobile_navigation`、`aubo_mobile_moveit_config`、
-`aubo_mobile_perception` 和 `aubo_mobile_sorting` 提供，本包只负责场景与任务编排。
+底层建图、导航和 MoveIt 分别由 `aubo_mobile_navigation`、
+`aubo_mobile_moveit_config` 提供；视觉检测、抓取状态机和 Gazebo 辅助插件分别由
+`aubo_perception`、`aubo_sorting_core`、`aubo_gazebo_plugins` 提供。移动端的参数
+和组合入口仍由 `aubo_mobile_perception`、`aubo_mobile_sorting` 提供，本包只负责
+导航到指定工位后的场景与任务编排。
 
 ## 1. 编译
 
@@ -45,8 +47,11 @@ roslaunch aubo_mobile_nav_sorting mapping.launch
 ## 3. 一键启动导航分拣场景
 
 ```bash
-roslaunch aubo_mobile_nav_sorting mission_gazebo.launch
+roslaunch aubo_mobile_bringup simulation.launch mode:=mission
 ```
+
+调试本场景时仍可直接运行
+`roslaunch aubo_mobile_nav_sorting mission_gazebo.launch`。
 
 系统稳定后执行：
 
@@ -57,7 +62,7 @@ rosservice call /nav_sorting/start
 需要启动后自动执行一次：
 
 ```bash
-roslaunch aubo_mobile_nav_sorting mission_gazebo.launch auto_start:=true
+roslaunch aubo_mobile_bringup simulation.launch mode:=mission auto_start:=true
 ```
 
 停止当前任务：
@@ -98,7 +103,9 @@ rostopic echo /sorting/state
 - 当前工位相对底盘的桌面与放置坐标：`config/sorting.yaml`
 - Gazebo 房间、障碍物、桌子和方块：`worlds/nav_sorting.world`
 - 配套静态地图：`maps/nav_sorting.yaml` 与 `maps/nav_sorting.pgm`
-- 抓取、放置、颜色顺序：`aubo_mobile_sorting/config/sorting.yaml`
+- 当前导航工位的抓取、放置和颜色顺序：本包 `config/sorting.yaml`
+- 普通移动分拣场景的默认参数：`aubo_mobile_sorting/config/sorting.yaml`
+- 通用分拣动作流程：`aubo_sorting_core`（不保存工位坐标）
 
 也可在启动时临时覆盖工位：
 

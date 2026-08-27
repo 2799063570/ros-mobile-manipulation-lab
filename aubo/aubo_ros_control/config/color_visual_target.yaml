@@ -6,6 +6,10 @@ camera_info_topic: /camera/color/camera_info
 target_pose_topic: /visual_servo/target_pose
 debug_image_topic: /visual_servo/debug_image
 target_label_topic: /visual_servo/target_label
+target_selection_topic: /visual_servo/target_selection
+perception_state_topic: /visual_servo/perception_state
+# Launch files may override this. Keep true for backward-compatible real-robot bringup.
+start_enabled: true
 
 target_label: red              # empty string accepts every configured color
 selection_policy: largest      # largest | image_center | nearest

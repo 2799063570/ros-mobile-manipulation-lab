@@ -14,6 +14,7 @@ import rospy
 from actionlib_msgs.msg import GoalStatus
 from geometry_msgs.msg import PoseStamped
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
+from sensor_msgs.msg import Image
 from tf.transformations import quaternion_from_euler
 
 
@@ -40,6 +41,12 @@ class NavigationArmCoordinator(object):
         self.arm_planning_time = float(rospy.get_param("~arm_planning_time", 10.0))
         self.velocity_scaling = float(rospy.get_param("~velocity_scaling", 0.20))
         self.acceleration_scaling = float(rospy.get_param("~acceleration_scaling", 0.20))
+        self.arm_goal_tolerance = float(rospy.get_param("~arm_goal_tolerance", 0.01))
+        self.wait_for_camera = bool(rospy.get_param("~wait_for_camera", False))
+        self.camera_topic = rospy.get_param(
+            "~camera_topic", "/hand_camera/image_raw"
+        )
+        self.camera_timeout = float(rospy.get_param("~camera_timeout", 5.0))
 
         self.goal_x = float(rospy.get_param("~goal_x", 1.0))        # 让机器人移动的目标位置
         self.goal_y = float(rospy.get_param("~goal_y", 0.0))
@@ -66,12 +73,50 @@ class NavigationArmCoordinator(object):
         self.arm.set_end_effector_link(self.end_effector_link)
         self.arm.set_planning_time(self.arm_planning_time)
         self.arm.set_num_planning_attempts(10)
+        self.arm.set_goal_tolerance(self.arm_goal_tolerance)
         self.arm.set_max_velocity_scaling_factor(self.velocity_scaling)
         self.arm.set_max_acceleration_scaling_factor(self.acceleration_scaling)
 
         self.navigation_client = actionlib.SimpleActionClient(
             self.navigation_action, MoveBaseAction
         ) # 导航move_base动作客户端
+
+    @staticmethod
+    def _normalise_plan(plan_result):
+        """Handle both Melodic and Noetic MoveIt Python plan return formats."""
+        if isinstance(plan_result, tuple):
+            if len(plan_result) < 2:
+                return False, None
+            success = bool(plan_result[0])
+            trajectory = plan_result[1]
+        else:
+            trajectory = plan_result
+            success = trajectory is not None
+
+        points = []
+        if trajectory is not None and hasattr(trajectory, "joint_trajectory"):
+            points = trajectory.joint_trajectory.points
+        return success and bool(points), trajectory
+
+    def _plan_and_execute_arm(self, description):
+        """Plan first and execute only a non-empty collision-checked trajectory."""
+        self.arm.set_start_state_to_current_state()
+        planned, trajectory = self._normalise_plan(self.arm.plan())
+        if not planned:
+            rospy.logerr(
+                "Arm target %s is not reachable from the current state; nothing was executed",
+                description,
+            )
+            self.arm.clear_pose_targets()
+            return False
+
+        rospy.loginfo("Arm target %s has a valid plan; executing", description)
+        success = bool(self.arm.execute(trajectory, wait=True))
+        self.arm.stop()
+        self.arm.clear_pose_targets()
+        if not success:
+            rospy.logerr("Execution failed for arm target %s", description)
+        return success
 
     def _rviz_goal_callback(self, target):
         self.rviz_goal = target
@@ -92,12 +137,7 @@ class NavigationArmCoordinator(object):
 
         rospy.loginfo("Planning arm group %s to named target %s", self.group_name, target_name)
         self.arm.set_named_target(target_name)
-        success = bool(self.arm.go(wait=True))
-        self.arm.stop()
-        self.arm.clear_pose_targets()
-        if not success:
-            rospy.logerr("Failed to move arm to named target %s", target_name)
-        return success
+        return self._plan_and_execute_arm("named pose '%s'" % target_name)
 
     def _move_arm_to_pose_target(self):
         pose = PoseStamped()
@@ -124,12 +164,41 @@ class NavigationArmCoordinator(object):
             pose.pose.position.z,
         )
         self.arm.set_pose_target(pose, self.end_effector_link)
-        success = bool(self.arm.go(wait=True))
-        self.arm.stop()
-        self.arm.clear_pose_targets()
-        if not success:
-            rospy.logerr("Failed to plan or execute arm pose target")
-        return success
+        return self._plan_and_execute_arm(
+            "TCP pose in %s [%.3f, %.3f, %.3f]"
+            % (
+                pose.header.frame_id,
+                pose.pose.position.x,
+                pose.pose.position.y,
+                pose.pose.position.z,
+            )
+        )
+
+    def _confirm_camera(self):
+        if not self.wait_for_camera:
+            return True
+        if self.camera_timeout <= 0.0:
+            rospy.logerr("camera_timeout must be positive when wait_for_camera is enabled")
+            return False
+
+        rospy.loginfo("Waiting for a camera frame on %s", self.camera_topic)
+        try:
+            image = rospy.wait_for_message(
+                self.camera_topic, Image, timeout=self.camera_timeout
+            )
+        except rospy.ROSException:
+            rospy.logerr(
+                "No camera frame received on %s within %.1f seconds",
+                self.camera_topic,
+                self.camera_timeout,
+            )
+            return False
+
+        if image.width <= 0 or image.height <= 0:
+            rospy.logerr("Camera returned an empty image on %s", self.camera_topic)
+            return False
+        rospy.loginfo("Camera observation ready (%dx%d)", image.width, image.height)
+        return True
 
     def _get_navigation_target(self):
         if self.goal_source == "rviz":
@@ -246,12 +315,14 @@ class NavigationArmCoordinator(object):
             return False
 
         if self.arm_target_type == "named":
-            return self._move_arm_to_named_target(self.post_navigation_target)
-        if self.arm_target_type == "pose":
-            return self._move_arm_to_pose_target()
+            arm_ready = self._move_arm_to_named_target(self.post_navigation_target)
+        elif self.arm_target_type == "pose":
+            arm_ready = self._move_arm_to_pose_target()
+        else:
+            rospy.logerr("Unsupported arm_target_type '%s'; use 'named' or 'pose'", self.arm_target_type)
+            return False
 
-        rospy.logerr("Unsupported arm_target_type '%s'; use 'named' or 'pose'", self.arm_target_type)
-        return False
+        return arm_ready and self._confirm_camera()
 
 
 def main():

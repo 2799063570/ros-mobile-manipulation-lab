@@ -1,5 +1,22 @@
 # AUBO 移动机器人导航
 
+## 双雷达与速度安全层
+
+`navigation.launch` 会把前、后两个 180° 激光雷达合并为 360° 的 `/scan`。导航器
+输出先进入 `/cmd_vel_raw`，再由 `laser_safety_filter.py` 检查机器人运动方向上的
+扫掠空间后发布 `/cmd_vel`。
+
+安全距离会随当前速度按反应时间和制动距离自动增加。前进、后退、原地旋转分别
+检查对应区域；普通障碍需至少三个相邻采样点才触发，极近障碍单点即可停车，以兼顾
+抗噪和紧急保护。雷达数据超过 0.5 秒未更新时采用失效安全策略，停止底盘。
+
+该节点是 `move_base` 代价地图之外的最后一道保护，不替代正确的地图、定位、底盘
+制动参数或现场急停。单独调试可运行：
+
+```bash
+roslaunch aubo_mobile_navigation laser_safety_filter.launch
+```
+
 该 ROS 1 功能包用于圆形 AUBO 移动机械臂的建图、定位和导航，坐标系及话题与
 `aubo_mobile_robot` 核心模型保持一致。
 
@@ -101,6 +118,44 @@ roslaunch aubo_mobile_navigation mapping_navigation.launch
 roslaunch aubo_mobile_navigation mapping_nav.launch
 ```
 
+## RRT 自主探索建图
+
+一键启动 Gazebo、双雷达、GMapping、move_base 和 RRT 前沿探索：
+
+```bash
+roslaunch aubo_mobile_navigation rrt_exploration_gazebo.launch
+```
+
+RViz 地图出现后，确认机械臂处于收拢姿态，然后选择 **Publish Point**：
+
+1. 按顺序点击探索区域的四个角点；
+2. 第五次点击机器人附近的自由区域，作为全局 RRT 的起点；
+3. 第五个点发布后，机器人将自动检测前沿并通过 `move_base` 探索。
+
+探索范围应落在当前地图坐标系内，并留出覆盖机器人半径的安全边界。可通过参数
+调整 RRT 步长及信息增益权重：
+
+```bash
+roslaunch aubo_mobile_navigation rrt_exploration_gazebo.launch \
+  global_eta:=2.0 local_eta:=0.5 info_radius:=1.0 info_multiplier:=3.0
+```
+
+机器人或仿真、GMapping 与 move_base 已经启动时，只启动探索节点：
+
+```bash
+roslaunch aubo_mobile_navigation rrt_exploration.launch
+```
+
+探索完成后仍使用项目已有入口保存地图：
+
+```bash
+roslaunch aubo_mobile_navigation map_saver.launch
+```
+
+RRT 探索使用在线 GMapping 地图，不要同时启动 `navigation.launch` 中的 AMCL。
+需要中止探索时可取消当前 `/move_base` 目标并停止该 launch；重新启动探索后需要
+再次发布四个边界点和一个起点。
+
 ## 检查命令
 
 ```bash
@@ -110,6 +165,7 @@ rostopic hz /scan
 rosrun tf tf_echo odom base_footprint
 rostopic echo -n 1 /map
 rostopic echo -n 1 /move_base/status
+rostopic echo -n 1 /filtered_points
 ```
 
 正常情况下 TF 发布关系为：

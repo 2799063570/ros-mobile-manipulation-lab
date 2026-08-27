@@ -15,6 +15,8 @@
 #include <sensor_msgs/JointState.h>
 #include <std_msgs/Float64.h>
 #include <std_msgs/String.h>
+#include <std_srvs/SetBool.h>
+#include <std_srvs/Trigger.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_listener.h>
@@ -406,12 +408,13 @@ private:
   JointPoint last_position_, last_velocity_;
 };
 
-enum class ServoState { WAITING, TRACKING, COAST, SEARCH_OPEN, HOLD };
+enum class ServoState { DISABLED, WAITING, TRACKING, COAST, SEARCH_OPEN, HOLD };
 
 const char* stateName(ServoState state)
 {
   switch (state)
   {
+    case ServoState::DISABLED: return "DISABLED";
     case ServoState::WAITING: return "WAITING";
     case ServoState::TRACKING: return "TRACKING";
     case ServoState::COAST: return "COAST";
@@ -430,9 +433,15 @@ public:
     valid_ = loadParameters() && initializeKinematics();
     if (!valid_)
       return;
+    state_ = enabled_ ? ServoState::WAITING : ServoState::DISABLED;
 
-    state_pub_ = private_nh_.advertise<std_msgs::String>("state", 1, true);
+    state_pub_ = nh_.advertise<std_msgs::String>(state_topic_, 1, true);
+    legacy_state_pub_ = private_nh_.advertise<std_msgs::String>("state", 1, true);
     target_sub_ = nh_.subscribe(target_topic_, 1, &EyeInHandVisualServo::targetCallback, this);
+    enable_service_ = nh_.advertiseService("/visual_servo/set_enabled",
+                                            &EyeInHandVisualServo::setEnabled, this);
+    reset_service_ = nh_.advertiseService("/visual_servo/reset",
+                                           &EyeInHandVisualServo::reset, this);
 
     if (backend_ == "gazebo")
     {
@@ -493,6 +502,7 @@ private:
     private_nh_.param<std::string>("base_link", base_link_, "base_link");
     private_nh_.param<std::string>("camera_link", camera_link_, "camera_color_optical_frame");
     private_nh_.param<std::string>("target_topic", target_topic_, "/visual_servo/target_pose");
+    private_nh_.param<std::string>("state_topic", state_topic_, "/visual_servo/state");
     private_nh_.param<std::string>("joint_states_topic", joint_states_topic_, "/joint_states");
     private_nh_.param<std::string>("loss_strategy", loss_strategy_, "coast_then_open");
     private_nh_.param<double>("control_rate", control_rate_, 100.0);
@@ -512,6 +522,7 @@ private:
     private_nh_.param<double>("search_velocity_limit", search_velocity_limit_, 0.2);
     private_nh_.param<double>("feedback_blend", feedback_blend_, 0.02);
     private_nh_.param<bool>("use_orientation_control", use_orientation_control_, false);
+    private_nh_.param<bool>("start_enabled", enabled_, false);
 
     if (control_rate_ <= 0.0 || output_rate_ < control_rate_ || output_rate_ > 500.0)
     {
@@ -629,6 +640,45 @@ private:
     have_target_ = true;
   }
 
+  bool setEnabled(std_srvs::SetBool::Request& request,
+                  std_srvs::SetBool::Response& response)
+  {
+    std::lock_guard<std::mutex> control_lock(control_mutex_);
+    enabled_ = request.data;
+    queue_.clear();
+    last_tracking_velocity_.setZero();
+    if (!enabled_)
+      transitionTo(ServoState::DISABLED);
+    else
+    {
+      // A new run must be driven by a fresh camera measurement.
+      std::lock_guard<std::mutex> target_lock(target_mutex_);
+      have_target_ = false;
+      have_ever_tracked_ = false;
+      transitionTo(ServoState::WAITING);
+    }
+    response.success = true;
+    response.message = enabled_ ? "visual servo enabled; waiting for a fresh target"
+                                : "visual servo disabled; holding position";
+    return true;
+  }
+
+  bool reset(std_srvs::Trigger::Request&, std_srvs::Trigger::Response& response)
+  {
+    std::lock_guard<std::mutex> control_lock(control_mutex_);
+    {
+      std::lock_guard<std::mutex> target_lock(target_mutex_);
+      have_target_ = false;
+      have_ever_tracked_ = false;
+    }
+    queue_.clear();
+    last_tracking_velocity_.setZero();
+    transitionTo(enabled_ ? ServoState::WAITING : ServoState::DISABLED);
+    response.success = true;
+    response.message = "visual target and loss-recovery state cleared";
+    return true;
+  }
+
   void jointStateCallback(const sensor_msgs::JointState::ConstPtr& message)
   {
     JointPoint ordered{};
@@ -674,6 +724,8 @@ private:
 
   ServoState selectState(bool fresh_target, double target_age)
   {
+    if (!enabled_)
+      return ServoState::DISABLED;
     if (fresh_target)
       return ServoState::TRACKING;
     if (!have_ever_tracked_)
@@ -778,6 +830,7 @@ private:
     std_msgs::String message;
     message.data = stateName(state_);
     state_pub_.publish(message);
+    legacy_state_pub_.publish(message);
   }
 
   void controlLoop(const ros::TimerEvent& event)
@@ -890,7 +943,7 @@ private:
   CommandQueue queue_;
   bool valid_{false};
 
-  std::string backend_, base_link_, camera_link_, target_topic_, joint_states_topic_, loss_strategy_;
+  std::string backend_, base_link_, camera_link_, target_topic_, state_topic_, joint_states_topic_, loss_strategy_;
   std::vector<std::string> joint_names_, gazebo_topics_;
   double control_rate_{100.0}, output_rate_{200.0};
   double linear_gain_{0.8}, angular_gain_{0.5};
@@ -899,7 +952,7 @@ private:
   double target_timeout_{0.2}, coast_duration_{0.35}, coast_decay_time_{0.18};
   double search_timeout_{8.0}, open_posture_gain_{0.7}, search_velocity_limit_{0.2};
   double feedback_blend_{0.02};
-  bool use_orientation_control_{false};
+  bool use_orientation_control_{false}, enabled_{false};
   JointPoint lower_limits_{}, upper_limits_{}, velocity_limits_{}, acceleration_limits_{};
   JointPoint open_posture_{}, feedback_position_{}, command_position_{}, command_velocity_{};
   JointPoint backend_velocity_{}, last_output_{};
@@ -917,10 +970,11 @@ private:
   ros::Time last_target_time_, last_joint_time_;
   bool have_target_{false}, have_joint_state_{false}, integrator_initialized_{false};
   bool have_ever_tracked_{false};
-  ServoState state_{ServoState::WAITING};
+  ServoState state_{ServoState::DISABLED};
 
   ros::Subscriber target_sub_, joint_sub_;
-  ros::Publisher state_pub_, sdk_joint_pub_;
+  ros::Publisher state_pub_, legacy_state_pub_, sdk_joint_pub_;
+  ros::ServiceServer enable_service_, reset_service_;
   std::vector<ros::Publisher> gazebo_publishers_;
   ros::Timer control_timer_, output_timer_, sdk_state_timer_;
 };

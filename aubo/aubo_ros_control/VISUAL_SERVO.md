@@ -26,8 +26,9 @@ Gazebo 与真机共用视觉误差、雅可比逆解、限制器和目标丢失�
 
 `desired_target_position: [0, 0, 0.35]` 表示期望目标保持在图像中心前方 35 cm。目标必须来自实时观测，不能把旧位姿持续加新时间戳重新发布，否则节点无法判断目标已经丢失。
 
-状态话题为 `~state`，可能值：
+状态话题为 `/visual_servo/state`（同时保留 `~state` 兼容输出），可能值：
 
+- `DISABLED`：闭环未启动，机械臂保持当前位置。
 - `WAITING`：尚未见过目标，保持当前位置。
 - `TRACKING`：目标新鲜，进行视觉伺服。
 - `COAST`：目标刚丢失，短时保持原运动方向并指数衰减。
@@ -38,6 +39,23 @@ Gazebo 与真机共用视觉误差、雅可比逆解、限制器和目标丢失�
 
 ```bash
 roslaunch aubo_ros_control visual_servo_gazebo.launch
+```
+
+该命令会同时启动 RGB-D 颜色识别和带“AUBO 眼在手上视觉伺服”控制面板的
+RViz。为避免启动界面时机械臂立即运动，闭环默认处于 `DISABLED`：先在面板
+选择红、绿、蓝或任意目标，再点击“启动闭环跟踪”。“停止并保持”会先停控制器
+再停识别输出；“清除目标 / 重新搜索”会清除滤波历史和目标丢失状态机。
+无人值守测试可显式使用 `auto_start:=true rviz:=false`。
+
+流程控制接口为：
+
+```text
+/visual_servo/set_enabled              std_srvs/SetBool
+/visual_servo/reset                    std_srvs/Trigger
+/visual_servo/perception/set_enabled   std_srvs/SetBool
+/visual_servo/perception/reset         std_srvs/Trigger
+/visual_servo/target_selection         std_msgs/String (red/green/blue/any)
+/visual_servo/perception_state         std_msgs/String
 ```
 
 该启动文件加载六个 `position_controllers/JointPositionController`。视觉节点以 200 Hz 从缓冲队列取点，并分别向六个控制器持续发送位置指令。不要同时启动原有 `aubo_i5_controller`，因为它会争用相同的六个位置接口。

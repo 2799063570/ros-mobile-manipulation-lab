@@ -1,8 +1,9 @@
 # AUBO 固定机械臂颜色抓取分拣
 
-`aubo_color_sorting` 是不带移动底盘的 AUBO i5 颜色分拣功能包。它使用腕部 RGB-D
-相机识别红、绿、蓝方块，并利用对齐深度图计算方块顶面的三维中心，通过 MoveIt
-规划抓取和放置轨迹，并在 Gazebo 中用世界插件提高小物体夹持的稳定性。
+`aubo_color_sorting` 是不带移动底盘的 AUBO i5 颜色分拣场景包。它保存固定平台的
+参数、world 和启动入口，并组合 `aubo_perception`、`aubo_sorting_core` 与
+`aubo_gazebo_plugins`。腕部 RGB-D 相机利用对齐深度图计算方块顶面的三维中心，
+MoveIt 负责抓取和放置，Gazebo 通用插件提高小物体夹持稳定性。
 
 ## 场景约束
 
@@ -13,6 +14,8 @@
   `[-1.0471976, 1.0471976] rad`，即 `[-60 deg, 60 deg]`。
 - 启动时任务节点还会读取 `/robot_description` 和 MoveIt 关节限制做一次一致性检查；
   如果仍加载旧模型，任务进入 `ERROR`，不会执行运动。
+
+通用检测器、消息、分拣状态机和插件不在本包内修改；本包只维护固定平台差异。
 
 ## 构建与启动
 

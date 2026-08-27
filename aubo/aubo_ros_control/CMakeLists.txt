@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.5)
 project(aubo_ros_control)
 
+set(CMAKE_AUTOMOC ON)
+
 find_package(catkin REQUIRED COMPONENTS
   aubo_sdk
   controller_manager
@@ -8,17 +10,21 @@ find_package(catkin REQUIRED COMPONENTS
   hardware_interface
   kdl_parser
   message_filters
+  pluginlib
   roscpp
   rospy
   roslib
   sensor_msgs
   std_msgs
+  std_srvs
   tf2_geometry_msgs
   tf2_ros
+  rviz
 )
 find_package(Threads REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(orocos_kdl REQUIRED)
+find_package(Qt5 REQUIRED COMPONENTS Widgets)
 
 # aubo_sdk exports its source/install resource root through a catkin CMake
 # extra, so this package no longer depends on a particular directory layout.
@@ -49,10 +55,10 @@ endif()
 
 catkin_package(
   INCLUDE_DIRS include
-  LIBRARIES ${PROJECT_NAME}
+  LIBRARIES ${PROJECT_NAME} aubo_visual_servo_panel
   CATKIN_DEPENDS aubo_sdk controller_manager geometry_msgs hardware_interface
-    kdl_parser message_filters roscpp rospy roslib sensor_msgs std_msgs
-    tf2_geometry_msgs tf2_ros
+    kdl_parser message_filters pluginlib roscpp rospy roslib rviz sensor_msgs
+    std_msgs std_srvs tf2_geometry_msgs tf2_ros
   DEPENDS orocos_kdl
 )
 
@@ -95,7 +101,19 @@ set_target_properties(eye_in_hand_visual_servo_node PROPERTIES
   BUILD_RPATH "${AUBO_SDK_RUNTIME_DIRS}"
   INSTALL_RPATH "${AUBO_SDK_NODE_INSTALL_RPATH}")
 
+add_library(aubo_visual_servo_panel
+  include/aubo_ros_control/visual_servo_panel.h
+  src/visual_servo_panel.cpp)
+target_compile_features(aubo_visual_servo_panel PRIVATE cxx_std_14)
+target_include_directories(aubo_visual_servo_panel PRIVATE
+  include
+  ${catkin_INCLUDE_DIRS})
+target_link_libraries(aubo_visual_servo_panel
+  ${catkin_LIBRARIES}
+  Qt5::Widgets)
+
 install(TARGETS ${PROJECT_NAME} aubo_hw_node eye_in_hand_visual_servo_node
+                aubo_visual_servo_panel
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
@@ -107,5 +125,5 @@ catkin_install_python(PROGRAMS
 
 install(DIRECTORY config launch worlds
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
-install(FILES VISUAL_SERVO.md
+install(FILES VISUAL_SERVO.md plugin_description.xml
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})

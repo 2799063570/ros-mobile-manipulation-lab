@@ -75,6 +75,8 @@ aubo_mobile_robot
 - `aubo_ros_control`：真实机械臂 `RobotHW` 接口、轨迹控制器及 MoveIt 实机启动入口。
 
 该部分覆盖从机器人描述、关节轨迹控制到运动规划和末端夹爪操作的基本流程。
+固定与移动平台的共用能力、场景层边界及消息迁移说明见
+[`aubo/README.md`](aubo/README.md)。
 
 ### 4. AUBO 复合移动机器人
 
@@ -86,7 +88,7 @@ aubo_mobile_robot
 | `aubo_mobile_robot` | 复合机器人 Xacro、Gazebo 场景、传感器和控制器 |
 | `aubo_mobile_moveit_config` | 移动机械臂的 MoveIt 规划配置 |
 | `aubo_mobile_navigation` | 双雷达融合、GMapping、AMCL 和 `move_base` |
-| `aubo_mobile_bringup` | 机器人、导航、分拣和完整任务的统一启动入口 |
+| `aubo_mobile_bringup` | 机器人、导航、分拣和完整任务的统一仿真入口 |
 | `aubo_mobile_control` | 底盘键盘控制及导航/机械臂顺序协调 |
 | `aubo_mobile_perception` | 移动平台的视觉参数与启动入口（算法复用 `aubo_perception`） |
 | `aubo_mobile_sorting` | 红、绿、蓝方块的视觉抓取与分类放置 |
@@ -115,14 +117,18 @@ aubo_mobile_robot
                                                        │
                           odom ← 差速底盘 ←────────────┘
 
-/hand_camera/image_raw ─ OpenCV 颜色识别 ─ 目标三维位置
-                                            │
-                                            ▼
-任务协调器 ── MoveIt ── 机械臂轨迹控制器 + 夹爪轨迹控制器
+/hand_camera/image_raw ─ aubo_perception ─ /sorting/detections
+                                                │
+                                                ▼
+导航任务编排 ─ /sorting/* 服务 ─ aubo_sorting_core ─ MoveIt
+                                                    │
+                                                    ├─ 机械臂轨迹控制器
+                                                    └─ 夹爪轨迹控制器
 ```
 
 移动底盘由 Navigation Stack 控制，机械臂由 MoveIt 控制。当前的复合任务采用
 “先移动、后操作”的顺序协调方式，并不是底盘与机械臂同时参与的全身运动规划。
+Gazebo 中的小物体夹持由 `aubo_gazebo_plugins` 辅助，真实机械臂不加载该插件。
 
 ## 运行环境
 
@@ -211,7 +217,7 @@ rosservice call /sorting/start
 ### 复合机器人：基础仿真
 
 ```bash
-roslaunch aubo_mobile_robot gazebo.launch
+roslaunch aubo_mobile_bringup simulation.launch mode:=robot
 rosrun aubo_mobile_control keyboard_teleop.py
 ```
 
@@ -237,7 +243,7 @@ roslaunch aubo_mobile_navigation navigation_gazebo.launch \
 ### 复合机器人：视觉分拣
 
 ```bash
-roslaunch aubo_mobile_sorting sorting_gazebo.launch
+roslaunch aubo_mobile_bringup simulation.launch mode:=sorting
 ```
 
 系统进入 `READY` 后，可以在 RViz 的“AUBO 视觉分拣”面板中开始任务，也可以调用：
@@ -251,7 +257,7 @@ rosservice call /sorting/start
 一键启动完整 Gazebo 场景：
 
 ```bash
-roslaunch aubo_mobile_nav_sorting mission_gazebo.launch
+roslaunch aubo_mobile_bringup simulation.launch mode:=mission
 ```
 
 系统稳定后启动任务：
@@ -263,7 +269,7 @@ rosservice call /nav_sorting/start
 也可以在启动时自动执行：
 
 ```bash
-roslaunch aubo_mobile_nav_sorting mission_gazebo.launch auto_start:=true
+roslaunch aubo_mobile_bringup simulation.launch mode:=mission auto_start:=true
 ```
 
 ## 关键接口
@@ -275,7 +281,7 @@ roslaunch aubo_mobile_nav_sorting mission_gazebo.launch auto_start:=true
 | `/scan` | 合并后的 360° 激光扫描 |
 | `/move_base` | 底盘导航 action |
 | `/hand_camera/image_raw` | 手部 RGB 相机图像 |
-| `/sorting/detections` | 颜色目标及其定位结果 |
+| `/sorting/detections` | `aubo_perception/DetectedObjectArray`，颜色目标及定位结果 |
 | `/sorting/state` | 视觉分拣状态 |
 | `/nav_sorting/state` | 导航分拣总任务状态 |
 | `/aubo_i5_controller/follow_joint_trajectory` | 六轴机械臂轨迹接口 |
@@ -321,8 +327,13 @@ map → odom → base_footprint → base_link → AUBO links → tcp_link
 - [自研差速机器人](simple_diff_robot_gazebo/README.md)
 - [AUBO 机械臂规划示例](aubo/aubo_planning/README.md)
 - [AUBO SDK 与真实机械臂控制](aubo/aubo_ros_control/README.md)
+- [AUBO 功能包分层说明](aubo/README.md)
+- [AUBO 通用视觉感知](aubo/aubo_perception/README.md)
+- [AUBO 通用分拣核心](aubo/aubo_sorting_core/README.md)
+- [AUBO Gazebo 通用插件](aubo/aubo_gazebo_plugins/README.md)
 - [AUBO 固定机械臂颜色抓取分拣](aubo/aubo_color_sorting/README.md)
 - [AUBO 复合移动机器人概览](aubo_mobile_robot/README.md)
+- [AUBO 移动机器人统一启动入口](aubo_mobile_robot/aubo_mobile_bringup/README.md)
 - [复合机器人模型与仿真](aubo_mobile_robot/aubo_mobile_robot/README.md)
 - [建图、定位与导航](aubo_mobile_robot/aubo_mobile_navigation/README.md)
 - [底盘与机械臂协调控制](aubo_mobile_robot/aubo_mobile_control/README.md)
