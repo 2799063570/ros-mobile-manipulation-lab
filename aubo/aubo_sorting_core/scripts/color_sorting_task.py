@@ -113,6 +113,10 @@ class ColorSortingTask(object):
         )
         self.grasp_offset_x = float(rospy.get_param("~grasp_offset_x", 0.0))
         self.grasp_offset_y = float(rospy.get_param("~grasp_offset_y", 0.0))
+        self.velocity_scaling = float(rospy.get_param("~velocity_scaling", 0.15))
+        self.acceleration_scaling = float(
+            rospy.get_param("~acceleration_scaling", 0.15)
+        )
         self.gripper_server_timeout = float(
             rospy.get_param("~gripper_server_timeout", 30.0)
         )
@@ -163,6 +167,7 @@ class ColorSortingTask(object):
             queue_size=5,
         )
 
+        self.robot = moveit_commander.RobotCommander()
         self.scene = moveit_commander.PlanningSceneInterface()
         self.arm = moveit_commander.MoveGroupCommander(self.group_name)
         self.arm.set_end_effector_link(self.end_effector_link)
@@ -171,12 +176,8 @@ class ColorSortingTask(object):
         self.tf_listener = tf.TransformListener()
         self.arm.set_planning_time(float(rospy.get_param("~planning_time", 12.0)))
         self.arm.set_num_planning_attempts(10)
-        self.arm.set_max_velocity_scaling_factor(
-            float(rospy.get_param("~velocity_scaling", 0.15))
-        )
-        self.arm.set_max_acceleration_scaling_factor(
-            float(rospy.get_param("~acceleration_scaling", 0.15))
-        )
+        self.arm.set_max_velocity_scaling_factor(self.velocity_scaling)
+        self.arm.set_max_acceleration_scaling_factor(self.acceleration_scaling)
 
         self.gripper_client = actionlib.SimpleActionClient(
             self.gripper_action_name, FollowJointTrajectoryAction
@@ -496,6 +497,44 @@ class ColorSortingTask(object):
         if fraction < self.minimum_cartesian_fraction:
             rospy.logwarn("Cartesian fraction too low; falling back to pose planning")
             return self._move_to_pose(target_pose, description)
+        # Older MoveIt releases can return Cartesian trajectories whose timing
+        # does not honour the scaling factors set on MoveGroupCommander.  The
+        # resulting fast descent may reach the final waypoint but fail the
+        # ros_control goal tolerance before the joints have settled.  Retime
+        # explicitly so Cartesian grasp/lift motions use the configured speed.
+        try:
+            plan = self.arm.retime_trajectory(
+                self.robot.get_current_state(),
+                plan,
+                self.velocity_scaling,
+                self.acceleration_scaling,
+            )
+        except Exception as error:
+            rospy.logwarn(
+                "Could not retime Cartesian path with acceleration scaling: %s; "
+                "retrying with velocity scaling only",
+                str(error),
+            )
+            try:
+                plan = self.arm.retime_trajectory(
+                    self.robot.get_current_state(), plan, self.velocity_scaling
+                )
+            except Exception as fallback_error:
+                rospy.logerr(
+                    "Could not safely retime Cartesian path to %s: %s",
+                    description,
+                    str(fallback_error),
+                )
+                return False
+        if not plan.joint_trajectory.points:
+            rospy.logerr("Retimed Cartesian path to %s is empty", description)
+            return False
+        rospy.loginfo(
+            "Retimed Cartesian path to %s: %.2f s at velocity scale %.2f",
+            description,
+            plan.joint_trajectory.points[-1].time_from_start.to_sec(),
+            self.velocity_scaling,
+        )
         success = bool(self.arm.execute(plan, wait=True))
         self.arm.stop()
         if not success:
