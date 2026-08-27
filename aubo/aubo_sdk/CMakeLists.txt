@@ -27,7 +27,7 @@ endif()
 catkin_package(
   INCLUDE_DIRS include
   CATKIN_DEPENDS roslib
-  CFG_EXTRAS cmake/aubo_sdk-extras.cmake
+  CFG_EXTRAS aubo_sdk-extras.cmake
 )
 file(MAKE_DIRECTORY "${PROJECT_SOURCE_DIR}/logfiles")
 
