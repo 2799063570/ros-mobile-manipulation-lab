@@ -95,29 +95,3 @@ arm_roll, arm_pitch, arm_yaw
 
 这里采用顺序式任务协调，并不是底盘与机械臂同时参与的全身运动规划。差速底盘
 仍由 `move_base` 控制，MoveIt 只控制 `aubo_i5` 规划组，末端链接为 `tcp_link`。
-
-## 雷达保护导航后观察环境
-
-手眼相机需要在导航结束后观察工作区域时，可直接运行：
-
-```bash
-roslaunch aubo_mobile_control environment_observation.launch \
-  goal_x:=1.0 goal_y:=0.5 goal_yaw:=1.57
-```
-
-该入口先将机械臂规划到紧凑的 `transport` 姿态，再通过双激光雷达导航；到达后，
-机械臂规划到 SRDF 中的 `observe` 关节姿态，并等待
-`/hand_camera/image_raw` 的有效图像。`transport` 和 `observe` 是确定关节角的命名
-姿态，本身不依赖在线逆解；MoveIt 仍会根据当前关节状态和规划场景做关节限位、
-自碰撞及路径可达性检查。
-
-Gazebo 中也可以使用已有完整入口：
-
-```bash
-roslaunch aubo_mobile_control navigation_arm_gazebo.launch \
-  pre_navigation_target:=transport post_navigation_target:=observe \
-  wait_for_camera:=true
-```
-
-若相机话题不同，可设置 `camera_topic`；在超时时间内没有收到非空图像，任务会
-明确失败。激光安全层默认开启，可用 `laser_safety:=false` 关闭（仅建议调试时使用）。

@@ -3,19 +3,24 @@
   <arg name="scan_topic" default="/scan"/>
   <arg name="input_cmd_vel" default="/cmd_vel_raw"/>
   <arg name="output_cmd_vel" default="/cmd_vel"/>
+  <arg name="robot_half_width" default="0.30"/>
+  <arg name="safety_margin" default="0.12"/>
+  <arg name="stop_distance" default="0.35"/>
+  <arg name="reverse_stop_distance" default="0.35"/>
+  <arg name="rotation_clearance" default="0.48"/>
 
   <node pkg="aubo_mobile_navigation" type="laser_safety_filter.py"
         name="laser_safety_filter" output="screen">
     <param name="scan_topic" value="$(arg scan_topic)"/>
     <param name="input_cmd_vel" value="$(arg input_cmd_vel)"/>
     <param name="output_cmd_vel" value="$(arg output_cmd_vel)"/>
-    <param name="robot_half_width" value="0.30"/>
-    <param name="safety_margin" value="0.12"/>
-    <param name="stop_distance" value="0.35"/>
-    <param name="reverse_stop_distance" value="0.35"/>
+    <param name="robot_half_width" value="$(arg robot_half_width)"/>
+    <param name="safety_margin" value="$(arg safety_margin)"/>
+    <param name="stop_distance" value="$(arg stop_distance)"/>
+    <param name="reverse_stop_distance" value="$(arg reverse_stop_distance)"/>
     <param name="reaction_time" value="0.25"/>
     <param name="max_deceleration" value="0.8"/>
-    <param name="rotation_clearance" value="0.48"/>
+    <param name="rotation_clearance" value="$(arg rotation_clearance)"/>
     <param name="min_cluster_points" value="3"/>
     <param name="emergency_distance" value="0.18"/>
     <param name="scan_timeout" value="0.5"/>

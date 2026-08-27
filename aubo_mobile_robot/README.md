@@ -12,6 +12,7 @@ aubo_mobile_robot/
 ├── aubo_mobile_navigation/     # 建图、定位、move_base 导航与 RRT 自主探索
 ├── aubo_mobile_bringup/        # 机器人、导航、分拣和任务的统一仿真入口
 ├── aubo_mobile_control/        # 键盘控制及导航/机械臂协同
+├── aubo_mobile_follower/       # 激光跟随、颜色跟随与视觉循线
 ├── aubo_mobile_perception/     # 移动平台视觉参数与检测启动入口
 ├── aubo_mobile_sorting/        # 移动分拣参数、场景、面板与启动入口
 └── aubo_mobile_nav_sorting/    # 建图、导航到工位并自动分拣的场景任务
@@ -26,6 +27,7 @@ aubo_mobile_robot/
 ├── aubo_mobile_navigation/     # 建图、定位及 move_base 参数
 ├── aubo_mobile_bringup/        # 统一仿真启动入口
 ├── aubo_mobile_control/        # 复合控制与指令分发
+├── aubo_mobile_follower/       # 跟随/循迹与机械臂相机姿态准备
 ├── aubo_mobile_perception/     # 移动平台视觉配置
 ├── aubo_mobile_sorting/        # 移动平台分拣场景配置
 └── aubo_mobile_nav_sorting/    # 导航分拣任务编排
@@ -46,7 +48,8 @@ aubo_description
 aubo_mobile_robot ── aubo_mobile_moveit_config
        │                         │
        ├── aubo_mobile_navigation│
-       └── aubo_mobile_control   │
+       ├── aubo_mobile_control   │
+       └── aubo_mobile_follower  │
                                  ▼
 aubo_mobile_perception ──→ aubo_perception
 aubo_mobile_sorting ──────→ aubo_sorting_core

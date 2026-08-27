@@ -19,7 +19,7 @@
 └── aubo_gazebo_plugins      # Gazebo 抓取辅助插件
 
 固定机械臂应用
-├── aubo_planning            # 抓放及夹爪规划示例
+├── aubo_planning            # 抓放、夹爪及深度相机 OctoMap 避障示例
 └── aubo_color_sorting       # 固定场景参数、world 和启动入口
 ```
 

@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>aubo_mobile_follower</name>
+  <version>0.1.0</version>
+  <description>Laser, colour-target and line following for the AUBO mobile manipulator.</description>
+
+  <maintainer email="wheeltec-client@todo.todo">wheeltec-client</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>catkin</buildtool_depend>
+
+  <exec_depend>aubo_mobile_moveit_config</exec_depend>
+  <exec_depend>aubo_mobile_navigation</exec_depend>
+  <exec_depend>aubo_mobile_robot</exec_depend>
+  <exec_depend>cv_bridge</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>moveit_commander</exec_depend>
+  <exec_depend>python-numpy</exec_depend>
+  <exec_depend>python-opencv</exec_depend>
+  <exec_depend>rospy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+
+  <export/>
+</package>

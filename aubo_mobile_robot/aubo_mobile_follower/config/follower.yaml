@@ -1,0 +1,46 @@
+# Conservative defaults for a mobile base carrying an extended manipulator.
+control_rate: 15.0
+sensor_timeout: 0.5
+require_arm_ready: true
+ready_topic: /aubo_mobile_follower/arm_ready
+cmd_vel_topic: /cmd_vel_raw
+
+laser:
+  target_distance: 1.0
+  min_target_distance: 0.35
+  search_angle: 1.0472
+  min_cluster_points: 4
+  cluster_jump: 0.12
+  max_tracking_jump: 0.55
+  angle_deadband: 0.06
+  distance_deadband: 0.08
+  linear_kp: 0.55
+  angular_kp: 1.4
+  max_linear_speed: 0.30
+  max_reverse_speed: 0.12
+  max_angular_speed: 0.65
+
+color:
+  # Default red target in OpenCV HSV space.
+  hsv_lower: [0, 110, 80]
+  hsv_upper: [10, 255, 255]
+  min_area_fraction: 0.002
+  target_area_fraction: 0.075
+  x_deadband: 0.06
+  area_deadband: 0.012
+  linear_kp: 1.2
+  angular_kp: 1.1
+  max_linear_speed: 0.24
+  max_reverse_speed: 0.08
+  max_angular_speed: 0.55
+
+line:
+  # Default black line. Change these values for a coloured guide line.
+  hsv_lower: [0, 0, 0]
+  hsv_upper: [180, 255, 65]
+  roi_top_fraction: 0.55
+  min_mask_fraction: 0.006
+  linear_speed: 0.16
+  angular_kp: 0.9
+  angular_kd: 0.12
+  max_angular_speed: 0.55

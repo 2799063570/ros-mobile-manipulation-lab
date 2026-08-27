@@ -1,0 +1,73 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Internal reusable entry. Use laser_follow.launch, color_follow.launch or
+       line_follow.launch instead of invoking this file directly. -->
+  <arg name="follower_type"/>
+  <arg name="arm_target"/>
+  <arg name="wait_for_camera" default="false"/>
+  <arg name="camera_topic" default="/hand_camera/image_raw"/>
+  <arg name="scan_topic" default="/scan"/>
+  <arg name="start_robot" default="false"/>
+  <arg name="start_moveit" default="true"/>
+  <arg name="start_scan_merger" default="true"/>
+  <arg name="use_laser_safety" default="true"/>
+  <arg name="world" default="$(find aubo_mobile_robot)/worlds/empty.world"/>
+  <arg name="gui" default="true"/>
+
+  <group if="$(arg start_robot)">
+    <include file="$(find aubo_mobile_robot)/launch/gazebo.launch">
+      <arg name="world" value="$(arg world)"/>
+      <arg name="gui" value="$(arg gui)"/>
+    </include>
+  </group>
+
+  <group if="$(arg start_moveit)">
+    <include file="$(find aubo_mobile_moveit_config)/launch/move_group.launch">
+      <arg name="allow_trajectory_execution" value="true"/>
+      <arg name="fake_execution" value="false"/>
+      <arg name="load_robot_description" value="false"/>
+    </include>
+  </group>
+
+  <group if="$(arg start_scan_merger)">
+    <include file="$(find aubo_mobile_navigation)/launch/scan_merger.launch"/>
+  </group>
+
+  <node pkg="aubo_mobile_follower" type="prepare_arm_pose.py"
+        name="prepare_follower_arm_pose" output="screen">
+    <param name="target" value="$(arg arm_target)"/>
+    <param name="wait_for_camera" value="$(arg wait_for_camera)"/>
+    <param name="camera_topic" value="$(arg camera_topic)"/>
+    <param name="ready_topic" value="/aubo_mobile_follower/arm_ready"/>
+  </node>
+
+  <group if="$(arg use_laser_safety)">
+    <node pkg="aubo_mobile_follower" type="$(arg follower_type)"
+          name="aubo_mobile_follower" output="screen">
+      <rosparam file="$(find aubo_mobile_follower)/config/follower.yaml" command="load"/>
+      <param name="image_topic" value="$(arg camera_topic)"/>
+      <param name="scan_topic" value="$(arg scan_topic)"/>
+      <param name="cmd_vel_topic" value="/cmd_vel_raw"/>
+    </node>
+    <include file="$(find aubo_mobile_navigation)/launch/laser_safety_filter.launch">
+      <arg name="scan_topic" value="$(arg scan_topic)"/>
+      <arg name="input_cmd_vel" value="/cmd_vel_raw"/>
+      <arg name="output_cmd_vel" value="/cmd_vel"/>
+      <!-- The arm/camera may extend beyond the circular mobile base. -->
+      <arg name="robot_half_width" value="0.42"/>
+      <arg name="safety_margin" value="0.15"/>
+      <arg name="stop_distance" value="0.70"/>
+      <arg name="reverse_stop_distance" value="0.45"/>
+      <arg name="rotation_clearance" value="0.75"/>
+    </include>
+  </group>
+  <group unless="$(arg use_laser_safety)">
+    <node pkg="aubo_mobile_follower" type="$(arg follower_type)"
+          name="aubo_mobile_follower" output="screen">
+      <rosparam file="$(find aubo_mobile_follower)/config/follower.yaml" command="load"/>
+      <param name="image_topic" value="$(arg camera_topic)"/>
+      <param name="scan_topic" value="$(arg scan_topic)"/>
+      <param name="cmd_vel_topic" value="/cmd_vel"/>
+    </node>
+  </group>
+</launch>

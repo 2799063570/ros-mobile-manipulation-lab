@@ -10,6 +10,7 @@
 #include <wheeltec_multi/avoid.h>
 #include <std_msgs/Int32.h>
 #include <std_msgs/Int8.h>
+#include <std_msgs/Bool.h>
 #include <std_msgs/String.h>
 
 
@@ -34,14 +35,19 @@ double max_vel_theta;
 double min_vel_theta;
 bool holonomic;
 double control_rate;
+double obstacle_timeout;
+ros::Time last_obstacle_time;
+bool obstacle_received=false;
 
 /**************************************************************************
 函数功能：sub回调函数
 入口参数：  laserTracker.py
 返回  值：无
 **************************************************************************/
-void current_position_Callback(const wheeltec_multi::avoid& msg)	
+void current_position_Callback(const wheeltec_multi::avoid& msg)
 {
+	last_obstacle_time = ros::Time::now();
+	obstacle_received = true;
 	distance1 = msg.distance;
 	dis_angleX = msg.angleX;
 	if(dis_angleX>0)
@@ -82,6 +88,7 @@ int main(int argc, char** argv)
 
 	/***创建底盘速度控制话题发布者***/
 	ros::Publisher cmd_vel_Pub = node.advertise<geometry_msgs::Twist>("cmd_vel", 1);
+	ros::Publisher avoidance_state_pub = node.advertise<std_msgs::Bool>("avoidance_active", 1, true);
 
 	/***创建底盘运动话题订阅者***/
 	ros::Subscriber vel_sub = node.subscribe("cmd_vel_ori", 1, cmd_vel_ori_Callback);
@@ -102,6 +109,8 @@ int main(int argc, char** argv)
 	private_nh.param<double>("min_vel_theta", min_vel_theta,0.05);
 	private_nh.param<bool>("holonomic", holonomic,false);
 	private_nh.param<double>("control_rate", control_rate,20.0);
+	private_nh.param<double>("obstacle_timeout", obstacle_timeout,0.5);
+	obstacle_timeout = fmax(0.0, obstacle_timeout);
 
 	double rate2 = fmax(1.0, control_rate);
 	ros::Rate loopRate2(rate2);
@@ -110,8 +119,18 @@ int main(int argc, char** argv)
 	while(ros::ok())
 	{
 		ros::spinOnce();
+		if (!obstacle_received ||
+			(obstacle_timeout > 0.0 &&
+			 (ros::Time::now() - last_obstacle_time).toSec() > obstacle_timeout))
+		{
+			distance1 = 100.0;
+			obstacle_received = false;
+			ROS_WARN_THROTTLE(2.0, "Obstacle data unavailable or stale; disabling avoidance correction");
+		}
 		avoidance_kw = fabs(avoidance_kw);	// 角速度避障系数 先设置成正数
 		cmd_vel_msg = cmd_vel_data;
+		std_msgs::Bool avoidance_state;
+		avoidance_state.data = obstacle_received && distance1 < safe_distence;
 		if (holonomic)
 		{
 			// 麦轮无需先转动车头：直接在底盘坐标系叠加远离障碍物的二维速度。
@@ -181,6 +200,7 @@ int main(int argc, char** argv)
 			cmd_vel_msg.angular.z=0;
 
 		cmd_vel_Pub.publish(cmd_vel_msg);
+		avoidance_state_pub.publish(avoidance_state);
 		ros::spinOnce();
 		loopRate2.sleep();
 	} 

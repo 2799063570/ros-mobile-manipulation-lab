@@ -52,7 +52,8 @@
   <depend>actionlib</depend>
   <depend>actionlib_msgs</depend>
   <depend>geometry_msgs</depend>
-  <depend>message_generation</depend>
+  <build_depend>message_generation</build_depend>
+  <exec_depend>message_runtime</exec_depend>
   <depend>nav_msgs</depend>
   <depend>roscpp</depend>
   <depend>serial</depend>

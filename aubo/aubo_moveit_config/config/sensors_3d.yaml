@@ -1,4 +1,12 @@
-# The name of this file shouldn't be changed, or else the Setup Assistant won't detect it
+# MoveIt's occupancy_map_monitor converts the registered depth point cloud to
+# an OctoMap in the planning scene.  The topic matches both the eye-in-hand
+# Gazebo sensor in aubo_description and the aligned RealSense point cloud.
 sensors:
-  - {}
-  - {}
+  - sensor_plugin: occupancy_map_monitor/PointCloudOctomapUpdater
+    point_cloud_topic: /camera/depth/color/points
+    max_range: 2.5
+    point_subsample: 1
+    padding_offset: 0.03
+    padding_scale: 1.0
+    max_update_rate: 3.0
+    filtered_cloud_topic: filtered_cloud

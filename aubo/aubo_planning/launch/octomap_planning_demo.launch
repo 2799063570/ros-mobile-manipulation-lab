@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Use this entry after a real robot/camera or another simulator is already
+       publishing joint states, TF, a registered PointCloud2, and move_group. -->
+  <arg name="point_cloud_topic" default="/camera/depth/color/points"/>
+  <arg name="sensor_pose" default="observe"/>
+  <arg name="target_pose" default="home"/>
+  <!-- Defaults to false because this generic entry can be used on real hardware. -->
+  <arg name="move_to_sensor_pose" default="false"/>
+  <arg name="execute" default="false"/>
+  <arg name="wait_timeout" default="30.0"/>
+
+  <node pkg="aubo_planning" type="octomap_planning_demo"
+        name="aubo_octomap_planning_demo" output="screen">
+    <param name="point_cloud_topic" value="$(arg point_cloud_topic)"/>
+    <param name="sensor_pose" value="$(arg sensor_pose)"/>
+    <param name="target_pose" value="$(arg target_pose)"/>
+    <param name="move_to_sensor_pose" value="$(arg move_to_sensor_pose)"/>
+    <param name="execute" value="$(arg execute)"/>
+    <param name="wait_timeout" value="$(arg wait_timeout)"/>
+  </node>
+</launch>

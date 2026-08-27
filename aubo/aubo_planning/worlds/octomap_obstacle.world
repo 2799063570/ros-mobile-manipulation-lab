@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<sdf version="1.6">
+  <world name="aubo_octomap_planning">
+    <include><uri>model://ground_plane</uri></include>
+    <include><uri>model://sun</uri></include>
+
+    <!-- These objects are intentionally NOT added through PlanningScene.
+         MoveIt can only discover them through the simulated depth camera. -->
+    <model name="work_table">
+      <static>true</static>
+      <pose>0.65 0 0.05 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.70 0.90 0.10</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>0.70 0.90 0.10</size></box></geometry>
+          <material><ambient>0.35 0.38 0.42 1</ambient><diffuse>0.45 0.48 0.52 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="camera_discovered_obstacle">
+      <static>true</static>
+      <!-- Offset from the named goal itself, but close enough to constrain
+           candidate swept volumes between observe and home. -->
+      <pose>0.60 0.10 0.30 0 0 0</pose>
+      <link name="link">
+        <collision name="collision"><geometry><box><size>0.12 0.24 0.50</size></box></geometry></collision>
+        <visual name="visual">
+          <geometry><box><size>0.12 0.24 0.50</size></box></geometry>
+          <material><ambient>0.75 0.18 0.08 1</ambient><diffuse>0.95 0.25 0.08 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+
+    <physics name="default_physics" type="ode">
+      <max_step_size>0.001</max_step_size>
+      <real_time_update_rate>1000</real_time_update_rate>
+    </physics>
+  </world>
+</sdf>

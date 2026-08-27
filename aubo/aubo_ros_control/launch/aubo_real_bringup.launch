@@ -4,6 +4,7 @@
   <arg name="use_rviz" default="true"/>
   <arg name="robot_xacro" default="aubo_i5_with_camera.xacro"/>
   <arg name="robot_srdf" default="aubo_i5_with_camera.srdf"/>
+  <arg name="use_sensor_manager" default="false"/>
 
   <include file="$(find aubo_ros_control)/launch/aubo_control.launch">
     <arg name="robot_ip" value="$(arg robot_ip)"/>
@@ -29,6 +30,7 @@
     <arg name="fake_execution" value="false"/>
     <arg name="robot_xacro" value="$(arg robot_xacro)"/>
     <arg name="robot_srdf" value="$(arg robot_srdf)"/>
+    <arg name="use_sensor_manager" value="$(arg use_sensor_manager)"/>
   </include>
 
   <include if="$(arg use_rviz)"
