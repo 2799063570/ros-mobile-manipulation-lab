@@ -271,12 +271,17 @@ class ColorVisualTargetNode(object):
         mask = candidate.mask
         if self.depth_mask_erosion > 1:
             mask = cv2.erode(mask, self.depth_kernel, iterations=1)
-        valid = (
-            (mask > 0)
-            & np.isfinite(depth_metres)
-            & (depth_metres >= self.minimum_depth)
-            & (depth_metres <= self.maximum_depth)
-        )
+        finite = np.isfinite(depth_metres)
+        # Registered depth images legitimately contain NaN/Inf at holes and
+        # outside the sensor range.  NumPy evaluates every '&' operand (there
+        # is no short-circuit), so comparing those values can emit warnings
+        # even though the finite mask later rejects them.
+        with np.errstate(invalid="ignore"):
+            within_range = (
+                (depth_metres >= self.minimum_depth)
+                & (depth_metres <= self.maximum_depth)
+            )
+        valid = (mask > 0) & finite & within_range
         samples = depth_metres[valid]
         if samples.size < 5:
             return None
