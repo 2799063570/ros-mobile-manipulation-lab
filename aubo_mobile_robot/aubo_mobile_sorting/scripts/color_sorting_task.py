@@ -61,6 +61,9 @@ class ColorSortingTask(object):
         self.observation_named_target = rospy.get_param(
             "~observation_named_target", ""
         )
+        self.work_ready_named_target = rospy.get_param(
+            "~work_ready_named_target", "work_ready"
+        )
         self.pregrasp_height = float(rospy.get_param("~pregrasp_height", 0.25))
         self.lift_height = float(rospy.get_param("~lift_height", 0.30))
         self.place_clearance = float(rospy.get_param("~place_clearance", 0.02))
@@ -184,6 +187,7 @@ class ColorSortingTask(object):
             rospy.Service("/sorting/start", Trigger, self._start_service),
             rospy.Service("/sorting/stop", Trigger, self._stop_service),
             rospy.Service("/sorting/open_gripper", Trigger, self._open_service),
+            rospy.Service("/sorting/prepare_work", Trigger, self._prepare_work_service),
             rospy.Service("/sorting/home", Trigger, self._home_service),
         ]
         self._publish_state("INITIALIZING", "waiting for Gazebo controllers")
@@ -395,6 +399,12 @@ class ColorSortingTask(object):
 
     def _open_service(self, _request):
         success, message = self._start_operation("OPENING", self._open_operation)
+        return TriggerResponse(success=success, message=message)
+
+    def _prepare_work_service(self, _request):
+        success, message = self._start_operation(
+            "PREPARING", self._prepare_work_operation
+        )
         return TriggerResponse(success=success, message=message)
 
     def _home_service(self, _request):
@@ -708,6 +718,13 @@ class ColorSortingTask(object):
     def _home_operation(self):
         self._observation_ready = False
         return self._move_named(self.finish_named_target)
+
+    def _prepare_work_operation(self):
+        self._observation_ready = False
+        # Refresh the map-fixed table before unfolding near the workstation.
+        if not self._add_table_collision():
+            return False
+        return self._move_named(self.work_ready_named_target)
 
     def _verify_visible_colors(self):
         required = set(str(color) for color in self.sort_colors)

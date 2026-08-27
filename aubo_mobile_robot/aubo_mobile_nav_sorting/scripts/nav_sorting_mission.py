@@ -102,6 +102,9 @@ class NavigationSortingMission(object):
         self.observe_service_name = rospy.get_param(
             "~sorting_observe_service", "/sorting/move_to_observation"
         )
+        self.prepare_service_name = rospy.get_param(
+            "~sorting_prepare_service", "/sorting/prepare_work"
+        )
         self.sort_service_name = rospy.get_param(
             "~sorting_start_service", "/sorting/start"
         )
@@ -114,6 +117,7 @@ class NavigationSortingMission(object):
         )
         self.clear_costmaps = rospy.ServiceProxy("/move_base/clear_costmaps", Empty)
         self.home_client = rospy.ServiceProxy(self.home_service_name, Trigger)
+        self.prepare_client = rospy.ServiceProxy(self.prepare_service_name, Trigger)
         self.observe_client = rospy.ServiceProxy(self.observe_service_name, Trigger)
         self.sort_client = rospy.ServiceProxy(self.sort_service_name, Trigger)
         self.sorting_stop_client = rospy.ServiceProxy(
@@ -365,6 +369,12 @@ class NavigationSortingMission(object):
     def _coordinate_near_field(self):
         if not self._navigate(self.pre_dock_goal, "pre-dock"):
             return False
+        self._publish_state("PREPARING_ARM", "moving arm to work-ready pose")
+        if not self._call_sorting_operation(
+            self.prepare_client, ("PREPARING",), "arm work preparation"
+        ):
+            return False
+        arm_prepared = True
         candidates = self._near_field_candidates()
         if not candidates:
             rospy.logerr("No near-field pose satisfies base, camera and detector constraints")
@@ -387,6 +397,14 @@ class NavigationSortingMission(object):
                 rospy.logwarn("Fine-dock candidate %d navigation failed", index + 1)
                 continue
 
+            if not arm_prepared:
+                self._publish_state("PREPARING_ARM", "restoring work-ready pose")
+                if not self._call_sorting_operation(
+                    self.prepare_client, ("PREPARING",), "arm work preparation"
+                ):
+                    return False
+                arm_prepared = True
+
             self._publish_state(
                 "VALIDATING_DOCK", "planning observation and checking colors"
             )
@@ -404,6 +422,7 @@ class NavigationSortingMission(object):
                 self.home_client, ("HOMING",), "arm re-stowing"
             ):
                 return False
+            arm_prepared = False
         rospy.logerr("All near-field docking candidates failed validation")
         return False
 

@@ -21,11 +21,11 @@ class NavigationArmCoordinator(object):
     """Run a safe arm-pose -> base-navigation -> arm-plan sequence once."""
 
     def __init__(self):
-        self.group_name = rospy.get_param("~planning_group", "aubo_i5")
-        self.end_effector_link = rospy.get_param("~end_effector_link", "tcp_link")
-        self.navigation_action = rospy.get_param("~navigation_action", "/move_base")
-        self.navigation_frame = rospy.get_param("~navigation_frame", "map")
-        self.goal_source = rospy.get_param("~goal_source", "launch").strip().lower()
+        self.group_name = rospy.get_param("~planning_group", "aubo_i5") # 规划组
+        self.end_effector_link = rospy.get_param("~end_effector_link", "tcp_link") # 末端执行坐标系
+        self.navigation_action = rospy.get_param("~navigation_action", "/move_base") # 导航动作服务器
+        self.navigation_frame = rospy.get_param("~navigation_frame", "map") 
+        self.goal_source = rospy.get_param("~goal_source", "launch").strip().lower() # 去掉空格转成小写
         self.rviz_goal_topic = rospy.get_param(
             "~rviz_goal_topic", "/nav_arm_coordinator/goal"
         )
@@ -41,7 +41,7 @@ class NavigationArmCoordinator(object):
         self.velocity_scaling = float(rospy.get_param("~velocity_scaling", 0.20))
         self.acceleration_scaling = float(rospy.get_param("~acceleration_scaling", 0.20))
 
-        self.goal_x = float(rospy.get_param("~goal_x", 1.0))
+        self.goal_x = float(rospy.get_param("~goal_x", 1.0))        # 让机器人移动的目标位置
         self.goal_y = float(rospy.get_param("~goal_y", 0.0))
         self.goal_yaw = float(rospy.get_param("~goal_yaw", 0.0))
 
@@ -60,9 +60,9 @@ class NavigationArmCoordinator(object):
                 PoseStamped,
                 self._rviz_goal_callback,
                 queue_size=1,
-            )
+            )  # 如果数据源是rviz 设置对应的话题订阅
 
-        self.arm = moveit_commander.MoveGroupCommander(self.group_name)
+        self.arm = moveit_commander.MoveGroupCommander(self.group_name) # 对moveit_group接口 进行初始化
         self.arm.set_end_effector_link(self.end_effector_link)
         self.arm.set_planning_time(self.arm_planning_time)
         self.arm.set_num_planning_attempts(10)
@@ -71,7 +71,7 @@ class NavigationArmCoordinator(object):
 
         self.navigation_client = actionlib.SimpleActionClient(
             self.navigation_action, MoveBaseAction
-        )
+        ) # 导航move_base动作客户端
 
     def _rviz_goal_callback(self, target):
         self.rviz_goal = target
@@ -238,11 +238,11 @@ class NavigationArmCoordinator(object):
             rospy.loginfo("Waiting %.1f seconds for controllers and localization", self.startup_delay)
             rospy.sleep(self.startup_delay)
 
-        if not self.skip_pre_navigation:
-            if not self._move_arm_to_named_target(self.pre_navigation_target):
+        if not self.skip_pre_navigation:  # 如果不跳过导航前的动作
+            if not self._move_arm_to_named_target(self.pre_navigation_target): # 移动机械臂到指定位置
                 return False
 
-        if not self._navigate():
+        if not self._navigate():        # 导航到指定位置
             return False
 
         if self.arm_target_type == "named":

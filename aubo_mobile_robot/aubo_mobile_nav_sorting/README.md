@@ -73,22 +73,24 @@ rostopic echo /nav_sorting/state
 rostopic echo /sorting/state
 ```
 
-任务状态依次为 `STOWING_ARM`、`NAVIGATING`、`COORDINATING`、
+任务状态依次为 `STOWING_ARM`、`NAVIGATING`、`PREPARING_ARM`、`COORDINATING`、
 `VALIDATING_DOCK`、`AT_WORKSTATION`、`SORTING`、`SUCCEEDED`；失败时为
 `FAILED`。
 
-到达工位后，任务会先调用 `/sorting/move_to_observation`，机械臂从
-`transport` 运输姿态移动到 `observe` 相机观察姿态，再开始检测。仿真手部相机
-使用 90° 水平视场，检测节点从 `/hand_camera/camera_info` 实时读取相机内参。
-底盘和机械臂采用安全的分阶段协同：机械臂折叠后底盘精确停靠，底盘完全停止并
-刷新桌子碰撞物后，机械臂才展开；两者不会同时运动。
+到达预停靠点后，任务先调用 `/sorting/prepare_work`，刷新桌子碰撞物并将机械臂从
+`transport` 运输姿态切换到末端向下的 `work_ready` 工作准备姿态，再进行低速精停。
+每段底盘运动开始前机械臂均已停止，两者不会同时运动。精停完成后任务调用
+`/sorting/move_to_observation`，机械臂从 `work_ready` 移动到 `observe` 相机观察
+姿态，再开始检测。仿真手部相机使用 90° 水平视场，检测节点从
+`/hand_camera/camera_info` 实时读取相机内参。
 
 近场协同默认启用。底盘先到 `pre_dock_goal`，再对
 `near_field_candidate_x/y/yaw` 的组合进行评分，淘汰桌边间距不足或无法覆盖全部
 方块的位姿。每个候选精停后，系统用真实 MoveIt 规划场景执行观察动作，并要求
 红、绿、蓝检测同时可见；失败时自动回到 `transport` 并尝试下一个候选。放置点
 使用 `map` 坐标，在执行时转换到当前 `base_link`，因此小幅横移或转角不会造成
-放置偏差。
+放置偏差。最终抓取 TCP 位于 40 mm 方块的几何中心；可通过
+`config/sorting.yaml` 的 `grasp_height_offset` 做毫米级实机标定。
 
 ## 4. 修改新场景
 

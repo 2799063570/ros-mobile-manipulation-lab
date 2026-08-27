@@ -15,12 +15,15 @@ table_size: [0.80, 1.20, 0.40]
 # gripper can still approach objects resting on the tabletop.
 table_collision_margin: 0.03
 object_height: 0.04
-grasp_height_offset: 0.01
+# Put the TCP at the centre of the 40 mm block.  The previous +10 mm offset
+# left the fingers too high for a reliable task-specific grasp.
+grasp_height_offset: 0.0
 scene_update_timeout: 10.0
 
 grasp_rpy: [3.141592653589793, 0.0, 0.0]
 observation_pose: [0.63, 0.0, 0.62]
 observation_named_target: observe
+work_ready_named_target: work_ready
 auto_move_to_observation: false
 auto_start: false
 pregrasp_height: 0.25

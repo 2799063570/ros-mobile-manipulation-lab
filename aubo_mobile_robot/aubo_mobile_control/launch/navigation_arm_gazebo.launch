@@ -18,13 +18,14 @@
     <arg name="gui" value="$(arg gui)"/>
   </include>
 
+  <!-- 复合机器人移动到指定位置(launch|rviz), 移动的过程分为三段 机械臂移动到移动模式、底盘导航、机械臂移动到指定位置-->
   <include file="$(find aubo_mobile_control)/launch/navigation_arm.launch">
     <arg name="map_file" value="$(arg map_file)"/>
     <arg name="rviz" value="$(arg rviz)"/>
-    <arg name="goal_x" value="$(arg goal_x)"/>
+    <arg name="goal_x" value="$(arg goal_x)"/> <!-- 机器人抓取的位置 -->
     <arg name="goal_y" value="$(arg goal_y)"/>
     <arg name="goal_yaw" value="$(arg goal_yaw)"/>
-    <arg name="goal_source" value="$(arg goal_source)"/>
+    <arg name="goal_source" value="$(arg goal_source)"/> <!-- launch\rviz 防止两个数据源产生冲突-->
     <arg name="rviz_goal_topic" value="$(arg rviz_goal_topic)"/>
     <arg name="goal_wait_timeout" value="$(arg goal_wait_timeout)"/>
     <arg name="pre_navigation_target" value="$(arg pre_navigation_target)"/>

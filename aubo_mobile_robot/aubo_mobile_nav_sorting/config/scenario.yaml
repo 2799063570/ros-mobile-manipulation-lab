@@ -37,6 +37,7 @@ startup_delay: 3.0
 home_before_navigation: true
 sorting_state_topic: /sorting/state
 sorting_home_service: /sorting/home
+sorting_prepare_service: /sorting/prepare_work
 sorting_observe_service: /sorting/move_to_observation
 sorting_start_service: /sorting/start
 sorting_stop_service: /sorting/stop

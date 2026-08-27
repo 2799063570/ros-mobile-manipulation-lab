@@ -5,10 +5,10 @@
   <arg name="rviz" default="true"/>
   <arg name="start_navigation" default="true"/>
   <arg name="start_moveit" default="true"/>
-  <arg name="goal_x" default="1.0"/>
+  <arg name="goal_x" default="1.0"/><!-- 机器人抓取的位置 -->
   <arg name="goal_y" default="0.0"/>
   <arg name="goal_yaw" default="0.0"/>
-  <arg name="goal_source" default="launch"/>
+  <arg name="goal_source" default="launch"/><!-- launch\rviz 防止两个数据源产生冲突-->
   <arg name="rviz_goal_topic" default="/nav_arm_coordinator/goal"/>
   <arg name="goal_wait_timeout" default="0.0"/>
   <arg name="pre_navigation_target" default="down"/>

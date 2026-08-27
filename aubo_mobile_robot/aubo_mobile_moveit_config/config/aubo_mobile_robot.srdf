@@ -33,6 +33,17 @@
         <joint name="wrist2_joint" value="1.5956" />
         <joint name="wrist3_joint" value="0" />
     </group_state>
+    <!-- Task-specific transition pose used near the sorting workstation.  The
+         TCP points down above the near edge of the table while retaining ample
+         vertical clearance for the final fine-docking motion. -->
+    <group_state name="work_ready" group="aubo_i5">
+        <joint name="foreArm_joint" value="1.562" />
+        <joint name="shoulder_joint" value="0" />
+        <joint name="upperArm_joint" value="0" />
+        <joint name="wrist1_joint" value="0" />
+        <joint name="wrist2_joint" value="1.5956" />
+        <joint name="wrist3_joint" value="0" />
+    </group_state>
     <!-- Low, compact A-shaped pose used while the mobile base is travelling.
          The upper arm rises inward, the forearm folds back toward the chassis,
          and the wrist/gripper remain near the centre of the circular base. -->

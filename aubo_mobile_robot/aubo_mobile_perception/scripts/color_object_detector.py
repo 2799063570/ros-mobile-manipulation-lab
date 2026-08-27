@@ -20,26 +20,26 @@ class ColorObjectDetector(object):
     """Detect HSV blobs and intersect their camera rays with a known table plane."""
 
     def __init__(self):
-        self.image_topic = rospy.get_param("~image_topic", "/hand_camera/image_raw")
+        self.image_topic = rospy.get_param("~image_topic", "/hand_camera/image_raw") # 原始图像数据
         self.camera_info_topic = rospy.get_param(
             "~camera_info_topic", "/hand_camera/camera_info"
-        )
+        ) # 相机内参数据
         self.detections_topic = rospy.get_param(
             "~detections_topic", "/sorting/detections"
-        )
+        ) # 检测到目标得数据参数 话题 
         self.debug_image_topic = rospy.get_param(
             "~debug_image_topic", "/sorting/debug_image"
-        )
+        ) # 检查到目标的图像处理后的图像 话题
         self.colors = rospy.get_param("~colors")
         self.min_area = float(rospy.get_param("~min_contour_area", 180.0))
         self.max_area = float(rospy.get_param("~max_contour_area", 8000.0))
         self.max_aspect_ratio = float(rospy.get_param("~max_aspect_ratio", 1.6))
         self.position_offset_x = float(rospy.get_param("~position_offset_x", 0.0))
         self.position_offset_y = float(rospy.get_param("~position_offset_y", 0.0))
-        self.kernel_size = int(rospy.get_param("~morphology_kernel", 5))
-        self.target_frame = rospy.get_param("~target_frame", "base_link")
-        self.table_z = float(rospy.get_param("~table_z", 0.14))
-        self.object_height = float(rospy.get_param("~object_height", 0.04))
+        self.kernel_size = int(rospy.get_param("~morphology_kernel", 5)) # 形态学核大小
+        self.target_frame = rospy.get_param("~target_frame", "base_link") # 目标坐标系
+        self.table_z = float(rospy.get_param("~table_z", 0.14)) # 桌面高度
+        self.object_height = float(rospy.get_param("~object_height", 0.04))     # 物体的高度
         self.projection_plane_z = float(
             rospy.get_param(
                 "~projection_plane_z", self.table_z + self.object_height
@@ -165,8 +165,8 @@ class ColorObjectDetector(object):
             return
 
         hsv_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2HSV)
-        debug_image = bgr_image.copy()
-        output = DetectedObjectArray()
+        debug_image = bgr_image.copy() # 复制一份图像用于调试显示
+        output = DetectedObjectArray() # 创建一个检测到的目标数组
         output.header.stamp = image_message.header.stamp
         output.header.frame_id = self.target_frame
 

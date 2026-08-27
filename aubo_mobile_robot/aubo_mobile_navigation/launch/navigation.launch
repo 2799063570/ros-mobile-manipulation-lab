@@ -3,7 +3,8 @@
   <!-- The robot/Gazebo must already be running and map_file must exist. -->
   <arg name="map_file" default="$(find aubo_mobile_navigation)/maps/map.yaml"/>
   <arg name="rviz" default="true"/>
-  <!-- Keep the standard topic by default; combined navigation/arm launch remaps it. -->
+  <!-- RViz 点击 2D Nav Goal 发送的话题数据 对应的话题名称 默认名称会直接发送到move_base，move_base内部会转化为导航任务 -->
+  <!-- 我们可修改话题 让我们的节点先接收该话题数据 然后决定是否执行导航 -->
   <arg name="nav_goal_topic" default="/move_base_simple/goal"/>
 
   <include file="$(find aubo_mobile_navigation)/launch/scan_merger.launch"/>
