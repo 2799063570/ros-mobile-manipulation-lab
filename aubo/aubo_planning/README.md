@@ -17,7 +17,8 @@ roslaunch aubo_planning octomap_planning_gazebo.launch
 场景中的灰色工作台和橙色立柱没有通过代码直接加入 PlanningScene；它们只能由
 腕部深度相机的 `/camera/depth/color/points` 点云被 MoveIt 发现，并以 4 cm
 OctoMap 体素显示。程序先到 `observe` 相机观察位，确认收到点云和非空八叉树，
-然后规划到 `home`。仿真默认执行轨迹；只看规划可使用：
+然后规划到 `home`。如果运动过程中相机发现了新障碍并使当前轨迹失效，示例会
+等待地图更新并重新规划观察位，最多尝试 3 次。仿真默认执行轨迹；只看规划可使用：
 
 ```bash
 roslaunch aubo_planning octomap_planning_gazebo.launch execute:=false
