@@ -1,7 +1,7 @@
 # AUBO 移动机器人视觉感知
 
-该功能包使用 OpenCV 对手部 RGB 相机图像进行颜色分割，并将识别结果转换为
-机器人坐标系下的桌面目标位置。
+该功能包保存移动平台专用的视觉参数和启动入口。通用 OpenCV 检测节点及消息定义
+由 `aubo_perception` 提供，识别结果会转换为机器人坐标系下的桌面目标位置。
 
 ## 话题接口
 
@@ -13,7 +13,7 @@
 发布：
 
 - `/sorting/detections`：目标颜色、像素位置及三维位置，消息类型为
-  `aubo_mobile_perception/DetectedObjectArray`
+  `aubo_perception/DetectedObjectArray`
 - `/sorting/debug_image`：带识别框和目标坐标的调试图像
 
 ## 定位原理
@@ -37,7 +37,7 @@ rosrun image_view image_view image:=/sorting/debug_image
 ```
 
 ROS Melodic 默认使用 Python 2，运行环境需要安装 `python-opencv`、`python-numpy`
-和 `ros-melodic-cv-bridge`。添加或修改本功能包的自定义消息后，必须重新执行
+和 `ros-melodic-cv-bridge`。修改 `aubo_perception` 的自定义消息后，必须重新执行
 `catkin_make` 并重新加载 `devel/setup.bash`。
 
 ## 参数调整

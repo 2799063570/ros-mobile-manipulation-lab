@@ -20,8 +20,12 @@ find_package(Threads REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(orocos_kdl REQUIRED)
 
-set(AUBO_SDK_ROOT "${PROJECT_SOURCE_DIR}/../aubo_sdk")
-set(AUBO_SDK_INCLUDE_DIR "${AUBO_SDK_ROOT}/include/aubo_driver")
+# aubo_sdk exports its source/install resource root through a catkin CMake
+# extra, so this package no longer depends on a particular directory layout.
+if(NOT AUBO_SDK_RESOURCE_ROOT)
+  message(FATAL_ERROR "aubo_sdk did not export AUBO_SDK_RESOURCE_ROOT")
+endif()
+set(AUBO_SDK_ROOT "${AUBO_SDK_RESOURCE_ROOT}")
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
   set(AUBO_SDK_LIB "${AUBO_SDK_ROOT}/lib/lib64/aubocontroller/libauborobotcontroller.so")
   set(AUBO_SDK_RUNTIME_DIRS
@@ -56,8 +60,7 @@ add_library(${PROJECT_NAME} src/aubo_hardware_interface.cpp)
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_14)
 target_include_directories(${PROJECT_NAME} PUBLIC
   include
-  ${catkin_INCLUDE_DIRS}
-  ${AUBO_SDK_INCLUDE_DIR})
+  ${catkin_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}
   ${AUBO_SDK_LIB}
@@ -80,7 +83,6 @@ target_compile_features(eye_in_hand_visual_servo_node PRIVATE cxx_std_14)
 target_include_directories(eye_in_hand_visual_servo_node PRIVATE
   include
   ${catkin_INCLUDE_DIRS}
-  ${AUBO_SDK_INCLUDE_DIR}
   ${orocos_kdl_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR})

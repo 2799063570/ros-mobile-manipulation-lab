@@ -1,0 +1,45 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- mode: robot | navigation | sorting | mission -->
+  <arg name="mode" default="sorting"/>
+  <arg name="gui" default="true"/>
+  <arg name="rviz" default="true"/>
+  <arg name="debug_view" default="false"/>
+  <arg name="paused" default="false"/>
+  <arg name="auto_start" default="false"/>
+
+  <group if="$(eval arg('mode') == 'robot')">
+    <include file="$(find aubo_mobile_robot)/launch/gazebo.launch">
+      <arg name="gui" value="$(arg gui)"/>
+      <arg name="paused" value="$(arg paused)"/>
+    </include>
+  </group>
+
+  <group if="$(eval arg('mode') == 'navigation')">
+    <include file="$(find aubo_mobile_navigation)/launch/navigation_gazebo.launch">
+      <arg name="gui" value="$(arg gui)"/>
+      <arg name="rviz" value="$(arg rviz)"/>
+      <arg name="paused" value="$(arg paused)"/>
+    </include>
+  </group>
+
+  <group if="$(eval arg('mode') == 'sorting')">
+    <include file="$(find aubo_mobile_sorting)/launch/sorting_gazebo.launch">
+      <arg name="gui" value="$(arg gui)"/>
+      <arg name="rviz" value="$(arg rviz)"/>
+      <arg name="debug_view" value="$(arg debug_view)"/>
+      <arg name="paused" value="$(arg paused)"/>
+      <arg name="auto_start" value="$(arg auto_start)"/>
+    </include>
+  </group>
+
+  <group if="$(eval arg('mode') == 'mission')">
+    <include file="$(find aubo_mobile_nav_sorting)/launch/mission_gazebo.launch">
+      <arg name="gui" value="$(arg gui)"/>
+      <arg name="rviz" value="$(arg rviz)"/>
+      <arg name="debug_view" value="$(arg debug_view)"/>
+      <arg name="paused" value="$(arg paused)"/>
+      <arg name="auto_start" value="$(arg auto_start)"/>
+    </include>
+  </group>
+</launch>

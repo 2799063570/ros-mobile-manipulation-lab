@@ -68,6 +68,9 @@ aubo_mobile_robot
 - `aubo_moveit_config`：MoveIt 运动规划配置；
 - `aubo_planning`：夹爪控制、抓取和放置示例；
 - `aubo_color_sorting`：固定底座机械臂的腕部相机颜色识别、抓取和分类放置；
+- `aubo_perception`：固定和移动平台共用的视觉消息与颜色检测；
+- `aubo_sorting_core`：固定和移动平台共用的 MoveIt 分拣状态机；
+- `aubo_gazebo_plugins`：仿真场景共用的抓取辅助插件；
 - `aubo_sdk`：AUBO 官方 SDK 头文件、运行库、只读连接测试和受保护运动示例；
 - `aubo_ros_control`：真实机械臂 `RobotHW` 接口、轨迹控制器及 MoveIt 实机启动入口。
 
@@ -83,8 +86,9 @@ aubo_mobile_robot
 | `aubo_mobile_robot` | 复合机器人 Xacro、Gazebo 场景、传感器和控制器 |
 | `aubo_mobile_moveit_config` | 移动机械臂的 MoveIt 规划配置 |
 | `aubo_mobile_navigation` | 双雷达融合、GMapping、AMCL 和 `move_base` |
+| `aubo_mobile_bringup` | 机器人、导航、分拣和完整任务的统一启动入口 |
 | `aubo_mobile_control` | 底盘键盘控制及导航/机械臂顺序协调 |
-| `aubo_mobile_perception` | 基于手部 RGB 相机和 OpenCV 的颜色目标定位 |
+| `aubo_mobile_perception` | 移动平台的视觉参数与启动入口（算法复用 `aubo_perception`） |
 | `aubo_mobile_sorting` | 红、绿、蓝方块的视觉抓取与分类放置 |
 | `aubo_mobile_nav_sorting` | 导航到工位后执行自动分拣的完整任务编排 |
 

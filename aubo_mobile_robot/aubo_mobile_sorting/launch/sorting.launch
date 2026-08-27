@@ -13,7 +13,7 @@
     <include file="$(find aubo_mobile_perception)/launch/color_detector.launch"/>
   </group>
 
-  <node if="$(arg start_task)" pkg="aubo_mobile_sorting" type="color_sorting_task.py"
+  <node if="$(arg start_task)" pkg="aubo_sorting_core" type="color_sorting_task.py"
         name="color_sorting_task" output="screen">
     <rosparam file="$(arg config)" command="load"/>
     <param name="auto_move_to_observation" value="$(arg auto_move_to_observation)"/>

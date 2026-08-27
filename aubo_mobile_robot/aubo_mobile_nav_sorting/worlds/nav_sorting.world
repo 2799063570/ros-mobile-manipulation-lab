@@ -2,7 +2,7 @@
 <sdf version="1.6">
   <world name="aubo_navigation_sorting">
     <plugin name="aubo_mobile_sorting_grasp"
-            filename="libaubo_mobile_sorting_grasp_plugin.so">
+            filename="libaubo_grasp_attach_plugin.so">
       <robot_model>aubo_mobile_robot</robot_model>
       <palm_link>wrist3_Link</palm_link>
       <object_link>block_link</object_link>

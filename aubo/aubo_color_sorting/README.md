@@ -59,6 +59,9 @@ roslaunch aubo_color_sorting sorting_gazebo.launch \
 | `/sorting/open_gripper` | 打开夹爪 |
 | `/sorting/home` | 回到 `down` 姿态 |
 
+`/sorting/detections` 的消息类型统一为 `aubo_perception/DetectedObjectArray`，固定与
+移动平台不再各自维护一套消息定义。
+
 颜色阈值、工作区和投影高度在 `config/colors.yaml` 中修改；抓取高度、放置点、速度
 和桌面碰撞体在 `config/sorting.yaml` 中修改。若调整桌面高度，必须同步修改这两个配置
 以及 `worlds/sorting.world`，避免视觉投影面、MoveIt 碰撞体和 Gazebo 实体不一致。

@@ -26,7 +26,7 @@ from std_srvs.srv import Trigger, TriggerResponse
 from tf.transformations import quaternion_from_euler
 from trajectory_msgs.msg import JointTrajectoryPoint
 
-from aubo_mobile_perception.msg import DetectedObjectArray
+from aubo_perception.msg import DetectedObjectArray
 
 
 class ColorSortingTask(object):

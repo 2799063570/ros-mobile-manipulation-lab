@@ -24,7 +24,11 @@ if(NOT EXISTS "${AUBO_SDK_CONTROLLER_LIB}")
   message(FATAL_ERROR "AUBO SDK library not found: ${AUBO_SDK_CONTROLLER_LIB}")
 endif()
 
-catkin_package(INCLUDE_DIRS include CATKIN_DEPENDS roslib)
+catkin_package(
+  INCLUDE_DIRS include
+  CATKIN_DEPENDS roslib
+  CFG_EXTRAS cmake/aubo_sdk-extras.cmake
+)
 file(MAKE_DIRECTORY "${PROJECT_SOURCE_DIR}/logfiles")
 
 function(add_aubo_sdk_demo target source)

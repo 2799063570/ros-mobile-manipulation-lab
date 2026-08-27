@@ -2,8 +2,8 @@
 <sdf version="1.6">
   <world name="aubo_color_sorting">
     <!-- Contact-assisted grasping for small blocks. -->
-    <plugin name="aubo_mobile_sorting_grasp"
-            filename="libaubo_mobile_sorting_grasp_plugin.so">
+    <plugin name="aubo_grasp_attach"
+            filename="libaubo_grasp_attach_plugin.so">
       <robot_model>aubo_mobile_robot</robot_model>
       <!-- wrist3_Link is guaranteed to survive URDF fixed-joint lumping; the
            fixed gripper base has the same pose in this model. -->

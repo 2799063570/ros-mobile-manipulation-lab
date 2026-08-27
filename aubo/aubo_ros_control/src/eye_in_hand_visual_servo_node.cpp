@@ -30,7 +30,7 @@
 #include <Eigen/Geometry>
 
 #include "AuboRobotMetaType.h"
-#include "serviceinterface.h"
+#include <aubo_driver/serviceinterface.h>
 
 #include <algorithm>
 #include <array>

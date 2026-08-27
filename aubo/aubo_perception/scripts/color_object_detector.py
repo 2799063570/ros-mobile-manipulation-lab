@@ -13,7 +13,7 @@ from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import CameraInfo, Image
 from tf.transformations import quaternion_matrix
 
-from aubo_color_sorting.msg import DetectedObject, DetectedObjectArray
+from aubo_perception.msg import DetectedObject, DetectedObjectArray
 
 
 class ColorObjectDetector(object):

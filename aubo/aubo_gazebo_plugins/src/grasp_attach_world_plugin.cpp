@@ -56,7 +56,7 @@ public:
 
     if (!ros::isInitialized())
     {
-      gzerr << "[aubo_color_sorting_grasp] ROS is not initialized. "
+      gzerr << "[aubo_grasp_attach] ROS is not initialized. "
             << "Launch Gazebo through gazebo_ros.\n";
       return;
     }

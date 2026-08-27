@@ -5,11 +5,11 @@
 
 ## 编译与启动
 
-感知包包含自定义消息，分拣包包含 RViz C++ 面板，因此修改后必须重新编译：
+通用感知包包含自定义消息，本包包含 RViz C++ 面板，因此修改后必须重新编译：
 
 ```bash
 catkin_make --force-cmake \
-  -DCATKIN_WHITELIST_PACKAGES="xf_mic_asr_offline_circle;aubo_mobile_perception;aubo_mobile_sorting" \
+  -DCATKIN_WHITELIST_PACKAGES="aubo_perception;aubo_sorting_core;aubo_gazebo_plugins;aubo_mobile_perception;aubo_mobile_sorting" \
   -j2
 source devel/setup.bash
 roslaunch aubo_mobile_sorting sorting_gazebo.launch
@@ -143,8 +143,8 @@ rosservice call /sorting/home
 
 ## Gazebo 抓取固定插件
 
-仅依赖摩擦力时，小尺寸方块可能在抬升瞬间丢失接触。包内提供
-`libaubo_mobile_sorting_grasp_plugin.so`：夹爪闭合后，分拣节点通过
+仅依赖摩擦力时，小尺寸方块可能在抬升瞬间丢失接触。通用插件包提供
+`libaubo_grasp_attach_plugin.so`：夹爪闭合后，分拣节点通过
 `/sorting/grasp/attach` 通知 Gazebo，在末端的 `wrist3_Link`（与固定夹爪基座同位姿）
 和对应颜色方块之间创建临时固定关节；到放置点张开夹爪后，再通过
 `/sorting/grasp/detach` 解除。插件状态
@@ -153,7 +153,7 @@ rosservice call /sorting/home
 这个插件不替代视觉定位或运动规划。只有机械臂已经移动到识别出的方块位置并完成
 夹爪闭合后才会固定方块，因此仍能暴露相机坐标或抓取位姿明显错误的问题。
 
-插件是本包的一部分，不需要安装第三方 link-attacher，但新增 C++ 库后必须重新运行
+插件由 `aubo_gazebo_plugins` 提供，不需要安装第三方 link-attacher；修改插件后必须重新运行
 `catkin_make --force-cmake` 并重新 `source devel/setup.bash`。如果插件没有成功加载，
 分拣节点会进入 `ERROR | Gazebo grasp plugin unavailable`，不会假装抓取成功。
 

@@ -5,7 +5,7 @@
   <arg name="detections_topic" default="/sorting/detections"/>
   <arg name="debug_image_topic" default="/sorting/debug_image"/>
 
-  <node pkg="aubo_mobile_perception" type="color_object_detector.py"
+  <node pkg="aubo_perception" type="color_object_detector.py"
         name="color_object_detector" output="screen">
     <rosparam file="$(find aubo_mobile_perception)/config/colors.yaml" command="load"/>
     <param name="image_topic" value="$(arg image_topic)"/>
