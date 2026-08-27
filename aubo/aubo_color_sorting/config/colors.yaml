@@ -19,6 +19,14 @@ max_contour_area: 8000.0
 max_aspect_ratio: 1.6
 morphology_kernel: 5
 
+# 使用对齐深度只提取方块顶面；这样画面两侧可见的侧面不会拉偏轮廓中心。
+use_depth: true
+max_depth_age: 0.25
+top_surface_tolerance: 0.008
+min_top_surface_points: 30
+# 用顶面点云 5%~95% 稳健边界的中点，降低边缘深度噪声影响。
+top_surface_percentile: 5.0
+
 # 所有高度均在 target_frame（base_link）下表达。
 target_frame: base_link
 table_z: 0.10

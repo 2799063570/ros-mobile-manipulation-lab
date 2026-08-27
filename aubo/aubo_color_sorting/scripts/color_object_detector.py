@@ -24,6 +24,9 @@ class ColorObjectDetector(object):
         self.camera_info_topic = rospy.get_param(
             "~camera_info_topic", "/camera/color/camera_info"
         )
+        self.depth_topic = rospy.get_param(
+            "~depth_topic", "/camera/aligned_depth_to_color/image_raw"
+        )
         self.detections_topic = rospy.get_param(
             "~detections_topic", "/sorting/detections"
         )
@@ -36,6 +39,17 @@ class ColorObjectDetector(object):
         self.max_aspect_ratio = float(rospy.get_param("~max_aspect_ratio", 1.6))
         self.position_offset_x = float(rospy.get_param("~position_offset_x", 0.0))
         self.position_offset_y = float(rospy.get_param("~position_offset_y", 0.0))
+        self.use_depth = bool(rospy.get_param("~use_depth", True))
+        self.max_depth_age = float(rospy.get_param("~max_depth_age", 0.25))
+        self.top_surface_tolerance = float(
+            rospy.get_param("~top_surface_tolerance", 0.008)
+        )
+        self.min_top_surface_points = int(
+            rospy.get_param("~min_top_surface_points", 30)
+        )
+        self.top_surface_percentile = float(
+            rospy.get_param("~top_surface_percentile", 5.0)
+        )
         self.kernel_size = int(rospy.get_param("~morphology_kernel", 5))
         self.target_frame = rospy.get_param("~target_frame", "base_link")
         self.table_z = float(rospy.get_param("~table_z", 0.10))
@@ -63,6 +77,8 @@ class ColorObjectDetector(object):
         self._bridge = CvBridge()
         self._listener = tf.TransformListener()
         self._camera_info = None
+        self._depth_image = None
+        self._depth_stamp = rospy.Time(0)
         self._lock = threading.Lock()
         self._kernel = np.ones((self.kernel_size, self.kernel_size), np.uint8)
 
@@ -75,6 +91,11 @@ class ColorObjectDetector(object):
         self._camera_info_subscriber = rospy.Subscriber(
             self.camera_info_topic, CameraInfo, self._camera_info_callback, queue_size=1
         )
+        self._depth_subscriber = None
+        if self.use_depth:
+            self._depth_subscriber = rospy.Subscriber(
+                self.depth_topic, Image, self._depth_callback, queue_size=1
+            )
         self._image_subscriber = rospy.Subscriber(
             self.image_topic, Image, self._image_callback, queue_size=1
         )
@@ -87,10 +108,35 @@ class ColorObjectDetector(object):
             self.object_center_z,
             self.target_frame,
         )
+        if self.use_depth:
+            rospy.loginfo(
+                "Top-surface depth refinement enabled: %s (z tolerance %.3f m)",
+                self.depth_topic,
+                self.top_surface_tolerance,
+            )
 
     def _camera_info_callback(self, message):
         with self._lock:
             self._camera_info = message
+
+    def _depth_callback(self, message):
+        try:
+            depth = self._bridge.imgmsg_to_cv2(message, "passthrough")
+        except CvBridgeError as error:
+            rospy.logwarn_throttle(5.0, "Cannot decode aligned depth image: %s", str(error))
+            return
+
+        depth = np.asarray(depth)
+        if depth.ndim != 2:
+            rospy.logwarn_throttle(5.0, "Aligned depth image is not single-channel")
+            return
+        if depth.dtype == np.uint16:
+            depth_metres = depth.astype(np.float32) * 0.001
+        else:
+            depth_metres = depth.astype(np.float32)
+        with self._lock:
+            self._depth_image = depth_metres
+            self._depth_stamp = message.header.stamp
 
     @staticmethod
     def _find_contours(mask):
@@ -128,6 +174,10 @@ class ColorObjectDetector(object):
             return None
 
         point = origin + scale * ray_target
+        return self._finalize_point(point)
+
+    def _finalize_point(self, point):
+        point = np.asarray(point, dtype=np.float64).copy()
         point[0] += self.position_offset_x
         point[1] += self.position_offset_y
         if not (self.min_x <= point[0] <= self.max_x):
@@ -138,6 +188,77 @@ class ColorObjectDetector(object):
         # centre height so the pose has an unambiguous geometric meaning.
         point[2] = self.object_center_z
         return point
+
+    def _depth_top_center(self, contour, color_mask, camera_info, transform, stamp):
+        """Return the centre of the visible horizontal top surface.
+
+        A colour contour contains both the top and side faces of a cube.  Its
+        2-D centroid therefore moves towards the visible side face away from
+        the optical axis.  Registered depth lets us discard those lower side
+        points before estimating the footprint centre.
+        """
+        if not self.use_depth:
+            return None
+        with self._lock:
+            depth_image = self._depth_image
+            depth_stamp = self._depth_stamp
+        if depth_image is None or depth_image.shape != color_mask.shape:
+            return None
+        if stamp != rospy.Time(0) and depth_stamp != rospy.Time(0):
+            if abs((stamp - depth_stamp).to_sec()) > self.max_depth_age:
+                return None
+
+        x, y, width, height = cv2.boundingRect(contour)
+        local_contour = contour.copy()
+        local_contour[:, 0, 0] -= x
+        local_contour[:, 0, 1] -= y
+        contour_mask = np.zeros((height, width), dtype=np.uint8)
+        cv2.drawContours(contour_mask, [local_contour], -1, 255, thickness=-1)
+        contour_mask = cv2.bitwise_and(
+            contour_mask, color_mask[y:y + height, x:x + width]
+        )
+
+        local_v, local_u = np.nonzero(contour_mask)
+        if local_u.size < self.min_top_surface_points:
+            return None
+        u = local_u + x
+        v = local_v + y
+        depth = depth_image[v, u]
+        valid = np.isfinite(depth) & (depth > 0.0)
+        if np.count_nonzero(valid) < self.min_top_surface_points:
+            return None
+        u = u[valid].astype(np.float64)
+        v = v[valid].astype(np.float64)
+        depth = depth[valid].astype(np.float64)
+
+        fx = float(camera_info.K[0])
+        fy = float(camera_info.K[4])
+        cx = float(camera_info.K[2])
+        cy = float(camera_info.K[5])
+        if fx <= 0.0 or fy <= 0.0:
+            return None
+        camera_points = np.vstack(
+            ((u - cx) * depth / fx, (v - cy) * depth / fy, depth)
+        )
+        translation, quaternion = transform
+        rotation = quaternion_matrix(quaternion)[0:3, 0:3]
+        target_points = np.dot(rotation, camera_points)
+        target_points += np.asarray(translation, dtype=np.float64).reshape(3, 1)
+
+        top = np.abs(target_points[2] - self.projection_plane_z)
+        top_points = target_points[:, top <= self.top_surface_tolerance]
+        if top_points.shape[1] < self.min_top_surface_points:
+            return None
+
+        # Midpoint of robust bounds is insensitive to perspective-dependent
+        # pixel density and to a few noisy depth samples near cube edges.
+        percentile = min(max(self.top_surface_percentile, 0.0), 49.0)
+        x_bounds = np.percentile(top_points[0], [percentile, 100.0 - percentile])
+        y_bounds = np.percentile(top_points[1], [percentile, 100.0 - percentile])
+        point = np.array(
+            [0.5 * np.sum(x_bounds), 0.5 * np.sum(y_bounds), self.object_center_z]
+        )
+        return self._finalize_point(point)
 
     def _mask_for_color(self, hsv_image, color_config):
         combined = np.zeros(hsv_image.shape[:2], dtype=np.uint8)
@@ -188,9 +309,14 @@ class ColorObjectDetector(object):
                     continue
                 pixel_x = int(moments["m10"] / moments["m00"])
                 pixel_y = int(moments["m01"] / moments["m00"])
-                point = self._pixel_to_table(
-                    pixel_x, pixel_y, camera_info, transform
+                point = self._depth_top_center(
+                    contour, mask, camera_info, transform, image_message.header.stamp
                 )
+                used_depth = point is not None
+                if point is None:
+                    point = self._pixel_to_table(
+                        pixel_x, pixel_y, camera_info, transform
+                    )
                 if point is None:
                     continue
 
@@ -206,7 +332,10 @@ class ColorObjectDetector(object):
                 output.objects.append(detected)
 
                 cv2.rectangle(debug_image, (x, y), (x + width, y + height), draw_color, 2)
-                label = "{} ({:.2f}, {:.2f})".format(color_name, point[0], point[1])
+                source = "D" if used_depth else "R"
+                label = "{}-{} ({:.2f}, {:.2f})".format(
+                    color_name, source, point[0], point[1]
+                )
                 cv2.putText(
                     debug_image,
                     label,
