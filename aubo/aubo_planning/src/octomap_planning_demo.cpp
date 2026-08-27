@@ -41,6 +41,33 @@ bool waitFor(const std::atomic<bool>& condition, double timeout, const std::stri
   }
   return true;
 }
+
+bool moveToNamedTarget(moveit::planning_interface::MoveGroupInterface& arm,
+                       const std::string& target,
+                       int attempts)
+{
+  for (int attempt = 1; ros::ok() && attempt <= attempts; ++attempt)
+  {
+    arm.setStartStateToCurrentState();
+    if (!arm.setNamedTarget(target))
+    {
+      ROS_ERROR_STREAM("Unknown SRDF named pose: " << target);
+      return false;
+    }
+
+    ROS_INFO_STREAM("Moving to camera observation pose '" << target << "' (attempt "
+                                                            << attempt << '/' << attempts << ").");
+    const moveit::planning_interface::MoveItErrorCode result = arm.move();
+    if (result == moveit::planning_interface::MoveItErrorCode::SUCCESS)
+      return true;
+
+    ROS_WARN_STREAM("Observation move stopped with MoveIt code " << result.val
+                    << ". The depth camera may have revealed new geometry; "
+                       "waiting for the OctoMap update before replanning.");
+    ros::WallDuration(1.0).sleep();
+  }
+  return false;
+}
 }  // namespace
 
 int main(int argc, char** argv)
@@ -60,6 +87,7 @@ int main(int argc, char** argv)
   double planning_time;
   bool move_to_sensor_pose;
   bool execute;
+  int sensor_pose_attempts;
   private_nh.param<std::string>("group_name", group_name, "aubo_i5");
   private_nh.param<std::string>("sensor_pose", sensor_pose, "observe");
   private_nh.param<std::string>("target_pose", target_pose, "home");
@@ -71,6 +99,7 @@ int main(int argc, char** argv)
   private_nh.param("planning_time", planning_time, 15.0);
   private_nh.param("move_to_sensor_pose", move_to_sensor_pose, true);
   private_nh.param("execute", execute, false);
+  private_nh.param("sensor_pose_attempts", sensor_pose_attempts, 3);
 
   const ros::Subscriber cloud_subscriber =
       nh.subscribe(point_cloud_topic, 1, cloudCallback);
@@ -95,16 +124,10 @@ int main(int argc, char** argv)
 
   if (move_to_sensor_pose)
   {
-    ROS_INFO_STREAM("Moving to camera observation pose '" << sensor_pose << "'.");
-    if (!arm.setNamedTarget(sensor_pose))
+    if (!moveToNamedTarget(arm, sensor_pose, sensor_pose_attempts))
     {
-      ROS_ERROR_STREAM("Unknown SRDF named pose: " << sensor_pose);
-      return 2;
-    }
-    const moveit::planning_interface::MoveItErrorCode result = arm.move();
-    if (result != moveit::planning_interface::MoveItErrorCode::SUCCESS)
-    {
-      ROS_ERROR_STREAM("Could not reach camera observation pose; MoveIt code " << result.val << '.');
+      ROS_ERROR_STREAM("Could not reach camera observation pose after "
+                       << sensor_pose_attempts << " attempts.");
       return 3;
     }
   }

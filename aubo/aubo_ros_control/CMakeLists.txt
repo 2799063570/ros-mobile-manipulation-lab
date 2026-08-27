@@ -73,14 +73,20 @@ target_link_libraries(${PROJECT_NAME}
   Threads::Threads)
 set_target_properties(${PROJECT_NAME} PROPERTIES
   BUILD_RPATH "${AUBO_SDK_RUNTIME_DIRS}"
-  INSTALL_RPATH "${AUBO_SDK_LIBRARY_INSTALL_RPATH}")
+  INSTALL_RPATH "${AUBO_SDK_LIBRARY_INSTALL_RPATH}"
+  # libauborobotcontroller loads libconfig/log4cplus transitively.  GNU ld's
+  # default DT_RUNPATH is not used for those indirect dependencies, whereas
+  # DT_RPATH is.  Keep the SDK self-contained without requiring users to set
+  # LD_LIBRARY_PATH in their shell startup files.
+  LINK_FLAGS "-Wl,--disable-new-dtags")
 
 add_executable(aubo_hw_node src/aubo_hw_main.cpp)
 target_compile_features(aubo_hw_node PRIVATE cxx_std_14)
 target_link_libraries(aubo_hw_node ${PROJECT_NAME} ${catkin_LIBRARIES})
 set_target_properties(aubo_hw_node PROPERTIES
   BUILD_RPATH "${AUBO_SDK_RUNTIME_DIRS}"
-  INSTALL_RPATH "${AUBO_SDK_NODE_INSTALL_RPATH}")
+  INSTALL_RPATH "${AUBO_SDK_NODE_INSTALL_RPATH}"
+  LINK_FLAGS "-Wl,--disable-new-dtags")
 
 # Unified eye-in-hand visual-servo node.  The same kinematics, limiter and
 # bounded queue are used by the Gazebo and direct-SDK backends.
@@ -99,7 +105,8 @@ target_link_libraries(eye_in_hand_visual_servo_node
   Threads::Threads)
 set_target_properties(eye_in_hand_visual_servo_node PROPERTIES
   BUILD_RPATH "${AUBO_SDK_RUNTIME_DIRS}"
-  INSTALL_RPATH "${AUBO_SDK_NODE_INSTALL_RPATH}")
+  INSTALL_RPATH "${AUBO_SDK_NODE_INSTALL_RPATH}"
+  LINK_FLAGS "-Wl,--disable-new-dtags")
 
 add_library(aubo_visual_servo_panel
   include/aubo_ros_control/visual_servo_panel.h

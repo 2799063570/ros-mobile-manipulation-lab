@@ -20,13 +20,14 @@
 
     <model name="camera_discovered_obstacle">
       <static>true</static>
-      <!-- Offset from the named goal itself, but close enough to constrain
-           candidate swept volumes between observe and home. -->
-      <pose>0.60 0.10 0.30 0 0 0</pose>
+      <!-- Keep clearance from the gripper at the observe pose.  The previous
+           0.50 m-tall column ended only centimetres below Link1, so the live
+           map correctly invalidated the observation trajectory. -->
+      <pose>0.70 0.10 0.25 0 0 0</pose>
       <link name="link">
-        <collision name="collision"><geometry><box><size>0.12 0.24 0.50</size></box></geometry></collision>
+        <collision name="collision"><geometry><box><size>0.12 0.24 0.30</size></box></geometry></collision>
         <visual name="visual">
-          <geometry><box><size>0.12 0.24 0.50</size></box></geometry>
+          <geometry><box><size>0.12 0.24 0.30</size></box></geometry>
           <material><ambient>0.75 0.18 0.08 1</ambient><diffuse>0.95 0.25 0.08 1</diffuse></material>
         </visual>
       </link>

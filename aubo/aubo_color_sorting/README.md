@@ -105,6 +105,17 @@ roslaunch aubo_color_sorting sorting_gazebo.launch \
 `position_offset_x/y` 修正随画面位置增大的误差，因为固定偏移只能补偿所有目标
 方向和大小一致的误差。
 
+## 笛卡尔轨迹执行
+
+抓取下降和抬升使用笛卡尔路径。任务节点会对 `compute_cartesian_path` 生成的轨迹再次
+进行时间参数化，确保 `velocity_scaling` 和 `acceleration_scaling` 对这类轨迹同样
+生效。日志中的 `Retimed Cartesian path ...` 会显示重新定时后的执行时长。
+
+如果路径显示 `100%`，随后控制器报告 `GOAL_TOLERANCE_VIOLATED`，表示路径规划已经
+成功，但仿真关节没有在规定时间内稳定到终点，并非视觉代码中的深度有效值检查失败。
+仿真控制器的目标时间和关节容差位于 `aubo_gazebo/config/controllers.yaml`；修改后必须
+完整重启 Gazebo，使控制器重新加载参数。
+
 ## 接入真实机械臂
 
 真实机械臂由 `aubo_ros_control` 和真实相机驱动提供控制器、关节状态及相机话题后，
