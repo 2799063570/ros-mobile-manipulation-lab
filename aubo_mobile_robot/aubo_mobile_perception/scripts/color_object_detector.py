@@ -164,26 +164,27 @@ class ColorObjectDetector(object):
             rospy.logwarn_throttle(5.0, "Camera processing unavailable: %s", str(error))
             return
 
-        hsv_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2HSV)
+        hsv_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2HSV)  # 将BGR图像转换为HSV图像（H 色相 S 饱和度 V 亮度）
         debug_image = bgr_image.copy() # 复制一份图像用于调试显示
         output = DetectedObjectArray() # 创建一个检测到的目标数组
         output.header.stamp = image_message.header.stamp
         output.header.frame_id = self.target_frame
 
+        # 遍历每种颜色的配置，进行颜色检测
         for color_name, color_config in self.colors.items():
-            mask = self._mask_for_color(hsv_image, color_config)
+            mask = self._mask_for_color(hsv_image, color_config)    # 根据颜色配置生成掩码
             draw_color = tuple(int(value) for value in color_config.get("draw_bgr", [255, 255, 255]))
             for contour in self._find_contours(mask):
                 area = float(cv2.contourArea(contour))
-                if area < self.min_area or area > self.max_area:
+                if area < self.min_area or area > self.max_area:        # 过滤掉面积过小或过大的轮廓
                     continue
                 x, y, width, height = cv2.boundingRect(contour)
-                short_side = float(min(width, height))
+                short_side = float(min(width, height))          # 计算轮廓的短边长度
                 if short_side <= 0.0:
                     continue
-                if float(max(width, height)) / short_side > self.max_aspect_ratio:
+                if float(max(width, height)) / short_side > self.max_aspect_ratio:      # 过滤掉长宽比过大的轮廓
                     continue
-                moments = cv2.moments(contour)
+                moments = cv2.moments(contour)  # 计算轮廓的矩，moments["m00"]是轮廓的面积，moments["m10"]和moments["m01"]分别是轮廓的x和y方向的矩
                 if abs(moments["m00"]) < 1.0e-6:
                     continue
                 pixel_x = int(moments["m10"] / moments["m00"])
