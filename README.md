@@ -21,6 +21,16 @@ https://github.com/user-attachments/assets/b636e380-9148-4471-b0e5-202318e15bf4
 显示播放器，可点击链接打开或下载原视频。更多演示素材见
 [`aubo/video_or_img/`](aubo/video_or_img/README.md)。
 
+### 功能截图
+
+| 差速机器人 Gazebo 场景 | 建图、定位与导航 |
+| --- | --- |
+| ![差速机器人 Gazebo 场景](aubo/video_or_img/simple_diff_gazebo.png) | ![机器人建图与导航](aubo/video_or_img/mapping_nav.png) |
+
+| RRT 自主探索 | AUBO 视觉识别与三维定位 |
+| --- | --- |
+| ![RRT 自主探索轨迹](aubo/video_or_img/rrt_exploration_view.png) | ![AUBO OpenCV 目标识别](aubo/video_or_img/opencv_detector.png) |
+
 ## 项目演进路线
 
 ```text
@@ -56,7 +66,7 @@ aubo_mobile_robot
 这些包帮助我们理解了 `/cmd_vel`、里程计、TF、激光雷达、SLAM、AMCL、
 `move_base` 以及多机器人命名空间等 ROS 核心机制。
 
-### 2. 自研差速移动机器人
+### 2. 差速移动机器人
 
 `simple_diff_robot_gazebo` 是一个从模型开始搭建的简洁差速机器人，包含：
 
@@ -344,7 +354,7 @@ map → odom → base_footprint → base_link → AUBO links → tcp_link
 1. 阅读 `turn_on_wheeltec_robot` 和 `wheeltec_robot_rc`，理解真机启动与遥控接口。
 2. 运行 `wheeltec_robot_gazebo`，观察模型、传感器、TF、建图和导航的数据流。
 3. 学习 `simple_follower`、`wheeltec_multi` 和 `rrt_exploration` 的功能组织方式。
-4. 运行 `simple_diff_robot_gazebo`，从 Xacro、差速插件开始理解自研移动机器人。
+4. 运行 `simple_diff_robot_gazebo`，从 Xacro、差速插件开始理解差速移动机器人。
 5. 分别完成差速机器人的建图、地图保存、AMCL 定位、目标导航和自主探索。
 6. 学习 `aubo_description`、`aubo_gazebo` 和 `aubo_moveit_config`，理解机械臂模型、
    控制器、规划组、末端执行器和 Planning Scene。
@@ -369,7 +379,7 @@ map → odom → base_footprint → base_link → AUBO links → tcp_link
 
 ## 详细文档
 
-- [自研差速机器人](simple_diff_robot_gazebo/README.md)
+- [差速机器人模型与导航](simple_diff_robot_gazebo/README.md)
 - [AUBO 机械臂规划示例](aubo/aubo_planning/README.md)
 - [AUBO SDK 与真实机械臂控制](aubo/aubo_ros_control/README.md)
 - [AUBO 功能包分层说明](aubo/README.md)
@@ -410,7 +420,7 @@ map → odom → base_footprint → base_link → AUBO links → tcp_link
 
 - 感谢 **WheelTec ROS 工程及其开发团队**提供的移动机器人功能包与实践案例。
   本项目通过学习其中的底盘启动、遥控、传感器接入、Gazebo 仿真、跟随、多机器人、
-  建图、定位、导航和 RRT 探索等功能，逐步完成了自研差速机器人、AUBO 六轴机械臂
+  建图、定位、导航和 RRT 探索等功能，逐步完成了差速机器人、AUBO 六轴机械臂
   以及移动操作复合机器人的设计与集成。
 
 - 感谢 **ROS、Gazebo、MoveIt、Navigation Stack、GMapping、OpenCV** 等开源项目
