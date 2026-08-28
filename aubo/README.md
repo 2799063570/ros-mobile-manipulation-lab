@@ -5,7 +5,9 @@
 
 ## 演示素材
 
-[▶ 查看 AUBO 分拣流程演示（MP4，约 22.7 MB）](video_or_img/sorting_process.mp4)
+[▶ 预览 AUBO 分拣流程（MP4，约 3.9 MB）](video_or_img/preview.mp4)
+
+[下载高清版本（MP4，约 22.7 MB）](video_or_img/sorting_process.mp4)
 
 视频和后续截图统一收录在 [`video_or_img/`](video_or_img/README.md)，避免把演示素材
 散落到算法、驱动和平台配置包中。

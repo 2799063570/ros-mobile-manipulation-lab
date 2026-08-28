@@ -5,10 +5,13 @@
 
 ## 分拣流程
 
-[▶ 播放或下载 `sorting_process.mp4`（约 22.7 MB）](sorting_process.mp4)
+[▶ 在线预览 `preview.mp4`（约 3.9 MB）](preview.mp4)
+
+[下载高清版本 `sorting_process.mp4`（约 22.7 MB）](sorting_process.mp4)
 
 内容包括目标识别、机械臂运动规划、抓取以及分类放置流程。GitHub若未直接显示
-播放器，点击链接后可在浏览器中打开或下载观看。
+播放器，点击链接后可在浏览器中打开或下载观看。`preview.mp4`用于README和网页
+快速预览，`sorting_process.mp4`保留较高画质。
 
 ## 素材维护约定
 

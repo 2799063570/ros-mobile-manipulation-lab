@@ -5,7 +5,9 @@
 
 ## 演示视频
 
-[▶ 查看目标识别、规划、抓取与分类放置流程（MP4，约 22.7 MB）](../aubo/video_or_img/sorting_process.mp4)
+[▶ 预览目标识别、规划、抓取与分类放置流程（MP4，约 3.9 MB）](../aubo/video_or_img/preview.mp4)
+
+[下载高清版本（MP4，约 22.7 MB）](../aubo/video_or_img/sorting_process.mp4)
 
 GitHub 若未直接显示播放器，可点击链接打开或下载原视频。视频及后续演示素材统一
 保存在 [`aubo/video_or_img/`](../aubo/video_or_img/README.md)。

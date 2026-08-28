@@ -11,7 +11,9 @@
 
 ## 效果演示
 
-[▶ 查看分拣流程演示视频（MP4，约 22.7 MB）](../aubo/video_or_img/sorting_process.mp4)
+[▶ 预览分拣流程（MP4，约 3.9 MB）](../aubo/video_or_img/preview.mp4)
+
+[下载高清版本（MP4，约 22.7 MB）](../aubo/video_or_img/sorting_process.mp4)
 
 该视频用于展示目标识别、机械臂规划、抓取和分类放置的整体效果。它不能替代下面的
 点云、TF、OctoMap和仅规划安全检查。

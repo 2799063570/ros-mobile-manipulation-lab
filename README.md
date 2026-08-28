@@ -12,7 +12,9 @@
 
 ## 项目演示
 
-[▶ 查看 AUBO 复合机器人分拣流程演示（MP4，约 22.7 MB）](aubo/video_or_img/sorting_process.mp4)
+[▶ 预览 AUBO 复合机器人分拣流程（MP4，约 3.9 MB）](aubo/video_or_img/preview.mp4)
+
+[下载高清版本（MP4，约 22.7 MB）](aubo/video_or_img/sorting_process.mp4)
 
 视频展示了项目中的目标识别、机械臂规划、抓取与分类放置流程。GitHub 若未直接
 显示播放器，可点击链接打开或下载原视频。更多演示素材见
