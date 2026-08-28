@@ -14,6 +14,7 @@
 
 
 https://github.com/user-attachments/assets/b636e380-9148-4471-b0e5-202318e15bf4
+
 [下载高清版本（MP4，约 22.7 MB）](aubo/video_or_img/sorting_process.mp4)
 
 视频展示了项目中的目标识别、机械臂规划、抓取与分类放置流程。GitHub 若未直接
