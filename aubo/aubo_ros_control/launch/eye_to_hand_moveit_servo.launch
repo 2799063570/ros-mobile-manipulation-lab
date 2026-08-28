@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- move_group, robot_state_publisher and an eye-to-hand target frontend
+       must already be running.  Do not launch eye_in_hand_visual_servo_node. -->
+  <arg name="config" default="$(find aubo_ros_control)/config/eye_to_hand_moveit_servo.yaml"/>
+  <arg name="plan_only" default="true"/>
+  <arg name="start_enabled" default="false"/>
+  <node pkg="aubo_ros_control" type="eye_to_hand_moveit_servo_node.py"
+        name="eye_to_hand_moveit_servo" output="screen" required="true">
+    <rosparam file="$(arg config)" command="load"/>
+    <param name="plan_only" value="$(arg plan_only)"/>
+    <param name="start_enabled" value="$(arg start_enabled)"/>
+  </node>
+</launch>

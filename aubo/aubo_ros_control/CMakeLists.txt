@@ -128,6 +128,7 @@ install(DIRECTORY include/${PROJECT_NAME}/
   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION})
 catkin_install_python(PROGRAMS
   scripts/color_visual_target_node.py
+  scripts/eye_to_hand_moveit_servo_node.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 install(DIRECTORY config launch worlds

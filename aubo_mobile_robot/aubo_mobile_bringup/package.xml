@@ -9,7 +9,9 @@
   <exec_depend>aubo_mobile_control</exec_depend>
   <exec_depend>aubo_mobile_nav_sorting</exec_depend>
   <exec_depend>aubo_mobile_navigation</exec_depend>
+  <exec_depend>aubo_mobile_perception</exec_depend>
   <exec_depend>aubo_mobile_robot</exec_depend>
   <exec_depend>aubo_mobile_sorting</exec_depend>
+  <exec_depend>aubo_ros_control</exec_depend>
   <export/>
 </package>

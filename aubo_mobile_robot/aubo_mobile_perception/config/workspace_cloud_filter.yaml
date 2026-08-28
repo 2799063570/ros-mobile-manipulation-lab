@@ -1,0 +1,12 @@
+input: /workspace_camera/depth/color/points
+output: /workspace_camera/points_for_moveit
+target_frame: base_link
+minimum_range: 0.15
+maximum_range: 2.50
+transform_timeout: 0.10
+
+# The table is already represented as an exact PlanningScene box.  Remove its
+# measured surface and the 4 cm sorting blocks so they do not prevent approach;
+# obstacles rising above this thin layer remain in the OctoMap.
+ignored_box_min: [0.30, -0.70, -0.10]
+ignored_box_max: [1.20, 0.70, 0.21]

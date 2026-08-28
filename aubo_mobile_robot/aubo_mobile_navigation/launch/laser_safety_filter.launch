@@ -8,12 +8,14 @@
   <arg name="stop_distance" default="0.35"/>
   <arg name="reverse_stop_distance" default="0.35"/>
   <arg name="rotation_clearance" default="0.48"/>
+  <arg name="motion_lock_topic" default="/sorting/base_locked"/>
 
   <node pkg="aubo_mobile_navigation" type="laser_safety_filter.py"
         name="laser_safety_filter" output="screen">
     <param name="scan_topic" value="$(arg scan_topic)"/>
     <param name="input_cmd_vel" value="$(arg input_cmd_vel)"/>
     <param name="output_cmd_vel" value="$(arg output_cmd_vel)"/>
+    <param name="motion_lock_topic" value="$(arg motion_lock_topic)"/>
     <param name="robot_half_width" value="$(arg robot_half_width)"/>
     <param name="safety_margin" value="$(arg safety_margin)"/>
     <param name="stop_distance" value="$(arg stop_distance)"/>

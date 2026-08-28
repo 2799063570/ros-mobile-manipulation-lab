@@ -19,6 +19,9 @@
   <arg name="max_safe_path_cost" default="1"/>
   <arg name="jiggle_fraction" default="0.05" />
   <arg name="publish_monitored_planning_scene" default="true"/>
+  <!-- Occupancy sensing is independent of trajectory execution.  This allows
+       RViz planning-only validation with the live RGB-D OctoMap enabled. -->
+  <arg name="use_sensor_manager" default="false"/>
 
   <arg name="capabilities" default=""/>
   <arg name="disable_capabilities" default=""/>
@@ -60,7 +63,7 @@
   </include>
 
   <!-- Sensors Functionality -->
-  <include ns="move_group" file="$(find aubo_mobile_moveit_config)/launch/sensor_manager.launch.xml" if="$(arg allow_trajectory_execution)">
+  <include ns="move_group" file="$(find aubo_mobile_moveit_config)/launch/sensor_manager.launch.xml" if="$(arg use_sensor_manager)">
     <arg name="moveit_sensor_manager" value="aubo_mobile_robot" />
   </include>
 

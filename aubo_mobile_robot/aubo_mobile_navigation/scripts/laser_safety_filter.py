@@ -22,6 +22,9 @@ class LaserSafetyFilter(object):
         self.input_topic = rospy.get_param("~input_cmd_vel", "/cmd_vel_raw")
         self.output_topic = rospy.get_param("~output_cmd_vel", "/cmd_vel")
         self.blocked_topic = rospy.get_param("~blocked_topic", "~blocked")
+        self.motion_lock_topic = rospy.get_param(
+            "~motion_lock_topic", "/sorting/base_locked"
+        )
 
         self.robot_half_width = float(rospy.get_param("~robot_half_width", 0.30))
         self.safety_margin = float(rospy.get_param("~safety_margin", 0.12))
@@ -57,6 +60,7 @@ class LaserSafetyFilter(object):
         self._command = Twist()
         self._command_received = None
         self._last_blocked = None
+        self._motion_locked = False
 
         self._velocity_publisher = rospy.Publisher(
             self.output_topic, Twist, queue_size=3
@@ -69,6 +73,9 @@ class LaserSafetyFilter(object):
         )
         self._command_subscriber = rospy.Subscriber(
             self.input_topic, Twist, self._command_callback, queue_size=3
+        )
+        self._motion_lock_subscriber = rospy.Subscriber(
+            self.motion_lock_topic, Bool, self._motion_lock_callback, queue_size=1
         )
         self._timer = rospy.Timer(
             rospy.Duration(1.0 / self.publish_rate), self._publish_safe_command
@@ -91,6 +98,10 @@ class LaserSafetyFilter(object):
         with self._lock:
             self._command = command
             self._command_received = rospy.Time.now()
+
+    def _motion_lock_callback(self, message):
+        with self._lock:
+            self._motion_locked = bool(message.data)
 
     @staticmethod
     def _copy_twist(source):
@@ -178,6 +189,15 @@ class LaserSafetyFilter(object):
             scan_received = self._scan_received
             command = self._copy_twist(self._command)
             command_received = self._command_received
+            motion_locked = self._motion_locked
+
+        if motion_locked:
+            self._velocity_publisher.publish(Twist())
+            self._publish_blocked(True)
+            rospy.logwarn_throttle(
+                2.0, "Mobile base locked while the manipulator is operating"
+            )
+            return
 
         if command_received is None or (now - command_received).to_sec() > self.command_timeout:
             self._velocity_publisher.publish(Twist())

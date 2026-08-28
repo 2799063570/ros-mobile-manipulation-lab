@@ -2,15 +2,25 @@
 <launch>
   <!-- Robot, controllers and move_group must already be running. -->
   <arg name="start_perception" default="true"/>
+  <arg name="perception_mode" default="color"/>
   <arg name="start_task" default="true"/>
   <arg name="config" default="$(find aubo_mobile_sorting)/config/sorting.yaml"/>
   <arg name="debug_view" default="true"/>
   <arg name="auto_move_to_observation" default="true"/>
   <arg name="auto_start" default="false"/>
   <arg name="use_grasp_attachment" default="true"/>
+  <arg name="start_octomap_cloud_filter" default="true"/>
+
+  <include if="$(arg start_octomap_cloud_filter)"
+           file="$(find aubo_mobile_perception)/launch/workspace_cloud_filter.launch"/>
 
   <group if="$(arg start_perception)">
-    <include file="$(find aubo_mobile_perception)/launch/color_detector.launch"/>
+    <group if="$(eval arg('perception_mode') == 'color')">
+      <include file="$(find aubo_mobile_perception)/launch/color_detector.launch"/>
+    </group>
+    <group if="$(eval arg('perception_mode') == 'yolo')">
+      <include file="$(find aubo_mobile_perception)/launch/yolo_rgbd_detector.launch"/>
+    </group>
   </group>
 
   <node if="$(arg start_task)" pkg="aubo_sorting_core" type="color_sorting_task.py"
