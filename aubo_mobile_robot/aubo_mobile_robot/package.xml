@@ -2,7 +2,7 @@
 <package format="2">
   <name>aubo_mobile_robot</name>
   <version>0.1.0</version>
-  <description>A circular differential-drive mobile manipulator with an AUBO i5 arm, dual lidars, wrist RGB and chassis-mounted RGB-D cameras.</description>
+  <description>A circular differential-drive mobile manipulator with an AUBO i5 arm, dual lidars and a wrist RGB camera.</description>
 
   <maintainer email="wheeltec-client@todo.todo">wheeltec-client</maintainer>
   <license>MIT</license>

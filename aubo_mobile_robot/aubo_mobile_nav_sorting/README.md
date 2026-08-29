@@ -53,6 +53,10 @@ roslaunch aubo_mobile_bringup simulation.launch mode:=mission
 调试本场景时仍可直接运行
 `roslaunch aubo_mobile_nav_sorting mission_gazebo.launch`。
 
+该仿真场景在源方块正上方 `(x=2.82, y=0, z=2.0 m)` 单独加载一台垂直向下的
+RGB-D 相机。相机固定在场景中，不连接移动底盘，也不修改通用机器人 URDF；机器人
+导航时，相机通过 `map` 坐标系保持固定。
+
 系统稳定后执行：
 
 ```bash

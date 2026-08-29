@@ -21,11 +21,15 @@ roslaunch aubo_mobile_bringup simulation.launch mode:=sorting
 该启动文件会同时运行：
 
 - `worlds/sorting.world` 分拣场景和复合机器人
+- 场景固定的俯视 RGB-D 相机（位于源方块正上方 `z=2.0 m`）
 - AUBO 机械臂及夹爪轨迹控制器
 - 使用 Gazebo 真实控制器执行轨迹的 `move_group`
 - `aubo_perception` 提供的颜色识别和标注图像发布节点
 - `aubo_sorting_core` 提供的红、绿、蓝分拣状态机
 - 带“AUBO 视觉分拣”控制面板的 RViz 和图像调试窗口
+
+俯视 RGB-D 相机由 `sorting.world` 单独加载，不属于机器人 URDF，也没有连接到底盘
+的立柱。其光轴垂直向下，与桌面约相距 `1.55 m`，不会侵入机械臂工作空间。
 
 不需要图形窗口时可以执行：
 

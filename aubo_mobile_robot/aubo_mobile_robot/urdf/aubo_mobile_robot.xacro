@@ -7,8 +7,6 @@
   <xacro:arg name="standalone" default="false"/>
   <xacro:arg name="robot_namespace" default="/"/>
   <xacro:arg name="aubo_description_path" default="$(find aubo_description)"/>
-  <xacro:arg name="use_eye_to_hand_rgbd" default="true"/>
-  <xacro:arg name="simulate_eye_to_hand_rgbd" default="true"/>
 
   <!-- Mobile base geometry (metres, kilograms). -->
   <xacro:property name="base_radius" value="0.34"/>
@@ -165,7 +163,6 @@
   <!-- Reuse the original AUBO i5 and gripper models without duplicating meshes. -->
   <xacro:include filename="$(arg aubo_description_path)/urdf/arm.xacro"/>
   <xacro:include filename="$(arg aubo_description_path)/urdf/jiazhua.urdf"/>
-  <xacro:include filename="$(arg aubo_description_path)/urdf/sensors/eye_to_hand_rgbd.xacro"/>
 
   <joint name="aubo_base_joint" type="fixed">
     <parent link="arm_mount_link"/>
@@ -388,20 +385,6 @@
   <gazebo reference="hand_camera_mount_link">
     <material>Gazebo/Black</material>
   </gazebo>
-
-  <!-- Chassis-mounted eye-to-hand RGB-D camera.  The positive pitch aims the
-       sensor's local +X optical direction down toward the work surface. -->
-  <xacro:if value="$(arg use_eye_to_hand_rgbd)">
-    <xacro:eye_to_hand_rgbd
-      name="workspace_camera"
-      parent="mobile_base_link"
-      xyz="0.10 -0.25 0.12"
-      rpy="0 0.65 0"
-      simulate="$(arg simulate_eye_to_hand_rgbd)"
-      update_rate="15.0"
-      horizontal_fov="1.0472"
-      mast_height="0.70"/>
-  </xacro:if>
 
   <gazebo reference="mobile_base_link">
     <material>Gazebo/Blue</material>

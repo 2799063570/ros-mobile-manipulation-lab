@@ -9,5 +9,6 @@
   <build_depend>aubo_perception</build_depend>
   <build_export_depend>aubo_perception</build_export_depend>
   <exec_depend>aubo_perception</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
   <export/>
 </package>

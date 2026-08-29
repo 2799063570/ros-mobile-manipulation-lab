@@ -190,6 +190,7 @@
   },
   "active": "91d8cfefc3ce4327",
   "lastOpenFiles": [
+    "aubo_mobile_robot/aubo_mobile_perception/launch/static_workspace_camera_tf.launch",
     "aubo/video_or_img/readme/sorting_control.png",
     "aubo/video_or_img/readme/simple_diff_gazebo.png",
     "aubo/video_or_img/readme/rrt_exploration_view.png",
@@ -202,7 +203,6 @@
     "aubo/video_or_img/readme",
     "tools/create_readme_thumbnails.ps1",
     "aubo/video_or_img/object_detector.png",
-    "aubo/video_or_img/octmap.png",
     "aubo/video_or_img/preview.mp4",
     "aubo/video_or_img/README.md",
     "aubo_mobile_robot/aubo_mobile_navigation/scripts/__pycache__/laser_safety_filter.cpython-312.pyc",
