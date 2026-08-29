@@ -25,11 +25,15 @@ https://github.com/user-attachments/assets/b636e380-9148-4471-b0e5-202318e15bf4
 
 | 差速机器人 Gazebo 场景 | 建图、定位与导航 |
 | --- | --- |
-| ![差速机器人 Gazebo 场景](aubo/video_or_img/simple_diff_gazebo.png) | ![机器人建图与导航](aubo/video_or_img/mapping_nav.png) |
+| ![差速机器人 Gazebo 场景](aubo/video_or_img/readme/simple_diff_gazebo.png) | ![机器人建图与导航](aubo/video_or_img/readme/mapping_nav.png) |
 
 | RRT 自主探索 | AUBO 视觉识别与三维定位 |
 | --- | --- |
-| ![RRT 自主探索轨迹](aubo/video_or_img/rrt_exploration_view.png) | ![AUBO OpenCV 目标识别](aubo/video_or_img/opencv_detector.png) |
+| ![RRT 自主探索轨迹](aubo/video_or_img/readme/rrt_exploration_view.png) | ![AUBO OpenCV 目标识别](aubo/video_or_img/readme/opencv_detector.png) |
+
+| YOLO OBB 目标检测 | MoveIt OctoMap 环境建模 |
+| --- | --- |
+| ![YOLO OBB 目标检测和抓取参数](aubo/video_or_img/readme/object_detector.png) | ![MoveIt OctoMap 环境建模](aubo/video_or_img/readme/octmap.png) |
 
 ## 项目演进路线
 
