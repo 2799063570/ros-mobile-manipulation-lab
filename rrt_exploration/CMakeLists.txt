@@ -66,7 +66,7 @@ install(TARGETS
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
-install(PROGRAMS
+catkin_install_python(PROGRAMS
   scripts/assigner.py
   scripts/filter.py
   scripts/frontier_opencv_detector.py

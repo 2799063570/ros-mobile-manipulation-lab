@@ -249,7 +249,7 @@ target_link_libraries(slave_tf_listener_mecanum ${catkin_LIBRARIES})
 #############
 
 ## Mark executable scripts (Python etc.) for installation
-install(PROGRAMS
+catkin_install_python(PROGRAMS
   scripts/listen_tfodom.py
   scripts/send_tfodom.py
   scripts/set_pose.py

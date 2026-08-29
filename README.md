@@ -1,6 +1,6 @@
 # WheelTec 学习与 AUBO 复合机器人项目
 
-本仓库是一个基于 **ROS 1 Melodic + Gazebo Classic** 的机器人学习与开发项目。
+本仓库是一个兼容 **ROS 1 Melodic / Noetic + Gazebo Classic** 的机器人学习与开发项目。
 项目以 WheelTec ROS 功能包为参考，学习移动机器人的底盘驱动、遥控、仿真、建图、
 定位、导航、跟随和自主探索等实现方式；在此基础上，我们搭建了自己的差速移动
 机器人，并进一步加入 AUBO i5 六轴机械臂，最终形成可完成移动、视觉识别、抓取和
@@ -159,8 +159,7 @@ aubo_mobile_robot
 
 ## 运行环境
 
-- Ubuntu 18.04
-- ROS 1 Melodic
+- Ubuntu 18.04 + ROS 1 Melodic，或 Ubuntu 20.04 + ROS 1 Noetic
 - Gazebo Classic
 - Catkin 工作空间
 - MoveIt 1、Navigation Stack、GMapping、AMCL
@@ -184,8 +183,30 @@ source src/setup_ros.sh
 ```
 
 也可以在仓库的任意绝对路径下直接 `source` 该脚本；脚本会自动定位工作空间，
-依次加载 ROS Melodic 和工作空间的 `devel/setup.bash`。如果尚未编译，脚本会提示
-先运行 `catkin_make`。
+自动选择已安装的 ROS Noetic 或 Melodic，再加载工作空间的 `devel/setup.bash`。
+如果当前终端已经加载 ROS，则沿用 `ROS_DISTRO`；如果尚未编译，脚本会提示先运行
+`catkin_make`。
+
+需要手动选择版本时，使用 `WHEELTEC_ROS_DISTRO`：
+
+```bash
+# Ubuntu 18.04 / ROS Melodic
+export WHEELTEC_ROS_DISTRO=melodic
+source /opt/ros/melodic/setup.bash
+catkin_make
+source src/setup_ros.sh
+
+# Ubuntu 20.04 / ROS Noetic
+export WHEELTEC_ROS_DISTRO=noetic
+source /opt/ros/noetic/setup.bash
+catkin_make
+source src/setup_ros.sh
+```
+
+同一个构建目录不能在两个 ROS 版本之间直接复用。切换发行版后应清理原来的
+`build/` 和 `devel/`，或分别使用两个 Catkin 工作空间，并在未加载另一 ROS 版本
+的干净终端中操作。Noetic 会通过 Catkin 将
+本仓库安装的 Python 节点指向 Python 3；Melodic 则保留其默认 Python 配置。
 
 ## 快速开始
 

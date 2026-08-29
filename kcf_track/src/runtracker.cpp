@@ -3,7 +3,7 @@
 #include <sstream>
 #include <algorithm>
 #include <dirent.h>
-#include </usr/include/opencv2/highgui/highgui_c.h>
+#include <opencv2/highgui/highgui_c.h>
 
 #include <ros/ros.h>
 #include <image_transport/image_transport.h>

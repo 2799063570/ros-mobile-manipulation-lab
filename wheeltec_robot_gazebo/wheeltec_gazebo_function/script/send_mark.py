@@ -26,7 +26,7 @@ def pose_callback(msg):
                 ', z:'+str(markerArray.markers[index-1].pose.orientation.z)+
                 ', w:'+str(markerArray.markers[index-1].pose.orientation.w))   
 
-            if count>1: print 'Complete instructions!' #只有一个目标点不算巡航
+            if count>1: print('Complete instructions!') #只有一个目标点不算巡航
             index = 0;
             pose = PoseStamped()
             pose.header.frame_id = 'map'

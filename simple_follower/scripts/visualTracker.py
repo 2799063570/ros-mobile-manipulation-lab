@@ -138,7 +138,7 @@ class visualTracker:
 			# go threw all the contours. starting with the bigest one  抛出了所有的轮廓线。从最大的那个开始
 			contour = sorted(contours, key=cv2.contourArea, reverse=True)[0]
 			# get position of object for this contour 获取此轮廓的对象位置
-		 	pos = self.analyseContour(contour, depthFrame)# 对象中心位置 和 对应的距离
+			pos = self.analyseContour(contour, depthFrame)# 对象中心位置 和 对应的距离
 			# if it's the first one we found it will be the fall back for the next scan if we don't find a plausible one
 			#如果这是我们发现的第一个，如果我们找不到可信的，它将是下一次扫描的后备
 			if newPos is None:

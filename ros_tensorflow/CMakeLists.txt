@@ -198,3 +198,10 @@ include_directories(
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
+
+catkin_install_python(PROGRAMS
+  scripts/ros_tensorflow_classify.py
+  scripts/ros_tensorflow_detect.py
+  scripts/ros_tensorflow_mnist.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)

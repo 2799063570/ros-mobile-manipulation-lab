@@ -23,6 +23,12 @@
 #include <QVBoxLayout>
 #include <opencv2/opencv.hpp>
 
+#define WHEELTEC_REMOTE_ROS_SETUP \
+    "_ros_distro=${WHEELTEC_ROS_DISTRO:-${ROS_DISTRO:-}}; " \
+    "if [ -z \"$_ros_distro\" ]; then " \
+    "if [ -f /opt/ros/noetic/setup.bash ]; then _ros_distro=noetic; else _ros_distro=melodic; fi; fi; " \
+    "source /opt/ros/$_ros_distro/setup.bash\n"
+
 /*****************************************************************************
 ** Namespaces
 *****************************************************************************/
@@ -449,7 +455,7 @@ void qt_ros_test::MainWindow::on_pushButton_linefollower_clicked(bool checked)
     if(ui.pushButton_linefollower->isChecked())
     {
         _cmd->write("ssh -Y wheeltec@192.168.0.100\n"
-                    "source /opt/ros/melodic/setup.bash\n"
+                    WHEELTEC_REMOTE_ROS_SETUP
                     "source wheeltec_robot/devel/setup.bash\n"
                     "roslaunch simple_follower line_follower.launch\n");
         ui.checkBox__opencamera->setChecked(true);
@@ -533,7 +539,7 @@ void qt_ros_test::MainWindow::on_pushButton_xfmic_clicked(bool checked)
     if(ui.pushButton_xfmic->isChecked())
     {
         _cmd->write("ssh -Y wheeltec@192.168.0.100\n"
-                    "source /opt/ros/melodic/setup.bash\n"
+                    WHEELTEC_REMOTE_ROS_SETUP
                     "source wheeltec_robot/devel/setup.bash\n"
                     "roslaunch xf_mic_asr_offline base.launch\n");
         emit sigSend("roslaunch xf_mic_asr_offline mic_init.launch\n");
@@ -554,7 +560,7 @@ void qt_ros_test::MainWindow::on_pushButton_kcftrack_clicked(bool checked)
     if(ui.pushButton_kcftrack->isChecked())
     {
         _cmd->write("ssh -Y wheeltec@192.168.0.100\n"
-                    "source /opt/ros/melodic/setup.bash\n"
+                    WHEELTEC_REMOTE_ROS_SETUP
                     "source wheeltec_robot/devel/setup.bash\n"
                     "roslaunch kcf_track kcf_tracker.launch\n");
         ui.checkBox__opencamera->setChecked(true);
@@ -581,7 +587,7 @@ void qt_ros_test::MainWindow::on_pushButton_webusbcam_clicked(bool checked)
         QString strCmd = QString("roslaunch usb_cam usb_cam-test.launch\n");
         emit sigSend(strCmd);
         _cmd->write("ssh -Y wheeltec@192.168.0.100\n"
-                    "source /opt/ros/melodic/setup.bash\n"
+                    WHEELTEC_REMOTE_ROS_SETUP
                     "source wheeltec_robot/devel/setup.bash\n"
                     "rosrun web_video_server web_video_server\n");
         ui.checkBox__opencamera->setChecked(true);
@@ -603,7 +609,7 @@ void qt_ros_test::MainWindow::on_pushButton_arlabel_clicked(bool checked)
     if(ui.pushButton_arlabel->isChecked())
     {
         _cmd->write("ssh -Y wheeltec@192.168.0.100\n"
-                    "source /opt/ros/melodic/setup.bash\n"
+                    WHEELTEC_REMOTE_ROS_SETUP
                     "source wheeltec_robot/devel/setup.bash\n"
                     "roslaunch turn_on_wheeltec_robot ar_label.launch\n");
         ui.checkBox__opencamera->setChecked(true);
@@ -631,7 +637,7 @@ void qt_ros_test::MainWindow::on_pushButton_arfollower_clicked(bool checked)
     if(ui.pushButton_arfollower->isChecked())
     {
         _cmd->write("ssh -Y wheeltec@192.168.0.100\n"
-                    "source /opt/ros/melodic/setup.bash\n"
+                    WHEELTEC_REMOTE_ROS_SETUP
                     "source wheeltec_robot/devel/setup.bash\n"
                     "roslaunch simple_follower ar_follower.launch\n");
         ui.checkBox__opencamera->setChecked(true);
@@ -706,7 +712,7 @@ void qt_ros_test::MainWindow::on_pushButton_2dmapsave_clicked(bool checked)
     if(ui.pushButton_2dmapsave->isChecked())
     {
         _cmd->write("ssh -Y wheeltec@192.168.0.100\n"
-                    "source /opt/ros/melodic/setup.bash\n"
+                    WHEELTEC_REMOTE_ROS_SETUP
                     "source wheeltec_robot/devel/setup.bash\n"
                     "roslaunch turn_on_wheeltec_robot map_saver.launch\n");
         QEventLoop loop;
@@ -752,7 +758,7 @@ void qt_ros_test::MainWindow::on_pushButton_3dmap_clicked(bool checked)
     if(ui.pushButton_3dmap->isChecked())
     {
         _cmd->write("ssh -Y wheeltec@192.168.0.100\n"
-                    "source /opt/ros/melodic/setup.bash\n"
+                    WHEELTEC_REMOTE_ROS_SETUP
                     "source wheeltec_robot/devel/setup.bash\n"
                     "roslaunch turn_on_wheeltec_robot 3d_mapping.launch\n");
         ui.checkBox__opencamera->setChecked(true);
@@ -791,7 +797,7 @@ void qt_ros_test::MainWindow::on_pushButton_3dnav_clicked(bool checked)
     if(ui.pushButton_3dnav->isChecked())
     {
         _cmd->write("ssh -Y wheeltec@192.168.0.100\n"
-                    "source /opt/ros/melodic/setup.bash\n"
+                    WHEELTEC_REMOTE_ROS_SETUP
                     "source wheeltec_robot/devel/setup.bash\n"
                     "roslaunch turn_on_wheeltec_robot 3d_navigation.launch\n");
         emit sigSend("rosrun turn_on_wheeltec_robot send_mark.py\n");
@@ -829,7 +835,7 @@ void qt_ros_test::MainWindow::on_pushButton_pure3dmap_clicked(bool checked)
     if(ui.pushButton_pure3dmap->isChecked())
     {
         _cmd->write("ssh -Y wheeltec@192.168.0.100\n"
-                    "source /opt/ros/melodic/setup.bash\n"
+                    WHEELTEC_REMOTE_ROS_SETUP
                     "source wheeltec_robot/devel/setup.bash\n"
                     "roslaunch turn_on_wheeltec_robot pure3d_mapping.launch\n");
         ui.checkBox__opencamera->setChecked(true);
@@ -862,7 +868,7 @@ void qt_ros_test::MainWindow::on_pushButton_pure3dnav_clicked(bool checked)
     if(ui.pushButton_pure3dnav->isChecked())
     {
         _cmd->write("ssh -Y wheeltec@192.168.0.100\n"
-                    "source /opt/ros/melodic/setup.bash\n"
+                    WHEELTEC_REMOTE_ROS_SETUP
                     "source wheeltec_robot/devel/setup.bash\n"
                     "roslaunch turn_on_wheeltec_robot pure3d_navigation.launch\n");
         ui.checkBox__opencamera->setChecked(true);
@@ -958,7 +964,7 @@ void qt_ros_test::MainWindow::on_pushButton_moveitpick_clicked(bool checked)
     if(ui.pushButton_moveitpick->isChecked())
     {
         _cmd->write("ssh -Y wheeltec@192.168.0.100\n"
-                    "source /opt/ros/melodic/setup.bash\n"
+                    WHEELTEC_REMOTE_ROS_SETUP
                     "source wheeltec_arm/devel/setup.bash\n"
                     "roslaunch wheeltec_arm_pick test_param.launch\n");
         btn_disableall(true);
@@ -988,7 +994,7 @@ void qt_ros_test::MainWindow::on_pushButton_moveitpick_2_clicked(bool checked)
     if(ui.pushButton_moveitpick_2->isChecked())
     {
         _cmd->write("ssh -Y wheeltec@192.168.0.100\n"
-                    "source /opt/ros/melodic/setup.bash\n"
+                    WHEELTEC_REMOTE_ROS_SETUP
                     "source wheeltec_arm/devel/setup.bash\n"
                     "roslaunch wheeltec_arm_pick arm_pick_color.launch\n");
         btn_disableall(true);
@@ -1009,7 +1015,7 @@ void qt_ros_test::MainWindow::on_pushButton_moveitpick_2_clicked(bool checked)
 void qt_ros_test::MainWindow::on_pushButton_2_clicked(bool checked)
 {
     _cmd->write("ssh -Y wheeltec@192.168.0.100\n"
-                "source /opt/ros/melodic/setup.bash\n"
+                WHEELTEC_REMOTE_ROS_SETUP
                 "source wheeltec_arm/devel/setup.bash\n");
     _cmd->write(ui.lineEdit_cmd->text().toLocal8Bit()+"\n");
     ui.textEdit_cmd->append("\r\n");

@@ -208,3 +208,16 @@ include_directories(
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
+
+catkin_install_python(PROGRAMS
+  script/gazebo_odometry.py
+  script/send_mark.py
+  script/turtlebot_teleop_key.py
+  script/velocity_bridge/mini_4wd/Sub_cmd_vel_mini_4wd.py
+  script/velocity_bridge/mini_4wd/real_cmd_vel_mini_4wd.py
+  script/velocity_bridge/mini_akm/Sub_cmd_vel_mini_akm.py
+  script/velocity_bridge/mini_akm/real_cmd_vel_mini_akm.py
+  script/velocity_bridge/mini_mec/Sub_cmd_vel_mini_mec.py
+  script/velocity_bridge/mini_mec/real_cmd_vel_mini_mec.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)

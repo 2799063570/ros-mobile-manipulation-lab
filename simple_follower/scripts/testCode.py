@@ -97,7 +97,7 @@ class Test_PID:
 		assert_raises(TypeError, simplePID, [0,30],[0.8, 0.7, 0.1], 0.001, 0.0001)
 		assert_raises(TypeError, simplePID, [0,30],[0.8, 0.7], 0.001, 0.0001)
 		assert_raises(TypeError, simplePID, 0,[0.8, 0.7], 0.001, 0.0001)
-		assert_raises(TypeError, simplePID, 0, [0.8, 0.7], [0.001, 0.001], [0.0001, 0,0001])
+		assert_raises(TypeError, simplePID, 0, [0.8, 0.7], [0.001, 0.001], [0.0001, 0.0001])
 		_ =  simplePID([0,30],[0.8, 0.7], [0.001, 0.001], [0.0001, 0.0001])
 		_ =  simplePID([0,30],0.8, 0.001, 0.0001)
 		_ =  simplePID(0,0.8, 0.001, 0.0001)

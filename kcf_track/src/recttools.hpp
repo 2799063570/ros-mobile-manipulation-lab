@@ -37,7 +37,7 @@ the use of this software, even if advised of the possibility of such damage.
 
 //#include <cv.h>
 #include <math.h>
-#include "/usr/include/opencv2/imgproc/types_c.h"
+#include <opencv2/imgproc/types_c.h>
 #ifndef _OPENCV_RECTTOOLS_HPP_
 #define _OPENCV_RECTTOOLS_HPP_
 #endif

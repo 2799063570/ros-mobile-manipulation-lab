@@ -229,3 +229,10 @@ include_directories(
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
+
+catkin_install_python(PROGRAMS
+  scripts/drive_decision_node.py
+  scripts/drive_execution_node.py
+  scripts/no_map_action.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)

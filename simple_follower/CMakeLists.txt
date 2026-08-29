@@ -209,3 +209,13 @@ target_link_libraries(obs_avo ${catkin_LIBRARIES})
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
+
+catkin_install_python(PROGRAMS
+  scripts/ar_follow.py
+  scripts/laser_follow.py
+  scripts/laserTracker.py
+  scripts/line_follow.py
+  scripts/visual_follow.py
+  scripts/visualTracker.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)

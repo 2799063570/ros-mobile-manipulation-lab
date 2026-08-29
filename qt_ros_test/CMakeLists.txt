@@ -59,3 +59,8 @@ add_executable(qt_ros_test ${QT_SOURCES} ${QT_RESOURCES_CPP} ${QT_FORMS_HPP} ${Q
 target_link_libraries(qt_ros_test  ${QT_LIBRARIES} ${catkin_LIBRARIES} ${SSH_LIBRARIES} ${OpenCV_LIBRARIES})
 install(TARGETS qt_ros_test RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
+catkin_install_python(PROGRAMS
+  script/initssh.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+

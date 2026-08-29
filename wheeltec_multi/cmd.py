@@ -4,6 +4,11 @@ import paramiko
 import time
 import threading
 
+try:
+    console_input = raw_input
+except NameError:
+    console_input = input
+
 
 #修改此变量，将你目前要操作的车辆的ip地址输入进去
 ip = [
@@ -85,14 +90,14 @@ if __name__=="__main__":
         for i in range(len(ip)):
             ip_status.append("stop")
         print_allcar_status(ip,ip_status)
-        makesure = raw_input("1.请确认目前使用的主车ip及从车ip无误，有误请修改cmd.py文件的ip变量，并按回车键确认:")
+        makesure = console_input("1.请确认目前使用的主车ip及从车ip无误，有误请修改cmd.py文件的ip变量，并按回车键确认:")
         print("正在初始化中，请稍后......")
         control_allcar(len(ip),ip,"stop")
         print_allcar_status(ip,ip_status)
         while True:
             print("2.选择你要操作的小车，开启或者结束运行这辆小车的程序")
-            thiscarnub = input("请输入你要操作的小车编号数字，并按回车键确认（操作所有车开启或关闭程序可输入数字0）:")
-            cmd = raw_input("请输入open或者stop开始运行或者结束运行程序,并按回车键确认:")
+            thiscarnub = int(console_input("请输入你要操作的小车编号数字，并按回车键确认（操作所有车开启或关闭程序可输入数字0）:"))
+            cmd = console_input("请输入open或者stop开始运行或者结束运行程序,并按回车键确认:")
             if thiscarnub == 0:
                 control_allcar(len(ip),ip,cmd)
             else:

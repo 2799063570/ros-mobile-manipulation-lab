@@ -2,7 +2,11 @@
 # -*- coding: utf-8 -*-
 
 import rospy
-import thread, threading
+try:
+	import thread
+except ImportError:
+	import _thread as thread
+import threading
 import time
 import numpy as np
 from sensor_msgs.msg import Joy, LaserScan

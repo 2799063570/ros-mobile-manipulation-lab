@@ -12,5 +12,10 @@ catkin_package(
   DEPENDS
 )
 
+catkin_install_python(PROGRAMS
+  scripts/turtlebot_teleop_key.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
 
 
