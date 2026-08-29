@@ -5,7 +5,9 @@ control_link: tcp_link
 # The fixed-camera target is transformed to base_link. The TCP tracks this
 # offset point. The lateral component keeps the arm out of the camera-target
 # sight line; calibrate its sign and magnitude for the actual workcell.
-target_offset: [0.0, -0.08, 0.18]
+# Keep the TCP 10 cm above the detected target. This is a pre-grasp clearance,
+# not a contact command; lower it only after validating the table/target TF.
+target_offset: [0.0, -0.08, 0.10]
 desired_target_position: [0.0, 0.0, 0.0]
 # Disabled here: fixed-camera depth is not TCP-to-obstacle clearance.
 minimum_safe_target_distance: 0.0

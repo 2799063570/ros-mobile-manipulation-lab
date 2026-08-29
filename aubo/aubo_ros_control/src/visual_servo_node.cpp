@@ -579,6 +579,16 @@ private:
         !getSixValues(private_nh_, "joint_acceleration_limits", acceleration_limits_) ||
         !getSixValues(private_nh_, "open_posture", open_posture_))
       return false;
+    // Keep open_posture as a backwards-compatible fallback, but allow initial
+    // acquisition and loss recovery to use independently validated viewpoints.
+    initial_search_posture_ = open_posture_;
+    recovery_posture_ = open_posture_;
+    if (private_nh_.hasParam("initial_search_posture") &&
+        !getSixValues(private_nh_, "initial_search_posture", initial_search_posture_))
+      return false;
+    if (private_nh_.hasParam("recovery_posture") &&
+        !getSixValues(private_nh_, "recovery_posture", recovery_posture_))
+      return false;
 
     std::vector<double> desired_position, desired_rpy;
     if (!private_nh_.getParam("desired_target_position", desired_position) ||
@@ -895,8 +905,11 @@ private:
     else if (state == ServoState::SEARCH_INITIAL ||
              state == ServoState::SEARCH_RECOVERY)
     {
+      const JointPoint& search_posture =
+          state == ServoState::SEARCH_INITIAL ? initial_search_posture_
+                                              : recovery_posture_;
       for (std::size_t i = 0; i < kDof; ++i)
-        velocity(i) = clampValue(open_posture_gain_ * (open_posture_[i] - position[i]),
+        velocity(i) = clampValue(open_posture_gain_ * (search_posture[i] - position[i]),
                                  -search_velocity_limit_, search_velocity_limit_);
     }
     return velocity;
@@ -1045,7 +1058,8 @@ private:
   double feedback_blend_{0.02};
   bool use_orientation_control_{false}, initial_search_enabled_{false}, enabled_{false};
   JointPoint lower_limits_{}, upper_limits_{}, velocity_limits_{}, acceleration_limits_{};
-  JointPoint open_posture_{}, feedback_position_{}, command_position_{}, command_velocity_{};
+  JointPoint open_posture_{}, initial_search_posture_{}, recovery_posture_{};
+  JointPoint feedback_position_{}, command_position_{}, command_velocity_{};
   JointPoint backend_velocity_{}, last_output_{};
   Eigen::Vector3d desired_position_{Eigen::Vector3d::Zero()};
   Eigen::Vector3d target_offset_{Eigen::Vector3d::Zero()};

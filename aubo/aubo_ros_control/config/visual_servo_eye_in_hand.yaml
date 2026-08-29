@@ -13,5 +13,10 @@ use_orientation_control: false
 
 # Before the first detection, move toward a view-friendly posture. This is
 # disabled automatically by the operator when start_enabled is false.
+# FK check for the Gazebo workcell: at this zero posture the camera optical
+# axis is about 8.2 deg from the red target (the previous fallback was 93.4 deg
+# away and put the target behind the camera).
+initial_search_posture: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+recovery_posture: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
 initial_search_enabled: true
 loss_strategy: stop

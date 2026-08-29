@@ -64,8 +64,9 @@ roslaunch aubo_ros_control eye_to_hand_visual_servo_real.launch \
 
 ## 初始化、遮挡与目标丢失
 
-- 眼在手上在第一次看到目标前进入 `SEARCH_INITIAL`，缓慢移动到视野较好的
-  `open_posture`；目标出现后立即进入 `TRACKING`。
+- 眼在手上在第一次看到目标前进入 `SEARCH_INITIAL`，缓慢移动到经过相机光轴验证的
+  `initial_search_posture`；目标出现后立即进入 `TRACKING`。丢失后的可选恢复动作使用
+  独立的 `recovery_posture`，两者不再复用通用 `open_posture`。
 - 眼在手外不需要机械臂搜索。`target_offset` 默认包含横向避遮挡分量和抓取上方的
   高度分量，使机械臂尽量不挡住相机到目标的视线。实际工位必须标定方向和大小。
 - 两种模式都拒绝超时目标。状态依次可能为 `TRACKING`、`COAST`、

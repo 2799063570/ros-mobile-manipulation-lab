@@ -9,17 +9,17 @@ target_selection_topic: /visual_servo/target_selection
 perception_state_topic: /visual_servo/perception_state
 start_enabled: false
 target_label: red
-selection_policy: nearest
+selection_policy: image_center
 minimum_contour_area: 180.0
 maximum_contour_area: 50000.0
-maximum_aspect_ratio: 2.5
-minimum_fill_ratio: 0.55
+maximum_aspect_ratio: 1.5
+minimum_fill_ratio: 0.70
 image_border_margin: 4
 morphology_kernel: 5
 # The fixed-camera view can contain the arm along its lower edge. Adjust this
 # normalized rectangle after changing the camera pose.
 ignored_regions:
-  - {x_min: 0.0, y_min: 0.82, x_max: 1.0, y_max: 1.0}
+  - {x_min: 0.0, y_min: 0.65, x_max: 1.0, y_max: 1.0}
 depth_mask_erosion: 3
 minimum_depth: 0.15
 maximum_depth: 2.50
