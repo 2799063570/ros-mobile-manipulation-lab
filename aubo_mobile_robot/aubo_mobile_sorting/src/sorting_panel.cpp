@@ -20,7 +20,7 @@ SortingPanel::SortingPanel(QWidget* parent)
   , detections_label_(new QLabel(tr("红:0  绿:0  蓝:0")))
   , command_label_(new QLabel(tr("请先移动到观察位并确认图像")))
 {
-  QLabel* title = new QLabel(tr("AUBO 视觉分拣"));
+  QLabel* title = new QLabel(tr("AUBO 视觉分拣")); // 提高字号加粗
   QFont title_font = title->font();
   title_font.setBold(true);
   title_font.setPointSize(title_font.pointSize() + 2);
@@ -56,6 +56,7 @@ SortingPanel::SortingPanel(QWidget* parent)
   layout->addStretch();
   setLayout(layout);
 
+  // 五个按钮对应的服务请求
   observation_client_ = node_handle_.serviceClient<std_srvs::Trigger>(
       "/sorting/move_to_observation");
   start_client_ = node_handle_.serviceClient<std_srvs::Trigger>("/sorting/start");
@@ -65,7 +66,7 @@ SortingPanel::SortingPanel(QWidget* parent)
   home_client_ = node_handle_.serviceClient<std_srvs::Trigger>("/sorting/home");
 
   state_subscriber_ = node_handle_.subscribe(
-      "/sorting/state", 1, &SortingPanel::stateCallback, this);
+      "/sorting/state", 1, &SortingPanel::stateCallback, this);   // 订阅分拣的状态
   detections_subscriber_ = node_handle_.subscribe(
       "/sorting/detection_summary", 1, &SortingPanel::detectionsCallback, this);
 
@@ -73,13 +74,14 @@ SortingPanel::SortingPanel(QWidget* parent)
   connect(start_button, SIGNAL(clicked()), this, SLOT(startSorting()));
   connect(stop_button, SIGNAL(clicked()), this, SLOT(stopSorting()));
   connect(open_button, SIGNAL(clicked()), this, SLOT(openGripper()));
-  connect(home_button, SIGNAL(clicked()), this, SLOT(moveHome()));
+  connect(home_button, SIGNAL(clicked()), this, SLOT(moveHome())); // 五个按钮 和对应事件连接
   connect(this, SIGNAL(stateReceived(QString)), this, SLOT(showState(QString)),
           Qt::QueuedConnection);
   connect(this, SIGNAL(detectionsReceived(QString)), this,
           SLOT(showDetections(QString)), Qt::QueuedConnection);
 }
 
+// 想对应服务客户端 发起请求 
 void SortingPanel::callTrigger(ros::ServiceClient& client,
                                const QString& command_name)
 {
