@@ -173,10 +173,19 @@ aubo_mobile_robot
 cd ..
 rosdep install --from-paths src --ignore-src -r -y
 catkin_make
-source devel/setup.bash
+source src/setup_ros.sh
 ```
 
-每次打开新终端后都需要重新执行 `source devel/setup.bash`。
+仓库根目录提供了 `setup_ros.sh`，它只修改当前终端的环境，不会写入
+`~/.bashrc`。每次打开新终端后，在工作空间根目录执行：
+
+```bash
+source src/setup_ros.sh
+```
+
+也可以在仓库的任意绝对路径下直接 `source` 该脚本；脚本会自动定位工作空间，
+依次加载 ROS Melodic 和工作空间的 `devel/setup.bash`。如果尚未编译，脚本会提示
+先运行 `catkin_make`。
 
 ## 快速开始
 

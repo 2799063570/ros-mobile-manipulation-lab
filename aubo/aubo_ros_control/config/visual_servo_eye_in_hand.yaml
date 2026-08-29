@@ -4,6 +4,9 @@ control_link: camera_color_optical_frame
 
 # Desired observed-object pose in the moving camera optical frame.
 desired_target_position: [0.0, 0.0, 0.35]
+# Independent controller-side guard. A closer target latches HOLD even if a
+# different perception publisher bypasses the HSV detector.
+minimum_safe_target_distance: 0.22
 desired_target_rpy: [0.0, 0.0, 0.0]
 target_offset: [0.0, 0.0, 0.0]
 use_orientation_control: false
@@ -11,4 +14,4 @@ use_orientation_control: false
 # Before the first detection, move toward a view-friendly posture. This is
 # disabled automatically by the operator when start_enabled is false.
 initial_search_enabled: true
-loss_strategy: coast_then_open
+loss_strategy: stop

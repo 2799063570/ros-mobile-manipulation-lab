@@ -3,7 +3,7 @@
   <!-- Deprecated compatibility entry. Use eye_in_hand_visual_servo_real.launch. -->
   <arg name="robot_ip" default="192.168.1.2"/>
   <arg name="target_topic" default="/visual_servo/target_pose"/>
-  <arg name="loss_strategy" default="coast_then_open"/>
+  <arg name="loss_strategy" default="stop"/>
   <arg name="load_robot_description" default="true"/>
   <arg name="start_realsense" default="true"/>
   <arg name="start_perception" default="true"/>

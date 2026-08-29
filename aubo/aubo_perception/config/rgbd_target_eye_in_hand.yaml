@@ -12,13 +12,19 @@ perception_state_topic: /visual_servo/perception_state
 start_enabled: false
 
 target_label: red              # empty string accepts every configured color
-selection_policy: largest      # largest | image_center | nearest
+selection_policy: nearest      # largest | image_center | nearest
 minimum_contour_area: 180.0
 maximum_contour_area: 50000.0
 maximum_aspect_ratio: 2.5
+minimum_fill_ratio: 0.55       # reject irregular robot/link colour patches
+image_border_margin: 4         # reject contours touching an image edge
 morphology_kernel: 5
+# Normalized image coordinates. The wrist/arm occupies the lower part of the
+# hand-camera image; masked pixels are never allowed to become servo targets.
+ignored_regions:
+  - {x_min: 0.0, y_min: 0.82, x_max: 1.0, y_max: 1.0}
 depth_mask_erosion: 3
-minimum_depth: 0.10
+minimum_depth: 0.10            # sensor validity; controller owns the 0.22 m safety stop
 maximum_depth: 2.50
 depth_scale_16u: 0.001         # RealSense 16UC1 millimetres -> metres
 position_filter_alpha: 0.35    # 1.0=no filtering; lower values reduce depth jitter

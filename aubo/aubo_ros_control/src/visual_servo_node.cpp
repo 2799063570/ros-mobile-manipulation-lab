@@ -532,6 +532,8 @@ private:
     private_nh_.param<double>("dls_lambda", dls_lambda_, 0.04);
     private_nh_.param<double>("joint_limit_margin", joint_limit_margin_, 0.08);
     private_nh_.param<double>("target_timeout", target_timeout_, 0.2);
+    private_nh_.param<double>("minimum_safe_target_distance",
+                              minimum_safe_target_distance_, 0.0);
     private_nh_.param<double>("coast_duration", coast_duration_, 0.35);
     private_nh_.param<double>("coast_decay_time", coast_decay_time_, 0.18);
     private_nh_.param<double>("search_timeout", search_timeout_, 8.0);
@@ -558,6 +560,11 @@ private:
         loss_strategy_ != "coast_then_open")
     {
       ROS_ERROR("[visual_servo] loss_strategy 必须是 stop、coast 或 coast_then_open");
+      return false;
+    }
+    if (minimum_safe_target_distance_ < 0.0)
+    {
+      ROS_ERROR("[visual_servo] minimum_safe_target_distance 不能为负数");
       return false;
     }
 
@@ -677,6 +684,21 @@ private:
       ROS_WARN_THROTTLE(1.0, "[visual_servo] 忽略无效或位于相机后方的目标");
       return;
     }
+    if (servo_mode_ == "eye_in_hand" && minimum_safe_target_distance_ > 0.0 &&
+        control_target.pose.position.z < minimum_safe_target_distance_)
+    {
+      safety_stop_.store(true);
+      queue_.clear();
+      {
+        std::lock_guard<std::mutex> lock(target_mutex_);
+        have_target_ = false;
+      }
+      ROS_ERROR_THROTTLE(
+          1.0,
+          "[visual_servo] 目标距离 %.3f m 小于安全阈值 %.3f m，锁存停止；请排除危险后复位",
+          control_target.pose.position.z, minimum_safe_target_distance_);
+      return;
+    }
     const ros::Time now = ros::Time::now();
     ros::Time measurement_time = message->header.stamp.isZero() ? now : message->header.stamp;
     if (measurement_time > now)
@@ -692,6 +714,7 @@ private:
   {
     std::lock_guard<std::mutex> control_lock(control_mutex_);
     enabled_ = request.data;
+    safety_stop_.store(false);
     queue_.clear();
     last_tracking_velocity_.setZero();
     if (!enabled_)
@@ -719,6 +742,7 @@ private:
       have_ever_tracked_ = false;
     }
     queue_.clear();
+    safety_stop_.store(false);
     last_tracking_velocity_.setZero();
     transitionTo(enabled_ ? ServoState::WAITING : ServoState::DISABLED);
     response.success = true;
@@ -773,6 +797,8 @@ private:
   {
     if (!enabled_)
       return ServoState::DISABLED;
+    if (safety_stop_.load())
+      return ServoState::HOLD;
     if (fresh_target)
       return ServoState::TRACKING;
     if (!have_ever_tracked_)
@@ -1014,6 +1040,7 @@ private:
   double max_linear_velocity_{0.08}, max_angular_velocity_{0.2};
   double position_deadband_{0.004}, dls_lambda_{0.04}, joint_limit_margin_{0.08};
   double target_timeout_{0.2}, coast_duration_{0.35}, coast_decay_time_{0.18};
+  double minimum_safe_target_distance_{0.0};
   double search_timeout_{8.0}, open_posture_gain_{0.7}, search_velocity_limit_{0.2};
   double feedback_blend_{0.02};
   bool use_orientation_control_{false}, initial_search_enabled_{false}, enabled_{false};
@@ -1035,6 +1062,7 @@ private:
   ros::Time last_target_time_, last_joint_time_;
   bool have_target_{false}, have_joint_state_{false}, integrator_initialized_{false};
   bool have_ever_tracked_{false};
+  std::atomic<bool> safety_stop_{false};
   ServoState state_{ServoState::DISABLED};
 
   ros::Subscriber target_sub_, joint_sub_;

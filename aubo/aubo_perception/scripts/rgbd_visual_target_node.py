@@ -44,11 +44,33 @@ class HsvColorFrontend(object):
     """Current OpenCV frontend; replaceable by a YOLO frontend later."""
 
     def __init__(self, colors, kernel_size, minimum_area, maximum_area,
-                 maximum_aspect_ratio):
+                 maximum_aspect_ratio, minimum_fill_ratio,
+                 image_border_margin, ignored_regions):
         self.colors = colors
         self.minimum_area = minimum_area
         self.maximum_area = maximum_area
         self.maximum_aspect_ratio = maximum_aspect_ratio
+        self.minimum_fill_ratio = minimum_fill_ratio
+        self.image_border_margin = max(0, int(image_border_margin))
+        self.ignored_regions = []
+        for index, region in enumerate(ignored_regions):
+            try:
+                x_min = float(region["x_min"])
+                y_min = float(region["y_min"])
+                x_max = float(region["x_max"])
+                y_max = float(region["y_max"])
+            except (KeyError, TypeError, ValueError):
+                raise rospy.ROSInitException(
+                    "ignored_regions[{}] must contain numeric x_min, y_min, "
+                    "x_max and y_max".format(index)
+                )
+            if not (0.0 <= x_min < x_max <= 1.0 and
+                    0.0 <= y_min < y_max <= 1.0):
+                raise rospy.ROSInitException(
+                    "ignored_regions[{}] coordinates must satisfy "
+                    "0 <= min < max <= 1".format(index)
+                )
+            self.ignored_regions.append((x_min, y_min, x_max, y_max))
         kernel_size = max(1, int(kernel_size))
         if kernel_size % 2 == 0:
             kernel_size += 1
@@ -59,8 +81,22 @@ class HsvColorFrontend(object):
         result = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         return result[0] if len(result) == 2 else result[1]
 
+    def ignored_pixel_regions(self, image_shape):
+        height, width = image_shape[:2]
+        regions = []
+        for x_min, y_min, x_max, y_max in self.ignored_regions:
+            left = max(0, min(width, int(round(x_min * width))))
+            top = max(0, min(height, int(round(y_min * height))))
+            right = max(0, min(width, int(round(x_max * width))))
+            bottom = max(0, min(height, int(round(y_max * height))))
+            if right > left and bottom > top:
+                regions.append((left, top, right, bottom))
+        return regions
+
     def detect(self, bgr_image):
         hsv_image = cv2.cvtColor(bgr_image, cv2.COLOR_BGR2HSV)
+        image_height, image_width = hsv_image.shape[:2]
+        ignored_regions = self.ignored_pixel_regions(hsv_image.shape)
         candidates = []
         for label, configuration in self.colors.items():
             color_mask = np.zeros(hsv_image.shape[:2], dtype=np.uint8)
@@ -72,16 +108,26 @@ class HsvColorFrontend(object):
                 )
             color_mask = cv2.morphologyEx(color_mask, cv2.MORPH_OPEN, self.kernel)
             color_mask = cv2.morphologyEx(color_mask, cv2.MORPH_CLOSE, self.kernel)
+            for left, top, right, bottom in ignored_regions:
+                color_mask[top:bottom, left:right] = 0
 
             for contour in self._find_contours(color_mask):
                 area = float(cv2.contourArea(contour))
                 if area < self.minimum_area or area > self.maximum_area:
                     continue
                 x, y, width, height = cv2.boundingRect(contour)
+                margin = self.image_border_margin
+                if (x <= margin or y <= margin or
+                        x + width >= image_width - margin or
+                        y + height >= image_height - margin):
+                    continue
                 short_side = float(min(width, height))
                 if short_side <= 0.0:
                     continue
                 if float(max(width, height)) / short_side > self.maximum_aspect_ratio:
+                    continue
+                fill_ratio = area / float(width * height)
+                if fill_ratio < self.minimum_fill_ratio:
                     continue
                 moments = cv2.moments(contour)
                 if abs(moments["m00"]) < 1.0e-9:
@@ -155,6 +201,9 @@ class RgbdVisualTargetNode(object):
             float(rospy.get_param("~minimum_contour_area", 180.0)),
             float(rospy.get_param("~maximum_contour_area", 50000.0)),
             float(rospy.get_param("~maximum_aspect_ratio", 2.5)),
+            float(rospy.get_param("~minimum_fill_ratio", 0.55)),
+            int(rospy.get_param("~image_border_margin", 4)),
+            rospy.get_param("~ignored_regions", []),
         )
 
         self.bridge = CvBridge()
@@ -341,6 +390,23 @@ class RgbdVisualTargetNode(object):
             return filtered
 
     def _publish_debug(self, image, candidates, selected, header):
+        for left, top, right, bottom in self.frontend.ignored_pixel_regions(image.shape):
+            overlay = image.copy()
+            cv2.rectangle(overlay, (left, top), (right - 1, bottom - 1),
+                          (40, 40, 40), thickness=-1)
+            cv2.addWeighted(overlay, 0.70, image, 0.30, 0.0, image)
+            cv2.rectangle(image, (left, top), (right - 1, bottom - 1),
+                          (0, 165, 255), thickness=2)
+            cv2.putText(
+                image,
+                "ROBOT MASK",
+                (left + 8, min(bottom - 8, top + 22)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.55,
+                (0, 165, 255),
+                2,
+                cv2.LINE_AA,
+            )
         for candidate in candidates:
             x, y, width, height = cv2.boundingRect(candidate.contour)
             thickness = 3 if candidate is selected else 1
