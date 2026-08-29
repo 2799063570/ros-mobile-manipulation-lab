@@ -67,3 +67,15 @@ acceleration_scaling: 0.15
 # Navigation mission calls /sorting/home before move_base starts. Keep the arm
 # in its compact A-shaped configuration while travelling.
 finish_named_target: transport
+
+# Rebuild the chassis-frame occupancy map after every navigation leg and lock
+# the velocity output while MoveIt owns the manipulator workspace.
+require_octomap: true
+point_cloud_topic: /workspace_camera/points_for_moveit
+planning_scene_topic: /move_group/monitored_planning_scene
+clear_octomap_service: /clear_octomap
+octomap_wait_timeout: 30.0
+base_lock_topic: /sorting/base_locked
+failure_topic: /sorting/failure
+workspace_config_param: /sorting/workspace_config
+workspace_update_topic: /sorting/workspace_update

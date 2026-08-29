@@ -26,8 +26,9 @@ Gazebo 与真机共用视觉误差、雅可比逆解、限制器和目标丢失�
 
 `desired_target_position: [0, 0, 0.35]` 表示期望目标保持在图像中心前方 35 cm。目标必须来自实时观测，不能把旧位姿持续加新时间戳重新发布，否则节点无法判断目标已经丢失。
 
-状态话题为 `~state`，可能值：
+状态话题为 `/visual_servo/state`（同时保留 `~state` 兼容输出），可能值：
 
+- `DISABLED`：闭环未启动，机械臂保持当前位置。
 - `WAITING`：尚未见过目标，保持当前位置。
 - `TRACKING`：目标新鲜，进行视觉伺服。
 - `COAST`：目标刚丢失，短时保持原运动方向并指数衰减。
@@ -38,6 +39,23 @@ Gazebo 与真机共用视觉误差、雅可比逆解、限制器和目标丢失�
 
 ```bash
 roslaunch aubo_ros_control visual_servo_gazebo.launch
+```
+
+该命令会同时启动 RGB-D 颜色识别和带“AUBO 眼在手上视觉伺服”控制面板的
+RViz。为避免启动界面时机械臂立即运动，闭环默认处于 `DISABLED`：先在面板
+选择红、绿、蓝或任意目标，再点击“启动闭环跟踪”。“停止并保持”会先停控制器
+再停识别输出；“清除目标 / 重新搜索”会清除滤波历史和目标丢失状态机。
+无人值守测试可显式使用 `auto_start:=true rviz:=false`。
+
+流程控制接口为：
+
+```text
+/visual_servo/set_enabled              std_srvs/SetBool
+/visual_servo/reset                    std_srvs/Trigger
+/visual_servo/perception/set_enabled   std_srvs/SetBool
+/visual_servo/perception/reset         std_srvs/Trigger
+/visual_servo/target_selection         std_msgs/String (red/green/blue/any)
+/visual_servo/perception_state         std_msgs/String
 ```
 
 该启动文件加载六个 `position_controllers/JointPositionController`。视觉节点以 200 Hz 从缓冲队列取点，并分别向六个控制器持续发送位置指令。不要同时启动原有 `aubo_i5_controller`，因为它会争用相同的六个位置接口。
@@ -112,3 +130,25 @@ OpenCV 前端在颜色轮廓内部取有效深度中值并发布
 5. 丢失时间参数和现场验证后的 `open_posture`。
 
 姿态伺服默认关闭。只有当检测器的目标姿态稳定且方向定义明确时，才启用 `use_orientation_control`。
+
+## 7. 眼在手外控制
+
+`eye_to_hand_moveit_servo_node.py` 是与高速眼在手上 SDK 控制器隔离的低频 MoveIt
+PBVS实现。它把固定 RGB-D 相机给出的目标变换到机械臂基座坐标系，以限制步长反复
+规划 TCP 位置。配置默认 `plan_only: true`、`start_enabled: false`。
+
+完整 Gazebo 仿真入口为：
+
+```bash
+roslaunch aubo_ros_control eye_to_hand_visual_servo_gazebo.launch
+```
+
+该入口启动固定俯视 RGB-D 相机、红色目标、AUBO 轨迹控制器、MoveIt、颜色深度
+前端、眼在手外 PBVS 和 RViz。启动后在 RViz 的视觉伺服面板点击“启动闭环跟踪”；
+无人值守测试可显式传入 `auto_start:=true rviz:=false gui:=false`。
+
+仿真默认 `plan_only:=false`，因此启用闭环后会执行每个 MoveIt 小步；只检查规划而
+不驱动 Gazebo 时传入 `plan_only:=true`。固定相机使用 `/workspace_camera` 话题前缀。
+
+眼在手上与眼在手外节点共用 `/visual_servo/target_pose`、启停服务和状态话题，因此
+同一时刻只能启动一个控制节点。YOLO适配器也只负责发布目标，不直接下发关节命令。

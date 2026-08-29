@@ -12,6 +12,10 @@
   <arg name="goal_wait_timeout" default="0.0"/>
   <arg name="pre_navigation_target" default="down"/>
   <arg name="post_navigation_target" default="up"/>
+  <arg name="laser_safety" default="true"/>
+  <arg name="wait_for_camera" default="false"/>
+  <arg name="camera_topic" default="/hand_camera/image_raw"/>
+  <arg name="camera_timeout" default="5.0"/>
 
   <include file="$(find aubo_mobile_robot)/launch/gazebo.launch">
     <arg name="world" value="$(arg world)"/>
@@ -30,5 +34,9 @@
     <arg name="goal_wait_timeout" value="$(arg goal_wait_timeout)"/>
     <arg name="pre_navigation_target" value="$(arg pre_navigation_target)"/>
     <arg name="post_navigation_target" value="$(arg post_navigation_target)"/>
+    <arg name="laser_safety" value="$(arg laser_safety)"/>
+    <arg name="wait_for_camera" value="$(arg wait_for_camera)"/>
+    <arg name="camera_topic" value="$(arg camera_topic)"/>
+    <arg name="camera_timeout" value="$(arg camera_timeout)"/>
   </include>
 </launch>

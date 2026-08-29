@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.5)
 project(aubo_ros_control)
 
+set(CMAKE_AUTOMOC ON)
+
 find_package(catkin REQUIRED COMPONENTS
   aubo_sdk
   controller_manager
@@ -8,20 +10,28 @@ find_package(catkin REQUIRED COMPONENTS
   hardware_interface
   kdl_parser
   message_filters
+  pluginlib
   roscpp
   rospy
   roslib
   sensor_msgs
   std_msgs
+  std_srvs
   tf2_geometry_msgs
   tf2_ros
+  rviz
 )
 find_package(Threads REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(orocos_kdl REQUIRED)
+find_package(Qt5 REQUIRED COMPONENTS Widgets)
 
-set(AUBO_SDK_ROOT "${PROJECT_SOURCE_DIR}/../aubo_sdk")
-set(AUBO_SDK_INCLUDE_DIR "${AUBO_SDK_ROOT}/include/aubo_driver")
+# aubo_sdk exports its source/install resource root through a catkin CMake
+# extra, so this package no longer depends on a particular directory layout.
+if(NOT AUBO_SDK_RESOURCE_ROOT)
+  message(FATAL_ERROR "aubo_sdk did not export AUBO_SDK_RESOURCE_ROOT")
+endif()
+set(AUBO_SDK_ROOT "${AUBO_SDK_RESOURCE_ROOT}")
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
   set(AUBO_SDK_LIB "${AUBO_SDK_ROOT}/lib/lib64/aubocontroller/libauborobotcontroller.so")
   set(AUBO_SDK_RUNTIME_DIRS
@@ -45,10 +55,10 @@ endif()
 
 catkin_package(
   INCLUDE_DIRS include
-  LIBRARIES ${PROJECT_NAME}
+  LIBRARIES ${PROJECT_NAME} aubo_visual_servo_panel
   CATKIN_DEPENDS aubo_sdk controller_manager geometry_msgs hardware_interface
-    kdl_parser message_filters roscpp rospy roslib sensor_msgs std_msgs
-    tf2_geometry_msgs tf2_ros
+    kdl_parser message_filters pluginlib roscpp rospy roslib rviz sensor_msgs
+    std_msgs std_srvs tf2_geometry_msgs tf2_ros
   DEPENDS orocos_kdl
 )
 
@@ -56,22 +66,27 @@ add_library(${PROJECT_NAME} src/aubo_hardware_interface.cpp)
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_14)
 target_include_directories(${PROJECT_NAME} PUBLIC
   include
-  ${catkin_INCLUDE_DIRS}
-  ${AUBO_SDK_INCLUDE_DIR})
+  ${catkin_INCLUDE_DIRS})
 target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}
   ${AUBO_SDK_LIB}
   Threads::Threads)
 set_target_properties(${PROJECT_NAME} PROPERTIES
   BUILD_RPATH "${AUBO_SDK_RUNTIME_DIRS}"
-  INSTALL_RPATH "${AUBO_SDK_LIBRARY_INSTALL_RPATH}")
+  INSTALL_RPATH "${AUBO_SDK_LIBRARY_INSTALL_RPATH}"
+  # libauborobotcontroller loads libconfig/log4cplus transitively.  GNU ld's
+  # default DT_RUNPATH is not used for those indirect dependencies, whereas
+  # DT_RPATH is.  Keep the SDK self-contained without requiring users to set
+  # LD_LIBRARY_PATH in their shell startup files.
+  LINK_FLAGS "-Wl,--disable-new-dtags")
 
 add_executable(aubo_hw_node src/aubo_hw_main.cpp)
 target_compile_features(aubo_hw_node PRIVATE cxx_std_14)
 target_link_libraries(aubo_hw_node ${PROJECT_NAME} ${catkin_LIBRARIES})
 set_target_properties(aubo_hw_node PROPERTIES
   BUILD_RPATH "${AUBO_SDK_RUNTIME_DIRS}"
-  INSTALL_RPATH "${AUBO_SDK_NODE_INSTALL_RPATH}")
+  INSTALL_RPATH "${AUBO_SDK_NODE_INSTALL_RPATH}"
+  LINK_FLAGS "-Wl,--disable-new-dtags")
 
 # Unified eye-in-hand visual-servo node.  The same kinematics, limiter and
 # bounded queue are used by the Gazebo and direct-SDK backends.
@@ -80,7 +95,6 @@ target_compile_features(eye_in_hand_visual_servo_node PRIVATE cxx_std_14)
 target_include_directories(eye_in_hand_visual_servo_node PRIVATE
   include
   ${catkin_INCLUDE_DIRS}
-  ${AUBO_SDK_INCLUDE_DIR}
   ${orocos_kdl_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR})
@@ -91,9 +105,22 @@ target_link_libraries(eye_in_hand_visual_servo_node
   Threads::Threads)
 set_target_properties(eye_in_hand_visual_servo_node PROPERTIES
   BUILD_RPATH "${AUBO_SDK_RUNTIME_DIRS}"
-  INSTALL_RPATH "${AUBO_SDK_NODE_INSTALL_RPATH}")
+  INSTALL_RPATH "${AUBO_SDK_NODE_INSTALL_RPATH}"
+  LINK_FLAGS "-Wl,--disable-new-dtags")
+
+add_library(aubo_visual_servo_panel
+  include/aubo_ros_control/visual_servo_panel.h
+  src/visual_servo_panel.cpp)
+target_compile_features(aubo_visual_servo_panel PRIVATE cxx_std_14)
+target_include_directories(aubo_visual_servo_panel PRIVATE
+  include
+  ${catkin_INCLUDE_DIRS})
+target_link_libraries(aubo_visual_servo_panel
+  ${catkin_LIBRARIES}
+  Qt5::Widgets)
 
 install(TARGETS ${PROJECT_NAME} aubo_hw_node eye_in_hand_visual_servo_node
+                aubo_visual_servo_panel
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
@@ -101,9 +128,10 @@ install(DIRECTORY include/${PROJECT_NAME}/
   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION})
 catkin_install_python(PROGRAMS
   scripts/color_visual_target_node.py
+  scripts/eye_to_hand_moveit_servo_node.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 
 install(DIRECTORY config launch worlds
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
-install(FILES VISUAL_SERVO.md
+install(FILES VISUAL_SERVO.md plugin_description.xml
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})

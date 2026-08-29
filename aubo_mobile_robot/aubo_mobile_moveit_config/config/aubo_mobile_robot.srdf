@@ -63,6 +63,17 @@
         <joint name="wrist2_joint" value="1.8979" />
         <joint name="wrist3_joint" value="0" />
     </group_state>
+    <!-- Forward follower camera pose. It is based on the proven 'up' state;
+         only the shoulder yaw is corrected so the hand-camera optical axis is
+         aligned with mobile-base +X instead of looking about 19 degrees left. -->
+    <group_state name="follow_forward" group="aubo_i5">
+        <joint name="foreArm_joint" value="0.8566" />
+        <joint name="shoulder_joint" value="-0.3270" />
+        <joint name="upperArm_joint" value="-0.4535" />
+        <joint name="wrist1_joint" value="1.2597" />
+        <joint name="wrist2_joint" value="1.8979" />
+        <joint name="wrist3_joint" value="0" />
+    </group_state>
     <!-- Hand camera is centred above the sorting blocks and points down. -->
     <group_state name="observe" group="aubo_i5">
         <joint name="foreArm_joint" value="0.06780" />

@@ -19,6 +19,9 @@ max_contour_area: 8000.0
 max_aspect_ratio: 1.6
 morphology_kernel: 5
 
+# 移动平台当前只有 RGB 图像；共用检测器将使用平面投影定位。
+use_depth: false
+
 # 所有高度均在 target_frame（base_link）下表达。
 target_frame: base_link
 table_z: 0.14

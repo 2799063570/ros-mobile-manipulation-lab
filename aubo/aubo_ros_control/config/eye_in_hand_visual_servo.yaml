@@ -3,6 +3,9 @@
 base_link: base_link
 camera_link: camera_color_optical_frame
 target_topic: /visual_servo/target_pose
+state_topic: /visual_servo/state
+# Gazebo launch overrides this to false so the RViz panel controls first motion.
+start_enabled: true
 joint_states_topic: /joint_states
 control_rate: 100.0
 output_rate: 200.0

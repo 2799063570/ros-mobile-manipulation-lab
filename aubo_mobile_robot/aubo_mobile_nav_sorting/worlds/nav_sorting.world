@@ -2,7 +2,7 @@
 <sdf version="1.6">
   <world name="aubo_navigation_sorting">
     <plugin name="aubo_mobile_sorting_grasp"
-            filename="libaubo_mobile_sorting_grasp_plugin.so">
+            filename="libaubo_grasp_attach_plugin.so">
       <robot_model>aubo_mobile_robot</robot_model>
       <palm_link>wrist3_Link</palm_link>
       <object_link>block_link</object_link>
@@ -14,6 +14,44 @@
 
     <include><uri>model://ground_plane</uri></include>
     <include><uri>model://sun</uri></include>
+
+    <!-- This task owns its fixed overhead RGB-D camera.  It is centred above
+         the source blocks, with no physical connection to the mobile robot. -->
+    <model name="workspace_camera">
+      <static>true</static>
+      <pose>2.82 0 2.00 0 1.57079632679 0</pose>
+      <link name="workspace_camera_link">
+        <collision name="camera_body_collision">
+          <geometry><box><size>0.090 0.025 0.025</size></box></geometry>
+        </collision>
+        <visual name="camera_body_visual">
+          <geometry><box><size>0.090 0.025 0.025</size></box></geometry>
+          <material><ambient>0.55 0.58 0.62 1</ambient><diffuse>0.55 0.58 0.62 1</diffuse></material>
+        </visual>
+        <sensor type="depth" name="workspace_camera_rgbd">
+          <pose>0.045 0 0 0 0 0</pose>
+          <always_on>true</always_on>
+          <visualize>false</visualize>
+          <update_rate>15</update_rate>
+          <camera name="workspace_camera_sensor">
+            <horizontal_fov>1.308996939</horizontal_fov>
+            <image><width>640</width><height>480</height><format>R8G8B8</format></image>
+            <clip><near>0.15</near><far>3.0</far></clip>
+          </camera>
+          <plugin name="workspace_camera_gazebo_ros_openni" filename="libgazebo_ros_openni_kinect.so">
+            <cameraName>workspace_camera</cameraName>
+            <imageTopicName>color/image_raw</imageTopicName>
+            <cameraInfoTopicName>color/camera_info</cameraInfoTopicName>
+            <depthImageTopicName>aligned_depth_to_color/image_raw</depthImageTopicName>
+            <depthImageCameraInfoTopicName>aligned_depth_to_color/camera_info</depthImageCameraInfoTopicName>
+            <pointCloudTopicName>depth/color/points</pointCloudTopicName>
+            <frameName>workspace_camera_color_optical_frame</frameName>
+            <pointCloudCutoff>0.15</pointCloudCutoff>
+            <pointCloudCutoffMax>3.0</pointCloudCutoffMax>
+          </plugin>
+        </sensor>
+      </link>
+    </model>
 
     <!-- 10 x 6 m room. The robot starts at (-2.5, 0) and docks near (2.15, 0). -->
     <model name="boundary_walls">

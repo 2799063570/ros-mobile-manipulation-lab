@@ -1,0 +1,6 @@
+if(@DEVELSPACE@)
+  set(AUBO_SDK_RESOURCE_ROOT "@PROJECT_SOURCE_DIR@")
+else()
+  get_filename_component(
+    AUBO_SDK_RESOURCE_ROOT "${aubo_sdk_DIR}/.." ABSOLUTE)
+endif()

@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="start_robot" default="false"/>
+  <arg name="start_moveit" default="true"/>
+  <arg name="start_scan_merger" default="true"/>
+  <arg name="use_laser_safety" default="true"/>
+  <arg name="world" default="$(find aubo_mobile_robot)/worlds/empty.world"/>
+  <arg name="gui" default="true"/>
+
+  <include file="$(find aubo_mobile_follower)/launch/follower.launch">
+    <arg name="follower_type" value="laser_follower.py"/>
+    <arg name="arm_target" value="transport"/>
+    <arg name="wait_for_camera" value="false"/>
+    <arg name="start_robot" value="$(arg start_robot)"/>
+    <arg name="start_moveit" value="$(arg start_moveit)"/>
+    <arg name="start_scan_merger" value="$(arg start_scan_merger)"/>
+    <arg name="use_laser_safety" value="$(arg use_laser_safety)"/>
+    <arg name="world" value="$(arg world)"/>
+    <arg name="gui" value="$(arg gui)"/>
+  </include>
+</launch>

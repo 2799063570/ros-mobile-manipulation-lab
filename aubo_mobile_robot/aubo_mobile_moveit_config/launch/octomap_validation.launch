@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Safe validation entry: live robot state + point cloud + MoveIt planning,
+       but move_group is not allowed to execute any trajectory. -->
+  <arg name="use_rviz" default="true"/>
+  <arg name="load_robot_description" default="true"/>
+
+  <include file="$(find aubo_mobile_perception)/launch/workspace_cloud_filter.launch"/>
+
+  <include file="$(find aubo_mobile_moveit_config)/launch/move_group.launch">
+    <arg name="allow_trajectory_execution" value="false"/>
+    <arg name="fake_execution" value="false"/>
+    <arg name="load_robot_description" value="$(arg load_robot_description)"/>
+    <arg name="use_sensor_manager" value="true"/>
+  </include>
+
+  <include if="$(arg use_rviz)" file="$(find aubo_mobile_moveit_config)/launch/moveit_rviz.launch">
+    <arg name="rviz_config" value="$(find aubo_mobile_moveit_config)/launch/moveit.rviz"/>
+  </include>
+</launch>

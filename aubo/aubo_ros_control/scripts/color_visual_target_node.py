@@ -24,6 +24,7 @@ from cv_bridge import CvBridge, CvBridgeError
 from geometry_msgs.msg import PoseStamped
 from sensor_msgs.msg import CameraInfo, Image
 from std_msgs.msg import String
+from std_srvs.srv import SetBool, SetBoolResponse, Trigger, TriggerResponse
 
 
 class Candidate(object):
@@ -122,7 +123,14 @@ class ColorVisualTargetNode(object):
         self.target_label_topic = rospy.get_param(
             "~target_label_topic", "/visual_servo/target_label"
         )
+        self.target_selection_topic = rospy.get_param(
+            "~target_selection_topic", "/visual_servo/target_selection"
+        )
+        self.perception_state_topic = rospy.get_param(
+            "~perception_state_topic", "/visual_servo/perception_state"
+        )
         self.target_label = rospy.get_param("~target_label", "red")
+        self.enabled = bool(rospy.get_param("~start_enabled", False))
         self.selection_policy = rospy.get_param("~selection_policy", "largest")
         self.minimum_depth = float(rospy.get_param("~minimum_depth", 0.10))
         self.maximum_depth = float(rospy.get_param("~maximum_depth", 2.50))
@@ -150,6 +158,7 @@ class ColorVisualTargetNode(object):
         )
 
         self.bridge = CvBridge()
+        self.control_lock = threading.RLock()
         self.camera_info = None
         self.filtered_position = None
         self.filtered_label = None
@@ -169,6 +178,18 @@ class ColorVisualTargetNode(object):
         self.debug_publisher = rospy.Publisher(
             self.debug_image_topic, Image, queue_size=1
         )
+        self.state_publisher = rospy.Publisher(
+            self.perception_state_topic, String, queue_size=1, latch=True
+        )
+        self.selection_subscriber = rospy.Subscriber(
+            self.target_selection_topic, String, self._selection_callback, queue_size=1
+        )
+        self.enable_service = rospy.Service(
+            "/visual_servo/perception/set_enabled", SetBool, self._set_enabled
+        )
+        self.reset_service = rospy.Service(
+            "/visual_servo/perception/reset", Trigger, self._reset
+        )
         self.info_subscriber = rospy.Subscriber(
             self.camera_info_topic, CameraInfo, self._camera_info_callback, queue_size=1
         )
@@ -180,6 +201,7 @@ class ColorVisualTargetNode(object):
             self.sync_slop,
         )
         self.synchronizer.registerCallback(self._images_callback)
+        self._publish_state("SEARCHING" if self.enabled else "DISABLED")
 
         rospy.loginfo(
             "RGB-D color target: color=%s depth=%s -> %s (label='%s')",
@@ -188,6 +210,51 @@ class ColorVisualTargetNode(object):
             self.target_pose_topic,
             self.target_label or "*",
         )
+
+    def _publish_state(self, state, detail=""):
+        with self.control_lock:
+            label = self.target_label or "any"
+        fields = [state, label]
+        if detail:
+            fields.append(detail)
+        self.state_publisher.publish(String(data="|".join(fields)))
+
+    def _clear_filter(self):
+        with self.control_lock:
+            self.filtered_position = None
+            self.filtered_label = None
+            self.filtered_stamp = rospy.Time(0)
+
+    def _selection_callback(self, message):
+        requested = message.data.strip().lower()
+        if requested == "any":
+            requested = ""
+        if requested and requested not in self.frontend.colors:
+            rospy.logwarn("Ignoring unknown visual target label '%s'", requested)
+            return
+        with self.control_lock:
+            self.target_label = requested
+            self._clear_filter()
+            enabled = self.enabled
+        self._publish_state("SEARCHING" if enabled else "DISABLED")
+
+    def _set_enabled(self, request):
+        with self.control_lock:
+            self.enabled = bool(request.data)
+            self._clear_filter()
+            enabled = self.enabled
+        self._publish_state("SEARCHING" if enabled else "DISABLED")
+        return SetBoolResponse(
+            success=True,
+            message=("perception enabled" if enabled else "perception disabled"),
+        )
+
+    def _reset(self, _request):
+        with self.control_lock:
+            self._clear_filter()
+            enabled = self.enabled
+        self._publish_state("SEARCHING" if enabled else "DISABLED")
+        return TriggerResponse(success=True, message="perception filter reset")
 
     def _camera_info_callback(self, message):
         with self.camera_info_lock:
@@ -204,12 +271,17 @@ class ColorVisualTargetNode(object):
         mask = candidate.mask
         if self.depth_mask_erosion > 1:
             mask = cv2.erode(mask, self.depth_kernel, iterations=1)
-        valid = (
-            (mask > 0)
-            & np.isfinite(depth_metres)
-            & (depth_metres >= self.minimum_depth)
-            & (depth_metres <= self.maximum_depth)
-        )
+        finite = np.isfinite(depth_metres)
+        # Registered depth images legitimately contain NaN/Inf at holes and
+        # outside the sensor range.  NumPy evaluates every '&' operand (there
+        # is no short-circuit), so comparing those values can emit warnings
+        # even though the finite mask later rejects them.
+        with np.errstate(invalid="ignore"):
+            within_range = (
+                (depth_metres >= self.minimum_depth)
+                & (depth_metres <= self.maximum_depth)
+            )
+        valid = (mask > 0) & finite & within_range
         samples = depth_metres[valid]
         if samples.size < 5:
             return None
@@ -218,8 +290,10 @@ class ColorVisualTargetNode(object):
         return float(np.median(samples))
 
     def _select(self, candidates, image_shape):
-        if self.target_label:
-            candidates = [item for item in candidates if item.label == self.target_label]
+        with self.control_lock:
+            target_label = self.target_label
+        if target_label:
+            candidates = [item for item in candidates if item.label == target_label]
         candidates = [item for item in candidates if item.depth is not None]
         if not candidates:
             return None
@@ -248,22 +322,23 @@ class ColorVisualTargetNode(object):
         return ((pixel_x - cx) * z / fx, (pixel_y - cy) * z / fy, z)
 
     def _filter_position(self, position, label, stamp):
-        reset = (
-            self.filtered_position is None
-            or label != self.filtered_label
-            or (stamp - self.filtered_stamp).to_sec() > self.filter_reset_timeout
-            or stamp < self.filtered_stamp
-        )
-        raw = np.asarray(position, dtype=np.float64)
-        if reset:
-            filtered = raw
-        else:
-            alpha = self.position_filter_alpha
-            filtered = alpha * raw + (1.0 - alpha) * self.filtered_position
-        self.filtered_position = filtered
-        self.filtered_label = label
-        self.filtered_stamp = stamp
-        return filtered
+        with self.control_lock:
+            reset = (
+                self.filtered_position is None
+                or label != self.filtered_label
+                or (stamp - self.filtered_stamp).to_sec() > self.filter_reset_timeout
+                or stamp < self.filtered_stamp
+            )
+            raw = np.asarray(position, dtype=np.float64)
+            if reset:
+                filtered = raw
+            else:
+                alpha = self.position_filter_alpha
+                filtered = alpha * raw + (1.0 - alpha) * self.filtered_position
+            self.filtered_position = filtered
+            self.filtered_label = label
+            self.filtered_stamp = stamp
+            return filtered
 
     def _publish_debug(self, image, candidates, selected, header):
         for candidate in candidates:
@@ -321,7 +396,9 @@ class ColorVisualTargetNode(object):
             candidate.depth = self._candidate_depth(candidate, depth_metres)
         selected = self._select(candidates, bgr_image.shape)
 
-        if selected is not None:
+        with self.control_lock:
+            enabled = self.enabled
+        if enabled and selected is not None:
             position = self._project(selected, camera_info)
             if position is not None:
                 position = self._filter_position(
@@ -340,6 +417,12 @@ class ColorVisualTargetNode(object):
                 pose.pose.orientation.w = 1.0
                 self.pose_publisher.publish(pose)
                 self.label_publisher.publish(String(data=selected.label))
+                self._publish_state(
+                    "DETECTED",
+                    "x={:.3f},y={:.3f},z={:.3f}".format(*position),
+                )
+        elif enabled:
+            self._publish_state("SEARCHING")
         # Deliberately publish no pose when detection/depth is invalid. The
         # servo watchdog then enters its target-loss state machine.
         self._publish_debug(bgr_image.copy(), candidates, selected, color_message.header)

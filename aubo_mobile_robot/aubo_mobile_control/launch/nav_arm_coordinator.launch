@@ -13,6 +13,9 @@
   <arg name="post_navigation_target" default="up"/>
   <arg name="arm_target_type" default="named"/>
   <arg name="navigation_timeout" default="180.0"/>
+  <arg name="wait_for_camera" default="false"/>
+  <arg name="camera_topic" default="/hand_camera/image_raw"/>
+  <arg name="camera_timeout" default="5.0"/>
 
   <node pkg="aubo_mobile_control" type="nav_arm_coordinator.py"
         name="nav_arm_coordinator" output="screen">
@@ -30,8 +33,12 @@
     <param name="post_navigation_target" value="$(arg post_navigation_target)"/>
     <param name="arm_target_type" value="$(arg arm_target_type)"/>
     <param name="navigation_timeout" value="$(arg navigation_timeout)"/>
+    <param name="wait_for_camera" value="$(arg wait_for_camera)"/>
+    <param name="camera_topic" value="$(arg camera_topic)"/>
+    <param name="camera_timeout" value="$(arg camera_timeout)"/>
     <param name="startup_delay" value="2.0"/>
     <param name="arm_planning_time" value="10.0"/>
+    <param name="arm_goal_tolerance" value="0.01"/>
     <param name="velocity_scaling" value="0.20"/>
     <param name="acceleration_scaling" value="0.20"/>
   </node>

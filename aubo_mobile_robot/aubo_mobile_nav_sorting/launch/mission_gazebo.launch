@@ -20,6 +20,15 @@
     <arg name="z" value="0.02"/>
   </include>
 
+  <!-- nav_sorting.world owns a fixed camera above the sorting target.  map is
+       the stable scene frame while the robot navigates beneath it. -->
+  <include file="$(find aubo_mobile_perception)/launch/static_workspace_camera_tf.launch">
+    <arg name="parent_frame" value="map"/>
+    <arg name="x" value="2.82"/>
+    <arg name="y" value="0.0"/>
+    <arg name="z" value="2.0"/>
+  </include>
+
   <include file="$(find aubo_mobile_navigation)/launch/navigation.launch">
     <arg name="map_file" value="$(arg map_file)"/>
     <arg name="rviz" value="$(arg rviz)"/>
@@ -37,6 +46,7 @@
     <arg name="allow_trajectory_execution" value="true"/>
     <arg name="fake_execution" value="false"/>
     <arg name="load_robot_description" value="false"/>
+    <arg name="use_sensor_manager" value="true"/>
   </include>
 
   <include file="$(find aubo_mobile_sorting)/launch/sorting.launch">

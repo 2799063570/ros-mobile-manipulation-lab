@@ -10,6 +10,15 @@ aubo_i5_controller:
     - wrist1_joint
     - wrist2_joint
     - wrist3_joint
+  constraints:
+    goal_time: 2.0
+    stopped_velocity_tolerance: 0.05
+    shoulder_joint: {trajectory: 0.10, goal: 0.05}
+    upperArm_joint:  {trajectory: 0.10, goal: 0.05}
+    foreArm_joint:   {trajectory: 0.10, goal: 0.05}
+    wrist1_joint:    {trajectory: 0.10, goal: 0.05}
+    wrist2_joint:    {trajectory: 0.10, goal: 0.05}
+    wrist3_joint:    {trajectory: 0.10, goal: 0.05}
   gains:
     shoulder_joint:
       p: 100

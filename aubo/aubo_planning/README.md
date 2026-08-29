@@ -4,6 +4,52 @@
 
 - `gripper_control_demo`：按 MoveIt 命名状态执行夹爪打开、闭合或循环动作。
 - `pick_place_demo`：向 PlanningScene 加入工作台和物体，使用 MoveIt `pick()` / `place()` 完成抓取与放置。
+- `octomap_planning_demo`：等待深度点云生成非空 OctoMap，再进行带环境碰撞检测的机械臂规划。
+
+## 深度相机 OctoMap 避障示例
+
+完整 Gazebo 示例只需一个入口：
+
+```bash
+roslaunch aubo_planning octomap_planning_gazebo.launch
+```
+
+场景中的灰色工作台和橙色立柱没有通过代码直接加入 PlanningScene；它们只能由
+腕部深度相机的 `/camera/depth/color/points` 点云被 MoveIt 发现，并以 4 cm
+OctoMap 体素显示。程序先到 `observe` 相机观察位，确认收到点云和非空八叉树，
+然后规划到 `home`。如果运动过程中相机发现了新障碍并使当前轨迹失效，示例会
+等待地图更新并重新规划观察位，最多尝试 3 次。仿真默认执行轨迹；只看规划可使用：
+
+```bash
+roslaunch aubo_planning octomap_planning_gazebo.launch execute:=false
+```
+
+在 RViz 的 MotionPlanning 显示中勾选 `Scene Geometry`，即可看到八叉树障碍物。
+也可以用下面的命令检查数据链路：
+
+```bash
+rostopic hz /camera/depth/color/points
+rostopic echo -n 1 /move_group/filtered_cloud
+rosservice call /clear_octomap
+```
+
+### RealSense + 真机
+
+先启动相机，再让真机 MoveIt 加载 OctoMap 更新器。真实机械臂示例默认只规划，
+请先在 RViz 检查点云、TF、八叉树和轨迹，确认安全后才传入 `execute:=true`：
+
+```bash
+roslaunch realsense2_camera rs_camera.launch \
+  align_depth:=true enable_pointcloud:=true publish_tf:=false
+roslaunch aubo_ros_control aubo_real_bringup.launch \
+  robot_ip:=192.168.1.2 use_sensor_manager:=true
+roslaunch aubo_planning octomap_planning_demo.launch \
+  move_to_sensor_pose:=false execute:=false target_pose:=home
+```
+
+若相机驱动点云话题不是 `/camera/depth/color/points`，需要同时修改
+`aubo_moveit_config/config/sensors_3d.yaml` 的 `point_cloud_topic` 和示例 launch 的
+`point_cloud_topic` 参数。点云消息的 `frame_id` 必须能通过 TF 变换到 `base_link`。
 
 ## 编译
 

@@ -24,7 +24,8 @@ near_field_base_clearance: 0.40
 near_field_detector_workspace: [0.40, 0.82, -0.22, 0.22]
 near_field_camera_target: [0.62, 0.0]
 
-# 导航与任务容错。
+# 导航与任务容错。工位/预停靠位、安全间距、超时和重试可在 RViz 面板或
+# rqt_reconfigure 中在线修改；为保证整段任务参数一致，运行期间的修改会被拒绝。
 navigation_action: /move_base
 navigation_timeout: 180.0
 navigation_retries: 1

@@ -36,9 +36,9 @@
 #include <hardware_interface/robot_hw.h>
 
 // AUBO SDK
-#include "AuboRobotMetaType.h"
-#include "serviceinterface.h"
-#include "readerwriterqueue.h"   // 无锁单生产者-单消费者队列
+#include <aubo_driver/AuboRobotMetaType.h>
+#include <aubo_driver/serviceinterface.h>
+#include <aubo_driver/readerwriterqueue.h>   // 无锁单生产者-单消费者队列
 
 namespace aubo_ros_control
 {

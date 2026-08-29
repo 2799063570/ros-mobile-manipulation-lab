@@ -1,0 +1,7 @@
+<library path="lib/libaubo_mobile_nav_sorting_panel">
+  <class name="aubo_mobile_nav_sorting/NavSortingPanel"
+         type="aubo_mobile_nav_sorting::NavSortingPanel"
+         base_class_type="rviz::Panel">
+    <description>AUBO 导航抓取分拣总任务控制与在线调参面板。</description>
+  </class>
+</library>

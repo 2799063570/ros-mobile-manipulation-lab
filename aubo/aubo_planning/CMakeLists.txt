@@ -8,6 +8,7 @@ find_package(catkin REQUIRED COMPONENTS
   moveit_msgs
   moveit_ros_planning_interface
   roscpp
+  sensor_msgs
   shape_msgs
   tf2
   tf2_geometry_msgs
@@ -20,6 +21,7 @@ catkin_package(
     moveit_msgs
     moveit_ros_planning_interface
     roscpp
+    sensor_msgs
     shape_msgs
     tf2
     tf2_geometry_msgs
@@ -34,11 +36,18 @@ target_link_libraries(gripper_control_demo ${catkin_LIBRARIES})
 add_executable(pick_place_demo src/pick_place_demo.cpp)
 target_link_libraries(pick_place_demo ${catkin_LIBRARIES})
 
-install(TARGETS gripper_control_demo pick_place_demo
+add_executable(octomap_planning_demo src/octomap_planning_demo.cpp)
+target_link_libraries(octomap_planning_demo ${catkin_LIBRARIES})
+
+install(TARGETS gripper_control_demo pick_place_demo octomap_planning_demo
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
 install(DIRECTORY launch
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+)
+
+install(DIRECTORY worlds
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
 

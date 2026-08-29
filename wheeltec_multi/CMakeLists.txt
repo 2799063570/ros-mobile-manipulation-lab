@@ -65,6 +65,8 @@ find_package(catkin REQUIRED COMPONENTS
  add_message_files(
    FILES
    avoid.msg
+   LeaderState.msg
+   FormationStatus.msg
  )
 
   generate_messages(
@@ -224,7 +226,7 @@ include_directories(
 )
 
 catkin_package(
-  CATKIN_DEPENDS roscpp  
+  CATKIN_DEPENDS geometry_msgs message_runtime roscpp std_msgs
 )
 
 add_executable(multi_avoidance src/multi_avoidance.cpp)

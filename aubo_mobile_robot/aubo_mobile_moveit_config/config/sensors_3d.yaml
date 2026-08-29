@@ -1,4 +1,11 @@
-# The name of this file shouldn't be changed, or else the Setup Assistant won't detect it
+# Chassis-mounted eye-to-hand RGB-D camera.  Both the Gazebo macro and the
+# real RealSense entry publish this registered point cloud contract.
 sensors:
-  - {}
-  - {}
+  - sensor_plugin: occupancy_map_monitor/PointCloudOctomapUpdater
+    point_cloud_topic: /workspace_camera/points_for_moveit
+    max_range: 2.5
+    point_subsample: 1
+    padding_offset: 0.03
+    padding_scale: 1.0
+    max_update_rate: 3.0
+    filtered_cloud_topic: filtered_cloud

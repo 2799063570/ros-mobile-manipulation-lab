@@ -6,9 +6,17 @@
   <arg name="debug_view" default="false"/>
   <arg name="sorting_config" default="$(find aubo_mobile_sorting)/config/sorting.yaml"/>
   <arg name="auto_start" default="false"/>
+  <arg name="start_rgbd_camera" default="true"/>
+  <arg name="camera_serial_no" default=""/>
+  <arg name="perception_mode" default="yolo"/>
   <arg name="goal_x" default="2.15"/>
   <arg name="goal_y" default="0.0"/>
   <arg name="goal_yaw" default="0.0"/>
+
+  <include if="$(arg start_rgbd_camera)"
+           file="$(find aubo_mobile_robot)/launch/eye_to_hand_rgbd_real.launch">
+    <arg name="serial_no" value="$(arg camera_serial_no)"/>
+  </include>
 
   <include file="$(find aubo_mobile_navigation)/launch/navigation.launch">
     <arg name="map_file" value="$(arg map_file)"/>
@@ -19,6 +27,7 @@
     <arg name="allow_trajectory_execution" value="true"/>
     <arg name="fake_execution" value="false"/>
     <arg name="load_robot_description" value="false"/>
+    <arg name="use_sensor_manager" value="true"/>
   </include>
 
   <include file="$(find aubo_mobile_sorting)/launch/sorting.launch">
@@ -27,6 +36,7 @@
     <arg name="auto_move_to_observation" value="false"/>
     <arg name="auto_start" value="false"/>
     <arg name="use_grasp_attachment" value="false"/>
+    <arg name="perception_mode" value="$(arg perception_mode)"/>
   </include>
 
   <include file="$(find aubo_mobile_nav_sorting)/launch/mission.launch">

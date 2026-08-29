@@ -7,6 +7,7 @@
 	 <!-- 分享主车位置与速度信息给其他车辆-->
 	<node pkg="wheeltec_multi" type="send_tfodom.py" name="send_tfodom" output="screen" >
 		<param name="broadcast_rate" type="double" value="30.0" />
+		<param name="udp_port" type="int" value="10000" />
 	</node>
 
 </launch>

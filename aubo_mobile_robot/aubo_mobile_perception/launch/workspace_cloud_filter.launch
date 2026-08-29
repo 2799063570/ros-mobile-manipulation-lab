@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="config" default="$(find aubo_mobile_perception)/config/workspace_cloud_filter.yaml"/>
+  <node pkg="aubo_perception" type="workspace_cloud_filter_node"
+        name="workspace_cloud_filter" output="screen" required="true">
+    <rosparam file="$(arg config)" command="load"/>
+  </node>
+</launch>

@@ -13,6 +13,7 @@ from nav_msgs.msg import Odometry
 leader_vx = 0.0
 leader_vy = 0.0
 leader_wz = 0.0
+sequence = 0
 
 
 def odom_callback(msg):
@@ -23,6 +24,7 @@ def odom_callback(msg):
 
 
 def publish_odom():
+    global sequence
     rospy.init_node('send_tfodom')
     rospy.Subscriber('odom', Odometry, odom_callback, queue_size=1)
 
@@ -30,7 +32,9 @@ def publish_odom():
     map_frame = rospy.get_param('~map_frame', 'map')
     base_frame = rospy.get_param('~base_frame', 'base_link')
     udp_port = rospy.get_param('~udp_port', 10000)
-    packet_format = '<6f'
+    # V2 packet: magic, monotonically increasing sequence, sender wall-clock
+    # stamp, followed by pose (x, y, yaw) and body twist (vx, vy, wz).
+    packet_format = '<4sId6f'
 
     listener = tf.TransformListener()
     udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -43,7 +47,10 @@ def publish_odom():
                 trans, rotation = listener.lookupTransform(
                     map_frame, base_frame, rospy.Time(0))
                 yaw = tf.transformations.euler_from_quaternion(rotation)[2]
-                packet = struct.pack(packet_format, trans[0], trans[1], yaw,
+                sequence = (sequence + 1) & 0xffffffff
+                packet = struct.pack(packet_format, b'WFM2', sequence,
+                                     rospy.Time.now().to_sec(),
+                                     trans[0], trans[1], yaw,
                                      leader_vx, leader_vy, leader_wz)
                 udp_socket.sendto(packet, ('<broadcast>', udp_port))
                 rospy.logdebug_throttle(

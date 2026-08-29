@@ -24,7 +24,11 @@ if(NOT EXISTS "${AUBO_SDK_CONTROLLER_LIB}")
   message(FATAL_ERROR "AUBO SDK library not found: ${AUBO_SDK_CONTROLLER_LIB}")
 endif()
 
-catkin_package(INCLUDE_DIRS include CATKIN_DEPENDS roslib)
+catkin_package(
+  INCLUDE_DIRS include
+  CATKIN_DEPENDS roslib
+  CFG_EXTRAS aubo_sdk-extras.cmake
+)
 file(MAKE_DIRECTORY "${PROJECT_SOURCE_DIR}/logfiles")
 
 function(add_aubo_sdk_demo target source)
@@ -34,7 +38,10 @@ function(add_aubo_sdk_demo target source)
   target_link_libraries(${target} ${AUBO_SDK_CONTROLLER_LIB} ${catkin_LIBRARIES} Threads::Threads)
   set_target_properties(${target} PROPERTIES
     BUILD_RPATH "${AUBO_SDK_RUNTIME_DIRS}"
-    INSTALL_RPATH "${AUBO_SDK_DEMO_INSTALL_RPATH}")
+    INSTALL_RPATH "${AUBO_SDK_DEMO_INSTALL_RPATH}"
+    # Preserve a transitive DT_RPATH so libauborobotcontroller can resolve its
+    # bundled libconfig/log4cplus dependencies without LD_LIBRARY_PATH.
+    LINK_FLAGS "-Wl,--disable-new-dtags")
 endfunction()
 
 add_aubo_sdk_demo(sdk_test src/sdk_test.cpp)

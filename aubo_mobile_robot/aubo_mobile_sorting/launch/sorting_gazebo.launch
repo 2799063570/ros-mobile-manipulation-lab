@@ -17,11 +17,21 @@
     <arg name="z" value="0.02"/>
   </include>
 
+  <!-- sorting.world places its camera above the source blocks.  In this
+       stationary scenario Gazebo world coordinates coincide with odom. -->
+  <include file="$(find aubo_mobile_perception)/launch/static_workspace_camera_tf.launch">
+    <arg name="parent_frame" value="odom"/>
+    <arg name="x" value="0.62"/>
+    <arg name="y" value="0.0"/>
+    <arg name="z" value="2.0"/>
+  </include>
+
   <!-- Use Gazebo trajectory controllers and the live odom -> base_footprint TF. -->
   <include file="$(find aubo_mobile_moveit_config)/launch/move_group.launch">
     <arg name="allow_trajectory_execution" value="true"/>
     <arg name="fake_execution" value="false"/>
     <arg name="load_robot_description" value="false"/>
+    <arg name="use_sensor_manager" value="true"/>
   </include>
 
   <include file="$(find aubo_mobile_sorting)/launch/sorting.launch">
