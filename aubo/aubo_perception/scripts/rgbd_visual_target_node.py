@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""RGB-D color target frontend for the eye-in-hand visual-servo controller.
+"""Mount-independent RGB-D color target frontend for AUBO visual servo.
 
 The detector-specific part ends at a 2-D candidate (label, mask and centre).
 Depth projection then publishes the stable public contract:
@@ -105,7 +105,7 @@ class HsvColorFrontend(object):
         return candidates
 
 
-class ColorVisualTargetNode(object):
+class RgbdVisualTargetNode(object):
     def __init__(self):
         self.color_topic = rospy.get_param("~color_topic", "/camera/color/image_raw")
         self.depth_topic = rospy.get_param(
@@ -429,8 +429,8 @@ class ColorVisualTargetNode(object):
 
 
 def main():
-    rospy.init_node("color_visual_target_node")
-    ColorVisualTargetNode()
+    rospy.init_node("rgbd_visual_target")
+    RgbdVisualTargetNode()
     rospy.spin()
 
 

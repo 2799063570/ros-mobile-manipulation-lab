@@ -1,5 +1,6 @@
 <?xml version="1.0"?>
 <launch>
+  <!-- Deprecated compatibility entry. Use eye_in_hand_visual_servo_real.launch. -->
   <arg name="robot_ip" default="192.168.1.2"/>
   <arg name="target_topic" default="/visual_servo/target_pose"/>
   <arg name="loss_strategy" default="coast_then_open"/>
@@ -7,44 +8,15 @@
   <arg name="start_realsense" default="true"/>
   <arg name="start_perception" default="true"/>
   <arg name="target_label" default="red"/>
-
-  <include if="$(arg start_realsense)"
-           file="$(find realsense2_camera)/launch/rs_camera.launch">
-    <arg name="enable_color" value="true"/>
-    <arg name="enable_depth" value="true"/>
-    <arg name="align_depth" value="true"/>
-    <!-- Robot URDF owns the eye-in-hand TF tree and calibrated mount. -->
-    <arg name="publish_tf" value="false"/>
+  <arg name="auto_start" default="false"/>
+  <include file="$(find aubo_ros_control)/launch/eye_in_hand_visual_servo_real.launch">
+    <arg name="robot_ip" value="$(arg robot_ip)"/>
+    <arg name="target_topic" value="$(arg target_topic)"/>
+    <arg name="loss_strategy" value="$(arg loss_strategy)"/>
+    <arg name="load_robot_description" value="$(arg load_robot_description)"/>
+    <arg name="start_realsense" value="$(arg start_realsense)"/>
+    <arg name="start_perception" value="$(arg start_perception)"/>
+    <arg name="target_label" value="$(arg target_label)"/>
+    <arg name="auto_start" value="$(arg auto_start)"/>
   </include>
-
-  <include if="$(arg load_robot_description)"
-           file="$(find aubo_moveit_config)/launch/planning_context.launch">
-    <arg name="load_robot_description" value="true"/>
-    <arg name="robot_xacro" value="aubo_i5_with_camera.xacro"/>
-    <arg name="robot_srdf" value="aubo_i5_with_camera.srdf"/>
-  </include>
-  <node name="robot_state_publisher" pkg="robot_state_publisher"
-        type="robot_state_publisher" output="screen"/>
-
-  <!-- No controller_manager and no ros_control hardware node in real mode. -->
-  <node name="eye_in_hand_visual_servo" pkg="aubo_ros_control"
-        type="eye_in_hand_visual_servo_node" output="screen" required="true">
-    <env name="LD_LIBRARY_PATH"
-         value="$(find aubo_sdk)/lib/lib64/aubocontroller:$(find aubo_sdk)/lib/lib64/log4cplus:$(find aubo_sdk)/lib/lib64/config:$(optenv LD_LIBRARY_PATH)"/>
-    <rosparam file="$(find aubo_ros_control)/config/eye_in_hand_visual_servo.yaml"
-              command="load"/>
-    <param name="backend" value="sdk"/>
-    <param name="robot_ip" value="$(arg robot_ip)"/>
-    <param name="target_topic" value="$(arg target_topic)"/>
-    <param name="joint_states_topic" value="/joint_states"/>
-    <param name="loss_strategy" value="$(arg loss_strategy)"/>
-  </node>
-
-  <node if="$(arg start_perception)" name="color_visual_target"
-        pkg="aubo_ros_control" type="color_visual_target_node.py" output="screen">
-    <rosparam file="$(find aubo_ros_control)/config/color_visual_target.yaml"
-              command="load"/>
-    <param name="target_label" value="$(arg target_label)"/>
-    <param name="target_pose_topic" value="$(arg target_topic)"/>
-  </node>
 </launch>

@@ -4,6 +4,45 @@
     <include><uri>model://ground_plane</uri></include>
     <include><uri>model://sun</uri></include>
 
+    <!-- Fixed eye-to-hand RGB-D camera. Its ROS frame tree is published by
+         aubo_description/eye_to_hand_camera_tf.launch. -->
+    <model name="workspace_camera">
+      <static>true</static>
+      <pose>0.55 0 1.60 0 1.57079632679 0</pose>
+      <link name="workspace_camera_link">
+        <collision name="camera_body_collision">
+          <geometry><box><size>0.09 0.03 0.03</size></box></geometry>
+        </collision>
+        <visual name="camera_body_visual">
+          <geometry><box><size>0.09 0.03 0.03</size></box></geometry>
+          <material><ambient>0.20 0.22 0.25 1</ambient><diffuse>0.35 0.38 0.42 1</diffuse></material>
+        </visual>
+        <sensor type="depth" name="workspace_camera_rgbd">
+          <pose>0.045 0 0 0 0 0</pose>
+          <always_on>true</always_on>
+          <visualize>false</visualize>
+          <update_rate>20</update_rate>
+          <camera name="workspace_camera_sensor">
+            <horizontal_fov>1.0471975512</horizontal_fov>
+            <image><width>640</width><height>480</height><format>R8G8B8</format></image>
+            <clip><near>0.15</near><far>3.0</far></clip>
+          </camera>
+          <plugin name="workspace_camera_gazebo_ros_openni"
+                  filename="libgazebo_ros_openni_kinect.so">
+            <cameraName>workspace_camera</cameraName>
+            <imageTopicName>color/image_raw</imageTopicName>
+            <cameraInfoTopicName>color/camera_info</cameraInfoTopicName>
+            <depthImageTopicName>aligned_depth_to_color/image_raw</depthImageTopicName>
+            <depthImageCameraInfoTopicName>aligned_depth_to_color/camera_info</depthImageCameraInfoTopicName>
+            <pointCloudTopicName>depth/color/points</pointCloudTopicName>
+            <frameName>workspace_camera_color_optical_frame</frameName>
+            <pointCloudCutoff>0.15</pointCloudCutoff>
+            <pointCloudCutoffMax>3.0</pointCloudCutoffMax>
+          </plugin>
+        </sensor>
+      </link>
+    </model>
+
     <!-- These objects are intentionally NOT added through PlanningScene.
          MoveIt can only discover them through the simulated depth camera. -->
     <model name="work_table">

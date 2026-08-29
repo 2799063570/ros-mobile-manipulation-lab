@@ -25,12 +25,14 @@
 
   <exec_depend>actionlib</exec_depend>
   <exec_depend>actionlib_msgs</exec_depend>
+  <exec_depend>aubo_description</exec_depend>
   <exec_depend>aubo_mobile_moveit_config</exec_depend>
   <exec_depend>aubo_gazebo_plugins</exec_depend>
   <exec_depend>aubo_mobile_navigation</exec_depend>
   <exec_depend>aubo_mobile_perception</exec_depend>
   <exec_depend>aubo_mobile_robot</exec_depend>
   <exec_depend>aubo_mobile_sorting</exec_depend>
+  <exec_depend>aubo_ros_control</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>dynamic_reconfigure</exec_depend>
   <exec_depend>move_base_msgs</exec_depend>

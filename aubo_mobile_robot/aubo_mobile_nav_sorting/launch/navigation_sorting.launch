@@ -14,8 +14,9 @@
   <arg name="goal_yaw" default="0.0"/>
 
   <include if="$(arg start_rgbd_camera)"
-           file="$(find aubo_mobile_robot)/launch/eye_to_hand_rgbd_real.launch">
+           file="$(find aubo_ros_control)/launch/eye_to_hand_camera_real.launch">
     <arg name="serial_no" value="$(arg camera_serial_no)"/>
+    <arg name="parent_frame" value="base_link"/>
   </include>
 
   <include file="$(find aubo_mobile_navigation)/launch/navigation.launch">

@@ -6,10 +6,14 @@
   <arg name="run_demo" default="true"/>
   <arg name="execute" default="true"/>
   <arg name="target_pose" default="home"/>
+  <arg name="point_cloud_topic" default="/workspace_camera/depth/color/points"/>
 
   <include file="$(find aubo_gazebo)/launch/aubo_world_gazebo.launch">
     <arg name="world_name" value="$(arg world)"/>
     <arg name="gui" value="$(arg gui)"/>
+    <!-- Eye-to-hand scene: do not load or publish the hand camera. -->
+    <arg name="model"
+         value="$(find xacro)/xacro --inorder '$(find aubo_description)/urdf/aubo_i5.xacro'"/>
   </include>
   <include file="$(find aubo_gazebo)/launch/aubo_controller_gazebo.launch"/>
 
@@ -18,13 +22,19 @@
     <rosparam param="source_list">[/aubo_i5/joint_states]</rosparam>
   </node>
 
+  <!-- The world owns the fixed RGB-D sensor; this calibrated frame tree makes
+       its PointCloud2 transformable to base_link. -->
+  <include file="$(find aubo_description)/launch/eye_to_hand_camera_tf.launch"/>
+
   <include file="$(find aubo_moveit_config)/launch/move_group.launch">
     <arg name="allow_trajectory_execution" value="true"/>
     <arg name="fake_execution" value="false"/>
     <arg name="load_robot_description" value="false"/>
-    <arg name="robot_xacro" value="aubo_i5_with_camera.xacro"/>
-    <arg name="robot_srdf" value="aubo_i5_with_camera.srdf"/>
+    <arg name="robot_xacro" value="aubo_i5.xacro"/>
+    <arg name="robot_srdf" value="aubo_i5.srdf"/>
     <arg name="use_sensor_manager" value="true"/>
+    <arg name="sensors_3d_config"
+         value="$(find aubo_moveit_config)/config/sensors_3d_eye_to_hand.yaml"/>
   </include>
 
   <include if="$(arg rviz)" file="$(find aubo_moveit_config)/launch/moveit_rviz.launch">
@@ -33,7 +43,9 @@
 
   <include if="$(arg run_demo)" file="$(find aubo_planning)/launch/octomap_planning_demo.launch">
     <arg name="target_pose" value="$(arg target_pose)"/>
-    <arg name="move_to_sensor_pose" value="true"/>
+    <arg name="point_cloud_topic" value="$(arg point_cloud_topic)"/>
+    <!-- The camera is fixed, so arm motion is not needed to acquire a view. -->
+    <arg name="move_to_sensor_pose" value="false"/>
     <arg name="execute" value="$(arg execute)"/>
     <arg name="wait_timeout" value="45.0"/>
   </include>

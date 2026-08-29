@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Shared calibrated frame tree for a fixed/external RGB-D camera. -->
+  <arg name="parent_frame" default="base_link"/>
+  <arg name="camera_name" default="workspace_camera"/>
+  <arg name="x" default="0.55"/><arg name="y" default="0.0"/>
+  <arg name="z" default="1.60"/><arg name="roll" default="0.0"/>
+  <arg name="pitch" default="1.57079632679"/><arg name="yaw" default="0.0"/>
+  <node pkg="tf2_ros" type="static_transform_publisher"
+        name="$(arg camera_name)_mount_tf"
+        args="$(arg x) $(arg y) $(arg z) $(arg yaw) $(arg pitch) $(arg roll) $(arg parent_frame) $(arg camera_name)_link"/>
+  <node pkg="tf2_ros" type="static_transform_publisher"
+        name="$(arg camera_name)_color_tf"
+        args="0.045 0 0 0 0 0 $(arg camera_name)_link $(arg camera_name)_color_frame"/>
+  <node pkg="tf2_ros" type="static_transform_publisher"
+        name="$(arg camera_name)_optical_tf"
+        args="0 0 0 -1.57079632679 0 -1.57079632679 $(arg camera_name)_color_frame $(arg camera_name)_color_optical_frame"/>
+</launch>

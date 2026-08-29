@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Shared controller entry. Robot model, joint states and camera target
+       publisher must already exist. -->
+  <arg name="mode_config"/>
+  <arg name="backend" default="gazebo"/>
+  <arg name="robot_ip" default="192.168.1.2"/>
+  <arg name="target_topic" default="/visual_servo/target_pose"/>
+  <arg name="joint_states_topic" default="/joint_states"/>
+  <arg name="loss_strategy" default=""/>
+  <arg name="start_enabled" default="false"/>
+
+  <node name="aubo_visual_servo" pkg="aubo_ros_control"
+        type="aubo_visual_servo_node" output="screen" required="true">
+    <env if="$(eval arg('backend') == 'sdk')" name="LD_LIBRARY_PATH"
+         value="$(find aubo_sdk)/lib/lib64/aubocontroller:$(find aubo_sdk)/lib/lib64/log4cplus:$(find aubo_sdk)/lib/lib64/config:$(optenv LD_LIBRARY_PATH)"/>
+    <rosparam file="$(find aubo_ros_control)/config/visual_servo_common.yaml"
+              command="load"/>
+    <rosparam file="$(arg mode_config)" command="load"/>
+    <param name="backend" value="$(arg backend)"/>
+    <param name="robot_ip" value="$(arg robot_ip)"/>
+    <param name="target_topic" value="$(arg target_topic)"/>
+    <param name="joint_states_topic" value="$(arg joint_states_topic)"/>
+    <param name="start_enabled" value="$(arg start_enabled)"/>
+    <param if="$(eval arg('loss_strategy') != '')"
+           name="loss_strategy" value="$(arg loss_strategy)"/>
+    <rosparam if="$(eval arg('backend') == 'gazebo')" param="gazebo_command_topics">
+      [/aubo_i5/shoulder_position_controller/command,
+       /aubo_i5/upper_arm_position_controller/command,
+       /aubo_i5/fore_arm_position_controller/command,
+       /aubo_i5/wrist1_position_controller/command,
+       /aubo_i5/wrist2_position_controller/command,
+       /aubo_i5/wrist3_position_controller/command]
+    </rosparam>
+  </node>
+</launch>

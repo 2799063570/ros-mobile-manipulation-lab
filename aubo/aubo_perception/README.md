@@ -1,6 +1,6 @@
 # AUBO 通用视觉感知
 
-该包提供固定机械臂和移动机械臂共用的颜色目标消息及手部相机检测节点。
+该包提供固定机械臂和移动机械臂共用的目标消息、RGB/RGB-D检测节点和点云过滤。
 相机话题、工作空间、投影平面和是否使用对齐深度均由调用方参数配置；平台场景
 参数继续分别保存在 `aubo_color_sorting` 和 `aubo_mobile_perception` 中。
 
@@ -12,6 +12,9 @@
 - `DetectedObject.msg`：颜色名称、目标位姿、轮廓面积和像素中心；
 - `DetectedObjectArray.msg`：同一图像帧中的目标数组；
 - `color_object_detector.py`：HSV 分割、轮廓过滤、TF 坐标转换和调试图发布。
+- `rgbd_visual_target_node.py`：两种相机安装共用的同步 RGB-D 目标位姿前端。
+- `yolo_rgbd_target_node.py`：YOLO 检测框与深度图到统一三维目标的适配器。
+- `workspace_cloud_filter_node`：MoveIt OctoMap 使用的工作区点云过滤。
 
 默认发布：
 

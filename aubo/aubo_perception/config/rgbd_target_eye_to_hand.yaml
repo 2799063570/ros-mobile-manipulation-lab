@@ -1,31 +1,27 @@
-# OpenCV HSV detector configuration. The public output contract is a standard
-# PoseStamped, so a future Torch/YOLO node can replace this detector unchanged.
-color_topic: /camera/color/image_raw
-aligned_depth_topic: /camera/aligned_depth_to_color/image_raw
-camera_info_topic: /camera/color/camera_info
+# Fixed-camera RGB-D frontend for eye-to-hand scenes.
+color_topic: /workspace_camera/color/image_raw
+aligned_depth_topic: /workspace_camera/aligned_depth_to_color/image_raw
+camera_info_topic: /workspace_camera/color/camera_info
 target_pose_topic: /visual_servo/target_pose
 debug_image_topic: /visual_servo/debug_image
 target_label_topic: /visual_servo/target_label
 target_selection_topic: /visual_servo/target_selection
 perception_state_topic: /visual_servo/perception_state
-# Launch files may override this. Keep true for backward-compatible real-robot bringup.
-start_enabled: true
-
-target_label: red              # empty string accepts every configured color
-selection_policy: largest      # largest | image_center | nearest
+start_enabled: false
+target_label: red
+selection_policy: largest
 minimum_contour_area: 180.0
 maximum_contour_area: 50000.0
 maximum_aspect_ratio: 2.5
 morphology_kernel: 5
 depth_mask_erosion: 3
-minimum_depth: 0.10
+minimum_depth: 0.15
 maximum_depth: 2.50
-depth_scale_16u: 0.001         # RealSense 16UC1 millimetres -> metres
-position_filter_alpha: 0.35    # 1.0=no filtering; lower values reduce depth jitter
+depth_scale_16u: 0.001
+position_filter_alpha: 0.35
 filter_reset_timeout: 0.50
 sync_queue_size: 8
 sync_slop: 0.08
-
 colors:
   red:
     ranges:

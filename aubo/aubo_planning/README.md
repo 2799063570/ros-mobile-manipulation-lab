@@ -14,11 +14,14 @@
 roslaunch aubo_planning octomap_planning_gazebo.launch
 ```
 
-场景中的灰色工作台和橙色立柱没有通过代码直接加入 PlanningScene；它们只能由
-腕部深度相机的 `/camera/depth/color/points` 点云被 MoveIt 发现，并以 4 cm
-OctoMap 体素显示。程序先到 `observe` 相机观察位，确认收到点云和非空八叉树，
-然后规划到 `home`。如果运动过程中相机发现了新障碍并使当前轨迹失效，示例会
-等待地图更新并重新规划观察位，最多尝试 3 次。仿真默认执行轨迹；只看规划可使用：
+场景中的灰色工作台和橙色立柱没有通过代码直接加入 PlanningScene；它们由固定的
+眼在手外 `workspace_camera` 观测。MoveIt 订阅
+`/workspace_camera/depth/color/points`，经 TF 变换和机器人自过滤后生成 4 cm
+OctoMap体素。
+
+眼在手外仿真使用不含手部相机的 `aubo_i5.xacro`，因此不会同时发布腕部相机数据；
+固定相机无需机械臂移动到 `observe` 姿态。程序确认收到点云和非空八叉树后直接规划
+到 `home`。仿真默认执行轨迹；只看规划可使用：
 
 ```bash
 roslaunch aubo_planning octomap_planning_gazebo.launch execute:=false
@@ -28,7 +31,7 @@ roslaunch aubo_planning octomap_planning_gazebo.launch execute:=false
 也可以用下面的命令检查数据链路：
 
 ```bash
-rostopic hz /camera/depth/color/points
+rostopic hz /workspace_camera/depth/color/points
 rostopic echo -n 1 /move_group/filtered_cloud
 rosservice call /clear_octomap
 ```
@@ -47,9 +50,10 @@ roslaunch aubo_planning octomap_planning_demo.launch \
   move_to_sensor_pose:=false execute:=false target_pose:=home
 ```
 
-若相机驱动点云话题不是 `/camera/depth/color/points`，需要同时修改
-`aubo_moveit_config/config/sensors_3d.yaml` 的 `point_cloud_topic` 和示例 launch 的
-`point_cloud_topic` 参数。点云消息的 `frame_id` 必须能通过 TF 变换到 `base_link`。
+眼在手外真机应使用 `sensors_3d_eye_to_hand.yaml` 和外部相机点云
+`/workspace_camera/depth/color/points`。眼在手上通用入口仍使用 `sensors_3d.yaml` 和
+`/camera/depth/color/points`。两者的点云
+`frame_id` 都必须能通过 TF 变换到 `base_link`。
 
 ## 编译
 

@@ -281,10 +281,11 @@ rosservice call /sorting/start
 
 ### 复合机器人：眼在手外 RGB-D 与 YOLO
 
-真实 RealSense 相机、对齐深度和注册点云入口：
+真实移动抓取组合入口（复用 `aubo` 的相机、感知与眼在手外伺服）：
 
 ```bash
-roslaunch aubo_mobile_robot eye_to_hand_rgbd_real.launch serial_no:=<serial>
+roslaunch aubo_mobile_bringup mobile_manipulation_visual_servo.launch \
+  camera_serial_no:=<serial>
 ```
 
 启动检测框与深度图的三维目标适配器：

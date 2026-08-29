@@ -1,0 +1,11 @@
+# Eye-to-hand occupancy source. MoveIt's updater transforms the fixed-camera
+# cloud through TF and performs robot self-filtering before updating OctoMap.
+sensors:
+  - sensor_plugin: occupancy_map_monitor/PointCloudOctomapUpdater
+    point_cloud_topic: /workspace_camera/depth/color/points
+    max_range: 2.5
+    point_subsample: 1
+    padding_offset: 0.03
+    padding_scale: 1.0
+    max_update_rate: 3.0
+    filtered_cloud_topic: filtered_cloud

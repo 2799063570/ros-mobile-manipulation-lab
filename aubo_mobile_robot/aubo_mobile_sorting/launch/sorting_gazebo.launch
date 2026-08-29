@@ -19,7 +19,7 @@
 
   <!-- sorting.world places its camera above the source blocks.  In this
        stationary scenario Gazebo world coordinates coincide with odom. -->
-  <include file="$(find aubo_mobile_perception)/launch/static_workspace_camera_tf.launch">
+  <include file="$(find aubo_description)/launch/eye_to_hand_camera_tf.launch">
     <arg name="parent_frame" value="odom"/>
     <arg name="x" value="0.62"/>
     <arg name="y" value="0.0"/>

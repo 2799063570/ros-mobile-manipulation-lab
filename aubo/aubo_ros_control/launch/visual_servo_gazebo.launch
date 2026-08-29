@@ -1,5 +1,6 @@
 <?xml version="1.0"?>
 <launch>
+  <!-- Deprecated compatibility entry. Use eye_in_hand_visual_servo_gazebo.launch. -->
   <arg name="gui" default="true"/>
   <arg name="target_topic" default="/visual_servo/target_pose"/>
   <arg name="loss_strategy" default="coast_then_open"/>
@@ -8,61 +9,14 @@
   <arg name="start_perception" default="true"/>
   <arg name="rviz" default="true"/>
   <arg name="debug_view" default="false"/>
-
-  <!-- Loads the eye-in-hand model, Gazebo and robot_state_publisher. -->
-  <include file="$(find aubo_gazebo)/launch/aubo_world_gazebo.launch">
+  <include file="$(find aubo_ros_control)/launch/eye_in_hand_visual_servo_gazebo.launch">
     <arg name="gui" value="$(arg gui)"/>
-    <arg name="world_name" value="$(find aubo_ros_control)/worlds/visual_servo.world"/>
+    <arg name="target_topic" value="$(arg target_topic)"/>
+    <arg name="loss_strategy" value="$(arg loss_strategy)"/>
+    <arg name="target_label" value="$(arg target_label)"/>
+    <arg name="auto_start" value="$(arg auto_start)"/>
+    <arg name="start_perception" value="$(arg start_perception)"/>
+    <arg name="rviz" value="$(arg rviz)"/>
+    <arg name="debug_view" value="$(arg debug_view)"/>
   </include>
-
-  <group ns="aubo_i5">
-    <rosparam file="$(find aubo_ros_control)/config/visual_servo_controllers.yaml"
-              command="load"/>
-    <node name="visual_servo_controller_spawner" pkg="controller_manager"
-          type="spawner" output="screen"
-          args="joint_state_controller shoulder_position_controller upper_arm_position_controller fore_arm_position_controller wrist1_position_controller wrist2_position_controller wrist3_position_controller"/>
-  </group>
-
-  <!-- The Gazebo controller publishes inside /aubo_i5, while the global
-       robot_state_publisher started by aubo_world_gazebo listens on
-       /joint_states.  Relay the namespaced state so the complete arm/camera
-       TF tree is connected to base_link. -->
-  <node name="aubo_joint_state_relay" pkg="joint_state_publisher"
-        type="joint_state_publisher" output="screen">
-    <rosparam param="source_list">[/aubo_i5/joint_states]</rosparam>
-  </node>
-
-  <node name="eye_in_hand_visual_servo" pkg="aubo_ros_control"
-        type="eye_in_hand_visual_servo_node" output="screen" required="true">
-    <rosparam file="$(find aubo_ros_control)/config/eye_in_hand_visual_servo.yaml"
-              command="load"/>
-    <param name="backend" value="gazebo"/>
-    <param name="target_topic" value="$(arg target_topic)"/>
-    <param name="joint_states_topic" value="/aubo_i5/joint_states"/>
-    <param name="loss_strategy" value="$(arg loss_strategy)"/>
-    <param name="start_enabled" value="$(arg auto_start)"/>
-    <rosparam param="gazebo_command_topics">
-      [/aubo_i5/shoulder_position_controller/command,
-       /aubo_i5/upper_arm_position_controller/command,
-       /aubo_i5/fore_arm_position_controller/command,
-       /aubo_i5/wrist1_position_controller/command,
-       /aubo_i5/wrist2_position_controller/command,
-       /aubo_i5/wrist3_position_controller/command]
-    </rosparam>
-  </node>
-
-  <node if="$(arg start_perception)" name="color_visual_target"
-        pkg="aubo_ros_control" type="color_visual_target_node.py" output="screen">
-    <rosparam file="$(find aubo_ros_control)/config/color_visual_target.yaml"
-              command="load"/>
-    <param name="target_label" value="$(arg target_label)"/>
-    <param name="target_pose_topic" value="$(arg target_topic)"/>
-    <param name="start_enabled" value="$(arg auto_start)"/>
-  </node>
-  <node if="$(arg rviz)" name="visual_servo_rviz" pkg="rviz" type="rviz"
-        args="-d $(find aubo_ros_control)/config/visual_servo.rviz" output="screen"/>
-  <node if="$(arg debug_view)" name="visual_servo_debug_view"
-        pkg="image_view" type="image_view" output="screen">
-    <remap from="image" to="/visual_servo/debug_image"/>
-  </node>
 </launch>

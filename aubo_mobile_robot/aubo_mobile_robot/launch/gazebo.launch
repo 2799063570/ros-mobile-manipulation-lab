@@ -6,9 +6,10 @@
   <arg name="x" default="0.0"/>
   <arg name="y" default="0.0"/>
   <arg name="z" default="0.02"/>
+  <arg name="enable_hand_camera" default="true"/>
 
   <param name="robot_description"
-         command="$(find xacro)/xacro --inorder $(find aubo_mobile_robot)/urdf/aubo_mobile_robot.xacro"/>
+         command="$(find xacro)/xacro --inorder $(find aubo_mobile_robot)/urdf/aubo_mobile_robot.xacro enable_hand_camera:=$(arg enable_hand_camera)"/>
 
   <include file="$(find gazebo_ros)/launch/empty_world.launch">
     <arg name="world_name" value="$(arg world)"/>

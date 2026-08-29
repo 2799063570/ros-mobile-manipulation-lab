@@ -21,7 +21,10 @@
 
   <exec_depend>aubo_moveit_config</exec_depend>
   <exec_depend>aubo_gazebo</exec_depend>
+  <exec_depend>aubo_description</exec_depend>
+  <exec_depend>gazebo_plugins</exec_depend>
   <exec_depend>joint_state_publisher</exec_depend>
+  <exec_depend>xacro</exec_depend>
 
   <export/>
 </package>

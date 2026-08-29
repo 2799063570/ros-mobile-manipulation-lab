@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="robot_ip" default="192.168.1.2"/>
+  <arg name="camera_serial_no" default=""/>
+  <arg name="start_camera" default="true"/>
+  <arg name="start_perception" default="true"/>
+  <arg name="target_label" default="red"/>
+  <arg name="auto_start" default="false"/>
+
+  <!-- The camera-free description also prevents accidental startup of the
+       hand-mounted camera while using the external sensor. -->
+  <include file="$(find aubo_moveit_config)/launch/planning_context.launch">
+    <arg name="load_robot_description" value="true"/>
+    <arg name="robot_xacro" value="aubo_i5.xacro"/>
+    <arg name="robot_srdf" value="aubo_i5.srdf"/>
+  </include>
+  <node name="robot_state_publisher" pkg="robot_state_publisher"
+        type="robot_state_publisher" output="screen"/>
+
+  <include if="$(arg start_camera)"
+           file="$(find aubo_ros_control)/launch/eye_to_hand_camera_real.launch">
+    <arg name="serial_no" value="$(arg camera_serial_no)"/>
+  </include>
+  <node if="$(arg start_perception)" name="rgbd_visual_target"
+        pkg="aubo_perception" type="rgbd_visual_target_node.py" output="screen">
+    <rosparam file="$(find aubo_perception)/config/rgbd_target_eye_to_hand.yaml"
+              command="load"/>
+    <param name="target_label" value="$(arg target_label)"/>
+    <param name="start_enabled" value="$(arg auto_start)"/>
+  </node>
+  <include file="$(find aubo_ros_control)/launch/visual_servo_core.launch">
+    <arg name="mode_config"
+         value="$(find aubo_ros_control)/config/visual_servo_eye_to_hand.yaml"/>
+    <arg name="backend" value="sdk"/>
+    <arg name="robot_ip" value="$(arg robot_ip)"/>
+    <arg name="start_enabled" value="$(arg auto_start)"/>
+  </include>
+</launch>

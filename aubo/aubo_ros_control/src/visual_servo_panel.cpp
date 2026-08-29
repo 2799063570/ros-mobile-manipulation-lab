@@ -201,9 +201,10 @@ void VisualServoPanel::showServoState(const QString& text)
   QString translated = text;
   if (text == "DISABLED") translated = tr("已停用 / 保持当前位置");
   else if (text == "WAITING") translated = tr("等待新目标");
+  else if (text == "SEARCH_INITIAL") translated = tr("初始化 / 移向可观测姿态");
   else if (text == "TRACKING") translated = tr("正在闭环跟踪");
   else if (text == "COAST") translated = tr("目标短暂丢失 / 减速滑行");
-  else if (text == "SEARCH_OPEN") translated = tr("目标丢失 / 移向开阔观察姿态");
+  else if (text == "SEARCH_RECOVERY") translated = tr("目标丢失 / 重新搜索");
   else if (text == "HOLD") translated = tr("搜索超时 / 保持");
   servo_state_label_->setText(translated);
 }

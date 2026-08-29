@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Mobile integration only: robot description, state publisher and base
+       must already be running. The arm capabilities come from aubo. -->
+  <arg name="robot_ip" default="192.168.1.2"/>
+  <arg name="camera_serial_no" default=""/>
+  <arg name="start_camera" default="true"/>
+  <arg name="start_yolo_adapter" default="true"/>
+  <arg name="start_enabled" default="false"/>
+
+  <include if="$(arg start_camera)"
+           file="$(find aubo_ros_control)/launch/eye_to_hand_camera_real.launch">
+    <arg name="serial_no" value="$(arg camera_serial_no)"/>
+    <arg name="parent_frame" value="base_link"/>
+  </include>
+  <include if="$(arg start_yolo_adapter)"
+           file="$(find aubo_mobile_perception)/launch/yolo_rgbd_detector.launch"/>
+  <include file="$(find aubo_ros_control)/launch/visual_servo_core.launch">
+    <arg name="mode_config"
+         value="$(find aubo_ros_control)/config/visual_servo_eye_to_hand.yaml"/>
+    <arg name="backend" value="sdk"/>
+    <arg name="robot_ip" value="$(arg robot_ip)"/>
+    <arg name="start_enabled" value="$(arg start_enabled)"/>
+  </include>
+</launch>

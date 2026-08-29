@@ -1,12 +1,13 @@
 /**
- * Eye-in-hand PBVS for AUBO i5.
+ * Unified eye-in-hand / eye-to-hand PBVS for AUBO i5.
  *
  * One controller core is shared by two deliberately separate backends:
  *   gazebo: bounded queue -> six JointPositionController command topics
  *   sdk:    bounded queue -> validation/optimization -> AUBO TCP2CANBUS SDK
  *
- * Input target poses are interpreted in the moving camera optical frame.  A
- * TF transform is applied when the detector publishes in another frame.
+ * Perception and command execution are shared.  Only the pose-error model is
+ * selected by ~servo_mode: a moving-camera error for eye_in_hand, or a TCP
+ * error in base_link for eye_to_hand.
  */
 
 #include <ros/ros.h>
@@ -408,7 +409,16 @@ private:
   JointPoint last_position_, last_velocity_;
 };
 
-enum class ServoState { DISABLED, WAITING, TRACKING, COAST, SEARCH_OPEN, HOLD };
+enum class ServoState
+{
+  DISABLED,
+  WAITING,
+  SEARCH_INITIAL,
+  TRACKING,
+  COAST,
+  SEARCH_RECOVERY,
+  HOLD
+};
 
 const char* stateName(ServoState state)
 {
@@ -416,18 +426,19 @@ const char* stateName(ServoState state)
   {
     case ServoState::DISABLED: return "DISABLED";
     case ServoState::WAITING: return "WAITING";
+    case ServoState::SEARCH_INITIAL: return "SEARCH_INITIAL";
     case ServoState::TRACKING: return "TRACKING";
     case ServoState::COAST: return "COAST";
-    case ServoState::SEARCH_OPEN: return "SEARCH_OPEN";
+    case ServoState::SEARCH_RECOVERY: return "SEARCH_RECOVERY";
     case ServoState::HOLD: return "HOLD";
   }
   return "UNKNOWN";
 }
 
-class EyeInHandVisualServo
+class VisualServo
 {
 public:
-  EyeInHandVisualServo()
+  VisualServo()
       : nh_(), private_nh_("~"), tf_listener_(tf_buffer_), queue_(readQueueCapacity())
   {
     valid_ = loadParameters() && initializeKinematics();
@@ -437,23 +448,23 @@ public:
 
     state_pub_ = nh_.advertise<std_msgs::String>(state_topic_, 1, true);
     legacy_state_pub_ = private_nh_.advertise<std_msgs::String>("state", 1, true);
-    target_sub_ = nh_.subscribe(target_topic_, 1, &EyeInHandVisualServo::targetCallback, this);
+    target_sub_ = nh_.subscribe(target_topic_, 1, &VisualServo::targetCallback, this);
     enable_service_ = nh_.advertiseService("/visual_servo/set_enabled",
-                                            &EyeInHandVisualServo::setEnabled, this);
+                                            &VisualServo::setEnabled, this);
     reset_service_ = nh_.advertiseService("/visual_servo/reset",
-                                           &EyeInHandVisualServo::reset, this);
+                                           &VisualServo::reset, this);
 
     if (backend_ == "gazebo")
     {
       joint_sub_ = nh_.subscribe(joint_states_topic_, 2,
-                                 &EyeInHandVisualServo::jointStateCallback, this);
+                                 &VisualServo::jointStateCallback, this);
       if (!setupGazeboPublishers())
       {
         valid_ = false;
         return;
       }
       output_timer_ = nh_.createTimer(ros::Duration(1.0 / output_rate_),
-                                      &EyeInHandVisualServo::gazeboOutput, this);
+                                      &VisualServo::gazeboOutput, this);
     }
     else if (backend_ == "sdk")
     {
@@ -465,7 +476,7 @@ public:
       }
       sdk_joint_pub_ = nh_.advertise<sensor_msgs::JointState>(joint_states_topic_, 2);
       sdk_state_timer_ = nh_.createTimer(ros::Duration(0.02),
-                                         &EyeInHandVisualServo::sdkStateUpdate, this);
+                                         &VisualServo::sdkStateUpdate, this);
       // Prime state synchronously so integration never starts from zero.
       JointPoint initial{};
       if (sdk_->readState(initial))
@@ -479,10 +490,11 @@ public:
     }
 
     control_timer_ = nh_.createTimer(ros::Duration(1.0 / control_rate_),
-                                     &EyeInHandVisualServo::controlLoop, this);
+                                     &VisualServo::controlLoop, this);
     publishState();
-    ROS_INFO("[visual_servo] 初始化完成：backend=%s, eye-in-hand chain=%s -> %s",
-             backend_.c_str(), base_link_.c_str(), camera_link_.c_str());
+    ROS_INFO("[visual_servo] 初始化完成：mode=%s, backend=%s, chain=%s -> %s",
+             servo_mode_.c_str(), backend_.c_str(), base_link_.c_str(),
+             control_link_.c_str());
   }
 
   bool valid() const { return valid_; }
@@ -499,8 +511,11 @@ private:
   bool loadParameters()
   {
     private_nh_.param<std::string>("backend", backend_, "gazebo");
+    private_nh_.param<std::string>("servo_mode", servo_mode_, "eye_in_hand");
     private_nh_.param<std::string>("base_link", base_link_, "base_link");
     private_nh_.param<std::string>("camera_link", camera_link_, "camera_color_optical_frame");
+    private_nh_.param<std::string>("control_link", control_link_,
+                                   servo_mode_ == "eye_to_hand" ? "tcp_link" : camera_link_);
     private_nh_.param<std::string>("target_topic", target_topic_, "/visual_servo/target_pose");
     private_nh_.param<std::string>("state_topic", state_topic_, "/visual_servo/state");
     private_nh_.param<std::string>("joint_states_topic", joint_states_topic_, "/joint_states");
@@ -509,8 +524,10 @@ private:
     private_nh_.param<double>("output_rate", output_rate_, 200.0);
     private_nh_.param<double>("linear_gain", linear_gain_, 0.8);
     private_nh_.param<double>("angular_gain", angular_gain_, 0.5);
-    private_nh_.param<double>("max_camera_linear_velocity", max_linear_velocity_, 0.08);
-    private_nh_.param<double>("max_camera_angular_velocity", max_angular_velocity_, 0.2);
+    if (!private_nh_.getParam("max_linear_velocity", max_linear_velocity_))
+      private_nh_.param<double>("max_camera_linear_velocity", max_linear_velocity_, 0.08);
+    if (!private_nh_.getParam("max_angular_velocity", max_angular_velocity_))
+      private_nh_.param<double>("max_camera_angular_velocity", max_angular_velocity_, 0.2);
     private_nh_.param<double>("position_deadband", position_deadband_, 0.004);
     private_nh_.param<double>("dls_lambda", dls_lambda_, 0.04);
     private_nh_.param<double>("joint_limit_margin", joint_limit_margin_, 0.08);
@@ -522,7 +539,15 @@ private:
     private_nh_.param<double>("search_velocity_limit", search_velocity_limit_, 0.2);
     private_nh_.param<double>("feedback_blend", feedback_blend_, 0.02);
     private_nh_.param<bool>("use_orientation_control", use_orientation_control_, false);
+    private_nh_.param<bool>("initial_search_enabled", initial_search_enabled_,
+                            servo_mode_ == "eye_in_hand");
     private_nh_.param<bool>("start_enabled", enabled_, false);
+
+    if (servo_mode_ != "eye_in_hand" && servo_mode_ != "eye_to_hand")
+    {
+      ROS_ERROR("[visual_servo] servo_mode 必须是 eye_in_hand 或 eye_to_hand");
+      return false;
+    }
 
     if (control_rate_ <= 0.0 || output_rate_ < control_rate_ || output_rate_ > 500.0)
     {
@@ -557,6 +582,15 @@ private:
       return false;
     }
     desired_position_ = Eigen::Vector3d(desired_position[0], desired_position[1], desired_position[2]);
+    std::vector<double> target_offset;
+    if (!private_nh_.getParam("target_offset", target_offset))
+      target_offset = {0.0, 0.0, 0.0};
+    if (target_offset.size() != 3)
+    {
+      ROS_ERROR("[visual_servo] target_offset 必须包含 3 个数");
+      return false;
+    }
+    target_offset_ = Eigen::Vector3d(target_offset[0], target_offset[1], target_offset[2]);
     desired_rotation_ =
         (Eigen::AngleAxisd(desired_rpy[2], Eigen::Vector3d::UnitZ()) *
          Eigen::AngleAxisd(desired_rpy[1], Eigen::Vector3d::UnitY()) *
@@ -574,15 +608,15 @@ private:
     }
     KDL::Tree tree;
     if (!kdl_parser::treeFromString(robot_description, tree) ||
-        !tree.getChain(base_link_, camera_link_, chain_))
+        !tree.getChain(base_link_, control_link_, chain_))
     {
       ROS_ERROR("[visual_servo] 无法建立 KDL 链 %s -> %s",
-                base_link_.c_str(), camera_link_.c_str());
+                base_link_.c_str(), control_link_.c_str());
       return false;
     }
     if (chain_.getNrOfJoints() != kDof)
     {
-      ROS_ERROR("[visual_servo] 相机链应有 6 个活动关节，实际为 %u", chain_.getNrOfJoints());
+      ROS_ERROR("[visual_servo] 控制链应有 6 个活动关节，实际为 %u", chain_.getNrOfJoints());
       return false;
     }
     fk_solver_.reset(new KDL::ChainFkSolverPos_recursive(chain_));
@@ -605,27 +639,40 @@ private:
 
   void targetCallback(const geometry_msgs::PoseStamped::ConstPtr& message)
   {
-    geometry_msgs::PoseStamped camera_target;
+    geometry_msgs::PoseStamped control_target;
+    const std::string target_frame =
+        servo_mode_ == "eye_in_hand" ? camera_link_ : base_link_;
     try
     {
-      if (message->header.frame_id.empty() || message->header.frame_id == camera_link_)
+      if (message->header.frame_id.empty())
       {
-        camera_target = *message;
-        camera_target.header.frame_id = camera_link_;
+        if (servo_mode_ == "eye_to_hand")
+        {
+          ROS_WARN_THROTTLE(1.0, "[visual_servo] 眼在手外目标必须提供 frame_id");
+          return;
+        }
+        control_target = *message;
+        control_target.header.frame_id = target_frame;
+      }
+      else if (message->header.frame_id == target_frame)
+      {
+        control_target = *message;
       }
       else
       {
-        camera_target = tf_buffer_.transform(*message, camera_link_, ros::Duration(0.03));
+        control_target = tf_buffer_.transform(*message, target_frame, ros::Duration(0.03));
       }
     }
     catch (const tf2::TransformException& exception)
     {
-      ROS_WARN_THROTTLE(1.0, "[visual_servo] 目标无法变换到相机系: %s", exception.what());
+      ROS_WARN_THROTTLE(1.0, "[visual_servo] 目标无法变换到 %s: %s",
+                        target_frame.c_str(), exception.what());
       return;
     }
-    if (!std::isfinite(camera_target.pose.position.x) ||
-        !std::isfinite(camera_target.pose.position.y) ||
-        !std::isfinite(camera_target.pose.position.z) || camera_target.pose.position.z <= 0.0)
+    if (!std::isfinite(control_target.pose.position.x) ||
+        !std::isfinite(control_target.pose.position.y) ||
+        !std::isfinite(control_target.pose.position.z) ||
+        (servo_mode_ == "eye_in_hand" && control_target.pose.position.z <= 0.0))
     {
       ROS_WARN_THROTTLE(1.0, "[visual_servo] 忽略无效或位于相机后方的目标");
       return;
@@ -635,7 +682,7 @@ private:
     if (measurement_time > now)
       measurement_time = now;
     std::lock_guard<std::mutex> lock(target_mutex_);
-    target_pose_ = camera_target.pose;
+    target_pose_ = control_target.pose;
     last_target_time_ = measurement_time;
     have_target_ = true;
   }
@@ -729,14 +776,14 @@ private:
     if (fresh_target)
       return ServoState::TRACKING;
     if (!have_ever_tracked_)
-      return ServoState::WAITING;
+      return initial_search_enabled_ ? ServoState::SEARCH_INITIAL : ServoState::WAITING;
     const double lost_for = std::max(0.0, target_age - target_timeout_);
     if (loss_strategy_ == "stop")
       return ServoState::HOLD;
     if (lost_for < coast_duration_)
       return ServoState::COAST;
     if (loss_strategy_ == "coast_then_open" && lost_for < coast_duration_ + search_timeout_)
-      return ServoState::SEARCH_OPEN;
+      return ServoState::SEARCH_RECOVERY;
     return ServoState::HOLD;
   }
 
@@ -747,39 +794,54 @@ private:
     for (std::size_t i = 0; i < kDof; ++i)
       joints(i) = position[i];
 
-    KDL::Frame base_camera;
+    KDL::Frame base_control;
     KDL::Jacobian kdl_jacobian(kDof);
-    if (fk_solver_->JntToCart(joints, base_camera) < 0 ||
+    if (fk_solver_->JntToCart(joints, base_control) < 0 ||
         jacobian_solver_->JntToJac(joints, kdl_jacobian) < 0)
       return Eigen::VectorXd::Zero(kDof);
 
-    Eigen::Vector3d current(target.position.x, target.position.y, target.position.z);
-    Eigen::Vector3d camera_linear = linear_gain_ * (current - desired_position_);
-    if ((current - desired_position_).norm() < position_deadband_)
-      camera_linear.setZero();
-    if (camera_linear.norm() > max_linear_velocity_)
-      camera_linear *= max_linear_velocity_ / camera_linear.norm();
-
-    Eigen::Vector3d camera_angular = Eigen::Vector3d::Zero();
-    if (use_orientation_control_)
+    Eigen::Vector3d base_linear = Eigen::Vector3d::Zero();
+    Eigen::Vector3d base_angular = Eigen::Vector3d::Zero();
+    const Eigen::Matrix3d base_from_control = kdlRotationToEigen(base_control.M);
+    if (servo_mode_ == "eye_in_hand")
     {
-      const Eigen::Quaterniond observed_q(target.orientation.w, target.orientation.x,
-                                          target.orientation.y, target.orientation.z);
-      if (observed_q.norm() > 1e-6)
+      const Eigen::Vector3d observed(target.position.x, target.position.y, target.position.z);
+      Eigen::Vector3d control_linear = linear_gain_ * (observed - desired_position_);
+      if ((observed - desired_position_).norm() < position_deadband_)
+        control_linear.setZero();
+      base_linear = base_from_control * control_linear;
+      if (use_orientation_control_)
       {
-        const Eigen::Matrix3d observed = observed_q.normalized().toRotationMatrix();
-        // Eye-in-hand sign: rotating the camera produces the opposite rotation
-        // in the observed object pose.
-        camera_angular = -angular_gain_ * rotationLog(desired_rotation_ * observed.transpose());
-        if (camera_angular.norm() > max_angular_velocity_)
-          camera_angular *= max_angular_velocity_ / camera_angular.norm();
+        const Eigen::Quaterniond observed_q(target.orientation.w, target.orientation.x,
+                                            target.orientation.y, target.orientation.z);
+        if (observed_q.norm() > 1e-6)
+        {
+          const Eigen::Matrix3d observed_rotation = observed_q.normalized().toRotationMatrix();
+          base_angular = base_from_control *
+              (-angular_gain_ * rotationLog(desired_rotation_ * observed_rotation.transpose()));
+        }
       }
     }
+    else
+    {
+      const Eigen::Vector3d target_in_base(target.position.x, target.position.y,
+                                           target.position.z);
+      const Eigen::Vector3d current_tcp(base_control.p.x(), base_control.p.y(),
+                                        base_control.p.z());
+      const Eigen::Vector3d position_error = target_in_base + target_offset_ - current_tcp;
+      if (position_error.norm() >= position_deadband_)
+        base_linear = linear_gain_ * position_error;
+      if (use_orientation_control_)
+        base_angular = angular_gain_ * rotationLog(desired_rotation_ * base_from_control.transpose());
+    }
+    if (base_linear.norm() > max_linear_velocity_)
+      base_linear *= max_linear_velocity_ / base_linear.norm();
+    if (base_angular.norm() > max_angular_velocity_)
+      base_angular *= max_angular_velocity_ / base_angular.norm();
 
-    const Eigen::Matrix3d base_from_camera = kdlRotationToEigen(base_camera.M);
     Eigen::VectorXd base_twist(6);
-    base_twist.head<3>() = base_from_camera * camera_linear;
-    base_twist.tail<3>() = base_from_camera * camera_angular;
+    base_twist.head<3>() = base_linear;
+    base_twist.tail<3>() = base_angular;
 
     Eigen::MatrixXd jacobian(6, kDof);
     for (int row = 0; row < 6; ++row)
@@ -804,7 +866,8 @@ private:
       const double decay = std::exp(-lost_for / std::max(0.01, coast_decay_time_));
       velocity = decay * last_tracking_velocity_;
     }
-    else if (state == ServoState::SEARCH_OPEN)
+    else if (state == ServoState::SEARCH_INITIAL ||
+             state == ServoState::SEARCH_RECOVERY)
     {
       for (std::size_t i = 0; i < kDof; ++i)
         velocity(i) = clampValue(open_posture_gain_ * (open_posture_[i] - position[i]),
@@ -943,7 +1006,8 @@ private:
   CommandQueue queue_;
   bool valid_{false};
 
-  std::string backend_, base_link_, camera_link_, target_topic_, state_topic_, joint_states_topic_, loss_strategy_;
+  std::string backend_, servo_mode_, base_link_, camera_link_, control_link_;
+  std::string target_topic_, state_topic_, joint_states_topic_, loss_strategy_;
   std::vector<std::string> joint_names_, gazebo_topics_;
   double control_rate_{100.0}, output_rate_{200.0};
   double linear_gain_{0.8}, angular_gain_{0.5};
@@ -952,11 +1016,12 @@ private:
   double target_timeout_{0.2}, coast_duration_{0.35}, coast_decay_time_{0.18};
   double search_timeout_{8.0}, open_posture_gain_{0.7}, search_velocity_limit_{0.2};
   double feedback_blend_{0.02};
-  bool use_orientation_control_{false}, enabled_{false};
+  bool use_orientation_control_{false}, initial_search_enabled_{false}, enabled_{false};
   JointPoint lower_limits_{}, upper_limits_{}, velocity_limits_{}, acceleration_limits_{};
   JointPoint open_posture_{}, feedback_position_{}, command_position_{}, command_velocity_{};
   JointPoint backend_velocity_{}, last_output_{};
   Eigen::Vector3d desired_position_{Eigen::Vector3d::Zero()};
+  Eigen::Vector3d target_offset_{Eigen::Vector3d::Zero()};
   Eigen::Matrix3d desired_rotation_{Eigen::Matrix3d::Identity()};
   Eigen::VectorXd last_tracking_velocity_{Eigen::VectorXd::Zero(kDof)};
 
@@ -983,8 +1048,8 @@ private:
 int main(int argc, char** argv)
 {
   setlocale(LC_ALL, "");
-  ros::init(argc, argv, "eye_in_hand_visual_servo");
-  EyeInHandVisualServo servo;
+  ros::init(argc, argv, "visual_servo");
+  VisualServo servo;
   if (!servo.valid())
     return 1;
   ros::AsyncSpinner spinner(3);

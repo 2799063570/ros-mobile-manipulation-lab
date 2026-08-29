@@ -1,0 +1,16 @@
+servo_mode: eye_to_hand
+camera_link: workspace_camera_color_optical_frame
+control_link: tcp_link
+
+# The fixed-camera target is transformed to base_link. The TCP tracks this
+# offset point. The lateral component keeps the arm out of the camera-target
+# sight line; calibrate its sign and magnitude for the actual workcell.
+target_offset: [0.0, -0.08, 0.18]
+desired_target_position: [0.0, 0.0, 0.0]
+desired_target_rpy: [3.141592653589793, 0.0, 0.0]
+use_orientation_control: true
+
+# A fixed camera does not need arm motion to acquire its first target. On loss,
+# decelerate briefly and hold instead of moving through the camera sight line.
+initial_search_enabled: false
+loss_strategy: coast

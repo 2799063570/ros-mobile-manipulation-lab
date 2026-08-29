@@ -14,13 +14,13 @@ GitHub 若未直接显示播放器，可点击链接打开或下载原视频。�
 
 ## 当前集成能力
 
-- 可供具体任务场景选用的 RealSense RGB-D 真机启动入口；
-- 对齐深度、注册点云以及工作区点云过滤；
+- 复用 `aubo` 的 RealSense RGB-D 真机启动入口；
+- 复用 `aubo_perception` 的对齐深度适配和工作区点云过滤；
 - `PointCloudOctomapUpdater` 与独立的 `use_sensor_manager` 开关；
 - YOLO检测框、深度图和相机内参到三维抓取目标的通用适配；
 - 分拣初始化阶段的点云与OctoMap就绪检查；
 - 底盘移动后清空OctoMap，机械臂规划和执行期间锁住底盘；
-- 默认只规划不执行的眼在手外MoveIt小步逼近模式。
+- 复用统一视觉伺服核心的眼在手外 SDK 控制模式。
 
 通用机器人 URDF 不安装眼在手外相机或相机立柱，以免占用机械臂工作空间并增加
 碰撞风险。固定相机应按任务需要安装在对应场景中，其外参也由该场景负责定义。
@@ -61,9 +61,9 @@ aubo_mobile_robot/
 AUBO 机械臂的通用网格模型和原有机械臂功能包继续保留在顶层 `aubo/` 目录中。
 移动机器人相关功能包应通过依赖复用这些资源，不要重复复制模型文件。
 
-颜色检测、分拣状态机和 Gazebo 抓取插件也已分别下沉到顶层的
-`aubo_perception`、`aubo_sorting_core` 和 `aubo_gazebo_plugins`。移动端包只保存
-底盘相关模型、参数、界面和场景编排。
+颜色/RGB-D检测、视觉伺服、OctoMap点云过滤、分拣状态机和Gazebo抓取插件已分别
+下沉到顶层的 `aubo_perception`、`aubo_ros_control`、`aubo_sorting_core` 和
+`aubo_gazebo_plugins`。移动端包只保存底盘模型、导航、场景参数和任务编排。
 
 ## 依赖方向
 
@@ -77,6 +77,7 @@ aubo_mobile_robot ── aubo_mobile_moveit_config
        └── aubo_mobile_follower  │
                                  ▼
 aubo_mobile_perception ──→ aubo_perception
+aubo_mobile_bringup ─────→ aubo_ros_control
 aubo_mobile_sorting ──────→ aubo_sorting_core
           │                → aubo_gazebo_plugins
           ▼
@@ -90,6 +91,12 @@ aubo_mobile_bringup（统一组合启动）
 
 ```bash
 roslaunch aubo_mobile_bringup simulation.launch mode:=sorting
+```
+
+移动导航抓取中的视觉伺服入口为：
+
+```bash
+roslaunch aubo_mobile_bringup mobile_manipulation_visual_servo.launch
 ```
 
 检测消息统一为 `aubo_perception/DetectedObjectArray`。`aubo_mobile_perception` 不再

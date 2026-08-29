@@ -3,10 +3,12 @@
   <!-- This file makes it easy to include the settings for sensor managers -->
 
   <!-- Params for 3D sensors config -->
-  <rosparam command="load" file="$(find aubo_moveit_config)/config/sensors_3d.yaml" />
+  <arg name="sensors_3d_config"
+       default="$(find aubo_moveit_config)/config/sensors_3d.yaml" />
+  <rosparam command="load" file="$(arg sensors_3d_config)" />
 
-  <!-- Keep the map fixed in the robot base frame while the eye-in-hand camera
-       moves.  A 4 cm voxel is a useful compromise for an AUBO-sized arm. -->
+  <!-- Keep the map fixed in the robot base frame for either camera mounting.
+       A 4 cm voxel is a useful compromise for an AUBO-sized arm. -->
   <param name="octomap_frame" type="string" value="base_link" />
   <param name="octomap_resolution" type="double" value="0.04" />
   <param name="max_range" type="double" value="2.5" />

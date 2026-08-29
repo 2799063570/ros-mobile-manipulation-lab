@@ -9,7 +9,6 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   hardware_interface
   kdl_parser
-  message_filters
   pluginlib
   roscpp
   rospy
@@ -57,7 +56,7 @@ catkin_package(
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME} aubo_visual_servo_panel
   CATKIN_DEPENDS aubo_sdk controller_manager geometry_msgs hardware_interface
-    kdl_parser message_filters pluginlib roscpp rospy roslib rviz sensor_msgs
+    kdl_parser pluginlib roscpp rospy roslib rviz sensor_msgs
     std_msgs std_srvs tf2_geometry_msgs tf2_ros
   DEPENDS orocos_kdl
 )
@@ -88,22 +87,22 @@ set_target_properties(aubo_hw_node PROPERTIES
   INSTALL_RPATH "${AUBO_SDK_NODE_INSTALL_RPATH}"
   LINK_FLAGS "-Wl,--disable-new-dtags")
 
-# Unified eye-in-hand visual-servo node.  The same kinematics, limiter and
-# bounded queue are used by the Gazebo and direct-SDK backends.
-add_executable(eye_in_hand_visual_servo_node src/eye_in_hand_visual_servo_node.cpp)
-target_compile_features(eye_in_hand_visual_servo_node PRIVATE cxx_std_14)
-target_include_directories(eye_in_hand_visual_servo_node PRIVATE
+# Unified visual-servo node.  Camera mounting mode and command backend are
+# orthogonal parameters, so all four combinations share one implementation.
+add_executable(aubo_visual_servo_node src/visual_servo_node.cpp)
+target_compile_features(aubo_visual_servo_node PRIVATE cxx_std_14)
+target_include_directories(aubo_visual_servo_node PRIVATE
   include
   ${catkin_INCLUDE_DIRS}
   ${orocos_kdl_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR})
-target_link_libraries(eye_in_hand_visual_servo_node
+target_link_libraries(aubo_visual_servo_node
   ${catkin_LIBRARIES}
   ${orocos_kdl_LIBRARIES}
   ${AUBO_SDK_LIB}
   Threads::Threads)
-set_target_properties(eye_in_hand_visual_servo_node PROPERTIES
+set_target_properties(aubo_visual_servo_node PROPERTIES
   BUILD_RPATH "${AUBO_SDK_RUNTIME_DIRS}"
   INSTALL_RPATH "${AUBO_SDK_NODE_INSTALL_RPATH}"
   LINK_FLAGS "-Wl,--disable-new-dtags")
@@ -119,18 +118,13 @@ target_link_libraries(aubo_visual_servo_panel
   ${catkin_LIBRARIES}
   Qt5::Widgets)
 
-install(TARGETS ${PROJECT_NAME} aubo_hw_node eye_in_hand_visual_servo_node
+install(TARGETS ${PROJECT_NAME} aubo_hw_node aubo_visual_servo_node
                 aubo_visual_servo_panel
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 install(DIRECTORY include/${PROJECT_NAME}/
   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION})
-catkin_install_python(PROGRAMS
-  scripts/color_visual_target_node.py
-  scripts/eye_to_hand_moveit_servo_node.py
-  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
-
 install(DIRECTORY config launch worlds
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
 install(FILES VISUAL_SERVO.md plugin_description.xml

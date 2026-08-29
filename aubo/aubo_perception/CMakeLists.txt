@@ -5,10 +5,12 @@ find_package(catkin REQUIRED COMPONENTS
   cv_bridge
   geometry_msgs
   message_generation
+  message_filters
   roscpp
   rospy
   sensor_msgs
   std_msgs
+  std_srvs
   tf
   tf2_ros
   tf2_sensor_msgs
@@ -21,7 +23,7 @@ add_message_files(FILES
 generate_messages(DEPENDENCIES geometry_msgs std_msgs)
 
 catkin_package(
-  CATKIN_DEPENDS cv_bridge geometry_msgs message_runtime roscpp rospy sensor_msgs std_msgs tf tf2_ros tf2_sensor_msgs
+  CATKIN_DEPENDS cv_bridge geometry_msgs message_filters message_runtime roscpp rospy sensor_msgs std_msgs std_srvs tf tf2_ros tf2_sensor_msgs
 )
 
 include_directories(${catkin_INCLUDE_DIRS})
@@ -32,11 +34,12 @@ add_dependencies(workspace_cloud_filter_node ${${PROJECT_NAME}_EXPORTED_TARGETS}
 
 catkin_install_python(PROGRAMS
   scripts/color_object_detector.py
+  scripts/rgbd_visual_target_node.py
   scripts/yolo_rgbd_target_node.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
-install(DIRECTORY msg
+install(DIRECTORY config msg
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
 install(TARGETS workspace_cloud_filter_node

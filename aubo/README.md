@@ -17,13 +17,13 @@
 ```text
 硬件与模型
 ├── aubo_sdk                 # 厂商 SDK 头文件、运行库及诊断示例
-├── aubo_description         # AUBO i5、夹爪和相机模型
-├── aubo_ros_control         # 真实机械臂 RobotHW 与轨迹控制
+├── aubo_description         # AUBO i5、夹爪及两种相机安装的模型/TF
+├── aubo_ros_control         # RobotHW、统一视觉伺服及 Gazebo/SDK 输出
 ├── aubo_gazebo              # 固定机械臂 Gazebo 启动及控制器
 └── aubo_moveit_config       # 固定机械臂 MoveIt 配置
 
 平台无关能力
-├── aubo_perception          # 检测消息和颜色目标检测器
+├── aubo_perception          # RGB-D/YOLO 检测、目标位姿及 OctoMap 点云过滤
 ├── aubo_sorting_core        # MoveIt 分拣状态机
 └── aubo_gazebo_plugins      # Gazebo 抓取辅助插件
 
@@ -79,11 +79,15 @@ roslaunch aubo_mobile_sorting sorting_gazebo.launch
 
 ```bash
 # 腕部相机（眼在手上）
-roslaunch aubo_ros_control visual_servo_gazebo.launch
+roslaunch aubo_ros_control eye_in_hand_visual_servo_gazebo.launch
 
 # 场景固定 RGB-D 相机（眼在手外）
 roslaunch aubo_ros_control eye_to_hand_visual_servo_gazebo.launch
 ```
+
+两种安装方式使用同一个 `aubo_visual_servo_node`；只在相机/TCP坐标误差上分支，
+Gazebo 与真机只在输出后端上分支。详细设计与真机入口见
+[`aubo_ros_control/VISUAL_SERVO.md`](aubo_ros_control/VISUAL_SERVO.md)。
 
 重构后检测消息统一为 `aubo_perception/DetectedObjectArray`。仓库外部节点如果曾
 导入 `aubo_color_sorting.msg` 或 `aubo_mobile_perception.msg`，需要改为

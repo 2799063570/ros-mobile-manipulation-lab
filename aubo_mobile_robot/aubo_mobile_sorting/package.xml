@@ -23,6 +23,7 @@
 
   <exec_depend>actionlib</exec_depend>
   <exec_depend>actionlib_msgs</exec_depend>
+  <exec_depend>aubo_description</exec_depend>
   <exec_depend>aubo_mobile_moveit_config</exec_depend>
   <exec_depend>aubo_mobile_perception</exec_depend>
   <exec_depend>aubo_mobile_robot</exec_depend>

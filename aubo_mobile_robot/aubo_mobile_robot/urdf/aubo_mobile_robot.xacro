@@ -7,6 +7,7 @@
   <xacro:arg name="standalone" default="false"/>
   <xacro:arg name="robot_namespace" default="/"/>
   <xacro:arg name="aubo_description_path" default="$(find aubo_description)"/>
+  <xacro:arg name="enable_hand_camera" default="true"/>
 
   <!-- Mobile base geometry (metres, kilograms). -->
   <xacro:property name="base_radius" value="0.34"/>
@@ -279,7 +280,9 @@
   <xacro:planar_lidar name="front" x="0.27" yaw="0" topic="front/scan"/>
   <xacro:planar_lidar name="rear" x="-0.27" yaw="${pi}" topic="rear/scan"/>
 
-  <!-- Camera mounted beside the hand; optical frame follows REP-103. -->
+  <!-- Camera mounted beside the hand; optical frame follows REP-103. It can
+       be omitted for external-camera tasks to avoid duplicate image streams. -->
+  <xacro:if value="$(arg enable_hand_camera)">
   <link name="hand_camera_mount_link">
     <!-- Two bars form an L bracket from the gripper body to the side camera. -->
     <visual>
@@ -385,6 +388,7 @@
   <gazebo reference="hand_camera_mount_link">
     <material>Gazebo/Black</material>
   </gazebo>
+  </xacro:if>
 
   <gazebo reference="mobile_base_link">
     <material>Gazebo/Blue</material>

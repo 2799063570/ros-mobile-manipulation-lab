@@ -22,7 +22,7 @@
 
   <!-- nav_sorting.world owns a fixed camera above the sorting target.  map is
        the stable scene frame while the robot navigates beneath it. -->
-  <include file="$(find aubo_mobile_perception)/launch/static_workspace_camera_tf.launch">
+  <include file="$(find aubo_description)/launch/eye_to_hand_camera_tf.launch">
     <arg name="parent_frame" value="map"/>
     <arg name="x" value="2.82"/>
     <arg name="y" value="0.0"/>

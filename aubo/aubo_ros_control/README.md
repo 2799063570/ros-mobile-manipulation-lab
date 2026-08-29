@@ -81,12 +81,15 @@ roslaunch aubo_ros_control aubo_real_bringup.launch \
   robot_xacro:=aubo_i5.xacro robot_srdf:=aubo_i5.srdf
 ```
 
-The visual-servo launch files use the same RealSense-style RGB-D topics in
-Gazebo and on hardware. `visual_servo_real.launch` can start the physical
+The eye-in-hand visual-servo launch files use the same RealSense-style RGB-D
+topics in Gazebo and on hardware. `eye_in_hand_visual_servo_real.launch` can start the physical
 RealSense driver with aligned depth; the robot URDF owns the calibrated mount TF
 and the common optical frame is `camera_color_optical_frame`.
 
-`visual_servo_gazebo.launch` relays `/aubo_i5/joint_states` to the global
+`eye_in_hand_visual_servo_gazebo.launch` relays `/aubo_i5/joint_states` to the global
 `/joint_states` topic consumed by `robot_state_publisher`. If RViz reports that
 all arm and camera links have no transform to `base_link`, verify that both
 topics are publishing before debugging the camera TF itself.
+
+`visual_servo_gazebo.launch` and `visual_servo_real.launch` are deprecated
+compatibility wrappers for existing deployments.
