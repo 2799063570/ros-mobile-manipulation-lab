@@ -1,0 +1,109 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <!--
+    Reusable eye-to-hand RGB-D camera.
+
+    The camera is fixed outside the arm kinematic chain.  On a mobile
+    manipulator its parent should normally be a chassis/mast link; a fixed
+    workstation can instantiate the same macro below a world/map fixture.
+
+    The frame names intentionally match the realsense2_camera tf_prefix
+    convention.  Real-hardware launch files can therefore disable the camera
+    driver's TF publisher and let robot_state_publisher own the calibrated
+    extrinsic transform.
+  -->
+  <xacro:macro name="eye_to_hand_rgbd" params="
+      name parent xyz rpy simulate update_rate horizontal_fov mast_height">
+    <link name="${name}_mount_link">
+      <visual>
+        <origin xyz="0 0 ${mast_height / 2.0}" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.018" length="${mast_height}"/></geometry>
+        <material name="eye_to_hand_mount"><color rgba="0.08 0.08 0.08 1"/></material>
+      </visual>
+      <collision>
+        <origin xyz="0 0 ${mast_height / 2.0}" rpy="0 0 0"/>
+        <geometry><cylinder radius="0.018" length="${mast_height}"/></geometry>
+      </collision>
+      <inertial>
+        <origin xyz="0 0 ${mast_height / 2.0}"/>
+        <mass value="0.30"/>
+        <inertia ixx="0.00325" ixy="0" ixz="0" iyy="0.00325" iyz="0" izz="0.00005"/>
+      </inertial>
+    </link>
+    <joint name="${name}_mount_joint" type="fixed">
+      <parent link="${parent}"/>
+      <child link="${name}_mount_link"/>
+      <origin xyz="${xyz}" rpy="0 0 0"/>
+    </joint>
+
+    <!-- Sensor link local +X is the viewing direction used by Gazebo. -->
+    <link name="${name}_link">
+      <visual>
+        <geometry><box size="0.090 0.025 0.025"/></geometry>
+        <material name="eye_to_hand_body"><color rgba="0.55 0.58 0.62 1"/></material>
+      </visual>
+      <collision><geometry><box size="0.090 0.025 0.025"/></geometry></collision>
+      <inertial>
+        <mass value="0.12"/>
+        <inertia ixx="0.000013" ixy="0" ixz="0" iyy="0.000084" iyz="0" izz="0.000084"/>
+      </inertial>
+    </link>
+    <joint name="${name}_joint" type="fixed">
+      <parent link="${name}_mount_link"/>
+      <child link="${name}_link"/>
+      <origin xyz="0 0 ${mast_height + 0.01}" rpy="${rpy}"/>
+    </joint>
+
+    <!-- Minimal RealSense-compatible frame tree.  Device-specific millimetre
+         offsets can be inserted here after the physical hand-eye calibration. -->
+    <link name="${name}_depth_frame"/>
+    <joint name="${name}_depth_joint" type="fixed">
+      <parent link="${name}_link"/><child link="${name}_depth_frame"/>
+      <origin xyz="0.045 0 0" rpy="0 0 0"/>
+    </joint>
+    <link name="${name}_depth_optical_frame"/>
+    <joint name="${name}_depth_optical_joint" type="fixed">
+      <parent link="${name}_depth_frame"/><child link="${name}_depth_optical_frame"/>
+      <origin xyz="0 0 0" rpy="${-pi / 2.0} 0 ${-pi / 2.0}"/>
+    </joint>
+    <link name="${name}_color_frame"/>
+    <joint name="${name}_color_joint" type="fixed">
+      <parent link="${name}_link"/><child link="${name}_color_frame"/>
+      <origin xyz="0.045 0 0" rpy="0 0 0"/>
+    </joint>
+    <link name="${name}_color_optical_frame"/>
+    <joint name="${name}_color_optical_joint" type="fixed">
+      <parent link="${name}_color_frame"/><child link="${name}_color_optical_frame"/>
+      <origin xyz="0 0 0" rpy="${-pi / 2.0} 0 ${-pi / 2.0}"/>
+    </joint>
+
+    <xacro:if value="${simulate}">
+      <gazebo reference="${name}_mount_link"><material>Gazebo/Black</material></gazebo>
+      <gazebo reference="${name}_link">
+        <material>Gazebo/Grey</material>
+        <sensor type="depth" name="${name}_rgbd">
+          <pose>0.045 0 0 0 0 0</pose>
+          <always_on>true</always_on>
+          <visualize>false</visualize>
+          <update_rate>${update_rate}</update_rate>
+          <camera name="${name}_sensor">
+            <horizontal_fov>${horizontal_fov}</horizontal_fov>
+            <image><width>640</width><height>480</height><format>R8G8B8</format></image>
+            <clip><near>0.15</near><far>3.0</far></clip>
+          </camera>
+          <plugin name="${name}_gazebo_ros_openni" filename="libgazebo_ros_openni_kinect.so">
+            <cameraName>${name}</cameraName>
+            <imageTopicName>color/image_raw</imageTopicName>
+            <cameraInfoTopicName>color/camera_info</cameraInfoTopicName>
+            <depthImageTopicName>aligned_depth_to_color/image_raw</depthImageTopicName>
+            <depthImageCameraInfoTopicName>aligned_depth_to_color/camera_info</depthImageCameraInfoTopicName>
+            <pointCloudTopicName>depth/color/points</pointCloudTopicName>
+            <frameName>${name}_color_optical_frame</frameName>
+            <pointCloudCutoff>0.15</pointCloudCutoff>
+            <pointCloudCutoffMax>3.0</pointCloudCutoffMax>
+          </plugin>
+        </sensor>
+      </gazebo>
+    </xacro:if>
+  </xacro:macro>
+</robot>

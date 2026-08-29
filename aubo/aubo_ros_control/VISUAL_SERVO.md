@@ -130,3 +130,12 @@ OpenCV 前端在颜色轮廓内部取有效深度中值并发布
 5. 丢失时间参数和现场验证后的 `open_posture`。
 
 姿态伺服默认关闭。只有当检测器的目标姿态稳定且方向定义明确时，才启用 `use_orientation_control`。
+
+## 7. 眼在手外控制
+
+`eye_to_hand_moveit_servo_node.py` 是与高速眼在手上 SDK 控制器隔离的低频 MoveIt
+PBVS实现。它把固定 RGB-D 相机给出的目标变换到机械臂基座坐标系，以限制步长反复
+规划 TCP 位置。配置默认 `plan_only: true`、`start_enabled: false`。
+
+眼在手上与眼在手外节点共用 `/visual_servo/target_pose`、启停服务和状态话题，因此
+同一时刻只能启动一个控制节点。YOLO适配器也只负责发布目标，不直接下发关节命令。

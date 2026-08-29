@@ -1,0 +1,22 @@
+boxes_topic: /darknet_ros/bounding_boxes
+aligned_depth_topic: /workspace_camera/aligned_depth_to_color/image_raw
+camera_info_topic: /workspace_camera/color/camera_info
+detections_topic: /sorting/detections
+target_pose_topic: /visual_servo/target_pose
+target_label_topic: /visual_servo/target_label
+target_frame: base_link
+
+minimum_probability: 0.50
+minimum_depth: 0.15
+maximum_depth: 2.50
+depth_scale_16u: 0.001
+roi_scale: 0.55
+maximum_depth_age: 0.25
+object_center_z: 0.16
+selected_class: ""
+
+# Map network class names to the stable labels used by sorting.yaml.
+class_aliases:
+  red_block: red
+  green_block: green
+  blue_block: blue

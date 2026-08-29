@@ -3,6 +3,15 @@
 顶层 `aubo/` 保存 AUBO 机械臂本体能力，以及固定底座和移动底盘都可以复用的
 通用能力。`aubo_mobile_robot/` 只保存移动底盘带来的模型、导航、平台参数和场景编排。
 
+## 演示素材
+
+[▶ 预览 AUBO 分拣流程（MP4，约 3.9 MB）](video_or_img/preview.mp4)
+
+[下载高清版本（MP4，约 22.7 MB）](video_or_img/sorting_process.mp4)
+
+视频和后续截图统一收录在 [`video_or_img/`](video_or_img/README.md)，避免把演示素材
+散落到算法、驱动和平台配置包中。
+
 ## 包职责
 
 ```text
@@ -26,6 +35,15 @@
 依赖只能由场景层指向通用层。例如 `aubo_color_sorting` 和
 `aubo_mobile_sorting` 都依赖 `aubo_sorting_core`，通用核心不能反向依赖任一平台
 场景。两套 MoveIt 配置对应不同机器人模型，应继续独立维护。
+
+## SDK 与上游参考
+
+`aubo_sdk` 中的控制器头文件、运行库和配置来自
+[`aubo_perception_planning`](https://github.com/2799063570/aubo_perception_planning)，
+本地保留厂商SDK接口，并对Catkin导出、只读诊断、受保护运动示例和
+`aubo_ros_control`安全状态处理进行了适配。远程仓库中的硬编码手眼标定结果、
+控制器名称和视觉伺服启动文件不能直接覆盖本工程；移动平台通过通用目标消息、TF、
+MoveIt和独立启动入口复用这些能力。
 
 ## 分拣调用关系
 

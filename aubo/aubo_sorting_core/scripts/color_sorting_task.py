@@ -21,8 +21,10 @@ from control_msgs.msg import (
     JointTolerance,
 )
 from geometry_msgs.msg import PoseStamped
-from std_msgs.msg import String
-from std_srvs.srv import Trigger, TriggerResponse
+from moveit_msgs.msg import PlanningScene
+from sensor_msgs.msg import PointCloud2
+from std_msgs.msg import Bool, String
+from std_srvs.srv import Empty, Trigger, TriggerResponse
 from tf.transformations import quaternion_from_euler
 from trajectory_msgs.msg import JointTrajectoryPoint
 
@@ -128,6 +130,22 @@ class ColorSortingTask(object):
             rospy.get_param("~auto_move_to_observation", True)
         )
         self.auto_start = bool(rospy.get_param("~auto_start", False))
+        self.require_octomap = bool(rospy.get_param("~require_octomap", False))
+        self.point_cloud_topic = rospy.get_param(
+            "~point_cloud_topic", "/workspace_camera/depth/color/points"
+        )
+        self.planning_scene_topic = rospy.get_param(
+            "~planning_scene_topic", "/move_group/monitored_planning_scene"
+        )
+        self.clear_octomap_service = rospy.get_param(
+            "~clear_octomap_service", "/clear_octomap"
+        )
+        self.octomap_wait_timeout = float(
+            rospy.get_param("~octomap_wait_timeout", 30.0)
+        )
+        self.base_lock_topic = rospy.get_param(
+            "~base_lock_topic", "/sorting/base_locked"
+        )
         self._robot_limits_valid = self._verify_loaded_upper_arm_limit()
 
         self._detections = None
@@ -141,6 +159,9 @@ class ColorSortingTask(object):
         self._initialized = False
         self._observation_ready = False
         self._stop_requested = threading.Event()
+        self._last_cloud_wall_time = 0.0
+        self._cloud_points = 0
+        self._octomap_sequence = 0
 
         self._state_publisher = rospy.Publisher(
             "/sorting/state", String, queue_size=1, latch=True
@@ -148,6 +169,10 @@ class ColorSortingTask(object):
         self._detection_summary_publisher = rospy.Publisher(
             "/sorting/detection_summary", String, queue_size=1, latch=True
         )
+        self._base_lock_publisher = rospy.Publisher(
+            self.base_lock_topic, Bool, queue_size=1, latch=True
+        )
+        self._base_lock_publisher.publish(Bool(data=False))
         self._subscriber = rospy.Subscriber(
             self.detections_topic,
             DetectedObjectArray,
@@ -166,6 +191,16 @@ class ColorSortingTask(object):
             self._grasp_status_callback,
             queue_size=5,
         )
+        self._cloud_subscriber = rospy.Subscriber(
+            self.point_cloud_topic, PointCloud2, self._cloud_callback, queue_size=1
+        )
+        self._planning_scene_subscriber = rospy.Subscriber(
+            self.planning_scene_topic,
+            PlanningScene,
+            self._planning_scene_callback,
+            queue_size=5,
+        )
+        self._clear_octomap = rospy.ServiceProxy(self.clear_octomap_service, Empty)
 
         self.robot = moveit_commander.RobotCommander()
         self.scene = moveit_commander.PlanningSceneInterface()
@@ -217,6 +252,65 @@ class ColorSortingTask(object):
         with self._data_lock:
             self._grasp_status = message.data
             self._grasp_status_sequence += 1
+
+    def _cloud_callback(self, message):
+        points = int(message.width) * int(message.height)
+        if points <= 0:
+            return
+        with self._data_lock:
+            self._cloud_points = points
+            self._last_cloud_wall_time = time.time()
+
+    def _planning_scene_callback(self, message):
+        if not message.world.octomap.octomap.data:
+            return
+        with self._data_lock:
+            self._octomap_sequence += 1
+
+    def _refresh_octomap(self):
+        """Clear stale chassis-frame geometry and require a fresh sensor map."""
+        if not self.require_octomap:
+            return True
+        deadline = time.time() + self.octomap_wait_timeout
+        cloud_not_before = time.time()
+        while not rospy.is_shutdown() and time.time() < deadline:
+            with self._data_lock:
+                cloud_time = self._last_cloud_wall_time
+                cloud_points = self._cloud_points
+            if cloud_time > cloud_not_before and cloud_points > 0:
+                break
+            if self._stop_requested.is_set():
+                return False
+            rospy.sleep(0.05)
+        else:
+            rospy.logerr("No fresh RGB-D cloud received on %s", self.point_cloud_topic)
+            return False
+
+        remaining = max(0.1, deadline - time.time())
+        try:
+            rospy.wait_for_service(self.clear_octomap_service, timeout=remaining)
+            with self._data_lock:
+                previous_sequence = self._octomap_sequence
+            self._clear_octomap()
+        except (rospy.ROSException, rospy.ServiceException) as error:
+            rospy.logerr("Cannot clear MoveIt OctoMap: %s", str(error))
+            return False
+
+        while not rospy.is_shutdown() and time.time() < deadline:
+            with self._data_lock:
+                refreshed = self._octomap_sequence > previous_sequence
+            if refreshed:
+                rospy.loginfo(
+                    "Fresh MoveIt OctoMap confirmed from %s (%d points/cloud)",
+                    self.point_cloud_topic,
+                    cloud_points,
+                )
+                return True
+            if self._stop_requested.is_set():
+                return False
+            rospy.sleep(0.05)
+        rospy.logerr("MoveIt did not publish a fresh non-empty OctoMap")
+        return False
 
     def _wait_for_grasp_plugin(self):
         if not self.use_grasp_attachment:
@@ -332,6 +426,10 @@ class ColorSortingTask(object):
             self._busy = False
             self._publish_state("ERROR", "sorting table missing from planning scene")
             return
+        if not self._refresh_octomap():
+            self._busy = False
+            self._publish_state("ERROR", "RGB-D cloud or MoveIt OctoMap unavailable")
+            return
         self._initialized = True
         self._busy = False
         self._publish_state("IDLE", "controllers ready")
@@ -349,6 +447,7 @@ class ColorSortingTask(object):
                 return False, "sorting node is not initialized"
             self._busy = True
             self._stop_requested.clear()
+            self._base_lock_publisher.publish(Bool(data=True))
 
         def worker():
             success = False
@@ -363,6 +462,7 @@ class ColorSortingTask(object):
                     self._release_attached_object_no_wait()
                 with self._operation_lock:
                     self._busy = False
+                self._base_lock_publisher.publish(Bool(data=False))
                 if self._stop_requested.is_set():
                     self._observation_ready = False
                     self._publish_state("STOPPED", "operation cancelled")
@@ -715,6 +815,8 @@ class ColorSortingTask(object):
 
     def _observation(self):
         self._observation_ready = False
+        if not self._refresh_octomap():
+            return False
         # The mobile base has moved since initialization. Refresh the static
         # table in the planning frame before planning out of transport pose.
         if not self._add_table_collision():
@@ -760,6 +862,8 @@ class ColorSortingTask(object):
 
     def _prepare_work_operation(self):
         self._observation_ready = False
+        if not self._refresh_octomap():
+            return False
         # Refresh the map-fixed table before unfolding near the workstation.
         if not self._add_table_collision():
             return False

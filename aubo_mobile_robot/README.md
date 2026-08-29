@@ -1,5 +1,27 @@
 # AUBO 复合移动机器人功能包集合
 
+眼在手外 RGB-D、MoveIt OctoMap、YOLO 抓取适配和视觉伺服的集成说明见
+[`EYE_TO_HAND_RGBD.md`](EYE_TO_HAND_RGBD.md)。
+
+## 演示视频
+
+[▶ 预览目标识别、规划、抓取与分类放置流程（MP4，约 3.9 MB）](../aubo/video_or_img/preview.mp4)
+
+[下载高清版本（MP4，约 22.7 MB）](../aubo/video_or_img/sorting_process.mp4)
+
+GitHub 若未直接显示播放器，可点击链接打开或下载原视频。视频及后续演示素材统一
+保存在 [`aubo/video_or_img/`](../aubo/video_or_img/README.md)。
+
+## 当前集成能力
+
+- 车体固定式 RealSense RGB-D 相机模型和真机启动入口；
+- 对齐深度、注册点云以及工作区点云过滤；
+- `PointCloudOctomapUpdater` 与独立的 `use_sensor_manager` 开关；
+- YOLO检测框、深度图和相机内参到三维抓取目标的通用适配；
+- 分拣初始化阶段的点云与OctoMap就绪检查；
+- 底盘移动后清空OctoMap，机械臂规划和执行期间锁住底盘；
+- 默认只规划不执行的眼在手外MoveIt小步逼近模式。
+
 该目录用于统一存放 AUBO 复合移动机器人相关的 ROS 功能包。外层目录没有
 `package.xml`，它只是功能包集合，因此 catkin 会继续发现下面的各个功能包。
 

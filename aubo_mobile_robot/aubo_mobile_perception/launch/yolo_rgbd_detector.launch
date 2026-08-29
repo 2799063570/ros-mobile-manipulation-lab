@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- darknet_ros itself is intentionally not started here.  This adapter can
+       be reused with any network/configuration that publishes BoundingBoxes. -->
+  <arg name="config" default="$(find aubo_mobile_perception)/config/yolo_rgbd.yaml"/>
+  <node pkg="aubo_perception" type="yolo_rgbd_target_node.py"
+        name="yolo_rgbd_target" output="screen" required="true">
+    <rosparam file="$(arg config)" command="load"/>
+  </node>
+</launch>

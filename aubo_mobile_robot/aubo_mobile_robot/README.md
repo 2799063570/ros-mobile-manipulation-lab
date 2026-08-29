@@ -11,6 +11,9 @@ Classic 仿真。
 - 后雷达：`rear_laser_link`，话题 `/rear/scan`，扫描后方 180°
 - 手部 RGB 相机：`hand_camera_optical_frame`
 - 相机话题：`/hand_camera/image_raw` 和 `/hand_camera/camera_info`
+- 车体立柱眼在手外 RGB-D：`workspace_camera_color_optical_frame`
+- RGB-D 点云：`/workspace_camera/depth/color/points`；MoveIt过滤点云：
+  `/workspace_camera/points_for_moveit`
 - 两个雷达带有可见且参与碰撞计算的安装支柱
 - 手部相机通过 L 形支架连接在夹爪侧面
 - 相机光轴与夹爪接近方向一致，TCP 朝下时相机同时观察桌面

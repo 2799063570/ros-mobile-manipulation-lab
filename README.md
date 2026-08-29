@@ -10,6 +10,31 @@
 > 对照；`simple_diff_robot_gazebo`、`aubo_planning` 以及 `aubo_mobile_robot/`
 > 下的功能包构成了本项目的主要实践成果。
 
+## 项目演示
+
+
+https://github.com/user-attachments/assets/b636e380-9148-4471-b0e5-202318e15bf4
+
+[下载高清版本（MP4，约 22.7 MB）](aubo/video_or_img/sorting_process.mp4)
+
+视频展示了项目中的目标识别、机械臂规划、抓取与分类放置流程。GitHub 若未直接
+显示播放器，可点击链接打开或下载原视频。更多演示素材见
+[`aubo/video_or_img/`](aubo/video_or_img/README.md)。
+
+### 功能截图
+
+| 差速机器人 Gazebo 场景 | 建图、定位与导航 |
+| --- | --- |
+| ![差速机器人 Gazebo 场景](aubo/video_or_img/readme/simple_diff_gazebo.png) | ![机器人建图与导航](aubo/video_or_img/readme/mapping_nav.png) |
+
+| RRT 自主探索 | AUBO 视觉识别与三维定位 |
+| --- | --- |
+| ![RRT 自主探索轨迹](aubo/video_or_img/readme/rrt_exploration_view.png) | ![AUBO OpenCV 目标识别](aubo/video_or_img/readme/opencv_detector.png) |
+
+| YOLO OBB 目标检测 | MoveIt OctoMap 环境建模 |
+| --- | --- |
+| ![YOLO OBB 目标检测和抓取参数](aubo/video_or_img/readme/object_detector.png) | ![MoveIt OctoMap 环境建模](aubo/video_or_img/readme/octmap.png) |
+
 ## 项目演进路线
 
 ```text
@@ -33,19 +58,19 @@ aubo_mobile_robot
 项目保留了 WheelTec 机器人及其生态中的多个功能包，用于分析成熟移动机器人系统
 的组织方式和数据链路。
 
-| 功能包 | 主要用途 |
-| --- | --- |
-| `turn_on_wheeltec_robot` | 真机底盘、雷达、相机启动，建图和导航入口 |
-| `wheeltec_robot_rc` | 键盘与手柄遥控 |
-| `wheeltec_robot_gazebo` | WheelTec 机器人模型、Gazebo 仿真、建图和导航 |
-| `wheeltec_multi` | 多机器人启动、遥控与导航 |
-| `simple_follower` | 激光、视觉、AR 和巡线跟随实验 |
-| `rrt_exploration` | 基于 RRT/frontier 的单机器人和多机器人自主探索 |
+| 功能包                   | 主要用途                                       |
+| ------------------------ | ---------------------------------------------- |
+| `turn_on_wheeltec_robot` | 真机底盘、雷达、相机启动，建图和导航入口       |
+| `wheeltec_robot_rc`      | 键盘与手柄遥控                                 |
+| `wheeltec_robot_gazebo`  | WheelTec 机器人模型、Gazebo 仿真、建图和导航   |
+| `wheeltec_multi`         | 多机器人启动、遥控与导航                       |
+| `simple_follower`        | 激光、视觉、AR 和巡线跟随实验                  |
+| `rrt_exploration`        | 基于 RRT/frontier 的单机器人和多机器人自主探索 |
 
 这些包帮助我们理解了 `/cmd_vel`、里程计、TF、激光雷达、SLAM、AMCL、
 `move_base` 以及多机器人命名空间等 ROS 核心机制。
 
-### 2. 自研差速移动机器人
+### 2. 差速移动机器人
 
 `simple_diff_robot_gazebo` 是一个从模型开始搭建的简洁差速机器人，包含：
 
@@ -80,19 +105,19 @@ aubo_mobile_robot
 
 ### 4. AUBO 复合移动机器人
 
-`aubo_mobile_robot/` 将差速移动底盘、AUBO i5、双指夹爪、双激光雷达和手部相机
-组合为一台移动操作机器人，主要功能包如下：
+`aubo_mobile_robot/` 将差速移动底盘、AUBO i5、双指夹爪、双激光雷达、腕部相机
+和眼在手外 RGB-D 相机组合为一台移动操作机器人，主要功能包如下：
 
-| 功能包 | 主要用途 |
-| --- | --- |
-| `aubo_mobile_robot` | 复合机器人 Xacro、Gazebo 场景、传感器和控制器 |
-| `aubo_mobile_moveit_config` | 移动机械臂的 MoveIt 规划配置 |
-| `aubo_mobile_navigation` | 双雷达融合、GMapping、AMCL 和 `move_base` |
-| `aubo_mobile_bringup` | 机器人、导航、分拣和完整任务的统一仿真入口 |
-| `aubo_mobile_control` | 底盘键盘控制及导航/机械臂顺序协调 |
-| `aubo_mobile_perception` | 移动平台的视觉参数与启动入口（算法复用 `aubo_perception`） |
-| `aubo_mobile_sorting` | 红、绿、蓝方块的视觉抓取与分类放置 |
-| `aubo_mobile_nav_sorting` | 导航到工位后执行自动分拣的完整任务编排 |
+| 功能包                      | 主要用途                                                   |
+| --------------------------- | ---------------------------------------------------------- |
+| `aubo_mobile_robot`         | 复合机器人 Xacro、Gazebo 场景、传感器和控制器              |
+| `aubo_mobile_moveit_config` | 移动机械臂的 MoveIt 规划配置                               |
+| `aubo_mobile_navigation`    | 双雷达融合、GMapping、AMCL 和 `move_base`                  |
+| `aubo_mobile_bringup`       | 机器人、导航、分拣和完整任务的统一仿真入口                 |
+| `aubo_mobile_control`       | 底盘键盘控制及导航/机械臂顺序协调                          |
+| `aubo_mobile_perception`    | 移动平台的视觉参数与启动入口（算法复用 `aubo_perception`） |
+| `aubo_mobile_sorting`       | 红、绿、蓝方块的视觉抓取与分类放置                         |
+| `aubo_mobile_nav_sorting`   | 导航到工位后执行自动分拣的完整任务编排                     |
 
 完整任务流程为：
 
@@ -117,18 +142,20 @@ aubo_mobile_robot
                                                        │
                           odom ← 差速底盘 ←────────────┘
 
-/hand_camera/image_raw ─ aubo_perception ─ /sorting/detections
-                                                │
-                                                ▼
-导航任务编排 ─ /sorting/* 服务 ─ aubo_sorting_core ─ MoveIt
-                                                    │
-                                                    ├─ 机械臂轨迹控制器
-                                                    └─ 夹爪轨迹控制器
+/workspace_camera/color + aligned_depth ─ YOLO/RGB-D适配 ─ /sorting/detections
+/workspace_camera/depth/color/points ─ 点云过滤 ─ MoveIt OctoMap       │
+                                                                     ▼
+导航任务编排 ─ 底盘互锁/OctoMap就绪检查 ─ aubo_sorting_core ─ MoveIt
+                                                          │
+                                                          ├─ 机械臂轨迹控制器
+                                                          └─ 夹爪轨迹控制器
 ```
 
 移动底盘由 Navigation Stack 控制，机械臂由 MoveIt 控制。当前的复合任务采用
 “先移动、后操作”的顺序协调方式，并不是底盘与机械臂同时参与的全身运动规划。
-Gazebo 中的小物体夹持由 `aubo_gazebo_plugins` 辅助，真实机械臂不加载该插件。
+底盘到站后会清空并等待重建 OctoMap，机械臂规划和执行期间通过
+`/sorting/base_locked` 禁止底盘运动。Gazebo 中的小物体夹持由
+`aubo_gazebo_plugins` 辅助，真实机械臂不加载该插件。
 
 ## 运行环境
 
@@ -252,6 +279,31 @@ roslaunch aubo_mobile_bringup simulation.launch mode:=sorting
 rosservice call /sorting/start
 ```
 
+### 复合机器人：眼在手外 RGB-D 与 YOLO
+
+真实 RealSense 相机、对齐深度和注册点云入口：
+
+```bash
+roslaunch aubo_mobile_robot eye_to_hand_rgbd_real.launch serial_no:=<serial>
+```
+
+启动检测框与深度图的三维目标适配器：
+
+```bash
+roslaunch aubo_mobile_perception yolo_rgbd_detector.launch
+```
+
+首次联调必须使用禁止轨迹执行的 MoveIt 入口，在 RViz 中确认点云、TF、OctoMap和
+规划轨迹后再连接真实机械臂：
+
+```bash
+roslaunch aubo_mobile_moveit_config octomap_validation.launch \
+  load_robot_description:=false
+```
+
+完整接线、标定和检查顺序见
+[`aubo_mobile_robot/EYE_TO_HAND_RGBD.md`](aubo_mobile_robot/EYE_TO_HAND_RGBD.md)。
+
 ### 复合机器人：导航到工位并分拣
 
 一键启动完整 Gazebo 场景：
@@ -274,18 +326,23 @@ roslaunch aubo_mobile_bringup simulation.launch mode:=mission auto_start:=true
 
 ## 关键接口
 
-| 接口 | 类型或作用 |
-| --- | --- |
-| `/cmd_vel` | `geometry_msgs/Twist`，底盘速度指令 |
-| `/odom` | `nav_msgs/Odometry`，轮式里程计 |
-| `/scan` | 合并后的 360° 激光扫描 |
-| `/move_base` | 底盘导航 action |
-| `/hand_camera/image_raw` | 手部 RGB 相机图像 |
-| `/sorting/detections` | `aubo_perception/DetectedObjectArray`，颜色目标及定位结果 |
-| `/sorting/state` | 视觉分拣状态 |
-| `/nav_sorting/state` | 导航分拣总任务状态 |
-| `/aubo_i5_controller/follow_joint_trajectory` | 六轴机械臂轨迹接口 |
-| `/gripper_controller/follow_joint_trajectory` | 双指夹爪轨迹接口 |
+| 接口                                                 | 类型或作用                                                |
+| ---------------------------------------------------- | --------------------------------------------------------- |
+| `/cmd_vel`                                           | `geometry_msgs/Twist`，底盘速度指令                       |
+| `/odom`                                              | `nav_msgs/Odometry`，轮式里程计                           |
+| `/scan`                                              | 合并后的 360° 激光扫描                                    |
+| `/move_base`                                         | 底盘导航 action                                           |
+| `/hand_camera/image_raw`                             | 手部 RGB 相机图像                                         |
+| `/workspace_camera/color/image_raw`                  | 眼在手外 RealSense 彩色图像                               |
+| `/workspace_camera/aligned_depth_to_color/image_raw` | 对齐到彩色画面的深度图                                    |
+| `/workspace_camera/points_for_moveit`                | 经过工作区过滤的 MoveIt OctoMap 点云                      |
+| `/sorting/detections`                                | `aubo_perception/DetectedObjectArray`，颜色目标及定位结果 |
+| `/sorting/state`                                     | 视觉分拣状态                                              |
+| `/sorting/base_locked`                               | 机械臂规划/执行期间的底盘运动锁                           |
+| `/clear_octomap`                                     | 底盘移动后清空 MoveIt OctoMap                             |
+| `/nav_sorting/state`                                 | 导航分拣总任务状态                                        |
+| `/aubo_i5_controller/follow_joint_trajectory`        | 六轴机械臂轨迹接口                                        |
+| `/gripper_controller/follow_joint_trajectory`        | 双指夹爪轨迹接口                                          |
 
 主要 TF 链路为：
 
@@ -301,7 +358,7 @@ map → odom → base_footprint → base_link → AUBO links → tcp_link
 1. 阅读 `turn_on_wheeltec_robot` 和 `wheeltec_robot_rc`，理解真机启动与遥控接口。
 2. 运行 `wheeltec_robot_gazebo`，观察模型、传感器、TF、建图和导航的数据流。
 3. 学习 `simple_follower`、`wheeltec_multi` 和 `rrt_exploration` 的功能组织方式。
-4. 运行 `simple_diff_robot_gazebo`，从 Xacro、差速插件开始理解自研移动机器人。
+4. 运行 `simple_diff_robot_gazebo`，从 Xacro、差速插件开始理解差速移动机器人。
 5. 分别完成差速机器人的建图、地图保存、AMCL 定位、目标导航和自主探索。
 6. 学习 `aubo_description`、`aubo_gazebo` 和 `aubo_moveit_config`，理解机械臂模型、
    控制器、规划组、末端执行器和 Planning Scene。
@@ -313,8 +370,10 @@ map → odom → base_footprint → base_link → AUBO links → tcp_link
 
 - 仿真环境和参数主要面向教学与功能验证，不能直接替代真机标定和安全测试。
 - 导航 footprint 仅覆盖机械臂收拢状态；机械臂伸展时不要移动底盘。
-- 手部相机当前为 RGB 相机，目标三维位置依赖已标定的平面高度；目标高度未知时应
-  使用深度相机或点云方案。
+- 腕部相机仍为 RGB 近距离观察相机；眼在手外 RealSense 提供目标三维定位和
+  OctoMap 点云。两套相机的职责和 TF 发布源必须保持独立。
+- 眼在手外相机的 Xacro 安装位姿仅是结构初值，真机抓取前必须重新完成相机内参、
+  相机内部 TF、底盘到相机外参和 TCP 标定。
 - Gazebo 分拣使用辅助抓取固定插件提高小方块抓取稳定性；真机仍需依赖实际夹爪、
   力学接触和安全策略。
 - 真机运行前必须重新校准地图、雷达外参、相机内外参、工位位姿、TCP、夹爪开合量
@@ -324,7 +383,7 @@ map → odom → base_footprint → base_link → AUBO links → tcp_link
 
 ## 详细文档
 
-- [自研差速机器人](simple_diff_robot_gazebo/README.md)
+- [差速机器人模型与导航](simple_diff_robot_gazebo/README.md)
 - [AUBO 机械臂规划示例](aubo/aubo_planning/README.md)
 - [AUBO SDK 与真实机械臂控制](aubo/aubo_ros_control/README.md)
 - [AUBO 功能包分层说明](aubo/README.md)
@@ -333,6 +392,8 @@ map → odom → base_footprint → base_link → AUBO links → tcp_link
 - [AUBO Gazebo 通用插件](aubo/aubo_gazebo_plugins/README.md)
 - [AUBO 固定机械臂颜色抓取分拣](aubo/aubo_color_sorting/README.md)
 - [AUBO 复合移动机器人概览](aubo_mobile_robot/README.md)
+- [眼在手外 RGB-D、OctoMap、YOLO 与视觉伺服](aubo_mobile_robot/EYE_TO_HAND_RGBD.md)
+- [项目演示视频与图片](aubo/video_or_img/README.md)
 - [AUBO 移动机器人统一启动入口](aubo_mobile_robot/aubo_mobile_bringup/README.md)
 - [复合机器人模型与仿真](aubo_mobile_robot/aubo_mobile_robot/README.md)
 - [建图、定位与导航](aubo_mobile_robot/aubo_mobile_navigation/README.md)
@@ -353,7 +414,7 @@ map → odom → base_footprint → base_link → AUBO links → tcp_link
   - [《ROS 理论与实践》视频课程](https://www.bilibili.com/video/BV1Ci4y1L7ZZ)
   - [《ROS 理论与实践》在线文档](https://www.autolabor.com.cn/book/ROSTutorials/)
 
-- 感谢 **胡春旭老师（古月居）**长期以来对 ROS 技术的讲解、实践与推广。《ROS
+- 感谢 **胡春旭老师 | 古月居**长期以来对 ROS 技术的讲解、实践与推广。《ROS
   入门 21 讲》帮助我们建立了对 ROS 节点、话题、服务、参数、TF 和 Launch 等核心
   概念的整体认识；相关进阶课程及《ROS机器人开发实践》一书，则为机器人建模、
   Gazebo 仿真、SLAM 与导航、机器视觉和机械臂开发等内容提供了系统参考。
@@ -363,7 +424,7 @@ map → odom → base_footprint → base_link → AUBO links → tcp_link
 
 - 感谢 **WheelTec ROS 工程及其开发团队**提供的移动机器人功能包与实践案例。
   本项目通过学习其中的底盘启动、遥控、传感器接入、Gazebo 仿真、跟随、多机器人、
-  建图、定位、导航和 RRT 探索等功能，逐步完成了自研差速机器人、AUBO 六轴机械臂
+  建图、定位、导航和 RRT 探索等功能，逐步完成了差速机器人、AUBO 六轴机械臂
   以及移动操作复合机器人的设计与集成。
 
 - 感谢 **ROS、Gazebo、MoveIt、Navigation Stack、GMapping、OpenCV** 等开源项目
