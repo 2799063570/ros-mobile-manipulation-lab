@@ -1,0 +1,38 @@
+# Fixed-camera RGB-D frontend for the Gazebo eye-to-hand scene.
+color_topic: /workspace_camera/color/image_raw
+aligned_depth_topic: /workspace_camera/aligned_depth_to_color/image_raw
+camera_info_topic: /workspace_camera/color/camera_info
+target_pose_topic: /visual_servo/target_pose
+debug_image_topic: /visual_servo/debug_image
+target_label_topic: /visual_servo/target_label
+target_selection_topic: /visual_servo/target_selection
+perception_state_topic: /visual_servo/perception_state
+start_enabled: false
+target_label: red
+selection_policy: largest
+minimum_contour_area: 180.0
+maximum_contour_area: 50000.0
+maximum_aspect_ratio: 2.5
+morphology_kernel: 5
+depth_mask_erosion: 3
+minimum_depth: 0.15
+maximum_depth: 2.50
+depth_scale_16u: 0.001
+position_filter_alpha: 0.35
+filter_reset_timeout: 0.50
+sync_queue_size: 8
+sync_slop: 0.08
+colors:
+  red:
+    ranges:
+      - {lower: [0, 110, 70], upper: [12, 255, 255]}
+      - {lower: [168, 110, 70], upper: [179, 255, 255]}
+    draw_bgr: [0, 0, 255]
+  green:
+    ranges:
+      - {lower: [38, 70, 55], upper: [88, 255, 255]}
+    draw_bgr: [0, 255, 0]
+  blue:
+    ranges:
+      - {lower: [95, 90, 55], upper: [132, 255, 255]}
+    draw_bgr: [255, 0, 0]

@@ -137,5 +137,18 @@ OpenCV 前端在颜色轮廓内部取有效深度中值并发布
 PBVS实现。它把固定 RGB-D 相机给出的目标变换到机械臂基座坐标系，以限制步长反复
 规划 TCP 位置。配置默认 `plan_only: true`、`start_enabled: false`。
 
+完整 Gazebo 仿真入口为：
+
+```bash
+roslaunch aubo_ros_control eye_to_hand_visual_servo_gazebo.launch
+```
+
+该入口启动固定俯视 RGB-D 相机、红色目标、AUBO 轨迹控制器、MoveIt、颜色深度
+前端、眼在手外 PBVS 和 RViz。启动后在 RViz 的视觉伺服面板点击“启动闭环跟踪”；
+无人值守测试可显式传入 `auto_start:=true rviz:=false gui:=false`。
+
+仿真默认 `plan_only:=false`，因此启用闭环后会执行每个 MoveIt 小步；只检查规划而
+不驱动 Gazebo 时传入 `plan_only:=true`。固定相机使用 `/workspace_camera` 话题前缀。
+
 眼在手上与眼在手外节点共用 `/visual_servo/target_pose`、启停服务和状态话题，因此
 同一时刻只能启动一个控制节点。YOLO适配器也只负责发布目标，不直接下发关节命令。

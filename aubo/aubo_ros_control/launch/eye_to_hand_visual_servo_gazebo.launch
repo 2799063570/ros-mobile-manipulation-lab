@@ -1,0 +1,61 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="gui" default="true"/>
+  <arg name="rviz" default="true"/>
+  <arg name="debug_view" default="false"/>
+  <arg name="paused" default="false"/>
+  <arg name="plan_only" default="false"/>
+  <arg name="auto_start" default="false"/>
+  <arg name="target_label" default="red"/>
+  <arg name="world" default="$(find aubo_ros_control)/worlds/eye_to_hand_visual_servo.world"/>
+
+  <include file="$(find aubo_gazebo)/launch/aubo_world_gazebo.launch">
+    <arg name="world_name" value="$(arg world)"/>
+    <arg name="gui" value="$(arg gui)"/>
+    <arg name="paused" value="$(arg paused)"/>
+  </include>
+  <include file="$(find aubo_gazebo)/launch/aubo_controller_gazebo.launch"/>
+
+  <node name="eye_to_hand_joint_state_relay" pkg="joint_state_publisher"
+        type="joint_state_publisher" output="screen">
+    <rosparam param="source_list">[/aubo_i5/joint_states]</rosparam>
+  </node>
+
+  <!-- The fixed TF exactly matches the scene camera pose. -->
+  <node pkg="tf2_ros" type="static_transform_publisher"
+        name="eye_to_hand_workspace_camera_tf"
+        args="0.55 0 1.60 0 1.57079632679 0 base_link workspace_camera_link"/>
+  <node pkg="tf2_ros" type="static_transform_publisher"
+        name="eye_to_hand_workspace_camera_color_tf"
+        args="0.045 0 0 0 0 0 workspace_camera_link workspace_camera_color_frame"/>
+  <node pkg="tf2_ros" type="static_transform_publisher"
+        name="eye_to_hand_workspace_camera_optical_tf"
+        args="0 0 0 -1.57079632679 0 -1.57079632679 workspace_camera_color_frame workspace_camera_color_optical_frame"/>
+
+  <include file="$(find aubo_moveit_config)/launch/move_group.launch">
+    <arg name="allow_trajectory_execution" value="true"/>
+    <arg name="fake_execution" value="false"/>
+    <arg name="load_robot_description" value="false"/>
+    <arg name="robot_xacro" value="aubo_i5_with_camera.xacro"/>
+    <arg name="robot_srdf" value="aubo_i5_with_camera.srdf"/>
+  </include>
+
+  <node name="eye_to_hand_visual_target" pkg="aubo_ros_control"
+        type="color_visual_target_node.py" output="screen" required="true">
+    <rosparam file="$(find aubo_ros_control)/config/eye_to_hand_visual_target.yaml" command="load"/>
+    <param name="target_label" value="$(arg target_label)"/>
+    <param name="start_enabled" value="$(arg auto_start)"/>
+  </node>
+
+  <include file="$(find aubo_ros_control)/launch/eye_to_hand_moveit_servo.launch">
+    <arg name="plan_only" value="$(arg plan_only)"/>
+    <arg name="start_enabled" value="$(arg auto_start)"/>
+  </include>
+
+  <node if="$(arg rviz)" name="eye_to_hand_visual_servo_rviz" pkg="rviz" type="rviz"
+        args="-d $(find aubo_ros_control)/config/visual_servo.rviz" output="screen"/>
+  <node if="$(arg debug_view)" name="eye_to_hand_debug_view"
+        pkg="image_view" type="image_view" output="screen">
+    <remap from="image" to="/visual_servo/debug_image"/>
+  </node>
+</launch>

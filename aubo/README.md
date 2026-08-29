@@ -75,6 +75,16 @@ roslaunch aubo_color_sorting sorting_gazebo.launch
 roslaunch aubo_mobile_sorting sorting_gazebo.launch
 ```
 
+固定机械臂的两种视觉位置伺服仿真入口为：
+
+```bash
+# 腕部相机（眼在手上）
+roslaunch aubo_ros_control visual_servo_gazebo.launch
+
+# 场景固定 RGB-D 相机（眼在手外）
+roslaunch aubo_ros_control eye_to_hand_visual_servo_gazebo.launch
+```
+
 重构后检测消息统一为 `aubo_perception/DetectedObjectArray`。仓库外部节点如果曾
 导入 `aubo_color_sorting.msg` 或 `aubo_mobile_perception.msg`，需要改为
 `aubo_perception.msg` 并重新编译工作空间。
