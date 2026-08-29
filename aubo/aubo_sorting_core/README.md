@@ -12,10 +12,16 @@
   `aubo_perception/DetectedObjectArray`；
 - 连接 MoveIt 的 `aubo_i5` 规划组和平台配置的夹爪轨迹 action；
 - 发布 `/sorting/state` 与 `/sorting/detection_summary`；
+- 发布 `/sorting/failure`；无法生成非空 MoveIt 轨迹时以
+  `PLANNING_FAILED | <目标>` 明确上报，执行器失败不会混为规划失败；
 - 提供 `/sorting/move_to_observation`、`/sorting/prepare_work`、
-  `/sorting/start`、`/sorting/stop`、`/sorting/open_gripper` 和 `/sorting/home`。
+  `/sorting/start`、`/sorting/stop`、`/sorting/open_gripper`、`/sorting/home` 和
+  `/sorting/configure_workspace`。
 
 `prepare_work` 主要供移动机器人到达工位后的任务编排使用，固定平台通常不调用。
+`configure_workspace` 在节点空闲时从 `/sorting/workspace_config` 读取当前桌子的
+碰撞体、抓取高度和放置点。切换桌子会清空本桌完成颜色记录；同一桌规划失败后重试
+则跳过已经完成的颜色，避免重复抓取。
 
 ## 参数边界
 

@@ -76,3 +76,6 @@ planning_scene_topic: /move_group/monitored_planning_scene
 clear_octomap_service: /clear_octomap
 octomap_wait_timeout: 30.0
 base_lock_topic: /sorting/base_locked
+failure_topic: /sorting/failure
+workspace_config_param: /sorting/workspace_config
+workspace_update_topic: /sorting/workspace_update

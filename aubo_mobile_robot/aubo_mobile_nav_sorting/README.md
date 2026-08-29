@@ -1,6 +1,6 @@
 # AUBO 复合机器人导航分拣任务
 
-该功能包把已有模块组合成一个完整场景：
+该功能包把已有模块组合成单工位或多工位完整场景：
 
 ```text
 机械臂收回 transport（低重心 A 形折叠）运输姿态
@@ -9,6 +9,10 @@
 → 通过 aubo_mobile_sorting 场景入口调用通用分拣核心
 → 发布最终任务结果
 ```
+
+多工位模式在每张桌子之间使用 `move_base`；只有当分拣核心明确发布
+`PLANNING_FAILED` 时，任务节点才停止使用导航数据，向 `/cmd_vel_raw` 发布短距离、
+单轴的 `linear.x`/`linear.y` 速度脉冲，并在每一步后重新请求 MoveIt 求解。
 
 底层建图、导航和 MoveIt 分别由 `aubo_mobile_navigation`、
 `aubo_mobile_moveit_config` 提供；视觉检测、抓取状态机和 Gazebo 辅助插件分别由
@@ -110,6 +114,34 @@ rostopic echo /sorting/state
 - 当前导航工位的抓取、放置和颜色顺序：本包 `config/sorting.yaml`
 - 普通移动分拣场景的默认参数：`aubo_mobile_sorting/config/sorting.yaml`
 - 通用分拣动作流程：`aubo_sorting_core`（不保存工位坐标）
+
+## 5. 四张桌子的第一阶段配置
+
+`config/four_tables.yaml` 提供与手绘路线一致的四工位模板。模板坐标只是接口示例，
+必须按现场 `map` 重新标定后再让真机执行：
+
+```bash
+roslaunch aubo_mobile_nav_sorting mission.launch \
+  config:=$(rospack find aubo_mobile_nav_sorting)/config/four_tables.yaml
+rosservice call /nav_sorting/start
+```
+
+每个 `workstations` 条目包含：
+
+- `navigation_goal`：完成上一桌后发给 `move_base` 的 `[x, y, yaw]`；
+- `table_center/table_size/table_z`：桌子碰撞体与抓取高度；
+- `place_targets`：该桌红、绿、蓝放置点；
+- `objects`：第一阶段的已知物体清单，后续感知模块可更新；
+- `enabled`（可选）：是否跳过该桌。
+
+当前工位的完整 JSON 会锁存发布到 `/nav_sorting/current_workstation`。任务节点同时把
+配置写入 `/sorting/workspace_config` 并调用 `/sorting/configure_workspace`，因此后续
+感知模块可以复用同一接口更新桌子/物体信息。物体检测结果仍使用现有强类型接口
+`/sorting/detections`（`aubo_perception/DetectedObjectArray`）。
+
+底盘搜索由 `base_recovery_steps` 配置，每项为当前 `base_link` 下的增量 `[dx, dy]`，
+必须有且仅有一个非零轴。速度命令经过现有激光安全过滤器；停止、执行失败、检测失败
+或夹爪失败都不会触发底盘搜索，只有机械臂规划失败会触发。
 
 也可在启动时临时覆盖工位：
 

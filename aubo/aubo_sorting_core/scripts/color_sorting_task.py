@@ -4,6 +4,7 @@
 from __future__ import print_function
 
 import copy
+import json
 import math
 import sys
 import threading
@@ -146,6 +147,15 @@ class ColorSortingTask(object):
         self.base_lock_topic = rospy.get_param(
             "~base_lock_topic", "/sorting/base_locked"
         )
+        self.failure_topic = rospy.get_param(
+            "~failure_topic", "/sorting/failure"
+        )
+        self.workspace_config_param = rospy.get_param(
+            "~workspace_config_param", "/sorting/workspace_config"
+        )
+        self.workspace_update_topic = rospy.get_param(
+            "~workspace_update_topic", "/sorting/workspace_update"
+        )
         self._robot_limits_valid = self._verify_loaded_upper_arm_limit()
 
         self._detections = None
@@ -162,6 +172,10 @@ class ColorSortingTask(object):
         self._last_cloud_wall_time = 0.0
         self._cloud_points = 0
         self._octomap_sequence = 0
+        self._last_failure = ""
+        self._workspace_id = "default"
+        self._pending_workspace = None
+        self._completed_colors = set()
 
         self._state_publisher = rospy.Publisher(
             "/sorting/state", String, queue_size=1, latch=True
@@ -172,7 +186,11 @@ class ColorSortingTask(object):
         self._base_lock_publisher = rospy.Publisher(
             self.base_lock_topic, Bool, queue_size=1, latch=True
         )
+        self._failure_publisher = rospy.Publisher(
+            self.failure_topic, String, queue_size=1, latch=True
+        )
         self._base_lock_publisher.publish(Bool(data=False))
+        self._failure_publisher.publish(String(data=""))
         self._subscriber = rospy.Subscriber(
             self.detections_topic,
             DetectedObjectArray,
@@ -200,6 +218,12 @@ class ColorSortingTask(object):
             self._planning_scene_callback,
             queue_size=5,
         )
+        self._workspace_subscriber = rospy.Subscriber(
+            self.workspace_update_topic,
+            String,
+            self._workspace_update_callback,
+            queue_size=1,
+        )
         self._clear_octomap = rospy.ServiceProxy(self.clear_octomap_service, Empty)
 
         self.robot = moveit_commander.RobotCommander()
@@ -225,6 +249,11 @@ class ColorSortingTask(object):
             rospy.Service("/sorting/open_gripper", Trigger, self._open_service),
             rospy.Service("/sorting/prepare_work", Trigger, self._prepare_work_service),
             rospy.Service("/sorting/home", Trigger, self._home_service),
+            rospy.Service(
+                "/sorting/configure_workspace",
+                Trigger,
+                self._configure_workspace_service,
+            ),
         ]
         self._publish_state("INITIALIZING", "waiting for Gazebo controllers")
 
@@ -237,6 +266,84 @@ class ColorSortingTask(object):
         message = state if not detail else "{} | {}".format(state, detail)
         self._state_publisher.publish(String(data=message))
         rospy.loginfo("Sorting state: %s", message)
+
+    def _set_failure(self, category, detail):
+        self._last_failure = "{} | {}".format(category, detail)
+        self._failure_publisher.publish(String(data=self._last_failure))
+        rospy.logerr("Sorting failure: %s", self._last_failure)
+
+    def _workspace_update_callback(self, message):
+        try:
+            workspace = json.loads(message.data)
+            if not isinstance(workspace, dict):
+                raise ValueError("workspace update must be a JSON object")
+            self._pending_workspace = workspace
+        except (TypeError, ValueError) as error:
+            rospy.logerr("Invalid workspace update: %s", str(error))
+
+    @staticmethod
+    def _workspace_vector(workspace, key, size):
+        value = workspace.get(key)
+        if not isinstance(value, list) or len(value) != size:
+            raise ValueError("workspace '{}' must contain {} numbers".format(key, size))
+        return [float(item) for item in value]
+
+    def _apply_workspace(self, workspace):
+        workspace_id = str(workspace.get("id", "")).strip()
+        if not workspace_id:
+            raise ValueError("workspace 'id' is required")
+
+        table_center = self._workspace_vector(workspace, "table_center", 3)
+        table_size = self._workspace_vector(workspace, "table_size", 3)
+        table_frame = str(workspace.get("table_frame", self.table_frame))
+        table_z = float(workspace.get("table_z", self.table_z))
+        place_frame = str(workspace.get("place_frame", self.place_frame))
+        place_targets = workspace.get("place_targets", self.place_targets)
+        if not isinstance(place_targets, dict):
+            raise ValueError("workspace 'place_targets' must be a mapping")
+        for color in self.sort_colors:
+            if color not in place_targets:
+                raise ValueError("workspace has no place target for '{}'".format(color))
+            if not isinstance(place_targets[color], list) or len(place_targets[color]) != 2:
+                raise ValueError("place target '{}' must be [x, y]".format(color))
+
+        self.table_center = table_center
+        self.table_size = table_size
+        self.table_frame = table_frame
+        self.table_z = table_z
+        self.place_frame = place_frame
+        self.place_targets = dict(
+            (str(color), [float(value) for value in target])
+            for color, target in place_targets.items()
+        )
+        self._workspace_id = workspace_id
+        self._completed_colors = set()
+        self._observation_ready = False
+        if not self._add_table_collision():
+            raise RuntimeError("MoveIt did not accept the workspace table")
+        rospy.loginfo("Configured sorting workspace '%s'", self._workspace_id)
+
+    def _configure_workspace_service(self, _request):
+        with self._operation_lock:
+            if self._busy:
+                return TriggerResponse(
+                    success=False, message="sorting operation is running"
+                )
+            workspace = self._pending_workspace
+            if rospy.has_param(self.workspace_config_param):
+                workspace = rospy.get_param(self.workspace_config_param)
+            if workspace is None:
+                return TriggerResponse(
+                    success=False, message="no workspace configuration received"
+                )
+            try:
+                self._apply_workspace(workspace)
+            except (KeyError, TypeError, ValueError, RuntimeError) as error:
+                self._set_failure("CONFIGURATION_FAILED", str(error))
+                return TriggerResponse(success=False, message=str(error))
+        return TriggerResponse(
+            success=True, message="workspace '{}' configured".format(self._workspace_id)
+        )
 
     def _detection_callback(self, message):
         with self._data_lock:
@@ -447,6 +554,8 @@ class ColorSortingTask(object):
                 return False, "sorting node is not initialized"
             self._busy = True
             self._stop_requested.clear()
+            self._last_failure = ""
+            self._failure_publisher.publish(String(data=""))
             self._base_lock_publisher.publish(Bool(data=True))
 
         def worker():
@@ -565,12 +674,39 @@ class ColorSortingTask(object):
             return False
         rospy.loginfo("Planning arm to %s", description)
         self.arm.set_pose_target(pose, self.end_effector_link)
-        success = bool(self.arm.go(wait=True))
+        success = self._plan_and_execute(description)
+        return success and not self._stop_requested.is_set()
+
+    @staticmethod
+    def _normalise_plan(plan_result):
+        """Handle both Melodic and Noetic MoveIt Python return formats."""
+        if isinstance(plan_result, tuple):
+            if len(plan_result) < 2:
+                return False, None
+            success = bool(plan_result[0])
+            trajectory = plan_result[1]
+        else:
+            trajectory = plan_result
+            success = trajectory is not None
+        points = []
+        if trajectory is not None and hasattr(trajectory, "joint_trajectory"):
+            points = trajectory.joint_trajectory.points
+        return success and bool(points), trajectory
+
+    def _plan_and_execute(self, description):
+        self.arm.set_start_state_to_current_state()
+        planned, trajectory = self._normalise_plan(self.arm.plan())
+        if not planned:
+            self.arm.stop()
+            self.arm.clear_pose_targets()
+            self._set_failure("PLANNING_FAILED", description)
+            return False
+        success = bool(self.arm.execute(trajectory, wait=True))
         self.arm.stop()
         self.arm.clear_pose_targets()
         if not success:
-            rospy.logerr("MoveIt failed to reach %s", description)
-        return success and not self._stop_requested.is_set()
+            self._set_failure("EXECUTION_FAILED", description)
+        return success
 
     def _move_named(self, target):
         if not target:
@@ -578,12 +714,21 @@ class ColorSortingTask(object):
         if self._stop_requested.is_set():
             return False
         if target not in self.arm.get_named_targets():
-            rospy.logerr("Unknown arm named target '%s'", target)
+            self._set_failure("CONFIGURATION_FAILED", "unknown named target '{}'".format(target))
             return False
+        target_values = self.arm.get_named_target_values(target)
+        active_joints = self.arm.get_active_joints()
+        current_values = dict(zip(active_joints, self.arm.get_current_joint_values()))
+        if target_values and all(
+            joint in current_values
+            and abs(float(value) - current_values[joint]) <= 1.0e-3
+            for joint, value in target_values.items()
+        ):
+            rospy.loginfo("Arm is already at named target %s", target)
+            return True
         rospy.loginfo("Moving arm to named target %s", target)
         self.arm.set_named_target(target)
-        success = bool(self.arm.go(wait=True))
-        self.arm.stop()
+        success = self._plan_and_execute("named target '{}'".format(target))
         return success and not self._stop_requested.is_set()
 
     def _cartesian_to(self, target_pose, description):
@@ -620,14 +765,17 @@ class ColorSortingTask(object):
                     self.robot.get_current_state(), plan, self.velocity_scaling
                 )
             except Exception as fallback_error:
-                rospy.logerr(
-                    "Could not safely retime Cartesian path to %s: %s",
-                    description,
-                    str(fallback_error),
+                self._set_failure(
+                    "PLANNING_FAILED",
+                    "cannot retime Cartesian path to {}: {}".format(
+                        description, str(fallback_error)
+                    ),
                 )
                 return False
         if not plan.joint_trajectory.points:
-            rospy.logerr("Retimed Cartesian path to %s is empty", description)
+            self._set_failure(
+                "PLANNING_FAILED", "empty Cartesian path to {}".format(description)
+            )
             return False
         rospy.loginfo(
             "Retimed Cartesian path to %s: %.2f s at velocity scale %.2f",
@@ -638,7 +786,7 @@ class ColorSortingTask(object):
         success = bool(self.arm.execute(plan, wait=True))
         self.arm.stop()
         if not success:
-            rospy.logerr("Failed to execute Cartesian path to %s", description)
+            self._set_failure("EXECUTION_FAILED", "Cartesian path to {}".format(description))
         return success and not self._stop_requested.is_set()
 
     def _command_gripper(self, position):
@@ -958,9 +1106,22 @@ class ColorSortingTask(object):
         )
 
     def _sorting_operation(self):
+        if self.sort_colors and all(
+            color in self._completed_colors for color in self.sort_colors
+        ):
+            # A fully completed set means this is a deliberate new run, not a
+            # retry of a partially completed table.
+            self._completed_colors = set()
         for index, color in enumerate(self.sort_colors):
             if self._stop_requested.is_set():
                 return False
+            if color in self._completed_colors:
+                rospy.loginfo(
+                    "Skipping completed color '%s' in workspace '%s'",
+                    color,
+                    self._workspace_id,
+                )
+                continue
             detection_start = time.time()
             self._publish_state("DETECTING", color)
             detected = self._wait_for_object(color, detection_start)
@@ -970,6 +1131,7 @@ class ColorSortingTask(object):
             self._publish_state("PICKING", color)
             if not self._pick_and_place(detected):
                 return False
+            self._completed_colors.add(color)
             if index < len(self.sort_colors) - 1:
                 self._publish_state("OBSERVING", "next object")
                 if not self._observation():

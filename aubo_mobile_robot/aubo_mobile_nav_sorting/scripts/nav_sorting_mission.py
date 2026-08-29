@@ -3,6 +3,7 @@
 
 from __future__ import print_function
 
+import json
 import math
 import threading
 import time
@@ -11,6 +12,7 @@ import actionlib
 import rospy
 from actionlib_msgs.msg import GoalStatus
 from dynamic_reconfigure.server import Server
+from geometry_msgs.msg import Twist
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from std_msgs.msg import String
 from std_srvs.srv import Empty, Trigger, TriggerResponse
@@ -95,6 +97,33 @@ class NavigationSortingMission(object):
             rospy.get_param("~home_before_navigation", True)
         )
         self.auto_start = bool(rospy.get_param("~auto_start", False))
+        self.workstations = rospy.get_param("~workstations", [])
+        if not isinstance(self.workstations, list):
+            raise ValueError("~workstations must be a list")
+        self._validate_workstations(self.workstations)
+
+        # move_base is used between workstations. These axis-aligned velocity
+        # pulses are allowed only after MoveIt explicitly reports no plan.
+        self.base_recovery_enabled = bool(
+            rospy.get_param("~base_recovery_enabled", True)
+        )
+        self.base_recovery_topic = rospy.get_param(
+            "~base_recovery_cmd_vel_topic", "/cmd_vel_raw"
+        )
+        self.base_recovery_speed = abs(
+            float(rospy.get_param("~base_recovery_speed", 0.04))
+        )
+        self.base_recovery_rate = max(
+            5.0, float(rospy.get_param("~base_recovery_rate", 20.0))
+        )
+        self.base_recovery_settle_time = max(
+            0.0, float(rospy.get_param("~base_recovery_settle_time", 0.8))
+        )
+        self.base_recovery_steps = rospy.get_param(
+            "~base_recovery_steps",
+            [[0.0, 0.06], [0.0, -0.12], [0.0, 0.06], [0.05, 0.0], [-0.10, 0.0]],
+        )
+        self._validate_recovery_steps(self.base_recovery_steps)
 
         self.sorting_state_topic = rospy.get_param(
             "~sorting_state_topic", "/sorting/state"
@@ -114,6 +143,15 @@ class NavigationSortingMission(object):
         self.sorting_stop_service_name = rospy.get_param(
             "~sorting_stop_service", "/sorting/stop"
         )
+        self.sorting_failure_topic = rospy.get_param(
+            "~sorting_failure_topic", "/sorting/failure"
+        )
+        self.sorting_configure_service_name = rospy.get_param(
+            "~sorting_configure_service", "/sorting/configure_workspace"
+        )
+        self.sorting_workspace_param = rospy.get_param(
+            "~sorting_workspace_param", "/sorting/workspace_config"
+        )
 
         self.navigation_client = actionlib.SimpleActionClient(
             self.navigation_action, MoveBaseAction
@@ -126,10 +164,14 @@ class NavigationSortingMission(object):
         self.sorting_stop_client = rospy.ServiceProxy(
             self.sorting_stop_service_name, Trigger
         )
+        self.configure_workspace_client = rospy.ServiceProxy(
+            self.sorting_configure_service_name, Trigger
+        )
 
         self._condition = threading.Condition()
         self._sorting_state = ""
         self._sorting_sequence = 0
+        self._sorting_failure = ""
         self._busy = False
         self._stop_requested = threading.Event()
 
@@ -144,8 +186,20 @@ class NavigationSortingMission(object):
         self.state_publisher = rospy.Publisher(
             "/nav_sorting/state", String, queue_size=1, latch=True
         )
+        self.workspace_publisher = rospy.Publisher(
+            "/nav_sorting/current_workstation", String, queue_size=1, latch=True
+        )
+        self.base_recovery_publisher = rospy.Publisher(
+            self.base_recovery_topic, Twist, queue_size=2
+        )
         self.sorting_subscriber = rospy.Subscriber(
             self.sorting_state_topic, String, self._sorting_state_callback, queue_size=5
+        )
+        self.sorting_failure_subscriber = rospy.Subscriber(
+            self.sorting_failure_topic,
+            String,
+            self._sorting_failure_callback,
+            queue_size=5,
         )
         self.start_service = rospy.Service(
             "/nav_sorting/start", Trigger, self._start_callback
@@ -166,6 +220,61 @@ class NavigationSortingMission(object):
         if not isinstance(values, list) or not values:
             raise ValueError("{} must be a non-empty list".format(parameter))
         return [float(value) for value in values]
+
+    @staticmethod
+    def _validate_workstations(workstations):
+        identifiers = set()
+        for index, workspace in enumerate(workstations):
+            if not isinstance(workspace, dict):
+                raise ValueError("workstations[{}] must be a mapping".format(index))
+            identifier = str(workspace.get("id", "")).strip()
+            if not identifier or identifier in identifiers:
+                raise ValueError("each workstation needs a unique non-empty id")
+            identifiers.add(identifier)
+            goal = workspace.get("navigation_goal")
+            if not isinstance(goal, list) or len(goal) != 3:
+                raise ValueError(
+                    "workstation '{}' navigation_goal must be [x, y, yaw]".format(
+                        identifier
+                    )
+                )
+            for key, size in (("table_center", 3), ("table_size", 3)):
+                value = workspace.get(key)
+                if not isinstance(value, list) or len(value) != size:
+                    raise ValueError(
+                        "workstation '{}' {} must contain {} numbers".format(
+                            identifier, key, size
+                        )
+                    )
+            objects = workspace.get("objects", [])
+            if not isinstance(objects, list):
+                raise ValueError(
+                    "workstation '{}' objects must be a list".format(identifier)
+                )
+            for item in objects:
+                if (
+                    not isinstance(item, dict)
+                    or not str(item.get("id", "")).strip()
+                    or not str(item.get("color", "")).strip()
+                    or not isinstance(item.get("position"), list)
+                    or len(item["position"]) != 3
+                ):
+                    raise ValueError(
+                        "workstation '{}' has an invalid known object".format(
+                            identifier
+                        )
+                    )
+
+    @staticmethod
+    def _validate_recovery_steps(steps):
+        if not isinstance(steps, list):
+            raise ValueError("~base_recovery_steps must be a list")
+        for step in steps:
+            if not isinstance(step, list) or len(step) != 2:
+                raise ValueError("each base recovery step must be [dx, dy]")
+            dx, dy = float(step[0]), float(step[1])
+            if abs(dx) > 1.0e-6 and abs(dy) > 1.0e-6:
+                raise ValueError("base recovery steps must be horizontal or vertical")
 
     @classmethod
     def _pose_param(cls, parameter, default):
@@ -264,6 +373,11 @@ class NavigationSortingMission(object):
             self._sorting_sequence += 1
             self._condition.notify_all()
 
+    def _sorting_failure_callback(self, message):
+        with self._condition:
+            self._sorting_failure = message.data
+            self._condition.notify_all()
+
     def _auto_start(self, _event):
         self._submit_mission()
 
@@ -289,6 +403,7 @@ class NavigationSortingMission(object):
             return TriggerResponse(success=True, message="no mission is running")
         self._stop_requested.set()
         self.navigation_client.cancel_all_goals()
+        self._stop_base()
         try:
             self.sorting_stop_client()
         except rospy.ServiceException as error:
@@ -343,6 +458,136 @@ class NavigationSortingMission(object):
                     return False
                 self._condition.wait(timeout=0.2)
         rospy.logerr("%s timed out after %.1f seconds", label, self.operation_timeout)
+        return False
+
+    def _planning_failed(self):
+        with self._condition:
+            return self._sorting_failure.startswith("PLANNING_FAILED")
+
+    def _configure_workspace(self, workspace):
+        payload = dict(workspace)
+        payload.pop("navigation_goal", None)
+        payload.pop("pre_dock_goal", None)
+        payload.pop("enabled", None)
+        rospy.set_param(self.sorting_workspace_param, payload)
+        self.workspace_publisher.publish(
+            String(data=json.dumps(workspace, sort_keys=True))
+        )
+        try:
+            rospy.wait_for_service(
+                self.sorting_configure_service_name, timeout=self.server_timeout
+            )
+            response = self.configure_workspace_client()
+        except (rospy.ROSException, rospy.ServiceException) as error:
+            rospy.logerr("Cannot configure workstation: %s", str(error))
+            return False
+        if not response.success:
+            rospy.logerr("Workstation configuration rejected: %s", response.message)
+            return False
+        return True
+
+    def _stop_base(self):
+        self.base_recovery_publisher.publish(Twist())
+
+    def _move_base_direct(self, step, attempt, total):
+        dx, dy = float(step[0]), float(step[1])
+        distance = max(abs(dx), abs(dy))
+        if distance <= 1.0e-6:
+            return True
+        if self.base_recovery_speed <= 1.0e-6:
+            rospy.logerr("base_recovery_speed must be greater than zero")
+            return False
+
+        self.navigation_client.cancel_all_goals()
+        duration = distance / self.base_recovery_speed
+        command = Twist()
+        command.linear.x = math.copysign(self.base_recovery_speed, dx) if abs(dx) > 1.0e-6 else 0.0
+        command.linear.y = math.copysign(self.base_recovery_speed, dy) if abs(dy) > 1.0e-6 else 0.0
+        self._publish_state(
+            "ADJUSTING_BASE",
+            "cmd_vel step {}/{} dx={:.3f} dy={:.3f}".format(
+                attempt, total, dx, dy
+            ),
+        )
+        rate = rospy.Rate(self.base_recovery_rate)
+        deadline = time.time() + duration
+        try:
+            while not rospy.is_shutdown() and time.time() < deadline:
+                if self._stop_requested.is_set():
+                    return False
+                self.base_recovery_publisher.publish(command)
+                rate.sleep()
+        finally:
+            self._stop_base()
+        if self.base_recovery_settle_time > 0.0:
+            rospy.sleep(self.base_recovery_settle_time)
+        return not self._stop_requested.is_set()
+
+    def _prepare_and_observe_once(self):
+        self._publish_state("PREPARING_ARM", "moving arm to work-ready pose")
+        if not self._call_sorting_operation(
+            self.prepare_client, ("PREPARING",), "arm work preparation"
+        ):
+            return False
+        self._publish_state("VALIDATING_DOCK", "planning observation pose")
+        return self._call_sorting_operation(
+            self.observe_client, ("OBSERVING",), "camera observation"
+        )
+
+    def _stow_for_base_recovery(self):
+        self._publish_state(
+            "STOWING_ARM", "making cmd_vel recovery motion safe"
+        )
+        return self._call_sorting_operation(
+            self.home_client, ("HOMING",), "arm stow before base recovery"
+        )
+
+    def _prepare_and_observe_with_recovery(self):
+        if self._prepare_and_observe_once():
+            return True
+        if not self.base_recovery_enabled or not self._planning_failed():
+            return False
+        total = len(self.base_recovery_steps)
+        for index, step in enumerate(self.base_recovery_steps):
+            if not self._stow_for_base_recovery():
+                return False
+            if not self._move_base_direct(step, index + 1, total):
+                return False
+            if self._prepare_and_observe_once():
+                return True
+            if not self._planning_failed():
+                return False
+        rospy.logerr("No direct base adjustment produced a valid observation plan")
+        return False
+
+    def _sort_with_recovery(self):
+        if self._call_sorting_operation(
+            self.sort_client,
+            ("SORTING", "DETECTING", "PICKING", "OBSERVING", "HOMING"),
+            "sorting",
+        ):
+            return True
+        if not self.base_recovery_enabled or not self._planning_failed():
+            return False
+        total = len(self.base_recovery_steps)
+        for index, step in enumerate(self.base_recovery_steps):
+            if not self._stow_for_base_recovery():
+                return False
+            if not self._move_base_direct(step, index + 1, total):
+                return False
+            if not self._prepare_and_observe_once():
+                if self._planning_failed():
+                    continue
+                return False
+            if self._call_sorting_operation(
+                self.sort_client,
+                ("SORTING", "DETECTING", "PICKING", "OBSERVING", "HOMING"),
+                "sorting retry",
+            ):
+                return True
+            if not self._planning_failed():
+                return False
+        rospy.logerr("No direct base adjustment produced a valid sorting plan")
         return False
 
     def _navigate_once(self, target):
@@ -516,10 +761,58 @@ class NavigationSortingMission(object):
         rospy.logerr("All near-field docking candidates failed validation")
         return False
 
+    def _run_workstation_sequence(self):
+        enabled = [
+            workspace
+            for workspace in self.workstations
+            if bool(workspace.get("enabled", True))
+        ]
+        if not enabled:
+            rospy.logerr("No enabled workstation is configured")
+            return False
+
+        for index, workspace in enumerate(enabled):
+            identifier = str(workspace["id"])
+            self._publish_state(
+                "CONFIGURING_WORKSTATION",
+                "{}/{} {}".format(index + 1, len(enabled), identifier),
+            )
+            if self.home_before_navigation or index > 0:
+                self._publish_state(
+                    "STOWING_ARM", "{} before navigation".format(identifier)
+                )
+                if not self._call_sorting_operation(
+                    self.home_client, ("HOMING",), "arm homing"
+                ):
+                    return False
+            if not self._configure_workspace(workspace):
+                return False
+
+            goal = [float(value) for value in workspace["navigation_goal"]]
+            if not self._navigate(goal, "workstation '{}'".format(identifier)):
+                return False
+            self._publish_state(
+                "AT_WORKSTATION", "{}; validating arm reach".format(identifier)
+            )
+            if not self._prepare_and_observe_with_recovery():
+                return False
+            self._publish_state("SORTING", "workstation '{}'".format(identifier))
+            if not self._sort_with_recovery():
+                return False
+            self._publish_state(
+                "WORKSTATION_COMPLETE", "{} ({}/{})".format(
+                    identifier, index + 1, len(enabled)
+                )
+            )
+        return True
+
     def _run_mission(self):
         success = False
         try:
             if not self._wait_for_sorting_ready():
+                return
+            if self.workstations:
+                success = self._run_workstation_sequence()
                 return
             if self.home_before_navigation:
                 self._publish_state("STOWING_ARM", "moving arm to navigation pose")
@@ -536,22 +829,17 @@ class NavigationSortingMission(object):
                 ):
                     return
                 self._publish_state("AT_WORKSTATION", "starting camera observation")
-                if not self._call_sorting_operation(
-                    self.observe_client, ("OBSERVING",), "camera observation"
-                ):
+                if not self._prepare_and_observe_with_recovery():
                     return
             self._publish_state("AT_WORKSTATION", "dock and camera view validated")
             self._publish_state("SORTING", "sorting detected objects")
-            if not self._call_sorting_operation(
-                self.sort_client,
-                ("SORTING", "DETECTING", "PICKING", "OBSERVING", "HOMING"),
-                "sorting",
-            ):
+            if not self._sort_with_recovery():
                 return
             success = True
         except Exception as error:
             rospy.logerr("Navigation-sorting mission failed: %s", str(error))
         finally:
+            self._stop_base()
             with self._condition:
                 self._busy = False
             if self._stop_requested.is_set():
