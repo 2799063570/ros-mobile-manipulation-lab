@@ -1,9 +1,18 @@
 cmake_minimum_required(VERSION 3.0.2)
 project(aubo_mobile_follower)
 
-find_package(catkin REQUIRED)
+find_package(catkin REQUIRED COMPONENTS
+  dynamic_reconfigure
+)
 
-catkin_package()
+generate_dynamic_reconfigure_options(
+  cfg/ColorFollower.cfg
+  cfg/LineFollower.cfg
+)
+
+catkin_package(
+  CATKIN_DEPENDS dynamic_reconfigure
+)
 
 catkin_install_python(PROGRAMS
   scripts/prepare_arm_pose.py

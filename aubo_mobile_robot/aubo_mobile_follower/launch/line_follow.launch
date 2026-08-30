@@ -10,6 +10,7 @@
   <arg name="world" default="$(find aubo_mobile_follower)/worlds/line_follow.world"/>
   <arg name="gui" default="true"/>
   <arg name="start_rviz" default="true"/>
+  <arg name="start_rqt_reconfigure" default="false"/>
   <arg name="start_path_trail" default="true"/>
 
   <include file="$(find aubo_mobile_follower)/launch/follower.launch">
@@ -36,4 +37,7 @@
     <env name="__GLX_VENDOR_LIBRARY_NAME" value="mesa"/>
     <env name="MESA_LOADER_DRIVER_OVERRIDE" value="llvmpipe"/>
   </node>
+
+  <node if="$(arg start_rqt_reconfigure)" pkg="rqt_reconfigure"
+        type="rqt_reconfigure" name="line_follow_reconfigure" output="screen"/>
 </launch>

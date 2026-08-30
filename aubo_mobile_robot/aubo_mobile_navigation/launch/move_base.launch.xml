@@ -1,6 +1,11 @@
 <?xml version="1.0"?>
 <launch>
   <arg name="cmd_vel_topic" default="/cmd_vel"/>
+  <arg name="clearing_rotation_allowed" default="true"/>
+  <arg name="max_vel_theta" default="0.80"/>
+  <arg name="min_vel_theta" default="0.08"/>
+  <arg name="xy_goal_tolerance" default="0.04"/>
+  <arg name="yaw_goal_tolerance" default="0.06"/>
   <node pkg="move_base" type="move_base" name="move_base"
         clear_params="true" output="screen">
     <remap from="cmd_vel" to="$(arg cmd_vel_topic)"/>
@@ -12,5 +17,12 @@
     <rosparam file="$(find aubo_mobile_navigation)/config/local_costmap.yaml" command="load"/>
     <rosparam file="$(find aubo_mobile_navigation)/config/dwa_local_planner.yaml" command="load"/>
     <rosparam file="$(find aubo_mobile_navigation)/config/move_base.yaml" command="load"/>
+    <!-- Launch-specific profiles can override the common defaults without
+         changing navigation behaviour for every consumer of this package. -->
+    <param name="clearing_rotation_allowed" value="$(arg clearing_rotation_allowed)"/>
+    <param name="DWAPlannerROS/max_vel_theta" value="$(arg max_vel_theta)"/>
+    <param name="DWAPlannerROS/min_vel_theta" value="$(arg min_vel_theta)"/>
+    <param name="DWAPlannerROS/xy_goal_tolerance" value="$(arg xy_goal_tolerance)"/>
+    <param name="DWAPlannerROS/yaw_goal_tolerance" value="$(arg yaw_goal_tolerance)"/>
   </node>
 </launch>

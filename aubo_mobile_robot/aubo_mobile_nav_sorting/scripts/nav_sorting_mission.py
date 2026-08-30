@@ -99,6 +99,16 @@ class NavigationSortingMission(object):
         self.direct_dock_goal_tolerance = max(
             0.01, float(rospy.get_param("~near_field_direct_dock_goal_tolerance", 0.06))
         )
+        self.direct_dock_timeout = max(
+            1.0, float(rospy.get_param("~near_field_direct_dock_timeout", 15.0))
+        )
+        self.direct_dock_stall_timeout = max(
+            0.5, float(rospy.get_param("~near_field_direct_dock_stall_timeout", 2.5))
+        )
+        self.direct_dock_progress_epsilon = max(
+            0.001,
+            float(rospy.get_param("~near_field_direct_dock_progress_epsilon", 0.005)),
+        )
 
         self.server_timeout = float(rospy.get_param("~server_timeout", 45.0))
         self.navigation_timeout = float(rospy.get_param("~navigation_timeout", 180.0))
@@ -601,32 +611,75 @@ class NavigationSortingMission(object):
 
         self._publish_state(
             "DIRECT_DOCKING",
-            "%s %.3f m at %.3f m/s through lidar safety".format(
+            "%s %.3f m closed-loop at %.3f m/s through lidar safety".format(
                 label, longitudinal, self.base_recovery_speed
             ),
         )
-        if not self._move_base_direct([longitudinal, 0.0], 1, 1):
-            return False
+        self.navigation_client.cancel_all_goals()
+        self._stop_base()
+        rospy.sleep(0.2)
 
-        actual = self._current_base_pose()
-        if actual is None:
-            return False
-        position_error = math.hypot(actual[0] - target[0], actual[1] - target[1])
-        actual_yaw_error = abs(self._angle_error(target[2], actual[2]))
-        if (
-            position_error > self.direct_dock_goal_tolerance
-            or actual_yaw_error > self.direct_dock_yaw_tolerance
-        ):
-            rospy.logwarn(
-                "%s stopped short: position error=%.3f yaw error=%.3f",
-                label, position_error, actual_yaw_error,
-            )
-            return False
-        rospy.loginfo(
-            "%s reached by straight cmd_vel: position error=%.3f yaw error=%.3f",
-            label, position_error, actual_yaw_error,
-        )
-        return True
+        deadline = time.time() + self.direct_dock_timeout
+        last_progress_time = time.time()
+        best_error = abs(longitudinal)
+        rate = rospy.Rate(self.base_recovery_rate)
+        try:
+            while not rospy.is_shutdown() and time.time() < deadline:
+                if self._stop_requested.is_set():
+                    return False
+                actual = self._current_base_pose()
+                if actual is None:
+                    rate.sleep()
+                    continue
+                longitudinal, lateral, yaw_error = self._direct_dock_geometry(
+                    actual, target
+                )
+                position_error = math.hypot(
+                    actual[0] - target[0], actual[1] - target[1]
+                )
+                if (
+                    position_error <= self.direct_dock_goal_tolerance
+                    and abs(yaw_error) <= self.direct_dock_yaw_tolerance
+                ):
+                    rospy.loginfo(
+                        "%s reached by closed-loop cmd_vel: position error=%.3f "
+                        "yaw error=%.3f",
+                        label, position_error, abs(yaw_error),
+                    )
+                    return True
+                if (
+                    abs(lateral) > self.direct_dock_lateral_tolerance
+                    or abs(yaw_error) > self.direct_dock_yaw_tolerance
+                ):
+                    rospy.logwarn(
+                        "%s drifted outside straight corridor: lateral=%.3f yaw=%.3f",
+                        label, lateral, yaw_error,
+                    )
+                    return False
+
+                current_error = abs(longitudinal)
+                if current_error <= best_error - self.direct_dock_progress_epsilon:
+                    best_error = current_error
+                    last_progress_time = time.time()
+                elif time.time() - last_progress_time > self.direct_dock_stall_timeout:
+                    rospy.logwarn(
+                        "%s made no progress for %.1f s (remaining %.3f m); "
+                        "lidar safety may be blocking the path",
+                        label, self.direct_dock_stall_timeout, current_error,
+                    )
+                    return False
+
+                command = Twist()
+                command.linear.x = math.copysign(
+                    min(self.base_recovery_speed, max(0.02, current_error)),
+                    longitudinal,
+                )
+                self.base_recovery_publisher.publish(command)
+                rate.sleep()
+        finally:
+            self._stop_base()
+        rospy.logwarn("%s timed out after %.1f seconds", label, self.direct_dock_timeout)
+        return False
 
     def _prepare_and_observe_once(self):
         self._publish_state("PREPARING_ARM", "moving arm to work-ready pose")
@@ -793,14 +846,12 @@ class NavigationSortingMission(object):
                         scored.append((score, candidate, self._table_clearance(candidate)))
         scored.sort(key=lambda item: item[0])
         if self.direct_dock_enabled:
-            # Prefer candidates reachable by a straight, low-speed final
-            # approach from pre-dock.  This avoids DWA rotation inside the
-            # table's near field while retaining its score within each group.
-            scored.sort(
-                key=lambda item: (
-                    not self._can_direct_dock_from_pre_dock(item[1]), item[0]
-                )
-            )
+            # Never fall back to DWA inside the table's near field. A rejected
+            # straight candidate is safer than an in-place recovery rotation.
+            scored = [
+                item for item in scored
+                if self._can_direct_dock_from_pre_dock(item[1])
+            ]
         selected = scored[:self.near_field_max_candidates]
         for index, (score, candidate, clearance) in enumerate(selected):
             rospy.loginfo(

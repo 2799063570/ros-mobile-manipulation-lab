@@ -29,7 +29,8 @@ catkin_make
 source devel/setup.bash
 ```
 
-机器人或 Gazebo 已经运行时，不要同时运行 `move_base`，直接选择一种模式：
+颜色跟随和循线启动文件默认会各自启动专用 Gazebo 世界、机器人、MoveIt、控制器
+以及对应的 RViz 配置；不要同时运行 `move_base`。直接选择一种模式：
 
 ```bash
 # 激光目标跟随
@@ -38,26 +39,46 @@ roslaunch aubo_mobile_follower laser_follow.launch
 # 激光跟随 + RViz 诊断（默认同时启动 Gazebo）
 roslaunch aubo_mobile_follower laser_follow_debug.launch
 
-# 红色色块跟随
+# 红色色块跟随：红色目标场景 + 前视相机 + RViz 目标控制/轨迹/调试图像
 roslaunch aubo_mobile_follower color_follow.launch
 
-# 黑线循迹
+# 黑线循迹：弯曲黑线场景 + 下视相机 + RViz 轨迹/调试图像
 roslaunch aubo_mobile_follower line_follow.launch
 ```
 
-需要由跟随启动文件一并启动 Gazebo 时：
+需要运行时调参时，在对应启动命令后增加：
 
 ```bash
-roslaunch aubo_mobile_follower color_follow.launch start_robot:=true
+roslaunch aubo_mobile_follower color_follow.launch start_rqt_reconfigure:=true
+roslaunch aubo_mobile_follower line_follow.launch  start_rqt_reconfigure:=true
 ```
 
-默认会启动 MoveIt、双雷达合并和激光安全层。如果这些节点已经由其他入口启动，
-应避免重复节点：
+在 `rqt_reconfigure` 左侧选择 `/aubo_mobile_follower`。颜色模式可以动态调整 HSV、
+目标面积、死区、速度和比例增益；循线模式可以动态调整 HSV、ROI、最小掩码面积、
+速度及 PD 增益。修改会立即作用于控制器，不需要重启节点。RViz 中的相机调试图像
+可用于观察阈值和 ROI 调整结果。
+
+无桌面环境或只做自动验证时，可以关闭 Gazebo 客户端和 RViz，物理仿真仍会运行：
 
 ```bash
-roslaunch aubo_mobile_follower line_follow.launch \
+roslaunch aubo_mobile_follower color_follow.launch gui:=false start_rviz:=false
+roslaunch aubo_mobile_follower line_follow.launch  gui:=false start_rviz:=false
+```
+
+若机器人或 Gazebo 已经由其他入口启动，应关闭重复的仿真、MoveIt 和传感器节点。
+颜色目标控制节点依赖专用世界里的 `color_target`，外部场景没有这个模型时也应关闭：
+
+```bash
+roslaunch aubo_mobile_follower color_follow.launch start_robot:=false \
+  start_moveit:=false start_scan_merger:=false start_target_control:=false
+roslaunch aubo_mobile_follower line_follow.launch start_robot:=false \
   start_moveit:=false start_scan_merger:=false
 ```
+
+在颜色跟随 RViz 中选择顶部 `Interact` 工具，可以拖动 `Color Target Control`
+的 X/Y 拉杆改变 Gazebo 红色目标位置。两个 RViz 配置都会显示机器人模型、合并雷达
+`/scan`、行驶轨迹 `/aubo_mobile_follower/path` 和相机调试图像。循线到达绿色终点、
+黑线离开视野后会发布 `line_lost` 并停车。
 
 ## 算法说明
 

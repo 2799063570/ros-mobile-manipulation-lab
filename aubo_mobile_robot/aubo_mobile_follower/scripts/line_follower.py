@@ -11,6 +11,8 @@ import cv2
 import cv_bridge
 import numpy as np
 import rospy
+from aubo_mobile_follower.cfg import LineFollowerConfig
+from dynamic_reconfigure.server import Server
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import Image
 from std_msgs.msg import Bool, String
@@ -67,6 +69,25 @@ class LineFollower(object):
         self._previous_time = None
         self._last_image_time = None
 
+        initial_configuration = {
+            "h_min": int(self.hsv_lower[0]),
+            "s_min": int(self.hsv_lower[1]),
+            "v_min": int(self.hsv_lower[2]),
+            "h_max": int(self.hsv_upper[0]),
+            "s_max": int(self.hsv_upper[1]),
+            "v_max": int(self.hsv_upper[2]),
+            "roi_top_fraction": self.roi_top_fraction,
+            "min_mask_fraction": self.min_mask_fraction,
+            "linear_speed": self.linear_speed,
+            "angular_kp": self.angular_kp,
+            "angular_kd": self.angular_kd,
+            "max_angular_speed": self.max_angular_speed,
+        }
+        self._reconfigure_server = Server(
+            LineFollowerConfig, self._reconfigure_callback
+        )
+        self._reconfigure_server.update_configuration(initial_configuration)
+
         self._command_publisher = rospy.Publisher(
             self.cmd_vel_topic, Twist, queue_size=2
         )
@@ -91,6 +112,24 @@ class LineFollower(object):
         with self._lock:
             self._arm_ready = bool(message.data)
 
+    def _reconfigure_callback(self, config, _level):
+        with self._lock:
+            self.hsv_lower = np.array(
+                [config["h_min"], config["s_min"], config["v_min"]],
+                dtype=np.uint8,
+            )
+            self.hsv_upper = np.array(
+                [config["h_max"], config["s_max"], config["v_max"]],
+                dtype=np.uint8,
+            )
+            self.roi_top_fraction = config["roi_top_fraction"]
+            self.min_mask_fraction = config["min_mask_fraction"]
+            self.linear_speed = config["linear_speed"]
+            self.angular_kp = config["angular_kp"]
+            self.angular_kd = config["angular_kd"]
+            self.max_angular_speed = config["max_angular_speed"]
+        return config
+
     def _image_callback(self, message):
         try:
             frame = self.bridge.imgmsg_to_cv2(message, desired_encoding="bgr8")
@@ -98,11 +137,17 @@ class LineFollower(object):
             rospy.logwarn_throttle(2.0, "Cannot decode line image: %s", str(error))
             return
 
+        with self._lock:
+            hsv_lower = self.hsv_lower.copy()
+            hsv_upper = self.hsv_upper.copy()
+            roi_top_fraction = self.roi_top_fraction
+            min_mask_fraction = self.min_mask_fraction
+
         height, width = frame.shape[:2]
-        roi_top = int(clamp(self.roi_top_fraction, 0.0, 0.95) * height)
+        roi_top = int(clamp(roi_top_fraction, 0.0, 0.95) * height)
         roi = frame[roi_top:height, :]
         hsv = cv2.cvtColor(roi, cv2.COLOR_BGR2HSV)
-        mask = cv2.inRange(hsv, self.hsv_lower, self.hsv_upper)
+        mask = cv2.inRange(hsv, hsv_lower, hsv_upper)
         kernel = np.ones((5, 5), np.uint8)
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
@@ -110,7 +155,7 @@ class LineFollower(object):
         mask_fraction = moments["m00"] / (255.0 * mask.shape[0] * mask.shape[1])
 
         error = None
-        if moments["m00"] > 0.0 and mask_fraction >= self.min_mask_fraction:
+        if moments["m00"] > 0.0 and mask_fraction >= min_mask_fraction:
             center_x = moments["m10"] / moments["m00"]
             center_y = moments["m01"] / moments["m00"]
             error = (center_x - width * 0.5) / (width * 0.5)
@@ -160,6 +205,10 @@ class LineFollower(object):
             error = self._line_error
             derivative = self._error_derivative
             image_time = self._last_image_time
+            linear_speed = self.linear_speed
+            angular_kp = self.angular_kp
+            angular_kd = self.angular_kd
+            max_angular_speed = self.max_angular_speed
 
         if not ready:
             self._stop()
@@ -176,11 +225,13 @@ class LineFollower(object):
 
         command = Twist()
         # Slow down on sharp bends so that the extended arm remains stable.
-        command.linear.x = self.linear_speed * max(0.35, 1.0 - abs(error))
+        command.linear.x = linear_speed * max(0.35, 1.0 - abs(error))
+        # With the wrist-mounted camera in the ``observe`` pose, increasing
+        # image x corresponds to a positive base yaw correction.
         command.angular.z = clamp(
-            -self.angular_kp * error - self.angular_kd * derivative,
-            -self.max_angular_speed,
-            self.max_angular_speed,
+            angular_kp * error + angular_kd * derivative,
+            -max_angular_speed,
+            max_angular_speed,
         )
         self._command_publisher.publish(command)
         self._state_publisher.publish(String(data="line_following"))

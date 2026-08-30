@@ -8,6 +8,11 @@
   <arg name="nav_goal_topic" default="/move_base_simple/goal"/>
   <arg name="laser_safety" default="true"/>
   <arg name="raw_cmd_vel_topic" default="/cmd_vel_raw"/>
+  <arg name="clearing_rotation_allowed" default="true"/>
+  <arg name="max_vel_theta" default="0.80"/>
+  <arg name="min_vel_theta" default="0.08"/>
+  <arg name="xy_goal_tolerance" default="0.04"/>
+  <arg name="yaw_goal_tolerance" default="0.06"/>
 
   <include file="$(find aubo_mobile_navigation)/launch/scan_merger.launch"/>
 
@@ -22,6 +27,11 @@
   <group if="$(arg laser_safety)">
     <include file="$(find aubo_mobile_navigation)/launch/move_base.launch.xml">
       <arg name="cmd_vel_topic" value="$(arg raw_cmd_vel_topic)"/>
+      <arg name="clearing_rotation_allowed" value="$(arg clearing_rotation_allowed)"/>
+      <arg name="max_vel_theta" value="$(arg max_vel_theta)"/>
+      <arg name="min_vel_theta" value="$(arg min_vel_theta)"/>
+      <arg name="xy_goal_tolerance" value="$(arg xy_goal_tolerance)"/>
+      <arg name="yaw_goal_tolerance" value="$(arg yaw_goal_tolerance)"/>
     </include>
     <include file="$(find aubo_mobile_navigation)/launch/laser_safety_filter.launch">
       <arg name="scan_topic" value="/scan"/>
@@ -32,6 +42,11 @@
   <group unless="$(arg laser_safety)">
     <include file="$(find aubo_mobile_navigation)/launch/move_base.launch.xml">
       <arg name="cmd_vel_topic" value="/cmd_vel"/>
+      <arg name="clearing_rotation_allowed" value="$(arg clearing_rotation_allowed)"/>
+      <arg name="max_vel_theta" value="$(arg max_vel_theta)"/>
+      <arg name="min_vel_theta" value="$(arg min_vel_theta)"/>
+      <arg name="xy_goal_tolerance" value="$(arg xy_goal_tolerance)"/>
+      <arg name="yaw_goal_tolerance" value="$(arg yaw_goal_tolerance)"/>
     </include>
   </group>
 

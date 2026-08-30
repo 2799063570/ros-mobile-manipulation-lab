@@ -19,6 +19,10 @@ near_field_direct_dock_max_distance: 0.50
 near_field_direct_dock_lateral_tolerance: 0.04
 near_field_direct_dock_yaw_tolerance: 0.04
 near_field_direct_dock_goal_tolerance: 0.06
+# 闭环精靠若被激光安全层持续拦停，会在超时/无进展后安全退出，不再交回 DWA 转圈。
+near_field_direct_dock_timeout: 15.0
+near_field_direct_dock_stall_timeout: 2.5
+near_field_direct_dock_progress_epsilon: 0.005
 # 近场直行复用恢复移动速度；低速可缩短激光安全层的动态停车距离。
 base_recovery_speed: 0.04
 

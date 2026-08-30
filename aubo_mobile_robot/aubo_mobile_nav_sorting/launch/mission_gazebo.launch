@@ -33,6 +33,14 @@
   <include file="$(find aubo_mobile_navigation)/launch/navigation.launch">
     <arg name="map_file" value="$(arg map_file)"/>
     <arg name="rviz" value="$(arg rviz)"/>
+    <!-- Near the table, rotate recovery can repeatedly spin against the local
+         costmap.  This mission stops at pre-dock and performs final docking
+         with its own low-speed straight controller, so use a calmer profile. -->
+    <arg name="clearing_rotation_allowed" value="false"/>
+    <arg name="max_vel_theta" value="0.45"/>
+    <arg name="min_vel_theta" value="0.05"/>
+    <arg name="xy_goal_tolerance" value="0.07"/>
+    <arg name="yaw_goal_tolerance" value="0.04"/>
   </include>
 
   <!-- Seed AMCL after it subscribes; this avoids requiring an RViz click. -->
