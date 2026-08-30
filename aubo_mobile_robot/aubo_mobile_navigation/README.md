@@ -108,14 +108,14 @@ roslaunch aubo_mobile_navigation navigation.launch \
 需要边建图边运行 move_base 时，先启动机器人，再执行：
 
 ```bash
-roslaunch aubo_mobile_navigation mapping_navigation.launch
+roslaunch aubo_mobile_navigation mapping_nav.launch
 ```
 
 按照参考工程 `simple_diff_robot_gazebo/launch/mapping_nav.launch` 的结构，同时
 启动 Gazebo、GMapping 和 move_base：
 
 ```bash
-roslaunch aubo_mobile_navigation mapping_nav.launch
+roslaunch aubo_mobile_navigation mapping_nav_gazebo.launch
 ```
 
 ## RRT 自主探索建图

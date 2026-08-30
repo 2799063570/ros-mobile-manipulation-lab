@@ -6,11 +6,13 @@
   <arg name="goal_x" default="2.15"/>
   <arg name="goal_y" default="0.0"/>
   <arg name="goal_yaw" default="0.0"/>
+  <arg name="direct_dock" default="true"/>
 
   <node pkg="aubo_mobile_nav_sorting" type="nav_sorting_mission.py"
         name="nav_sorting_mission" output="screen">
     <rosparam file="$(arg config)" command="load"/>
     <rosparam param="sorting_goal" subst_value="true">[$(arg goal_x), $(arg goal_y), $(arg goal_yaw)]</rosparam>
+    <param name="near_field_direct_dock_enabled" value="$(arg direct_dock)"/>
     <param name="auto_start" value="$(arg auto_start)"/>
   </node>
 </launch>

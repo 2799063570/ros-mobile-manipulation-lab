@@ -66,16 +66,18 @@ int gridValue(nav_msgs::OccupancyGrid& mapData, std::vector<float> Xp) {
   float Xstartx = mapData.info.origin.position.x;
   float Xstarty = mapData.info.origin.position.y;
 
-  float width = mapData.info.width;
+  int width = mapData.info.width;
+  int height = mapData.info.height;
   std::vector<signed char> Data = mapData.data;
 
   // returns grid value at "Xp" location
   // map data:  100 occupied      -1 unknown       0 free
-  float indx =
-      (floor((Xp[1] - Xstarty) / resolution) * width) + (floor((Xp[0] - Xstartx) / resolution));
-  int out;
-  out = Data[int(indx)];
-  return out;
+  int cell_x = int(floor((Xp[0] - Xstartx) / resolution));
+  int cell_y = int(floor((Xp[1] - Xstarty) / resolution));
+  if (cell_x < 0 || cell_x >= width || cell_y < 0 || cell_y >= height) {
+    return 100;
+  }
+  return Data[cell_y * width + cell_x];
 }
 
 // ObstacleFree function-------------------------------------
@@ -85,6 +87,10 @@ int ObstacleFree(std::vector<float> xnear, std::vector<float>& xnew,
   float rez = float(mapsub.info.resolution) * .2;// 根据网格分辨率设置步长
   float stepz = int(ceil(Norm(xnew, xnear)) / rez);
   std::vector<float> xi = xnear;
+  // A navigation goal must lie in known free space.  Keep the last free
+  // sample so that reaching unknown space reports the free side of the
+  // frontier instead of the first unknown cell (costmap value 255).
+  std::vector<float> last_free = xnear;
   int obs = 0;
   int unk = 0;
 
@@ -100,11 +106,17 @@ int ObstacleFree(std::vector<float> xnear, std::vector<float>& xnew,
       unk = 1;
       break;
     }
+
+    if (gridValue(mapsub, xi) == 0) {
+      last_free = xi;
+    }
   }
   int out = 0;
-  xnew = xi;
   if (unk == 1) {
+    xnew = last_free;
     out = -1;
+  } else {
+    xnew = xi;
   }
 
   if (obs == 1) {

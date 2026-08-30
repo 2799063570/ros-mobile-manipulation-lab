@@ -1,6 +1,11 @@
 #!/usr/bin/env python3
 
 # --------Include modules---------------
+import os
+import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 import rospy
 from visualization_msgs.msg import Marker
 from nav_msgs.msg import OccupancyGrid

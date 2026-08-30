@@ -95,17 +95,18 @@ def index_of_point(mapData, Xp):
     Xstartx = mapData.info.origin.position.x
     Xstarty = mapData.info.origin.position.y
     width = mapData.info.width
-    Data = mapData.data
-    index = int((floor((Xp[1] - Xstarty) / resolution) * width) +
-                (floor((Xp[0] - Xstartx) / resolution)))
-    return index
+    cell_x = int(floor((Xp[0] - Xstartx) / resolution))
+    cell_y = int(floor((Xp[1] - Xstarty) / resolution))
+    if cell_x < 0 or cell_x >= mapData.info.width or cell_y < 0 or cell_y >= mapData.info.height:
+        return -1
+    return cell_y * width + cell_x
 
 
 def point_of_index(mapData, i):
-    y = mapData.info.origin.position.y + \
-        (i/mapData.info.width)*mapData.info.resolution
-    x = mapData.info.origin.position.x + \
-        (i-(i/mapData.info.width)*(mapData.info.width))*mapData.info.resolution
+    row = i // mapData.info.width
+    column = i % mapData.info.width
+    y = mapData.info.origin.position.y + row * mapData.info.resolution
+    x = mapData.info.origin.position.x + column * mapData.info.resolution
     return array([x, y])
 
 
@@ -115,12 +116,14 @@ def point_of_index(mapData, i):
 def informationGain(mapData, point, r):
     infoGain = 0
     index = index_of_point(mapData, point)
+    if index < 0:
+        return 0.0
     r_region = int(r / mapData.info.resolution)
     init_index = index - r_region * (mapData.info.width + 1)
     for n in range(0, 2 * r_region + 1):
         start = n * mapData.info.width + init_index
         end = start + 2 * r_region
-        limit = ((start / mapData.info.width) + 2) * mapData.info.width
+        limit = ((start // mapData.info.width) + 2) * mapData.info.width
         for i in range(start, end + 1):
             if (i >= 0 and i < limit and i < len(mapData.data)):
                 if (mapData.data[i] == -1 and norm(array(point) - point_of_index(mapData, i)) <= r):
@@ -131,6 +134,8 @@ def informationGain(mapData, point, r):
 def checkAround(mapData, point, r):
     valueAtound = 0
     index = index_of_point(mapData, point)
+    if index < 0:
+        return 10000
     r_region = int(r / mapData.info.resolution)
     init_index = index - r_region * (mapData.info.width + 1)
     for n in range(0, 2 * r_region + 1):
@@ -149,12 +154,14 @@ def checkAround(mapData, point, r):
 
 def discount(mapData, assigned_pt, centroids, infoGain, r):
     index = index_of_point(mapData, assigned_pt)
+    if index < 0:
+        return infoGain
     r_region = int(r / mapData.info.resolution)  # 附近的栅各数目
     init_index = index - r_region * (mapData.info.width + 1)  # 第一行第一个点
     for n in range(0, 2 * r_region + 1):
         start = n * mapData.info.width + init_index     # 遍历 每行的第一个点
         end = start + 2 * r_region      # 遍历 每行的最后一个点
-        limit = ((start / mapData.info.width) + 2) * mapData.info.width
+        limit = ((start // mapData.info.width) + 2) * mapData.info.width
         for i in range(start, end + 1):
             if (i >= 0 and i < limit and i < len(mapData.data)):
                 for j in range(0, len(centroids)):
@@ -171,7 +178,7 @@ def discount(mapData, assigned_pt, centroids, infoGain, r):
 
 def pathCost(path):
     if (len(path) > 0):
-        i = len(path) / 2
+        i = len(path) // 2
         p1 = array([path[i - 1].pose.position.x, path[i - 1].pose.position.y])
         p2 = array([path[i].pose.position.x, path[i].pose.position.y])
         return norm(p1 - p2) * (len(path) - 1)
@@ -184,12 +191,14 @@ def pathCost(path):
 
 def unvalid(mapData, pt):
     index = index_of_point(mapData, pt)
+    if index < 0:
+        return True
     r_region = 5
     init_index = index - r_region * (mapData.info.width + 1)
     for n in range(0, 2 * r_region + 1):
         start = n * mapData.info.width + init_index
         end = start + 2 * r_region
-        limit = ((start / mapData.info.width) + 2) * mapData.info.width
+        limit = ((start // mapData.info.width) + 2) * mapData.info.width
         for i in range(start, end + 1):
             if (i >= 0 and i < limit and i < len(mapData.data)):
                 if (mapData.data[i] == 1):
@@ -229,18 +238,10 @@ def Nearest2(V, x):
 
 
 def gridValue(mapData, Xp):
-    resolution = mapData.info.resolution
-    Xstartx = mapData.info.origin.position.x
-    Xstarty = mapData.info.origin.position.y
-
-    width = mapData.info.width
     Data = mapData.data
     # returns grid value at "Xp" location
     # map data:  100 occupied      -1 unknown       0 free
-    index = (floor((Xp[1]-Xstarty)/resolution)*width) + \
-        (floor((Xp[0]-Xstartx)/resolution))
-
-    if int(index) < len(Data):
-        return Data[int(index)]
-    else:
+    index = index_of_point(mapData, Xp)
+    if index < 0 or index >= len(Data):
         return 100
+    return Data[index]

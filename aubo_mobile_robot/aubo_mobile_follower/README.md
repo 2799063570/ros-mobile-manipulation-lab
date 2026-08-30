@@ -6,7 +6,7 @@
 | 模式 | 传感器 | 机械臂命名姿态 | 作用 |
 | --- | --- | --- | --- |
 | 激光跟随 | 合并后的 `/scan` | `transport` | 收拢机械臂后跟随前方目标点簇 |
-| 颜色跟随 | `/hand_camera/image_raw` | `follow_forward` | 相机光轴对准车体前方，跟随指定 HSV 色块 |
+| 颜色跟随 | `/hand_camera/image_raw` | `follow_forward` | 机械臂低位折叠，相机保持水平朝前，跟随指定 HSV 色块 |
 | 循线 | `/hand_camera/image_raw` | `observe` | 相机向下，沿地面引导线行驶 |
 
 `prepare_arm_pose.py` 会先检查命名姿态是否存在，再要求 MoveIt 从当前状态规划出
@@ -14,9 +14,11 @@
 `/aubo_mobile_follower/arm_ready=true`。因此机械臂不可达、规划失败或相机未启动时，
 底盘始终保持停止。
 
-`follow_forward` 从已有可用的 `up` 关节姿态派生，仅将 `shoulder_joint` 调整为
-−0.327 rad，使相机光轴从侧偏约 19°校正到车体正前方。六个关节值均在 URDF
-限位内，并且不进行未经验证的笛卡尔目标直达。
+`follow_forward` 保留 `transport` 的低位 A 形折叠构型，调整腕部使
+相机光轴水平对准车体正前方，同时用 `wrist3_joint` 校正相机横滚，
+保持图像地平线水平。这会将相机从高位观测
+收至靠近底盘的低位观测位置。六个关节值均在 URDF 限位内，并且不进行
+未经验证的笛卡尔目标直达。
 
 ## 使用方法
 
@@ -32,6 +34,9 @@ source devel/setup.bash
 ```bash
 # 激光目标跟随
 roslaunch aubo_mobile_follower laser_follow.launch
+
+# 激光跟随 + RViz 诊断（默认同时启动 Gazebo）
+roslaunch aubo_mobile_follower laser_follow_debug.launch
 
 # 红色色块跟随
 roslaunch aubo_mobile_follower color_follow.launch
@@ -83,3 +88,11 @@ roslaunch aubo_mobile_follower line_follow.launch \
 
 状态话题为 `/aubo_mobile_follower/state`。首次实机测试应架空驱动轮或使用急停，
 先把最大线速度降到较低值，再标定相机 HSV、目标面积和雷达安全距离。
+
+激光 RViz 诊断话题为 `/aubo_mobile_follower/laser_debug`：青色球表示通过点数和
+连续性检查的候选点簇，绿色球表示当前控制目标，黄色弧线表示期望跟随距离。
+`laser_follow_debug.launch` 默认还会在车前生成名为 `follower_target` 的红色测试
+立柱，可以通过 `/gazebo/set_model_state` 服务移动；不需要测试目标时传入
+`spawn_test_target:=false`。
+RViz 中的 `Target Control` 使用标准 Interactive Markers 插件显示 X/Y 拉杆；选择
+顶部的 Interact 工具后拖动拉杆，即可实时移动 Gazebo 中的测试立柱。

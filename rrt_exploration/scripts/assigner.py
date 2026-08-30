@@ -2,6 +2,14 @@
 # -*- coding: utf-8 -*-
 
 # --------Include modules---------------
+import os
+import sys
+
+# catkin executes this source through a relay in devel/lib.  Put the actual
+# source directory first so the sibling helper module is importable there as
+# well as from an installed package.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 from copy import copy
 import rospy
 from visualization_msgs.msg import Marker
@@ -80,12 +88,12 @@ def node():
     # ---------------------------------------------------------------------------------------------------------------
 
     # wait if no frontier is received yet  等待前沿节点订阅更新
-    while len(frontiers) < 1:
-        pass
+    while len(frontiers) < 1 and not rospy.is_shutdown():
+        rospy.sleep(0.05)
     centroids = copy(frontiers)
     # wait if map is not received yet  等待地图数据订阅更新
-    while (len(mapData.data) < 1):
-        pass
+    while len(mapData.data) < 1 and not rospy.is_shutdown():
+        rospy.sleep(0.05)
 
     # 初始化：给机器人发送当前位置
     robots = []

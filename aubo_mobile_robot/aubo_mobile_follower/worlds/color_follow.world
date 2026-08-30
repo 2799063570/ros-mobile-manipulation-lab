@@ -1,0 +1,57 @@
+<?xml version="1.0"?>
+<sdf version="1.6">
+  <world name="aubo_color_follow">
+    <include><uri>model://ground_plane</uri></include>
+    <include><uri>model://sun</uri></include>
+
+    <!-- Red target seen by the low, forward-facing hand camera.  Gravity is
+         disabled so RViz can move it through /gazebo/set_model_state. -->
+    <model name="color_target">
+      <static>false</static>
+      <pose>2.5 0 0.35 0 0 0</pose>
+      <link name="target_link">
+        <gravity>false</gravity>
+        <inertial>
+          <mass>8.0</mass>
+          <inertia>
+            <ixx>0.352667</ixx><iyy>0.352667</iyy><izz>0.172800</izz>
+            <ixy>0</ixy><ixz>0</ixz><iyz>0</iyz>
+          </inertia>
+        </inertial>
+        <collision name="collision">
+          <geometry><box><size>0.36 0.36 0.70</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.36 0.36 0.70</size></box></geometry>
+          <material>
+            <ambient>0.85 0.01 0.01 1</ambient>
+            <diffuse>1.00 0.02 0.02 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Visual-only start and target-distance markings make the task layout
+         obvious in Gazebo without introducing extra laser obstacles. -->
+    <model name="start_marker">
+      <static>true</static><pose>0 0 0.003 0 0 0</pose>
+      <link name="link"><visual name="visual">
+        <geometry><cylinder><radius>0.42</radius><length>0.006</length></cylinder></geometry>
+        <material><ambient>0.08 0.20 0.55 1</ambient><diffuse>0.08 0.30 0.85 1</diffuse></material>
+      </visual></link>
+    </model>
+    <model name="target_stop_marker">
+      <static>true</static><pose>1.5 0 0.004 0 0 0</pose>
+      <link name="link"><visual name="visual">
+        <geometry><box><size>0.04 1.2 0.008</size></box></geometry>
+        <material><ambient>0.95 0.75 0.05 1</ambient><diffuse>1 0.85 0.08 1</diffuse></material>
+      </visual></link>
+    </model>
+
+    <physics name="color_follow_physics" type="ode">
+      <max_step_size>0.001</max_step_size>
+      <real_time_update_rate>1000</real_time_update_rate>
+      <ode><solver><type>quick</type><iters>100</iters><sor>1.3</sor></solver></ode>
+    </physics>
+  </world>
+</sdf>

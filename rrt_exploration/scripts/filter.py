@@ -2,6 +2,14 @@
 # -*- coding: utf-8 -*-
 
 # --------Include modules---------------
+import os
+import sys
+
+# catkin executes this source through a relay in devel/lib.  Put the actual
+# source directory first so the sibling helper module is importable there as
+# well as from an installed package.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 from copy import copy
 import rospy
 from visualization_msgs.msg import Marker
@@ -118,8 +126,8 @@ def node():
     rospy.loginfo("the map and global costmaps are received")
 
     # wait if no frontier is received yet
-    while len(frontiers) < 1:
-        pass
+    while len(frontiers) < 1 and not rospy.is_shutdown():
+        rospy.sleep(0.05)
 
     points = Marker()
     points_clust = Marker()
@@ -205,6 +213,9 @@ def node():
         # clearing old frontiers
 
         z = 0
+        rejected_costmap = 0
+        rejected_around = 0
+        rejected_gain = 0
         while z < len(centroids):
             cond = False
             around = False
@@ -218,11 +229,22 @@ def node():
                 cond = (gridValue(globalmaps[i], x) > threshold) or cond
             around = (checkAround(mapData, [centroids[z][0], centroids[z][1]], info_radius * 0.5)
                       > 1000)
-            if (cond or around or (informationGain(mapData, [centroids[z][0], centroids[z][1]],
-                                                   info_radius * 0.5)) < 0.2):
+            low_gain = (informationGain(mapData, [centroids[z][0], centroids[z][1]],
+                                        info_radius * 0.5) < 0.2)
+            if cond:
+                rejected_costmap += 1
+            elif around:
+                rejected_around += 1
+            elif low_gain:
+                rejected_gain += 1
+            if cond or around or low_gain:
                 centroids = delete(centroids, (z), axis=0)
                 z = z - 1
             z += 1
+        rospy.loginfo_throttle(
+            5.0,
+            'Frontier filter: %d accepted, %d costmap, %d near-obstacle, %d low-gain rejected',
+            len(centroids), rejected_costmap, rejected_around, rejected_gain)
         # -------------------------------------------------------------------------
         # Publish filtered frontiers and visualization markers.
         arraypoints.points = []

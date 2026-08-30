@@ -1,30 +1,11 @@
 <?xml version="1.0"?>
 <launch>
-  <!-- Gazebo + dual lidar + GMapping + move_base, based on the reference
-       simple_diff_robot_gazebo/launch/mapping_nav.launch. -->
-  <arg name="world" default="$(find aubo_mobile_navigation)/worlds/training.world"/>
-  <arg name="gui" default="true"/>
+  <!-- The robot or Gazebo must already be running. -->
   <arg name="rviz" default="true"/>
-  <arg name="paused" default="false"/>
-  <arg name="x" default="0.0"/>
-  <arg name="y" default="0.0"/>
-  <arg name="z" default="0.02"/>
 
-  <include file="$(find aubo_mobile_robot)/launch/gazebo.launch">
-    <arg name="world" value="$(arg world)"/>
-    <arg name="gui" value="$(arg gui)"/>
-    <arg name="paused" value="$(arg paused)"/>
-    <arg name="x" value="$(arg x)"/>
-    <arg name="y" value="$(arg y)"/>
-    <arg name="z" value="$(arg z)"/>
+  <include file="$(find aubo_mobile_navigation)/launch/mapping.launch">
+    <arg name="rviz" value="false"/>
   </include>
-
-  <include file="$(find aubo_mobile_navigation)/launch/scan_merger.launch"/>
-
-  <node pkg="gmapping" type="slam_gmapping" name="slam_gmapping" output="screen">
-    <rosparam file="$(find aubo_mobile_navigation)/config/gmapping.yaml" command="load"/>
-    <remap from="scan" to="/scan"/>
-  </node>
 
   <!-- During live mapping, GMapping supplies /map and map -> odom. -->
   <include file="$(find aubo_mobile_navigation)/launch/move_base.launch.xml"/>

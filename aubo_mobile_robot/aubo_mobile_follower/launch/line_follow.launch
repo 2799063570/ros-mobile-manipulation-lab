@@ -1,12 +1,16 @@
 <?xml version="1.0"?>
 <launch>
-  <arg name="start_robot" default="false"/>
+  <!-- Standalone task simulation by default.  Set start_robot:=false when
+       connecting the follower to an already running robot or Gazebo. -->
+  <arg name="start_robot" default="true"/>
   <arg name="start_moveit" default="true"/>
   <arg name="start_scan_merger" default="true"/>
   <arg name="use_laser_safety" default="true"/>
   <arg name="camera_topic" default="/hand_camera/image_raw"/>
-  <arg name="world" default="$(find aubo_mobile_robot)/worlds/empty.world"/>
+  <arg name="world" default="$(find aubo_mobile_follower)/worlds/line_follow.world"/>
   <arg name="gui" default="true"/>
+  <arg name="start_rviz" default="true"/>
+  <arg name="start_path_trail" default="true"/>
 
   <include file="$(find aubo_mobile_follower)/launch/follower.launch">
     <arg name="follower_type" value="line_follower.py"/>
@@ -21,4 +25,15 @@
     <arg name="world" value="$(arg world)"/>
     <arg name="gui" value="$(arg gui)"/>
   </include>
+
+  <node if="$(arg start_path_trail)" pkg="aubo_mobile_follower"
+        type="follower_path.py" name="line_follower_path" output="screen"/>
+
+  <node if="$(arg start_rviz)" pkg="rviz" type="rviz"
+        name="line_follow_rviz" output="screen"
+        args="-d $(find aubo_mobile_follower)/rviz/line_follow.rviz">
+    <env name="LIBGL_ALWAYS_SOFTWARE" value="1"/>
+    <env name="__GLX_VENDOR_LIBRARY_NAME" value="mesa"/>
+    <env name="MESA_LOADER_DRIVER_OVERRIDE" value="llvmpipe"/>
+  </node>
 </launch>

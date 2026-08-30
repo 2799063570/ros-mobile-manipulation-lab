@@ -306,6 +306,7 @@ catkin_test_results build/test_results
 
 roslaunch --nodes turn_on_wheeltec_robot robot_model_visualization.launch
 roslaunch --nodes aubo_mobile_navigation mapping_gazebo.launch
+roslaunch --nodes aubo_mobile_navigation mapping_nav_gazebo.launch
 ```
 
 ### 7. 在 Melodic 与 Noetic 之间切换
@@ -402,6 +403,9 @@ rosrun aubo_mobile_control keyboard_teleop.py
 ```bash
 # Gazebo + 双雷达融合 + GMapping + RViz
 roslaunch aubo_mobile_navigation mapping_gazebo.launch
+
+# Gazebo + 双雷达融合 + GMapping + move_base + RViz
+roslaunch aubo_mobile_navigation mapping_nav_gazebo.launch
 
 # 保存地图
 roslaunch aubo_mobile_navigation map_saver.launch

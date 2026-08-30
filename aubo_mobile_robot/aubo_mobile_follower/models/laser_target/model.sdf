@@ -1,0 +1,40 @@
+<?xml version="1.0"?>
+<sdf version="1.6">
+  <model name="follower_target">
+    <!-- Dynamic is required for /gazebo/set_model_state to move the target.
+         Gravity is disabled so it remains at lidar height after teleporting. -->
+    <static>false</static>
+    <link name="body">
+      <gravity>false</gravity>
+      <inertial>
+        <mass>20.0</mass>
+        <inertia>
+          <ixx>1.933333</ixx>
+          <iyy>1.933333</iyy>
+          <izz>0.533333</izz>
+          <ixy>0.0</ixy>
+          <ixz>0.0</ixz>
+          <iyz>0.0</iyz>
+        </inertia>
+      </inertial>
+      <collision name="collision">
+        <geometry>
+          <box>
+            <size>0.4 0.4 1.0</size>
+          </box>
+        </geometry>
+      </collision>
+      <visual name="visual">
+        <geometry>
+          <box>
+            <size>0.4 0.4 1.0</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.9 0.15 0.15 1</ambient>
+          <diffuse>0.9 0.15 0.15 1</diffuse>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>

@@ -1,0 +1,132 @@
+Panels:
+  - Class: rviz/Displays
+    Name: Displays
+    Property Tree Widget:
+      Expanded:
+        - /Robot1
+        - /Colour Detection1
+        - /Target Control1
+      Splitter Ratio: 0.52
+    Tree Height: 620
+  - Class: rviz/Views
+    Name: Views
+Preferences:
+  PromptSaveOnExit: false
+Toolbars:
+  toolButtonStyle: 2
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Alpha: 0.45
+      Cell Size: 1
+      Class: rviz/Grid
+      Color: 130; 130; 130
+      Enabled: true
+      Name: Ground Grid
+      Plane: XY
+      Plane Cell Count: 12
+      Reference Frame: <Fixed Frame>
+      Value: true
+    - Alpha: 1
+      Class: rviz/RobotModel
+      Collision Enabled: false
+      Enabled: true
+      Links:
+        All Links Enabled: true
+        Expand Joint Details: false
+        Expand Link Details: false
+        Expand Tree: false
+        Link Tree Style: Links in Alphabetic Order
+      Name: Robot
+      Robot Description: robot_description
+      TF Prefix: ""
+      Update Interval: 0
+      Value: true
+      Visual Enabled: true
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/LaserScan
+      Color: 240; 240; 240
+      Color Transformer: FlatColor
+      Decay Time: 0.15
+      Enabled: true
+      Name: Safety Laser
+      Position Transformer: XYZ
+      Queue Size: 10
+      Size (Pixels): 3
+      Style: Points
+      Topic: /scan
+      Unreliable: false
+      Use Fixed Frame: true
+      Value: true
+    - Alpha: 1
+      Buffer Length: 1
+      Class: rviz/Path
+      Color: 30; 220; 255
+      Enabled: true
+      Line Style: Lines
+      Line Width: 0.04
+      Name: Base Trail
+      Pose Style: None
+      Topic: /aubo_mobile_follower/path
+      Unreliable: false
+      Value: true
+    - Class: rviz/Image
+      Enabled: true
+      Image Topic: /aubo_mobile_follower/color_debug
+      Max Value: 1
+      Median window: 5
+      Min Value: 0
+      Name: Colour Detection
+      Normalize Range: true
+      Queue Size: 2
+      Transport Hint: raw
+      Unreliable: false
+      Value: true
+    - Class: rviz/InteractiveMarkers
+      Enable Transparency: true
+      Enabled: true
+      Name: Target Control
+      Show Axes: false
+      Show Descriptions: true
+      Show Visual Aids: true
+      Update Topic: /aubo_mobile_follower/target_control/update
+      Value: true
+  Enabled: true
+  Global Options:
+    Background Color: 35; 35; 35
+    Default Light: true
+    Fixed Frame: odom
+    Frame Rate: 30
+  Name: root
+  Tools:
+    - Class: rviz/Interact
+    - Class: rviz/MoveCamera
+    - Class: rviz/Select
+    - Class: rviz/FocusCamera
+    - Class: rviz/Measure
+  Value: true
+  Views:
+    Current:
+      Class: rviz/Orbit
+      Distance: 5
+      Focal Point:
+        X: 1.2
+        Y: 0
+        Z: 0.35
+      Name: Task View
+      Near Clip Distance: 0.01
+      Pitch: 0.55
+      Target Frame: odom
+      Yaw: 3.14
+Window Geometry:
+  Height: 900
+  Width: 1400
+  X: 40
+  Y: 30

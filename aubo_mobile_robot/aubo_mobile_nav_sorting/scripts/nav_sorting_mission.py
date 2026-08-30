@@ -10,13 +10,14 @@ import time
 
 import actionlib
 import rospy
+import tf
 from actionlib_msgs.msg import GoalStatus
 from dynamic_reconfigure.server import Server
 from geometry_msgs.msg import Twist
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
 from std_msgs.msg import String
 from std_srvs.srv import Empty, Trigger, TriggerResponse
-from tf.transformations import quaternion_from_euler
+from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
 from aubo_mobile_nav_sorting.cfg import NavSortingConfig
 
@@ -82,6 +83,22 @@ class NavigationSortingMission(object):
         )
         if len(self.camera_target) != 2:
             raise ValueError("~near_field_camera_target must be [x, y]")
+        self.base_frame = rospy.get_param("~base_frame", "base_footprint")
+        self.direct_dock_enabled = bool(
+            rospy.get_param("~near_field_direct_dock_enabled", True)
+        )
+        self.direct_dock_max_distance = max(
+            0.0, float(rospy.get_param("~near_field_direct_dock_max_distance", 0.50))
+        )
+        self.direct_dock_lateral_tolerance = max(
+            0.0, float(rospy.get_param("~near_field_direct_dock_lateral_tolerance", 0.04))
+        )
+        self.direct_dock_yaw_tolerance = max(
+            0.0, float(rospy.get_param("~near_field_direct_dock_yaw_tolerance", 0.04))
+        )
+        self.direct_dock_goal_tolerance = max(
+            0.01, float(rospy.get_param("~near_field_direct_dock_goal_tolerance", 0.06))
+        )
 
         self.server_timeout = float(rospy.get_param("~server_timeout", 45.0))
         self.navigation_timeout = float(rospy.get_param("~navigation_timeout", 180.0))
@@ -102,8 +119,8 @@ class NavigationSortingMission(object):
             raise ValueError("~workstations must be a list")
         self._validate_workstations(self.workstations)
 
-        # move_base is used between workstations. These axis-aligned velocity
-        # pulses are allowed only after MoveIt explicitly reports no plan.
+        # move_base is used between workstations. Low-speed velocity pulses are
+        # also reused for the final straight approach and remain safety-filtered.
         self.base_recovery_enabled = bool(
             rospy.get_param("~base_recovery_enabled", True)
         )
@@ -156,6 +173,7 @@ class NavigationSortingMission(object):
         self.navigation_client = actionlib.SimpleActionClient(
             self.navigation_action, MoveBaseAction
         )
+        self.tf_listener = tf.TransformListener()
         self.clear_costmaps = rospy.ServiceProxy("/move_base/clear_costmaps", Empty)
         self.home_client = rospy.ServiceProxy(self.home_service_name, Trigger)
         self.prepare_client = rospy.ServiceProxy(self.prepare_service_name, Trigger)
@@ -523,6 +541,93 @@ class NavigationSortingMission(object):
             rospy.sleep(self.base_recovery_settle_time)
         return not self._stop_requested.is_set()
 
+    @staticmethod
+    def _angle_error(target, actual):
+        return math.atan2(math.sin(target - actual), math.cos(target - actual))
+
+    def _current_base_pose(self):
+        try:
+            self.tf_listener.waitForTransform(
+                self.navigation_frame,
+                self.base_frame,
+                rospy.Time(0),
+                rospy.Duration(1.0),
+            )
+            translation, rotation = self.tf_listener.lookupTransform(
+                self.navigation_frame, self.base_frame, rospy.Time(0)
+            )
+            yaw = euler_from_quaternion(rotation)[2]
+            return [translation[0], translation[1], yaw]
+        except (tf.LookupException, tf.ConnectivityException,
+                tf.ExtrapolationException, tf.Exception) as error:
+            rospy.logwarn("Cannot read base pose for direct docking: %s", str(error))
+            return None
+
+    def _direct_dock_geometry(self, start, target):
+        dx = target[0] - start[0]
+        dy = target[1] - start[1]
+        cosine = math.cos(start[2])
+        sine = math.sin(start[2])
+        longitudinal = cosine * dx + sine * dy
+        lateral = -sine * dx + cosine * dy
+        yaw_error = self._angle_error(target[2], start[2])
+        return longitudinal, lateral, yaw_error
+
+    def _can_direct_dock_from_pre_dock(self, candidate):
+        longitudinal, lateral, yaw_error = self._direct_dock_geometry(
+            self.pre_dock_goal, candidate
+        )
+        return (
+            0.0 < longitudinal <= self.direct_dock_max_distance
+            and abs(lateral) <= self.direct_dock_lateral_tolerance
+            and abs(yaw_error) <= self.direct_dock_yaw_tolerance
+        )
+
+    def _drive_straight_to(self, target, label):
+        start = self._current_base_pose()
+        if start is None:
+            return False
+        longitudinal, lateral, yaw_error = self._direct_dock_geometry(start, target)
+        if (
+            abs(longitudinal) > self.direct_dock_max_distance
+            or abs(lateral) > self.direct_dock_lateral_tolerance
+            or abs(yaw_error) > self.direct_dock_yaw_tolerance
+        ):
+            rospy.logwarn(
+                "%s is not a straight motion: forward=%.3f lateral=%.3f yaw=%.3f",
+                label, longitudinal, lateral, yaw_error,
+            )
+            return False
+
+        self._publish_state(
+            "DIRECT_DOCKING",
+            "%s %.3f m at %.3f m/s through lidar safety".format(
+                label, longitudinal, self.base_recovery_speed
+            ),
+        )
+        if not self._move_base_direct([longitudinal, 0.0], 1, 1):
+            return False
+
+        actual = self._current_base_pose()
+        if actual is None:
+            return False
+        position_error = math.hypot(actual[0] - target[0], actual[1] - target[1])
+        actual_yaw_error = abs(self._angle_error(target[2], actual[2]))
+        if (
+            position_error > self.direct_dock_goal_tolerance
+            or actual_yaw_error > self.direct_dock_yaw_tolerance
+        ):
+            rospy.logwarn(
+                "%s stopped short: position error=%.3f yaw error=%.3f",
+                label, position_error, actual_yaw_error,
+            )
+            return False
+        rospy.loginfo(
+            "%s reached by straight cmd_vel: position error=%.3f yaw error=%.3f",
+            label, position_error, actual_yaw_error,
+        )
+        return True
+
     def _prepare_and_observe_once(self):
         self._publish_state("PREPARING_ARM", "moving arm to work-ready pose")
         if not self._call_sorting_operation(
@@ -687,6 +792,15 @@ class NavigationSortingMission(object):
                     if score is not None:
                         scored.append((score, candidate, self._table_clearance(candidate)))
         scored.sort(key=lambda item: item[0])
+        if self.direct_dock_enabled:
+            # Prefer candidates reachable by a straight, low-speed final
+            # approach from pre-dock.  This avoids DWA rotation inside the
+            # table's near field while retaining its score within each group.
+            scored.sort(
+                key=lambda item: (
+                    not self._can_direct_dock_from_pre_dock(item[1]), item[0]
+                )
+            )
         selected = scored[:self.near_field_max_candidates]
         for index, (score, candidate, clearance) in enumerate(selected):
             rospy.loginfo(
@@ -704,12 +818,9 @@ class NavigationSortingMission(object):
     def _coordinate_near_field(self):
         if not self._navigate(self.pre_dock_goal, "pre-dock"):
             return False
-        self._publish_state("PREPARING_ARM", "moving arm to work-ready pose")
-        if not self._call_sorting_operation(
-            self.prepare_client, ("PREPARING",), "arm work preparation"
-        ):
-            return False
-        arm_prepared = True
+        # Keep the arm in its transport pose while the base enters the table's
+        # near field.  Prepare it only after the base has stopped at a candidate.
+        arm_prepared = False
         candidates = self._near_field_candidates()
         if not candidates:
             rospy.logerr("No near-field pose satisfies base, camera and detector constraints")
@@ -728,8 +839,20 @@ class NavigationSortingMission(object):
                     candidate[2],
                 ),
             )
-            if not self._navigate(candidate, "fine-dock"):
-                rospy.logwarn("Fine-dock candidate %d navigation failed", index + 1)
+            used_direct_dock = (
+                self.direct_dock_enabled
+                and self._can_direct_dock_from_pre_dock(candidate)
+            )
+            if used_direct_dock:
+                docked = self._drive_straight_to(
+                    candidate, "fine-dock candidate {}".format(index + 1)
+                )
+            else:
+                docked = self._navigate(candidate, "fine-dock")
+            if not docked:
+                rospy.logwarn("Fine-dock candidate %d motion failed", index + 1)
+                if used_direct_dock:
+                    self._drive_straight_to(self.pre_dock_goal, "pre-dock retreat")
                 continue
 
             if not arm_prepared:
@@ -758,6 +881,11 @@ class NavigationSortingMission(object):
             ):
                 return False
             arm_prepared = False
+            if used_direct_dock and not self._drive_straight_to(
+                self.pre_dock_goal, "pre-dock retreat"
+            ):
+                rospy.logerr("Could not retreat safely after rejected direct dock")
+                return False
         rospy.logerr("All near-field docking candidates failed validation")
         return False
 

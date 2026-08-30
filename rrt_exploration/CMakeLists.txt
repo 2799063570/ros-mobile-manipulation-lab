@@ -73,7 +73,8 @@ catkin_install_python(PROGRAMS
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
-# These modules are imported by the executable Python nodes above.
+# Helper modules imported by the executable Python nodes above.  They must be
+# real modules, not catkin executable relay scripts.
 install(FILES
   scripts/functions.py
   scripts/getfrontier.py

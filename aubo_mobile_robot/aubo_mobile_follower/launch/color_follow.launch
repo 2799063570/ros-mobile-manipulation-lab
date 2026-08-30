@@ -1,12 +1,17 @@
 <?xml version="1.0"?>
 <launch>
-  <arg name="start_robot" default="false"/>
+  <!-- Standalone task simulation by default.  Set start_robot:=false when
+       connecting the follower to an already running robot or Gazebo. -->
+  <arg name="start_robot" default="true"/>
   <arg name="start_moveit" default="true"/>
   <arg name="start_scan_merger" default="true"/>
   <arg name="use_laser_safety" default="true"/>
   <arg name="camera_topic" default="/hand_camera/image_raw"/>
-  <arg name="world" default="$(find aubo_mobile_robot)/worlds/empty.world"/>
+  <arg name="world" default="$(find aubo_mobile_follower)/worlds/color_follow.world"/>
   <arg name="gui" default="true"/>
+  <arg name="start_rviz" default="true"/>
+  <arg name="start_path_trail" default="true"/>
+  <arg name="start_target_control" default="true"/>
 
   <include file="$(find aubo_mobile_follower)/launch/follower.launch">
     <arg name="follower_type" value="color_follower.py"/>
@@ -21,4 +26,29 @@
     <arg name="world" value="$(arg world)"/>
     <arg name="gui" value="$(arg gui)"/>
   </include>
+
+  <node if="$(arg start_path_trail)" pkg="aubo_mobile_follower"
+        type="follower_path.py" name="color_follower_path" output="screen"/>
+
+  <!-- The colour target is part of color_follow.world and can be repositioned
+       from RViz with the Interact tool. -->
+  <node if="$(arg start_target_control)" pkg="aubo_mobile_follower"
+        type="target_interactive_marker.py" name="color_target_control"
+        output="screen">
+    <param name="model_name" value="color_target"/>
+    <param name="marker_frame" value="odom"/>
+    <param name="target_z" value="0.35"/>
+    <param name="description" value="拖动 X/Y 拉杆移动颜色目标"/>
+    <param name="marker_size_x" value="0.36"/>
+    <param name="marker_size_y" value="0.36"/>
+    <param name="marker_size_z" value="0.70"/>
+  </node>
+
+  <node if="$(arg start_rviz)" pkg="rviz" type="rviz"
+        name="color_follow_rviz" output="screen"
+        args="-d $(find aubo_mobile_follower)/rviz/color_follow.rviz">
+    <env name="LIBGL_ALWAYS_SOFTWARE" value="1"/>
+    <env name="__GLX_VENDOR_LIBRARY_NAME" value="mesa"/>
+    <env name="MESA_LOADER_DRIVER_OVERRIDE" value="llvmpipe"/>
+  </node>
 </launch>

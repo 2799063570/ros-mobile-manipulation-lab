@@ -12,6 +12,16 @@ near_field_candidate_y: [0.0, -0.08, 0.08]
 near_field_candidate_yaw: [0.0, -0.08, 0.08]
 near_field_max_candidates: 6
 
+# move_base 只负责到 pre_dock；与 pre_dock 同轴的候选位姿使用低速直行精靠。
+# 直行命令仍经过 /cmd_vel_raw -> lidar safety -> /cmd_vel，不绕过急停保护。
+near_field_direct_dock_enabled: true
+near_field_direct_dock_max_distance: 0.50
+near_field_direct_dock_lateral_tolerance: 0.04
+near_field_direct_dock_yaw_tolerance: 0.04
+near_field_direct_dock_goal_tolerance: 0.06
+# 近场直行复用恢复移动速度；低速可缩短激光安全层的动态停车距离。
+base_recovery_speed: 0.04
+
 # map 坐标下的桌子包围盒、三个方块中心，以及底盘中心到桌边的最小距离。
 near_field_table: [3.00, 0.0, 0.80, 1.20]
 near_field_workpieces:
