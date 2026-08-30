@@ -1,6 +1,6 @@
 # Obsidian stores per-user UI state here; vault content and reusable settings remain trackable.
-WHEELTEC-Obsidian/.obsidian/workspace.json
-WHEELTEC-Obsidian/.obsidian/workspace-mobile.json
+robot-system-wiki/.obsidian/workspace.json
+robot-system-wiki/.obsidian/workspace-mobile.json
 
 # Maps generated while running the teaching simulation.
 simple_diff_robot_gazebo/maps/*.pgm

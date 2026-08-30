@@ -109,6 +109,29 @@ class NavigationSortingMission(object):
             0.001,
             float(rospy.get_param("~near_field_direct_dock_progress_epsilon", 0.005)),
         )
+        self.heading_alignment_enabled = bool(
+            rospy.get_param("~near_field_heading_alignment_enabled", True)
+        )
+        self.heading_max_correction = max(
+            0.0, float(rospy.get_param("~near_field_heading_max_correction", 0.12))
+        )
+        self.heading_speed = max(
+            0.01, abs(float(rospy.get_param("~near_field_heading_speed", 0.12)))
+        )
+        self.heading_goal_tolerance = max(
+            0.005,
+            float(rospy.get_param("~near_field_heading_goal_tolerance", 0.015)),
+        )
+        self.heading_final_tolerance = max(
+            self.heading_goal_tolerance,
+            float(rospy.get_param("~near_field_heading_final_tolerance", 0.025)),
+        )
+        self.heading_timeout = max(
+            1.0, float(rospy.get_param("~near_field_heading_timeout", 4.0))
+        )
+        self.heading_stall_timeout = max(
+            0.5, float(rospy.get_param("~near_field_heading_stall_timeout", 1.5))
+        )
 
         self.server_timeout = float(rospy.get_param("~server_timeout", 45.0))
         self.navigation_timeout = float(rospy.get_param("~navigation_timeout", 180.0))
@@ -593,6 +616,75 @@ class NavigationSortingMission(object):
             and abs(yaw_error) <= self.direct_dock_yaw_tolerance
         )
 
+    def _align_heading_for_direct_dock(self, target_yaw, label):
+        """Apply one bounded heading correction while still at pre-dock."""
+        actual = self._current_base_pose()
+        if actual is None:
+            return False
+        initial_error = self._angle_error(target_yaw, actual[2])
+        if abs(initial_error) <= self.heading_goal_tolerance:
+            return True
+        if (
+            not self.heading_alignment_enabled
+            or abs(initial_error) > self.heading_max_correction
+        ):
+            rospy.logwarn(
+                "%s heading error %.3f exceeds bounded correction %.3f",
+                label, initial_error, self.heading_max_correction,
+            )
+            return False
+
+        self.navigation_client.cancel_all_goals()
+        self._stop_base()
+        rospy.sleep(0.2)
+        self._publish_state(
+            "ALIGNING_BASE",
+            "{} heading correction {:.3f} rad before straight docking".format(
+                label, initial_error
+            ),
+        )
+        deadline = time.time() + self.heading_timeout
+        best_error = abs(initial_error)
+        last_progress_time = time.time()
+        rate = rospy.Rate(self.base_recovery_rate)
+        try:
+            while not rospy.is_shutdown() and time.time() < deadline:
+                if self._stop_requested.is_set():
+                    return False
+                actual = self._current_base_pose()
+                if actual is None:
+                    rate.sleep()
+                    continue
+                yaw_error = self._angle_error(target_yaw, actual[2])
+                absolute_error = abs(yaw_error)
+                if absolute_error <= self.heading_goal_tolerance:
+                    rospy.loginfo(
+                        "%s heading aligned: yaw error=%.3f rad",
+                        label, absolute_error,
+                    )
+                    return True
+                if absolute_error < best_error - 0.002:
+                    best_error = absolute_error
+                    last_progress_time = time.time()
+                elif time.time() - last_progress_time > self.heading_stall_timeout:
+                    rospy.logwarn(
+                        "%s heading made no progress for %.1f s; "
+                        "lidar safety may be blocking rotation",
+                        label, self.heading_stall_timeout,
+                    )
+                    return False
+
+                command = Twist()
+                command.angular.z = math.copysign(
+                    min(self.heading_speed, max(0.04, absolute_error)), yaw_error
+                )
+                self.base_recovery_publisher.publish(command)
+                rate.sleep()
+        finally:
+            self._stop_base()
+        rospy.logwarn("%s heading alignment timed out", label)
+        return False
+
     def _drive_straight_to(self, target, label):
         start = self._current_base_pose()
         if start is None:
@@ -601,7 +693,7 @@ class NavigationSortingMission(object):
         if (
             abs(longitudinal) > self.direct_dock_max_distance
             or abs(lateral) > self.direct_dock_lateral_tolerance
-            or abs(yaw_error) > self.direct_dock_yaw_tolerance
+            or abs(yaw_error) > self.heading_max_correction
         ):
             rospy.logwarn(
                 "%s is not a straight motion: forward=%.3f lateral=%.3f yaw=%.3f",
@@ -609,9 +701,27 @@ class NavigationSortingMission(object):
             )
             return False
 
+        if not self._align_heading_for_direct_dock(target[2], label):
+            return False
+        start = self._current_base_pose()
+        if start is None:
+            return False
+        longitudinal, lateral, yaw_error = self._direct_dock_geometry(start, target)
+        if (
+            abs(longitudinal) > self.direct_dock_max_distance
+            or abs(lateral) > self.direct_dock_lateral_tolerance
+            or abs(yaw_error) > self.heading_goal_tolerance
+        ):
+            rospy.logwarn(
+                "%s remains outside straight corridor after alignment: "
+                "forward=%.3f lateral=%.3f yaw=%.3f",
+                label, longitudinal, lateral, yaw_error,
+            )
+            return False
+
         self._publish_state(
             "DIRECT_DOCKING",
-            "%s %.3f m closed-loop at %.3f m/s through lidar safety".format(
+            "{} {:.3f} m closed-loop at {:.3f} m/s through lidar safety".format(
                 label, longitudinal, self.base_recovery_speed
             ),
         )
@@ -639,7 +749,7 @@ class NavigationSortingMission(object):
                 )
                 if (
                     position_error <= self.direct_dock_goal_tolerance
-                    and abs(yaw_error) <= self.direct_dock_yaw_tolerance
+                    and abs(yaw_error) <= self.heading_final_tolerance
                 ):
                     rospy.loginfo(
                         "%s reached by closed-loop cmd_vel: position error=%.3f "

@@ -13,7 +13,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "WHEELTEC-Obsidian/README.md",
+                "file": "robot-system-wiki/README.md",
                 "mode": "source",
                 "source": false
               },
@@ -99,7 +99,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "WHEELTEC-Obsidian/功能包/wheeltec_robot_rc.md",
+                "file": "robot-system-wiki/功能包/wheeltec_robot_rc.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -118,7 +118,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "WHEELTEC-Obsidian/功能包/wheeltec_robot_rc.md",
+                "file": "robot-system-wiki/功能包/wheeltec_robot_rc.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
@@ -161,7 +161,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "WHEELTEC-Obsidian/功能包/wheeltec_robot_rc.md",
+                "file": "robot-system-wiki/功能包/wheeltec_robot_rc.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
@@ -228,10 +228,10 @@
     "aubo_mobile_robot/aubo_mobile_perception/README.md",
     "aubo_mobile_robot/README.md",
     "aubo/aubo_mobile_robot/README.md",
-    "WHEELTEC-Obsidian/04-系统数据流.md",
-    "WHEELTEC-Obsidian/03-运行与调试手册.md",
-    "WHEELTEC-Obsidian/00-首页.md",
-    "WHEELTEC-Obsidian/功能包/wheeltec_robot_rc.md",
-    "WHEELTEC-Obsidian/功能包/rrt_exploration.md"
+    "robot-system-wiki/04-系统数据流.md",
+    "robot-system-wiki/03-运行与调试手册.md",
+    "robot-system-wiki/00-首页.md",
+    "robot-system-wiki/功能包/wheeltec_robot_rc.md",
+    "robot-system-wiki/功能包/rrt_exploration.md"
   ]
 }
