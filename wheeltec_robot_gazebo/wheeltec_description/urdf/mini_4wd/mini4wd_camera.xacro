@@ -4,7 +4,7 @@
     <xacro:macro name="astra_camera" params="prefix">
     <!--Defining camera_link -->
     <link name="${prefix}_link">
-        <box_inertial_matrix  m="0.001" w="0.001" h="0.001" d="0.001"/>
+        <xacro:box_inertial_matrix  m="0.001" w="0.001" h="0.001" d="0.001"/>
         <visual>
             <origin xyz="0 0 0" rpy="0 0 0 "/>
             <geometry>

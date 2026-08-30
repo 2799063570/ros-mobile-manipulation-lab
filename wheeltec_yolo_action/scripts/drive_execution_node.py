@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # coding=utf-8
 
 import rospy
@@ -60,7 +60,7 @@ class Follower:
         self.bridge = cv_bridge.CvBridge()
         #cv2.namedWindow("window", 1)
         # 订阅usb摄像头
-        self.image_sub = rospy.Subscriber("/camera/rgb/image_raw", Image, self.image_callback)
+        self.image_sub = rospy.Subscriber("/camera/color/image_raw", Image, self.image_callback)
         # self.image_sub = rospy.Subscriber("cv_bridge_image", Image, self.image_callback)
 
         self.ctrl_sub = rospy.Subscriber("/ctrl_data", CtrlData, self.ctrl_callback)
@@ -68,8 +68,8 @@ class Follower:
         #self.position_sub = rospy.Subscriber("/object_tracker/current_position", position, self.position_callback)
 
         # 订阅深度相机
-        # self.image_sub = rospy.Subscriber("/camera/rgb/image_raw", Image, self.image_callback)
-        # self.image_sub = rospy.Subscriber("/camera/depth/image_raw", Image,self.image_callback)
+        # self.image_sub = rospy.Subscriber("/camera/color/image_raw", Image, self.image_callback)
+        # self.image_sub = rospy.Subscriber("/camera/aligned_depth_to_color/image_raw", Image,self.image_callback)
         self.cmd_vel_pub = rospy.Publisher("/cmd_vel", Twist, queue_size=1)
         self.drive_line_pub = rospy.Publisher("/drive_line", Image, queue_size=1)
         self.control_flag_pub = rospy.Publisher("/control_flag", Int8, queue_size=1)

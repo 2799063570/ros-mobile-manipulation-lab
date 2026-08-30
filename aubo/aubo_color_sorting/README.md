@@ -10,6 +10,9 @@ MoveIt 负责抓取和放置，Gazebo 通用插件提高小物体夹持稳定性
 - 机械臂底座固定在世界原点，不加载底盘、里程计或导航节点。
 - 桌面高度为 `0.10 m`，桌体中心为 `[0.70, 0.0, 0.0]`，尺寸为
   `0.70 x 1.00 x 0.20 m`。
+- 红、绿、蓝放置区域由 `sorting_gazebo.launch` 单独生成，不写入公共 world；因此
+  视觉伺服复用同一场景时只会看到真实物块。分拣仿真可用
+  `show_sorting_pads:=false` 隐藏放置区域。
 - `upperArm_joint` 的 URDF 与 MoveIt 位置范围均为
   `[-1.0471976, 1.0471976] rad`，即 `[-60 deg, 60 deg]`。
 - 启动时任务节点还会读取 `/robot_description` 和 MoveIt 关节限制做一次一致性检查；
@@ -37,6 +40,12 @@ rosservice call /sorting/start
 
 ```bash
 roslaunch aubo_color_sorting sorting_gazebo.launch auto_start:=true
+```
+
+如需在没有彩色放置区域干扰的情况下调试分拣识别：
+
+```bash
+roslaunch aubo_color_sorting sorting_gazebo.launch show_sorting_pads:=false
 ```
 
 无界面运行时可关闭 Gazebo、RViz 和图像窗口：

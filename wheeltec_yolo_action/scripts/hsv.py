@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # coding=utf-8
 
 import rospy
@@ -30,7 +30,7 @@ class Follower:
         self.HSV_S_max=col_red[4]
         self.HSV_V_max=col_red[5]
         self.bridge = cv_bridge.CvBridge()
-        self.image_sub = rospy.Subscriber("/camera/rgb/image_raw", Image, self.image_callback)
+        self.image_sub = rospy.Subscriber("/camera/color/image_raw", Image, self.image_callback)
         self.drive_line_pub = rospy.Publisher("/drive_line", Image, queue_size=1)
 
     def image_callback(self, msg):

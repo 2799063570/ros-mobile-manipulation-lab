@@ -6,7 +6,10 @@
   <arg name="paused" default="false"/>
   <arg name="auto_start" default="false"/>
   <arg name="target_label" default="red"/>
-  <arg name="world" default="$(find aubo_ros_control)/worlds/eye_to_hand_visual_servo.world"/>
+  <arg name="target_topic" default="/visual_servo/target_pose"/>
+  <arg name="loss_strategy" default="stop"/>
+  <arg name="start_perception" default="true"/>
+  <arg name="world" default="$(find aubo_color_sorting)/worlds/sorting.world"/>
 
   <!-- The fixed workcell camera is provided by the world. Use the camera-free
        arm model so the hand sensor and its image topics remain disabled. -->
@@ -37,15 +40,18 @@
     <arg name="mode_config"
          value="$(find aubo_ros_control)/config/visual_servo_eye_to_hand.yaml"/>
     <arg name="backend" value="gazebo"/>
+    <arg name="target_topic" value="$(arg target_topic)"/>
     <arg name="joint_states_topic" value="/aubo_i5/joint_states"/>
+    <arg name="loss_strategy" value="$(arg loss_strategy)"/>
     <arg name="start_enabled" value="$(arg auto_start)"/>
   </include>
 
-  <node name="rgbd_visual_target" pkg="aubo_perception"
-        type="rgbd_visual_target_node.py" output="screen" required="true">
+  <node if="$(arg start_perception)" name="rgbd_visual_target"
+        pkg="aubo_perception" type="rgbd_visual_target_node.py" output="screen">
     <rosparam file="$(find aubo_perception)/config/rgbd_target_eye_to_hand.yaml"
               command="load"/>
     <param name="target_label" value="$(arg target_label)"/>
+    <param name="target_pose_topic" value="$(arg target_topic)"/>
     <param name="start_enabled" value="$(arg auto_start)"/>
   </node>
 

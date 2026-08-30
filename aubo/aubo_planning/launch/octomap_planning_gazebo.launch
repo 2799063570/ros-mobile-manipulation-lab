@@ -7,6 +7,7 @@
   <arg name="execute" default="true"/>
   <arg name="target_pose" default="home"/>
   <arg name="point_cloud_topic" default="/workspace_camera/depth/color/points"/>
+  <arg name="display_delay" default="1.0"/>
 
   <include file="$(find aubo_gazebo)/launch/aubo_world_gazebo.launch">
     <arg name="world_name" value="$(arg world)"/>
@@ -19,6 +20,10 @@
 
   <node name="aubo_joint_state_relay" pkg="joint_state_publisher"
         type="joint_state_publisher" output="screen">
+    <!-- Keep robot TF newer than the 20 Hz depth-cloud timestamps. Without an
+         explicit rate joint_state_publisher relays too slowly for exact-time
+         MoveIt self-filtering and intermittently lags the cloud by 1 ms. -->
+    <param name="rate" value="100.0"/>
     <rosparam param="source_list">[/aubo_i5/joint_states]</rosparam>
   </node>
 
@@ -48,5 +53,6 @@
     <arg name="move_to_sensor_pose" value="false"/>
     <arg name="execute" value="$(arg execute)"/>
     <arg name="wait_timeout" value="45.0"/>
+    <arg name="display_delay" value="$(arg display_delay)"/>
   </include>
 </launch>

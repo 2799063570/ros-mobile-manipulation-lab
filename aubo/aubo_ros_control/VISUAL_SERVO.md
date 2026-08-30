@@ -33,6 +33,7 @@ aubo_ros_control: 坐标误差 -> 雅可比逆解 -> 限速/限加速度 -> 有�
 ```bash
 roslaunch aubo_ros_control eye_in_hand_visual_servo_gazebo.launch
 roslaunch aubo_ros_control eye_to_hand_visual_servo_gazebo.launch
+roslaunch aubo_ros_control eye_to_hand_visual_servo_gazebo.launch target_label:=blue
 roslaunch aubo_ros_control eye_to_hand_visual_servo_real.launch \
   robot_ip:=192.168.1.2 camera_serial_no:=<serial>
 ```
@@ -57,22 +58,39 @@ roslaunch aubo_ros_control eye_to_hand_visual_servo_real.launch \
 /visual_servo/state                    std_msgs/String
 ```
 
-眼在手外仿真从 world 额外加载 `workspace_camera`，同时使用不含手部相机的
-`aubo_i5.xacro`，避免无用的手部图像和深度话题。真机入口也只启动外部 RealSense；
+两种 Gazebo 模式默认共用 `aubo_color_sorting/worlds/sorting.world`。该场景同时包含
+红、绿、蓝分拣块以及 `workspace_camera`：眼在手上使用腕部相机，眼在手外使用固定
+相机，并用共同的 `target_label:=red|green|blue` 参数选择跟踪颜色。分拣用的彩色
+放置区域不在该 world 内，只由 `sorting_gazebo.launch` 按需生成，因此不会参与伺服
+识别。眼在手外仍使用
+不含手部相机的 `aubo_i5.xacro`，避免无用的手部图像和深度话题。真机入口也只启动外部 RealSense；
 外参由 `aubo_description/launch/eye_to_hand_camera_tf.launch` 统一发布。默认外参仅用于
 仿真，真机必须替换为标定结果。
+
+启动后也可以在共用 RViz“视觉伺服控制”面板的“跟踪目标”下拉框中切换红、绿、蓝；
+该选择通过 `/visual_servo/target_selection` 同时适用于眼在手上和眼在手外。
 
 ## 初始化、遮挡与目标丢失
 
 - 眼在手上在第一次看到目标前进入 `SEARCH_INITIAL`，缓慢移动到经过相机光轴验证的
   `initial_search_posture`；目标出现后立即进入 `TRACKING`。丢失后的可选恢复动作使用
-  独立的 `recovery_posture`，两者不再复用通用 `open_posture`。
+  独立的 `recovery_posture`，两者不再复用通用 `open_posture`。默认丢失策略为
+  `coast_then_open` 且 `coast_duration: 0.0`：目标超时后直接向观测姿态移动；移动中
+  任意一帧重新获得有效目标都会立即中断恢复动作并回到 `TRACKING`。
+- 眼在手上的期望观测深度默认为 `0.15 m`。腕部相机光心沿接近方向比 TCP 后缩约
+  `0.035 m`，因此最终 TCP 到目标约为 `0.115 m`，这是预抓取对准距离而不是接触距离。
+  `TRACKING` 仅表示持续收到有效目标，不代表已经收敛；是否停止由三维位置误差和
+  `position_deadband` 决定。
 - 眼在手外不需要机械臂搜索。`target_offset` 默认包含横向避遮挡分量和抓取上方的
   高度分量，使机械臂尽量不挡住相机到目标的视线。实际工位必须标定方向和大小。
 - 两种模式都拒绝超时目标。状态依次可能为 `TRACKING`、`COAST`、
-  `SEARCH_RECOVERY`、`HOLD`。眼在手外默认只短暂减速后保持；眼在手上可在丢失后
-  回到开阔姿态重新搜索。
+  `SEARCH_RECOVERY`、`HOLD`。眼在手外默认保持；眼在手上会在丢失后回到观测姿态
+  重新搜索。
 - 检测器在目标或深度无效时不发布旧位姿；否则看门狗无法识别目标丢失。
+- 检测器先用 `minimum_contour_area` / `maximum_contour_area` 过滤像素轮廓，再结合
+  深度和相机内参计算投影物理面积。默认
+  `maximum_projected_contour_area: 0.006`（平方米），用于排除大块同色区域，同时
+  避免目标靠近相机后仅因像素面积变大而丢失。
 
 配置分为三份：
 

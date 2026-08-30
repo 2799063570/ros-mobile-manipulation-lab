@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # coding=utf-8
 
 import rospy
@@ -23,11 +23,8 @@ class Follower:
         #cv2.namedWindow("window", 1)
         # 订阅摄像头
         # self.image_sub = rospy.Subscriber("cv_bridge_image", Image, self.image_callback)
-        self.if_six=rospy.get_param("/if_six",'no')
-        if self.if_six=='yes':
-            self.image_sub = rospy.Subscriber("/usb_cam/image_raw", Image, self.image_callback)
-        if self.if_six=='no':
-            self.image_sub = rospy.Subscriber("/camera/rgb/image_raw", Image, self.image_callback)
+        image_topic = rospy.get_param("~image_topic", "/camera/color/image_raw")
+        self.image_sub = rospy.Subscriber(image_topic, Image, self.image_callback)
         self.cmd_vel_pub = rospy.Publisher("cmd_vel_ori", Twist, queue_size=1)
         self.twist = Twist()
         self.temp = 0
@@ -135,4 +132,3 @@ class Follower:
 rospy.init_node("opencv")
 follower = Follower()
 rospy.spin()
-

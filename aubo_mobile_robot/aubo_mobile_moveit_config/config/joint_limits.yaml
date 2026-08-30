@@ -1,3 +1,9 @@
+# The RGB-D cloud and joint states are produced by independent Gazebo update
+# loops.  Give MoveIt's robot-shape filter enough time to obtain transforms at
+# the cloud timestamp; otherwise a transient copy of the moving arm can be
+# inserted into the OctoMap and block the following Cartesian motion.
+shape_transform_cache_lookup_wait_time: 0.25
+
 # joint_limits.yaml allows the dynamics properties specified in the URDF to be overwritten or augmented as needed
 # Specific joint properties can be changed with the keys [max_position, min_position, max_velocity, max_acceleration]
 # Joint limits can be turned off with [has_velocity_limits, has_acceleration_limits]

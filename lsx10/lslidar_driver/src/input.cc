@@ -409,8 +409,9 @@ namespace lslidar_driver
 		}
 		if (flag == 0)
 		{
-			abort();
+			return -1;
 		}
+		return -1;
 	}
 
 } // namespace

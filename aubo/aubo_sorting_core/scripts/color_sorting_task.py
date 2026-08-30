@@ -1,9 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 from __future__ import print_function
 
 import copy
+import inspect
 import json
 import math
 import sys
@@ -209,22 +210,30 @@ class ColorSortingTask(object):
             self._grasp_status_callback,
             queue_size=5,
         )
-        self._cloud_subscriber = rospy.Subscriber(
-            self.point_cloud_topic, PointCloud2, self._cloud_callback, queue_size=1
-        )
-        self._planning_scene_subscriber = rospy.Subscriber(
-            self.planning_scene_topic,
-            PlanningScene,
-            self._planning_scene_callback,
-            queue_size=5,
-        )
+        self._cloud_subscriber = None
+        self._planning_scene_subscriber = None
+        if self.require_octomap:
+            self._cloud_subscriber = rospy.Subscriber(
+                self.point_cloud_topic,
+                PointCloud2,
+                self._cloud_callback,
+                queue_size=1,
+            )
+            self._planning_scene_subscriber = rospy.Subscriber(
+                self.planning_scene_topic,
+                PlanningScene,
+                self._planning_scene_callback,
+                queue_size=5,
+            )
         self._workspace_subscriber = rospy.Subscriber(
             self.workspace_update_topic,
             String,
             self._workspace_update_callback,
             queue_size=1,
         )
-        self._clear_octomap = rospy.ServiceProxy(self.clear_octomap_service, Empty)
+        self._clear_octomap = None
+        if self.require_octomap:
+            self._clear_octomap = rospy.ServiceProxy(self.clear_octomap_service, Empty)
 
         self.robot = moveit_commander.RobotCommander()
         self.scene = moveit_commander.PlanningSceneInterface()
@@ -735,10 +744,42 @@ class ColorSortingTask(object):
         if self._stop_requested.is_set():
             return False
         waypoint = copy.deepcopy(target_pose.pose)
-        plan, fraction = self.arm.compute_cartesian_path(
-            [waypoint], self.cartesian_step, 0.0, True
-        )
+        # MoveIt Commander has two incompatible ROS 1 signatures here.  The
+        # older API accepts ``jump_threshold`` before ``avoid_collisions``;
+        # newer Noetic builds removed it.  Passing four positional arguments
+        # to the newer API makes ``True`` a path constraint and raises:
+        # "unknown constraint type <class 'bool'>".
+        cartesian_parameters = inspect.signature(
+            self.arm.compute_cartesian_path
+        ).parameters
+        cartesian_arguments = {"avoid_collisions": True}
+        if "jump_threshold" in cartesian_parameters:
+            cartesian_arguments["jump_threshold"] = 0.0
+        def compute_path():
+            self.arm.set_start_state_to_current_state()
+            return self.arm.compute_cartesian_path(
+                [waypoint], self.cartesian_step, **cartesian_arguments
+            )
+
+        plan, fraction = compute_path()
         rospy.loginfo("Cartesian path to %s: %.1f%%", description, 100.0 * fraction)
+        # The eye-to-hand cloud and joint states arrive on independent Gazebo
+        # update loops.  Under load, MoveIt's shape mask can briefly leave a
+        # copy of the just-moved arm in the OctoMap.  A place descent then
+        # stops part-way and pose planning reports zero valid goal states even
+        # though the same target is normally reachable.  Rebuild the sensor
+        # map once from the settled pose before treating the target as invalid.
+        if fraction < self.minimum_cartesian_fraction and self.require_octomap:
+            rospy.logwarn(
+                "Cartesian fraction too low; refreshing OctoMap and retrying once"
+            )
+            if self._refresh_octomap() and not self._stop_requested.is_set():
+                plan, fraction = compute_path()
+                rospy.loginfo(
+                    "Cartesian path retry to %s: %.1f%%",
+                    description,
+                    100.0 * fraction,
+                )
         if fraction < self.minimum_cartesian_fraction:
             rospy.logwarn("Cartesian fraction too low; falling back to pose planning")
             return self._move_to_pose(target_pose, description)

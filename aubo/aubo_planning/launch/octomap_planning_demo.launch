@@ -10,6 +10,7 @@
   <arg name="execute" default="false"/>
   <arg name="wait_timeout" default="30.0"/>
   <arg name="sensor_pose_attempts" default="3"/>
+  <arg name="display_delay" default="1.0"/>
 
   <node pkg="aubo_planning" type="octomap_planning_demo"
         name="aubo_octomap_planning_demo" output="screen">
@@ -20,5 +21,6 @@
     <param name="execute" value="$(arg execute)"/>
     <param name="wait_timeout" value="$(arg wait_timeout)"/>
     <param name="sensor_pose_attempts" value="$(arg sensor_pose_attempts)"/>
+    <param name="display_delay" value="$(arg display_delay)"/>
   </node>
 </launch>

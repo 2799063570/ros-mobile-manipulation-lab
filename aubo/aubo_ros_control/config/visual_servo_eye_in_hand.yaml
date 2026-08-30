@@ -2,21 +2,24 @@ servo_mode: eye_in_hand
 camera_link: camera_color_optical_frame
 control_link: camera_color_optical_frame
 
-# Desired observed-object pose in the moving camera optical frame.
-desired_target_position: [0.0, 0.0, 0.35]
-# Independent controller-side guard. A closer target latches HOLD even if a
-# different perception publisher bypasses the HSV detector.
-minimum_safe_target_distance: 0.22
+# Desired observed-object pose in the moving camera optical frame. The camera
+# centre is about 35 mm behind the TCP along the approach axis, so 0.15 m here
+# leaves roughly 0.115 m between the TCP and the target for a safe pre-grasp.
+desired_target_position: [0.0, 0.0, 0.15]
+# Independent controller-side guard. This remains below the desired distance
+# and matches the perception frontend's minimum valid depth.
+minimum_safe_target_distance: 0.10
 desired_target_rpy: [0.0, 0.0, 0.0]
 target_offset: [0.0, 0.0, 0.0]
 use_orientation_control: false
 
-# Before the first detection, move toward a view-friendly posture. This is
-# disabled automatically by the operator when start_enabled is false.
-# FK check for the Gazebo workcell: at this zero posture the camera optical
-# axis is about 8.2 deg from the red target (the previous fallback was 93.4 deg
-# away and put the target behind the camera).
-initial_search_posture: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-recovery_posture: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+# The shared sorting scene puts all targets on the table. Use the same joint
+# posture as the sorting "observe" SRDF target so the wrist camera faces that
+# workspace before first detection and after target loss.
+initial_search_posture: [0.08648, -0.54623, 0.06780, -0.91058, 1.58105, 1.82491]
+recovery_posture: [0.08648, -0.54623, 0.06780, -0.91058, 1.58105, 1.82491]
 initial_search_enabled: true
-loss_strategy: stop
+# On target loss, immediately move toward the observation posture. A fresh
+# camera target always preempts this recovery motion and resumes visual servo.
+loss_strategy: coast_then_open
+coast_duration: 0.0

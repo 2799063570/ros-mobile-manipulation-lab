@@ -12,6 +12,8 @@ target_label: red
 selection_policy: image_center
 minimum_contour_area: 180.0
 maximum_contour_area: 50000.0
+# Depth-normalized projected area (m^2); rejects large coloured placement areas.
+maximum_projected_contour_area: 0.006
 maximum_aspect_ratio: 1.5
 minimum_fill_ratio: 0.70
 image_border_margin: 4

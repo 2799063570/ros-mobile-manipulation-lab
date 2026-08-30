@@ -4,7 +4,8 @@ project(lslidar_driver)
 add_compile_options(-std=c++14)
 set( CMAKE_CXX_STANDARD 14)
 
-set(libpcap_LIBRARIES -lpcap)
+find_path(PCAP_INCLUDE_DIR pcap.h)
+find_library(PCAP_LIBRARY pcap)
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp
@@ -30,8 +31,19 @@ catkin_package(
     boost
 )
 
+if(NOT PCAP_INCLUDE_DIR OR NOT PCAP_LIBRARY)
+  message(WARNING
+    "libpcap development files were not found; skipping optional "
+    "lslidar_driver targets. Install libpcap-dev and rerun catkin_make "
+    "to enable this Leishen lidar driver.")
+  install(DIRECTORY launch
+          DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
+  return()
+endif()
+
 include_directories(
   include
+  ${PCAP_INCLUDE_DIR}
   ${Boost_INCLUDE_DIR}
   ${catkin_INCLUDE_DIRS}
 )
@@ -50,7 +62,7 @@ add_library(lslidar_driver
 
 target_link_libraries(lslidar_driver
   ${catkin_LIBRARIES}
-  ${libpcap_LIBRARIES}
+  ${PCAP_LIBRARY}
 )
 
 add_dependencies(lslidar_driver
@@ -62,7 +74,7 @@ add_dependencies(lslidar_driver
 add_executable(lslidar_driver_node
   src/lslidar_driver_node.cc
 )
- 
+
 target_link_libraries(lslidar_driver_node
   lslidar_driver
   ${catkin_LIBRARIES}
@@ -73,7 +85,7 @@ add_dependencies(lslidar_driver_node
 )
 
 # install options
-install(TARGETS lslidar_driver_node 
+install(TARGETS lslidar_driver_node
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
@@ -82,4 +94,3 @@ install(TARGETS lslidar_driver_node
 install(DIRECTORY launch
         DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
-

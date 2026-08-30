@@ -15,6 +15,9 @@ target_label: red              # empty string accepts every configured color
 selection_policy: image_center # largest | image_center | nearest
 minimum_contour_area: 180.0
 maximum_contour_area: 50000.0
+# Depth-normalized projected area (m^2). A 4 cm block is about 0.0016 m^2;
+# reject large same-colour surfaces without losing the block as it approaches.
+maximum_projected_contour_area: 0.006
 maximum_aspect_ratio: 1.5      # configured targets are approximately square
 minimum_fill_ratio: 0.70       # reject irregular robot/link colour patches
 image_border_margin: 4         # reject contours touching an image edge

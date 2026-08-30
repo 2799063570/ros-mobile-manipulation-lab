@@ -1,4 +1,4 @@
-#!/usr/bin/env python 
+#!/usr/bin/env python3
 # coding=utf-8
 #1.编译器声明和2.编码格式声明
 #1:为了防止用户没有将python3安装在默认的/usr/bin目录，系统会先从env(系统环境变量)里查找python3的安装路径，再调用对应路径下的解析器完成操作
@@ -14,8 +14,8 @@ class Image_converter:
  def __init__(self): #类成员初始化函数   
      self.bridge = cv_bridge.CvBridge() #初始化图片转换功能，cv_bridge.CvBridge()
      #message_filters的作用是把订阅的数据同步后再在message_filters的回调函数中使用
-     im_sub = message_filters.Subscriber('/camera/rgb/image_raw', Image)
-     dep_sub = message_filters.Subscriber('/camera/depth/image_raw', Image)
+     im_sub = message_filters.Subscriber('/camera/color/image_raw', Image)
+     dep_sub = message_filters.Subscriber('/camera/aligned_depth_to_color/image_raw', Image)
      self.resize_rgb_pub = rospy.Publisher("resize_image_rgb", Image, queue_size=1)
      self.resize_depth_pub = rospy.Publisher("resize_image_depth", Image, queue_size=1)
      self.timeSynchronizer = message_filters.ApproximateTimeSynchronizer([im_sub, dep_sub], 10, 0.5)

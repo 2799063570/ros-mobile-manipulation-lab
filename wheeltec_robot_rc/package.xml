@@ -17,5 +17,4 @@
   
   <run_depend>roscpp</run_depend>
   <run_depend>geometry_msgs</run_depend>
-  <run_depend>yocs_velocity_smoother</run_depend>
 </package>

@@ -22,7 +22,7 @@ VisualServoPanel::VisualServoPanel(QWidget* parent)
   , target_pose_label_(new QLabel(tr("尚无有效三维目标")))
   , command_label_(new QLabel(tr("请选择目标，然后启动视觉伺服")))
 {
-  QLabel* title = new QLabel(tr("AUBO 眼在手上视觉伺服"));
+  QLabel* title = new QLabel(tr("AUBO 统一视觉伺服"));
   QFont title_font = title->font();
   title_font.setBold(true);
   title_font.setPointSize(title_font.pointSize() + 2);

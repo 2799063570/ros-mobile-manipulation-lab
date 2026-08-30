@@ -60,18 +60,29 @@ else
 fi
 
 source "${_wheeltec_ros_setup}"
+
+if [[ "${_wheeltec_requested_distro}" == "melodic" ]]; then
+  _wheeltec_melodic_py3_overlay="${WHEELTEC_MELODIC_PY3_OVERLAY:-${_wheeltec_workspace_dir}/melodic_py3_cv_bridge_ws}"
+  if [[ -f "${_wheeltec_melodic_py3_overlay}/devel/setup.bash" ]]; then
+    source "${_wheeltec_melodic_py3_overlay}/devel/setup.bash"
+  else
+    echo "警告：未找到 Melodic Python 3 cv_bridge overlay：${_wheeltec_melodic_py3_overlay}" >&2
+    echo "视觉 Python 节点将无法转换图像；请运行 src/tools/build_melodic_python3_cv_bridge.sh。" >&2
+  fi
+fi
 source "${_wheeltec_workspace_dir}/devel/setup.bash"
 
 export WHEELTEC_ROS_DISTRO="${_wheeltec_requested_distro}"
-if [[ "${_wheeltec_requested_distro}" == "noetic" ]]; then
-  export WHEELTEC_PYTHON_EXECUTABLE="${WHEELTEC_PYTHON_EXECUTABLE:-python3}"
-else
-  export WHEELTEC_PYTHON_EXECUTABLE="${WHEELTEC_PYTHON_EXECUTABLE:-python}"
+if [[ ! -x /usr/bin/python3 ]]; then
+  echo "未找到 /usr/bin/python3；Melodic 和 Noetic 均要求 Python 3。" >&2
+  unset _wheeltec_src_dir _wheeltec_ros_setup _wheeltec_workspace_dir _wheeltec_requested_distro
+  return 1
 fi
+export WHEELTEC_PYTHON_EXECUTABLE=/usr/bin/python3
 
 echo "ROS ${_wheeltec_requested_distro} 工作空间已加载：${_wheeltec_workspace_dir}"
 if ! rospack find aubo_sdk >/dev/null 2>&1; then
   echo "警告：当前环境仍未发现 aubo_sdk；请确认已重新运行 catkin_make。" >&2
 fi
 
-unset _wheeltec_src_dir _wheeltec_ros_setup _wheeltec_workspace_dir _wheeltec_requested_distro
+unset _wheeltec_src_dir _wheeltec_ros_setup _wheeltec_workspace_dir _wheeltec_requested_distro _wheeltec_melodic_py3_overlay

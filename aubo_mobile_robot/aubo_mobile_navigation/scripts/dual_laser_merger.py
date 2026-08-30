@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 from __future__ import print_function
@@ -34,6 +34,7 @@ class DualLaserMerger(object):
         self._lock = threading.Lock()
         self._front = None
         self._rear = None
+        self._last_published_stamp = None
         self._listener = tf.TransformListener()
         self._publisher = rospy.Publisher(self.output_topic, LaserScan, queue_size=2)
 
@@ -117,6 +118,16 @@ class DualLaserMerger(object):
         if not valid_scans:
             return
 
+        # The timer and Gazebo lidar updates run independently.  A timer tick
+        # can therefore see the same pair of source scans more than once.  Do
+        # not republish that data: AMCL otherwise processes a duplicate scan
+        # and broadcasts map -> odom again with the same timestamp, which
+        # causes TF_REPEATED_DATA in every TF listener.
+        output_stamp = max(scan.header.stamp for scan in valid_scans)
+        with self._lock:
+            if output_stamp == self._last_published_stamp:
+                return
+
         angle_min = -math.pi
         angle_increment = 2.0 * math.pi / float(self.samples)
         output_ranges = [float("inf")] * self.samples
@@ -129,7 +140,7 @@ class DualLaserMerger(object):
             return
 
         merged = LaserScan()
-        merged.header.stamp = max(scan.header.stamp for scan in valid_scans)
+        merged.header.stamp = output_stamp
         merged.header.frame_id = self.target_frame
         merged.angle_min = angle_min
         merged.angle_max = angle_min + (self.samples - 1) * angle_increment
@@ -140,6 +151,8 @@ class DualLaserMerger(object):
         merged.range_max = self.range_max
         merged.ranges = output_ranges
         self._publisher.publish(merged)
+        with self._lock:
+            self._last_published_stamp = output_stamp
 
 
 def main():

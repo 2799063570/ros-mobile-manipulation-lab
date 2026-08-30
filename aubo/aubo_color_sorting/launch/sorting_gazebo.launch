@@ -3,10 +3,11 @@
   <arg name="world" default="$(find aubo_color_sorting)/worlds/sorting.world"/>
   <arg name="gui" default="true"/>
   <arg name="rviz" default="true"/>
-  <arg name="debug_view" default="true"/>
+  <arg name="debug_view" default="false"/>
   <arg name="paused" default="false"/>
   <arg name="auto_move_to_observation" default="true"/>
   <arg name="auto_start" default="false"/>
+  <arg name="show_sorting_pads" default="true"/>
 
   <!-- Fixed-base AUBO i5; no mobile-base model or odometry is loaded. -->
   <include file="$(find aubo_gazebo)/launch/aubo_world_gazebo.launch">
@@ -17,6 +18,13 @@
     <arg name="y_pos" value="0.0"/>
     <arg name="z_pos" value="0.0"/>
   </include>
+
+  <!-- Placement guides belong to the sorting task, not to the shared world.
+       Keeping them out of the world prevents visual-servo launches from
+       mistaking a large same-colour pad for a physical block. -->
+  <node if="$(arg show_sorting_pads)" name="spawn_sorting_pads"
+        pkg="gazebo_ros" type="spawn_model" output="screen"
+        args="-sdf -file $(find aubo_color_sorting)/models/sorting_pads/model.sdf -model sorting_pads"/>
 
   <include file="$(find aubo_gazebo)/launch/aubo_controller_gazebo.launch"/>
 

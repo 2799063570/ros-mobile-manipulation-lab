@@ -101,9 +101,9 @@
       <child link="imu_link"/>
     </joint>
     <!--macro call rplidar imu astra_camera-->
-    <rplidar LA="laser"/>
-    <imu prefix="imu"/>
-    <astra_camera prefix="camera"/>
+    <xacro:rplidar LA="laser"/>
+    <xacro:imu prefix="imu"/>
+    <xacro:astra_camera prefix="camera"/>
     <!--macro call wheel_link-->
     <xacro:wheel_link LR="right" FR="rear">
         <origin xyz="-3.98258093170512E-11 -0.00279452473049574 1.19940203602287E-11" rpy="0 0 0" />
@@ -159,10 +159,10 @@
         <origin xyz="${left_front_wheel_position_x} ${left_front_wheel_position_y} ${front_wheel_position_z}" rpy="0 0 0" />
     </xacro:front_joint>   
     <!--macro call transmission-->
-    <wheel_transmission LR="right" FR="rear"/>
-    <wheel_transmission LR="left" FR="rear"/>
-    <wheel_transmission LR="right" FR="front"/>
-    <wheel_transmission LR="left" FR="front"/>
-    <steering_transmission LR="right" />
-    <steering_transmission LR="left" />
+    <xacro:wheel_transmission LR="right" FR="rear"/>
+    <xacro:wheel_transmission LR="left" FR="rear"/>
+    <xacro:wheel_transmission LR="right" FR="front"/>
+    <xacro:wheel_transmission LR="left" FR="front"/>
+    <xacro:steering_transmission LR="right" />
+    <xacro:steering_transmission LR="left" />
 </robot>

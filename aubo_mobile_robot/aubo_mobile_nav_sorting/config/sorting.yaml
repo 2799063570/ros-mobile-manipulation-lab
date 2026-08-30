@@ -68,9 +68,10 @@ acceleration_scaling: 0.15
 # in its compact A-shaped configuration while travelling.
 finish_named_target: transport
 
-# Rebuild the chassis-frame occupancy map after every navigation leg and lock
-# the velocity output while MoveIt owns the manipulator workspace.
-require_octomap: true
+# Obstacles are supplied as parameterized collision objects in MoveIt's
+# PlanningScene.  RGB-D remains available for object detection, but is not an
+# OctoMap safety gate for motion planning.
+require_octomap: false
 point_cloud_topic: /workspace_camera/points_for_moveit
 planning_scene_topic: /move_group/monitored_planning_scene
 clear_octomap_service: /clear_octomap

@@ -85,6 +85,7 @@ int main(int argc, char** argv)
   std::string planning_scene_topic;
   double wait_timeout;
   double planning_time;
+  double display_delay;
   bool move_to_sensor_pose;
   bool execute;
   int sensor_pose_attempts;
@@ -97,6 +98,7 @@ int main(int argc, char** argv)
                                 "/move_group/monitored_planning_scene");
   private_nh.param("wait_timeout", wait_timeout, 30.0);
   private_nh.param("planning_time", planning_time, 15.0);
+  private_nh.param("display_delay", display_delay, 1.0);
   private_nh.param("move_to_sensor_pose", move_to_sensor_pose, true);
   private_nh.param("execute", execute, false);
   private_nh.param("sensor_pose_attempts", sensor_pose_attempts, 3);
@@ -164,6 +166,12 @@ int main(int argc, char** argv)
   display.model_id = arm.getRobotModel()->getName();
   display.trajectory_start = plan.start_state_;
   display.trajectory.push_back(plan.trajectory_);
+  // RViz can subscribe to the latched display topic before its robot model is
+  // ready, producing a misleading "No robot state or robot model loaded"
+  // error even though MoveGroup is healthy. Give its MotionPlanning display
+  // time to finish initialization after the first successful plan.
+  if (display_delay > 0.0)
+    ros::WallDuration(display_delay).sleep();
   display_publisher.publish(display);
   ROS_INFO_STREAM("Plan found with " << plan.trajectory_.joint_trajectory.points.size()
                                      << " trajectory points.");

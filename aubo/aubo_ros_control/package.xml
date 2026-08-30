@@ -13,7 +13,8 @@
   <depend>hardware_interface</depend>
   <depend>kdl_parser</depend>
   <depend>pluginlib</depend>
-  <depend>orocos_kdl</depend>
+  <build_depend>liborocos-kdl-dev</build_depend>
+  <exec_depend>liborocos-kdl</exec_depend>
   <depend>roscpp</depend>
   <depend>rospy</depend>
   <depend>roslib</depend>
@@ -25,6 +26,7 @@
   <depend>rviz</depend>
   <build_depend>qtbase5-dev</build_depend>
   <exec_depend>joint_state_controller</exec_depend>
+  <exec_depend>aubo_color_sorting</exec_depend>
   <exec_depend>aubo_perception</exec_depend>
   <exec_depend>image_view</exec_depend>
   <exec_depend>joint_state_publisher</exec_depend>

@@ -1,8 +1,10 @@
 # Maps
 
-建图后运行 `map_saver.launch`，此目录会生成 `my_map.pgm` 和 `my_map.yaml`。
+本目录自带与默认 `worlds/zlab_map.world` 匹配的 `zlab_map.pgm` 和
+`zlab_map.yaml`，可直接供 `navigation.launch` 使用。
 
-`navigation.launch` 默认读取 `my_map.yaml`，因此首次导航前必须先建图并保存。
+重新建图后运行 `map_saver.launch`，默认会覆盖 `zlab_map.pgm` 和
+`zlab_map.yaml`。如需保留自带地图，请通过 `map_name` 指定其他文件名。
 
 如果包安装在 `/opt/ros` 或其他只读目录，请指定可写的绝对路径：
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """Detector-neutral bridge from darknet_ros boxes + aligned depth to AUBO targets.
 
@@ -15,7 +15,10 @@ import numpy as np
 import rospy
 import tf
 from cv_bridge import CvBridge, CvBridgeError
-from darknet_ros_msgs.msg import BoundingBoxes
+try:
+    from darknet_ros_msgs.msg import BoundingBoxes
+except ImportError:
+    BoundingBoxes = None
 from geometry_msgs.msg import PoseStamped
 from sensor_msgs.msg import CameraInfo, Image
 from std_msgs.msg import String
@@ -232,6 +235,12 @@ class YoloRgbdTargetNode(object):
 
 def main():
     rospy.init_node("yolo_rgbd_target")
+    if BoundingBoxes is None:
+        rospy.logfatal(
+            "yolo_rgbd_target requires the optional darknet_ros_msgs package; "
+            "install a maintained detector backend or migrate this adapter to its messages."
+        )
+        return
     YoloRgbdTargetNode()
     rospy.spin()
 

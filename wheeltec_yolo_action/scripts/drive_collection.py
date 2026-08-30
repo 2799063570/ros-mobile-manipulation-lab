@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # coding=utf-8
 
 import rospy
@@ -18,7 +18,7 @@ class Follower:
         self.bridge = cv_bridge.CvBridge()
         #cv2.namedWindow("window", 1)
         # 订阅usb摄像头
-        self.image_sub = rospy.Subscriber("/camera/rgb/image_raw", Image, self.image_callback)
+        self.image_sub = rospy.Subscriber("/camera/color/image_raw", Image, self.image_callback)
         # self.image_sub = rospy.Subscriber("cv_bridge_image", Image, self.image_callback)
 
     

@@ -3,7 +3,10 @@
   <!-- Robot controllers and move_group must already be running. -->
   <arg name="start_perception" default="true"/>
   <arg name="start_task" default="true"/>
-  <arg name="debug_view" default="true"/>
+  <!-- image_view/OpenCV 4.2 can abort while closing an unregistered GTK
+       window.  Keep publishing /sorting/debug_image, but make the optional
+       desktop viewer opt-in so shutdown remains clean and headless-safe. -->
+  <arg name="debug_view" default="false"/>
   <arg name="auto_move_to_observation" default="true"/>
   <arg name="auto_start" default="false"/>
   <arg name="use_grasp_attachment" default="true"/>

@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.0.2)
 project(aubo_gazebo_plugins)
 
-add_compile_options(-std=c++11)
 find_package(catkin REQUIRED COMPONENTS gazebo_ros roscpp std_msgs)
 find_package(gazebo REQUIRED)
 

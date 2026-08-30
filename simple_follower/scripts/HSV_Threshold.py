@@ -1,4 +1,4 @@
-#!/usr/bin/env python 
+#!/usr/bin/env python3
 # coding=utf-8
 #1.编译器声明和2.编码格式声明
 #1:为了防止用户没有将python3安装在默认的/usr/bin目录，系统会先从env(系统环境变量)里查找python3的安装路径，再调用对应路径下的解析器完成操作

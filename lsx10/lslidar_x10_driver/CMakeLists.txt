@@ -4,7 +4,8 @@ project(lslidar_x10_driver)
 add_compile_options(-std=c++14)
 set( CMAKE_CXX_STANDARD 14)
 
-set(libpcap_LIBRARIES -lpcap)
+find_path(PCAP_INCLUDE_DIR pcap.h)
+find_library(PCAP_LIBRARY pcap)
 
 find_package(catkin REQUIRED COMPONENTS
   roscpp
@@ -28,8 +29,19 @@ catkin_package(
     boost
 )
 
+if(NOT PCAP_INCLUDE_DIR OR NOT PCAP_LIBRARY)
+  message(WARNING
+    "libpcap development files were not found; skipping optional "
+    "lslidar_x10_driver targets. Install libpcap-dev and rerun catkin_make "
+    "to enable this Leishen lidar driver.")
+  install(DIRECTORY launch
+          DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
+  return()
+endif()
+
 include_directories(
   include
+  ${PCAP_INCLUDE_DIR}
   ${Boost_INCLUDE_DIR}
   ${catkin_INCLUDE_DIRS}
 )
@@ -61,7 +73,7 @@ add_library(lslidar_x10_driver
 
 target_link_libraries(lslidar_input_x10
   ${catkin_LIBRARIES}
-  ${libpcap_LIBRARIES}
+  ${PCAP_LIBRARY}
 )
 
 target_link_libraries(lslidar_serial_x10
@@ -108,4 +120,3 @@ install(TARGETS lslidar_input_x10 lslidar_x10_driver lslidar_x10_driver_node lsl
 install(DIRECTORY launch
         DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
-

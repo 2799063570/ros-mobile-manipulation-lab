@@ -309,6 +309,8 @@ bool checkRPLIDARHealth(ILidarDriver * drv)
                 ROS_ERROR("Error, rplidar internal error detected. Please reboot the device to retry.");
 				return false;
         }
+        ROS_ERROR("Unknown rplidar health status: %d", healthinfo.status);
+        return false;
     } else {
         ROS_ERROR("Error, cannot retrieve rplidar health code: %x", op_result);
         return false;

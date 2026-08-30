@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # coding=utf-8
 
 import rospy
@@ -134,7 +134,7 @@ def side_flag_callback(msg):
 def T_junction():
 	cx = 0
 	cy = 0
-	image = rospy.wait_for_message("/camera/rgb/image_raw", Image, timeout = None)	
+	image = rospy.wait_for_message("/camera/color/image_raw", Image, timeout = None)
 	bridge = cv_bridge.CvBridge()
 	image = bridge.imgmsg_to_cv2(image, desired_encoding='bgr8')
 	image = cv2.resize(image, (320,240), interpolation=cv2.INTER_AREA)
@@ -270,7 +270,7 @@ def ctrl_data(currentState, side):
 	return ctrldata
 	
 def line_judgment():
-	image = rospy.wait_for_message("/camera/rgb/image_raw", Image, timeout = None)	
+	image = rospy.wait_for_message("/camera/color/image_raw", Image, timeout = None)
 	bridge = cv_bridge.CvBridge()
 	image = bridge.imgmsg_to_cv2(image, desired_encoding='bgr8')
 	image = cv2.resize(image, (320,240), interpolation=cv2.INTER_AREA)
@@ -406,7 +406,6 @@ def control_drive():
 	decelerate_pub = rospy.Publisher("/decelerate_data", Int8, queue_size=1)
 	line_pub = rospy.Publisher("/line_judgment", Int8, queue_size=1)
 	cmdvel_pub = rospy.Publisher("/cmd_vel", Twist, queue_size=1)
-	#image_sub = rospy.Subscriber("/usb_cam/image_raw", Image, image_callback)
 	position_sub = rospy.Subscriber("/object_tracker/current_position", position, position_callback)
 	side_flag_sub = rospy.Subscriber("/darknet_ros/bounding_boxes", BoundingBoxes, side_flag_callback)
 	control_flag_sub = rospy.Subscriber("/control_flag", Int8, control_flag_callback)

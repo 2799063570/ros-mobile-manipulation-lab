@@ -13,7 +13,6 @@
 
   <run_depend>lslidar_x10_driver</run_depend>
   <run_depend>lslidar_x10_msgs</run_depend>
-  <run_depend>lslidar_x10_decoder</run_depend>
 
   <export>
     <metapackage/>

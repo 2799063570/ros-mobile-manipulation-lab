@@ -9,7 +9,7 @@
   <arg name="auto_move_to_observation" default="true"/>
   <arg name="auto_start" default="false"/>
   <arg name="use_grasp_attachment" default="true"/>
-  <arg name="start_octomap_cloud_filter" default="true"/>
+  <arg name="start_octomap_cloud_filter" default="false"/>
 
   <include if="$(arg start_octomap_cloud_filter)"
            file="$(find aubo_mobile_perception)/launch/workspace_cloud_filter.launch"/>

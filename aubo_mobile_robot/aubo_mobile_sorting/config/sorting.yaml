@@ -64,8 +64,9 @@ velocity_scaling: 0.15
 acceleration_scaling: 0.15
 finish_named_target: down
 
-# Eye-to-hand RGB-D / MoveIt occupancy-map safety gate.
-require_octomap: true
+# Obstacles are added directly to MoveIt's PlanningScene from parameters.
+# RGB-D is used for detection only, not for an OctoMap safety gate.
+require_octomap: false
 point_cloud_topic: /workspace_camera/points_for_moveit
 planning_scene_topic: /move_group/monitored_planning_scene
 clear_octomap_service: /clear_octomap

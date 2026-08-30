@@ -24,6 +24,21 @@ if(NOT EXISTS "${AUBO_SDK_CONTROLLER_LIB}")
   message(FATAL_ERROR "AUBO SDK library not found: ${AUBO_SDK_CONTROLLER_LIB}")
 endif()
 
+# The vendor SDK was built against protobuf 2.6 (SONAME libprotobuf.so.9).
+# Bionic and Focal do not provide an ABI-compatible replacement under the
+# current protobuf SONAME, so fail during configuration with an actionable
+# message instead of emitting hundreds of undefined references at link time.
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+  find_file(AUBO_PROTOBUF9_LIBRARY NAMES libprotobuf.so.9
+    PATHS /lib /usr/lib /usr/local/lib
+    PATH_SUFFIXES x86_64-linux-gnu)
+  if(NOT AUBO_PROTOBUF9_LIBRARY)
+    message(FATAL_ERROR
+      "AUBO SDK requires libprotobuf.so.9. Install Ubuntu package "
+      "libprotobuf9v5 as documented in ROS1_COMPATIBILITY.md.")
+  endif()
+endif()
+
 catkin_package(
   INCLUDE_DIRS include
   CATKIN_DEPENDS roslib
@@ -35,7 +50,7 @@ function(add_aubo_sdk_demo target source)
   add_executable(${target} ${source})
   target_compile_features(${target} PRIVATE cxx_std_14)
   target_include_directories(${target} PRIVATE ${AUBO_SDK_INCLUDE_DIR} ${catkin_INCLUDE_DIRS})
-  target_link_libraries(${target} ${AUBO_SDK_CONTROLLER_LIB} ${catkin_LIBRARIES} Threads::Threads)
+  target_link_libraries(${target} ${AUBO_SDK_CONTROLLER_LIB} ${AUBO_PROTOBUF9_LIBRARY} ${catkin_LIBRARIES} Threads::Threads)
   set_target_properties(${target} PROPERTIES
     BUILD_RPATH "${AUBO_SDK_RUNTIME_DIRS}"
     INSTALL_RPATH "${AUBO_SDK_DEMO_INSTALL_RPATH}"

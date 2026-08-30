@@ -2,17 +2,20 @@
 <launch>
   <arg name="gui" default="true"/>
   <arg name="target_topic" default="/visual_servo/target_pose"/>
-  <arg name="loss_strategy" default="stop"/>
+  <arg name="loss_strategy" default="coast_then_open"/>
   <arg name="target_label" default="red"/>
   <arg name="auto_start" default="false"/>
   <arg name="start_perception" default="true"/>
   <arg name="rviz" default="true"/>
   <arg name="debug_view" default="false"/>
+  <arg name="paused" default="false"/>
+  <arg name="world" default="$(find aubo_color_sorting)/worlds/sorting.world"/>
 
   <!-- Loads the eye-in-hand model, Gazebo and robot_state_publisher. -->
   <include file="$(find aubo_gazebo)/launch/aubo_world_gazebo.launch">
     <arg name="gui" value="$(arg gui)"/>
-    <arg name="world_name" value="$(find aubo_ros_control)/worlds/eye_in_hand_visual_servo.world"/>
+    <arg name="paused" value="$(arg paused)"/>
+    <arg name="world_name" value="$(arg world)"/>
   </include>
 
   <group ns="aubo_i5">

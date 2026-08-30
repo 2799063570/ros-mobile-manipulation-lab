@@ -18,7 +18,7 @@
   </joint>
     <!-- Defining the base_link-->
     <link name="base_link">
-        <box_inertial_matrix  m="${box_mass}" d="${box_width}" h="${box_height}" w="${box_length}" />
+        <xacro:box_inertial_matrix  m="${box_mass}" d="${box_width}" h="${box_height}" w="${box_length}" />
         <visual>
             <geometry>
                 <mesh filename="package://wheeltec_description/meshes/mini_4wd/base_link.STL" />

@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<sdf version="1.6">
+  <!-- Optional visual-only placement guide. It is spawned by the sorting
+       launch file and is deliberately absent from visual-servo scenes. -->
+  <model name="sorting_pads">
+    <static>true</static>
+    <link name="pads_link">
+      <visual name="red_pad">
+        <pose>0.44 -0.25 0.102 0 0 0</pose>
+        <geometry><box><size>0.14 0.14 0.004</size></box></geometry>
+        <material>
+          <ambient>0.45 0.02 0.02 1</ambient>
+          <diffuse>0.8 0.03 0.03 1</diffuse>
+        </material>
+      </visual>
+      <visual name="green_pad">
+        <pose>0.58 -0.25 0.102 0 0 0</pose>
+        <geometry><box><size>0.14 0.14 0.004</size></box></geometry>
+        <material>
+          <ambient>0.02 0.40 0.02 1</ambient>
+          <diffuse>0.03 0.8 0.03 1</diffuse>
+        </material>
+      </visual>
+      <visual name="blue_pad">
+        <pose>0.44 0.25 0.102 0 0 0</pose>
+        <geometry><box><size>0.14 0.14 0.004</size></box></geometry>
+        <material>
+          <ambient>0.02 0.02 0.45 1</ambient>
+          <diffuse>0.03 0.03 0.8 1</diffuse>
+        </material>
+      </visual>
+    </link>
+  </model>
+</sdf>

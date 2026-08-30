@@ -1,3 +1,8 @@
+# Allow the PointCloudOctomapUpdater to wait for the next simulated robot TF.
+# The depth camera and joint-state controllers are independent Gazebo update
+# loops, so an exact cloud timestamp can briefly be ahead of the latest TF.
+shape_transform_cache_lookup_wait_time: 0.25
+
 # joint_limits.yaml allows the dynamics properties specified in the URDF to be overwritten or augmented as needed
 # Specific joint properties can be changed with the keys [max_position, min_position, max_velocity, max_acceleration]
 # Joint limits can be turned off with [has_velocity_limits, has_acceleration_limits]

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # coding=utf-8
 """广播主车在 map 中的位姿以及 base_link 坐标系速度。"""
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """Drive a differential robot through relative waypoints around one obstacle."""
 
 from __future__ import division

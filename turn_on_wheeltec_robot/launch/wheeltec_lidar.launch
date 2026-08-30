@@ -1,5 +1,5 @@
 <launch>
-    <arg name="rplidar_mode"  default="ls_N10P" 
+    <arg name="rplidar_mode"  default="rplidar_A1_A2"
     doc="opt:  ls_M10_uart, ls_M10P_uart, ls_M10P_PLUS_uart, ls_M10_net, ls_M10P_net, ls_M10P_PLUS_net, ls_N10, ls_N10P, ld_14, ld_19, rplidar_A1_A2, rplidar_A3, rplidar_S1"/>
 
     <!--所有雷达正前方（小车正前方）为0度角方向，扫描角度顺时针方向增加 -->

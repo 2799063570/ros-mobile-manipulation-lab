@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """Mount-independent RGB-D color target frontend for AUBO visual servo.
 
@@ -182,6 +182,9 @@ class RgbdVisualTargetNode(object):
         self.maximum_depth = float(rospy.get_param("~maximum_depth", 2.50))
         self.depth_scale_16u = float(rospy.get_param("~depth_scale_16u", 0.001))
         self.depth_mask_erosion = int(rospy.get_param("~depth_mask_erosion", 3))
+        self.maximum_projected_contour_area = float(
+            rospy.get_param("~maximum_projected_contour_area", 0.0)
+        )
         self.position_filter_alpha = float(
             rospy.get_param("~position_filter_alpha", 0.35)
         )
@@ -370,6 +373,15 @@ class RgbdVisualTargetNode(object):
         z = candidate.depth
         return ((pixel_x - cx) * z / fx, (pixel_y - cy) * z / fy, z)
 
+    @staticmethod
+    def _projected_contour_area(candidate, camera_info):
+        """Approximate the contour's camera-facing physical area in m^2."""
+        fx = float(camera_info.K[0])
+        fy = float(camera_info.K[4])
+        if fx <= 0.0 or fy <= 0.0 or candidate.depth is None:
+            return None
+        return candidate.area * candidate.depth * candidate.depth / (fx * fy)
+
     def _filter_position(self, position, label, stamp):
         with self.control_lock:
             reset = (
@@ -460,6 +472,14 @@ class RgbdVisualTargetNode(object):
         candidates = self.frontend.detect(bgr_image)
         for candidate in candidates:
             candidate.depth = self._candidate_depth(candidate, depth_metres)
+        if self.maximum_projected_contour_area > 0.0:
+            size_filtered_candidates = []
+            for candidate in candidates:
+                projected_area = self._projected_contour_area(candidate, camera_info)
+                if (projected_area is not None and
+                        projected_area <= self.maximum_projected_contour_area):
+                    size_filtered_candidates.append(candidate)
+            candidates = size_filtered_candidates
         selected = self._select(candidates, bgr_image.shape)
 
         with self.control_lock:

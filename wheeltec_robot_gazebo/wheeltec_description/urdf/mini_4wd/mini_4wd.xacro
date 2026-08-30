@@ -62,8 +62,8 @@
       <parent link="base_link"/>
       <child link="imu_link"/>
     </joint>
-    <imu prefix="imu"/>
-    <astra_camera prefix="camera"/>
+    <xacro:imu prefix="imu"/>
+    <xacro:astra_camera prefix="camera"/>
     <xacro:joint_choose LR="right" FR="front" >
         <origin xyz="${front_wheel_position_x} ${right_wheel_position_y} ${wheel_position_z} " rpy="0 0 0"/>
     </xacro:joint_choose>
@@ -120,9 +120,9 @@
           iyz="1.8473E-15"
           izz="1.996E-05" />
     </xacro:wheel_choose>
-    <transmission_choose LR="right" FR="front" />
-    <transmission_choose LR="left"  FR="front" />
-    <transmission_choose LR="right" FR="rear"  />
-    <transmission_choose LR="left"  FR="rear"  />
-    <rplidar LA="laser"/>
+    <xacro:transmission_choose LR="right" FR="front" />
+    <xacro:transmission_choose LR="left"  FR="front" />
+    <xacro:transmission_choose LR="right" FR="rear"  />
+    <xacro:transmission_choose LR="left"  FR="rear"  />
+    <xacro:rplidar LA="laser"/>
 </robot>

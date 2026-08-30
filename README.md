@@ -157,56 +157,172 @@ aubo_mobile_robot
 `/sorting/base_locked` 禁止底盘运动。Gazebo 中的小物体夹持由
 `aubo_gazebo_plugins` 辅助，真实机械臂不加载该插件。
 
-## 运行环境
+## 安装、编译与环境加载
 
-- Ubuntu 18.04 + ROS 1 Melodic，或 Ubuntu 20.04 + ROS 1 Noetic
-- Gazebo Classic
-- Catkin 工作空间
-- MoveIt 1、Navigation Stack、GMapping、AMCL
-- OpenCV、`cv_bridge`（运行视觉分拣时需要）
+### 支持状态
 
-仓库根目录的 `CMakeLists.txt` 是 Catkin `src` 目录使用的顶层文件。如果当前目录
-就是工作空间的 `src`，应在它的上一级目录编译：
+本仓库维护同一套 Python 3 源码，目标环境为：
 
-```bash
-cd ..
-rosdep install --from-paths src --ignore-src -r -y
-catkin_make
-source src/setup_ros.sh
+| 系统 | ROS | Python | 当前验证状态 |
+| --- | --- | --- | --- |
+| Ubuntu 18.04 | Melodic | Python 3 | 容器内 41 个活动包全量构建通过 |
+| Ubuntu 20.04 | Noetic | Python 3 | 实际工作空间全量构建通过，3 项测试无失败 |
+
+OpenCV 3（Melodic）和 OpenCV 4（Noetic）均已通过编译。这里的“兼容”指源码、依赖、
+编译及无硬件启动检查通过；RealSense、雷达、WheelTec 控制器和 AUBO 真机仍需在
+对应系统上完成实物验收。
+
+### 1. 准备 Catkin 工作空间
+
+本文假定目录结构如下，仓库内容位于工作空间的 `src` 中：
+
+```text
+~/aubo/ros_mobile_manipulation_lab/
+├── build/                 # catkin_make 生成
+├── devel/                 # catkin_make 生成
+└── src/                   # 本仓库
+    ├── CMakeLists.txt
+    ├── setup_ros.sh
+    ├── aubo/
+    └── aubo_mobile_robot/
 ```
 
-仓库根目录提供了 `setup_ros.sh`，它只修改当前终端的环境，不会写入
-`~/.bashrc`。每次打开新终端后，在工作空间根目录执行：
+打开一个没有加载其他 ROS 发行版的终端，进入工作空间根目录并选择当前系统的 ROS：
 
 ```bash
-source src/setup_ros.sh
-```
+cd ~/aubo/ros_mobile_manipulation_lab
 
-也可以在仓库的任意绝对路径下直接 `source` 该脚本；脚本会自动定位工作空间，
-自动选择已安装的 ROS Noetic 或 Melodic，再加载工作空间的 `devel/setup.bash`。
-如果当前终端已经加载 ROS，则沿用 `ROS_DISTRO`；如果尚未编译，脚本会提示先运行
-`catkin_make`。
-
-需要手动选择版本时，使用 `WHEELTEC_ROS_DISTRO`：
-
-```bash
-# Ubuntu 18.04 / ROS Melodic
-export WHEELTEC_ROS_DISTRO=melodic
+# Ubuntu 18.04
 source /opt/ros/melodic/setup.bash
-catkin_make
-source src/setup_ros.sh
 
-# Ubuntu 20.04 / ROS Noetic
-export WHEELTEC_ROS_DISTRO=noetic
+# Ubuntu 20.04（与上一条二选一）
 source /opt/ros/noetic/setup.bash
-catkin_make
+```
+
+建议先退出 Conda：
+
+```bash
+conda deactivate 2>/dev/null || true
+```
+
+顶层 CMake 也会忽略仍处于激活状态的 Conda 前缀，避免 Conda protobuf 覆盖
+Gazebo 使用的 Ubuntu 系统 ABI。
+
+### 2. 安装系统依赖
+
+初始化过 rosdep 后，在工作空间根目录执行：
+
+```bash
+sudo rosdep init  # 本机从未初始化 rosdep 时只执行一次
+rosdep update
+rosdep install --from-paths src --ignore-src -r -y
+```
+
+项目中的 Navigation、TEB、Karto、深度图转激光和 RealSense 驱动使用对应 ROS
+发行版的系统包，不再编译仓库中的旧 Melodic/vendor 快照。如果需要手动补装常用
+依赖，可执行：
+
+```bash
+sudo apt install \
+  python3-pip python3-numpy python3-opencv python3-sklearn \
+  libpcap-dev \
+  ros-$ROS_DISTRO-navigation \
+  ros-$ROS_DISTRO-gmapping \
+  ros-$ROS_DISTRO-teb-local-planner \
+  ros-$ROS_DISTRO-depthimage-to-laserscan \
+  ros-$ROS_DISTRO-realsense2-camera \
+  ros-$ROS_DISTRO-slam-karto \
+  ros-$ROS_DISTRO-warehouse-ros-mongo
+```
+
+雷神 LSX10 驱动需要 `libpcap-dev`。缺少它时两个 LSX10 驱动会被明确标记为跳过，
+不会阻塞 RPLIDAR 和其余工作空间；安装后重新运行 `catkin_make` 即会自动启用。
+
+### 3. 安装 AUBO SDK 所需 protobuf ABI
+
+仓库中的 AUBO 预编译 SDK 固定依赖 `libprotobuf.so.9`。不能将系统新版 protobuf
+软链接成该文件；若系统中尚无这个 SONAME，请安装经过校验的 Ubuntu 兼容包：
+
+```bash
+curl -L --fail -o /tmp/libprotobuf9v5_2.6.1-1.3_amd64.deb \
+  http://archive.ubuntu.com/ubuntu/pool/main/p/protobuf/libprotobuf9v5_2.6.1-1.3_amd64.deb
+echo '8178472ae72a3242f4e1c78f38bfd137c5aadadcefc1980aee2ba9820be1d192  /tmp/libprotobuf9v5_2.6.1-1.3_amd64.deb' | sha256sum -c -
+sudo apt install /tmp/libprotobuf9v5_2.6.1-1.3_amd64.deb
+```
+
+### 4. 编译主工作空间
+
+Melodic 和 Noetic 都显式使用 `/usr/bin/python3`：
+
+```bash
+cd ~/aubo/ros_mobile_manipulation_lab
+catkin_make -DPYTHON_EXECUTABLE=/usr/bin/python3
+```
+
+正常结果应以 `[100%]` 结束。较新 CMake 输出的 deprecation、CMP0148 等信息属于
+ROS 1 旧版 CMake 模块的警告；只要命令退出码为 0，就不表示构建失败。
+
+### 5. Melodic 专用：构建 Python 3 cv_bridge
+
+Noetic 用户跳过本节。Melodic 的系统 `cv_bridge` 通常是 Python 2 ABI；需要视觉、
+跟随、KCF、RRT 图像检测或 AUBO Python 感知节点时，执行：
+
+```bash
+cd ~/aubo/ros_mobile_manipulation_lab
+python3 -m pip install --user \
+  'catkin_pkg<1' 'rospkg<2' 'empy==3.3.4' defusedxml pyyaml
+bash src/tools/build_melodic_python3_cv_bridge.sh
+```
+
+脚本会在工作空间根目录生成 `melodic_py3_cv_bridge_ws`。以后加载项目环境时，
+`setup_ros.sh` 会在 Melodic 下自动加载这个 overlay。
+
+### 6. 加载环境并验证
+
+每个新终端都应执行：
+
+```bash
+cd ~/aubo/ros_mobile_manipulation_lab
 source src/setup_ros.sh
 ```
 
-同一个构建目录不能在两个 ROS 版本之间直接复用。切换发行版后应清理原来的
-`build/` 和 `devel/`，或分别使用两个 Catkin 工作空间，并在未加载另一 ROS 版本
-的干净终端中操作。Noetic 会通过 Catkin 将
-本仓库安装的 Python 节点指向 Python 3；Melodic 则保留其默认 Python 配置。
+该脚本只修改当前终端，不写入 `~/.bashrc`。它会选择已安装或当前已经加载的
+Melodic/Noetic，加载 `devel/setup.bash`，并统一导出 Python 3 解释器。验证环境：
+
+```bash
+echo "$ROS_DISTRO"
+python3 --version
+rospack find aubo_sdk
+rospack find aubo_mobile_bringup
+rospack find robot_pose_ekf
+rospack find rrt_exploration
+```
+
+可进一步执行仓库现有测试和 launch 静态展开检查：
+
+```bash
+catkin_make run_tests_robot_pose_ekf
+catkin_test_results build/test_results
+
+roslaunch --nodes turn_on_wheeltec_robot robot_model_visualization.launch
+roslaunch --nodes aubo_mobile_navigation mapping_gazebo.launch
+```
+
+### 7. 在 Melodic 与 Noetic 之间切换
+
+不要让两个发行版复用同一组 `build/`、`devel/`。推荐分别建立两个工作空间；若确实
+需要切换，应在干净终端中选择目标 ROS，并删除旧发行版生成的构建目录后重新编译。
+删除前务必确认目标路径是本工作空间的 `build` 和 `devel`。
+
+如同一系统安装了多个 ROS 发行版，可以在加载项目前指定：
+
+```bash
+export WHEELTEC_ROS_DISTRO=melodic  # 或 noetic
+source src/setup_ros.sh
+```
+
+完整的保留范围、已隔离源码及双版本实现细节见
+[ROS 1 双版本兼容说明](ROS1_COMPATIBILITY.md)。
 
 ## 快速开始
 

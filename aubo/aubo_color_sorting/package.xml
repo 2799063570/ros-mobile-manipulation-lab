@@ -12,6 +12,7 @@
   <exec_depend>aubo_moveit_config</exec_depend>
   <exec_depend>aubo_perception</exec_depend>
   <exec_depend>aubo_sorting_core</exec_depend>
+  <exec_depend>gazebo_ros</exec_depend>
   <exec_depend>image_view</exec_depend>
   <exec_depend>joint_state_publisher</exec_depend>
   <export/>

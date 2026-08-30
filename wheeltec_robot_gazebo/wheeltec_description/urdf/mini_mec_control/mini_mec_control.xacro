@@ -62,8 +62,8 @@
       <parent link="base_link"/>
       <child link="imu_link"/>
     </joint>
-    <imu prefix="imu"/>
-    <astra_camera prefix="camera"/>
+    <xacro:imu prefix="imu"/>
+    <xacro:astra_camera prefix="camera"/>
     <xacro:wheel_joint LR="right" FR="front" >
         <origin xyz="${front_wheel_position_x} ${right_wheel_position_y} ${wheel_position_z} " rpy="0 0 0"/>
     </xacro:wheel_joint>
@@ -116,9 +116,9 @@
           iyz="-1.1342E-09"
           izz="5.7729E-06"/>
     </xacro:wheel_link>
-    <wheel_link_gazebo LR="right" FR="front" />
-    <wheel_link_gazebo LR="left"  FR="front" />
-    <wheel_link_gazebo LR="right" FR="rear"  />
-    <wheel_link_gazebo LR="left"  FR="rear"  />
-    <rplidar LA="laser"/>
+    <xacro:wheel_link_gazebo LR="right" FR="front" />
+    <xacro:wheel_link_gazebo LR="left"  FR="front" />
+    <xacro:wheel_link_gazebo LR="right" FR="rear"  />
+    <xacro:wheel_link_gazebo LR="left"  FR="rear"  />
+    <xacro:rplidar LA="laser"/>
 </robot>

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # coding=utf-8
 """接收主车 UDP 状态，发布新版 leader_state 和兼容的 multfodom。"""
 

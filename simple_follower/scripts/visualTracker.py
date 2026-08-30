@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 from __future__ import division
 import rospy
@@ -55,8 +55,8 @@ class visualTracker:
 		self.targetDist = rospy.get_param('~targetDist')
 
 		# one callback that deals with depth and rgb at the same time 一个同时处理深度和RGB的回调
-		im_sub = message_filters.Subscriber('/camera/rgb/image_raw', Image)
-		dep_sub = message_filters.Subscriber('/camera/depth/image_raw', Image)
+		im_sub = message_filters.Subscriber('/camera/color/image_raw', Image)
+		dep_sub = message_filters.Subscriber('/camera/aligned_depth_to_color/image_raw', Image)
 		self.timeSynchronizer = message_filters.ApproximateTimeSynchronizer([im_sub, dep_sub], 10, 0.5)
 		
 		self.timeSynchronizer.registerCallback(self.trackObject)

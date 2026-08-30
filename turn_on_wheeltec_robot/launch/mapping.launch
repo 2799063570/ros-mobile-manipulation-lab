@@ -1,16 +1,16 @@
 
 <launch>
-  <arg name="mapping_mode"  default="gmapping" doc="opt: gmapping,hector,cartographer,karto"/>
+  <arg name="mapping_mode"  default="gmapping" doc="supported: gmapping,karto; optional legacy: hector,cartographer"/>
+  <arg name="rplidar_mode" default="rplidar_A1_A2"/>
   
   <!-- 是否在建图时开启导航 默认不开启 仅在rrt自主建图时同时进行-->
   <arg name="navigation" default="false"/>
   <arg name="odom_frame_id"  default="odom_combined"/>
 
   <!-- turn on lidar开启雷达  -->
-  <include file="$(find turn_on_wheeltec_robot)/launch/wheeltec_lidar.launch" />
-
-  <!-- 启动APP一键保存地图功能  -->
-  <node pkg="world_canvas_msgs" type="save" name="save_map" />
+  <include file="$(find turn_on_wheeltec_robot)/launch/wheeltec_lidar.launch">
+    <arg name="rplidar_mode" value="$(arg rplidar_mode)"/>
+  </include>
 
   <!-- 开启gmapping建图算法  -->
   <group if="$(eval mapping_mode == 'gmapping')">

@@ -17,7 +17,9 @@ roslaunch aubo_planning octomap_planning_gazebo.launch
 场景中的灰色工作台和橙色立柱没有通过代码直接加入 PlanningScene；它们由固定的
 眼在手外 `workspace_camera` 观测。MoveIt 订阅
 `/workspace_camera/depth/color/points`，经 TF 变换和机器人自过滤后生成 4 cm
-OctoMap体素。
+OctoMap体素。启动入口以 100 Hz 中继 Gazebo 关节状态，并允许 MoveIt 最多等待
+0.25 s 获取与点云时间戳匹配的机器人 TF，避免相机与控制器更新周期不同导致的
+毫秒级外推错误。
 
 眼在手外仿真使用不含手部相机的 `aubo_i5.xacro`，因此不会同时发布腕部相机数据；
 固定相机无需机械臂移动到 `observe` 姿态。程序确认收到点云和非空八叉树后直接规划
