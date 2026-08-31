@@ -1,0 +1,12 @@
+<launch>
+  <arg name="config" default="$(find aubo_perception)/config/ultralytics_yolo.yaml"/>
+  <arg name="python" default="/home/zlab/anaconda3/envs/yolo/bin/python"/>
+
+  <node pkg="aubo_perception"
+        type="ultralytics_yolo_node.sh"
+        name="ultralytics_yolo"
+        output="screen">
+    <rosparam command="load" file="$(arg config)"/>
+    <param name="python_executable" value="$(arg python)"/>
+  </node>
+</launch>

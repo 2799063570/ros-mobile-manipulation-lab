@@ -1,0 +1,14 @@
+image_topic: /camera/color/image_raw
+detections_topic: /yolo/detections
+annotated_image_topic: /yolo/annotated_image
+
+project_path: /home/zlab/deepL/code/ultralytics-main-modify
+model_path: /home/zlab/deepL/code/ultralytics-main-modify/weights/GC-yolo.pt
+
+confidence: 0.25
+iou: 0.70
+image_size: 640
+device: cpu
+max_detections: 100
+publish_annotated_image: true
+inference_rate: 10.0

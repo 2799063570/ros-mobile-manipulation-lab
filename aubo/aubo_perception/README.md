@@ -15,6 +15,41 @@
 - `rgbd_visual_target_node.py`：两种相机安装共用的同步 RGB-D 目标位姿前端。
 - `yolo_rgbd_target_node.py`：YOLO 检测框与深度图到统一三维目标的适配器。
 - `workspace_cloud_filter_node`：MoveIt OctoMap 使用的工作区点云过滤。
+- `ultralytics_yolo_node.py`：在独立 Conda Python 中执行 YOLO/OBB 推理，且不加载
+  与 Conda ABI 冲突的 Noetic `cv_bridge`。
+
+## Ultralytics YOLO
+
+默认订阅 `/camera/color/image_raw`，发布：
+
+| 话题 | 类型 | 用途 |
+| --- | --- | --- |
+| `/yolo/detections` | `aubo_perception/YoloDetectionArray` | 类别、置信度、中心、尺寸和 OBB 弧度角 |
+| `/yolo/annotated_image` | `sensor_msgs/Image` | 带检测结果的 BGR 图像 |
+
+环境定义保存在 `environment/yolo_ros.yml`。已有的 `yolo` 环境也可以直接使用。
+节点通过 NumPy 解码 ROS 图像，不调用 `cv_bridge`，因此 ROS Noetic 保持系统
+Python 3.8，YOLO 可使用 Conda Python 3.10。
+
+需要从零重建环境时执行：
+
+```bash
+conda env create -f src/aubo/aubo_perception/environment/yolo_ros.yml
+```
+
+```bash
+cd /home/zlab/aubo/ros_mobile_manipulation_lab
+catkin_make
+source devel/setup.bash
+roslaunch aubo_perception ultralytics_yolo.launch
+```
+
+若使用新建的环境，则启动命令增加
+`python:=/home/zlab/anaconda3/envs/yolo_ros/bin/python`。
+
+模型、话题、阈值和设备在 `config/ultralytics_yolo.yaml` 中配置。当前机器的
+NVIDIA 驱动不可用，所以默认 `device: cpu`；驱动恢复且
+`torch.cuda.is_available()` 返回 `True` 后再改为 `device: "0"`。
 
 默认发布：
 

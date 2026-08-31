@@ -19,6 +19,8 @@ find_package(catkin REQUIRED COMPONENTS
 add_message_files(FILES
   DetectedObject.msg
   DetectedObjectArray.msg
+  YoloDetection.msg
+  YoloDetectionArray.msg
 )
 generate_messages(DEPENDENCIES geometry_msgs std_msgs)
 
@@ -35,11 +37,16 @@ add_dependencies(workspace_cloud_filter_node ${${PROJECT_NAME}_EXPORTED_TARGETS}
 catkin_install_python(PROGRAMS
   scripts/color_object_detector.py
   scripts/rgbd_visual_target_node.py
+  scripts/ultralytics_yolo_node.py
   scripts/yolo_rgbd_target_node.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
-install(DIRECTORY config msg
+install(PROGRAMS scripts/ultralytics_yolo_node.sh
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
+install(DIRECTORY config environment launch msg
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
 install(TARGETS workspace_cloud_filter_node
