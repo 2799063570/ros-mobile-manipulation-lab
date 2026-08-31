@@ -35,5 +35,8 @@ gripper_controller:
     joint1: {trajectory: 0.30, goal: 0.30}
     joint2: {trajectory: 0.30, goal: 0.30}
   gains:
-    joint1: {p: 40.0, i: 0.2, d: 1.0, i_clamp: 0.5}
-    joint2: {p: 40.0, i: 0.2, d: 1.0, i_clamp: 0.5}
+    # The gripper is a two-state actuator in simulation. Integral action is
+    # intentionally disabled so an open/closed command cannot wind up and
+    # chatter while holding its fixed endpoint.
+    joint1: {p: 25.0, i: 0.0, d: 2.0, i_clamp: 0.0}
+    joint2: {p: 25.0, i: 0.0, d: 2.0, i_clamp: 0.0}

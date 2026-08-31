@@ -1,0 +1,66 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="start_robot" default="true"/>
+  <arg name="start_moveit" default="true"/>
+  <arg name="start_scan_merger" default="true"/>
+  <arg name="use_laser_safety" default="true"/>
+  <arg name="camera_topic" default="/hand_camera/image_raw"/>
+  <arg name="world" default="$(find aubo_mobile_follower)/worlds/line_follow.world"/>
+  <arg name="gui" default="true"/>
+  <arg name="start_rviz" default="true"/>
+  <arg name="start_rqt_reconfigure" default="false"/>
+  <arg name="start_path_trail" default="true"/>
+  <arg name="detection_backend" default="darknet"/>
+  <arg name="boxes_topic" default="/darknet_ros/bounding_boxes"/>
+  <arg name="semantic_config"
+       default="$(find aubo_mobile_follower)/config/semantic_actions.yaml"/>
+
+  <include file="$(find aubo_mobile_follower)/launch/follower.launch">
+    <arg name="follower_type" value="line_follower.py"/>
+    <arg name="arm_target" value="observe"/>
+    <arg name="wait_for_camera" value="true"/>
+    <arg name="camera_topic" value="$(arg camera_topic)"/>
+    <arg name="start_robot" value="$(arg start_robot)"/>
+    <arg name="start_moveit" value="$(arg start_moveit)"/>
+    <arg name="start_scan_merger" value="$(arg start_scan_merger)"/>
+    <arg name="use_laser_safety" value="$(arg use_laser_safety)"/>
+    <arg name="safe_follower_cmd_vel_topic" value="/aubo_mobile_follower/line_cmd"/>
+    <arg name="direct_follower_cmd_vel_topic" value="/aubo_mobile_follower/line_cmd"/>
+    <arg name="world" value="$(arg world)"/>
+    <arg name="gui" value="$(arg gui)"/>
+  </include>
+
+  <group if="$(arg use_laser_safety)">
+    <node pkg="aubo_mobile_follower" type="semantic_drive_supervisor.py"
+          name="semantic_drive_supervisor" output="screen" required="true">
+      <rosparam file="$(arg semantic_config)" command="load"/>
+      <param name="detection_backend" value="$(arg detection_backend)"/>
+      <param name="boxes_topic" value="$(arg boxes_topic)"/>
+      <param name="output_cmd_vel_topic" value="/cmd_vel_raw"/>
+    </node>
+  </group>
+  <group unless="$(arg use_laser_safety)">
+    <node pkg="aubo_mobile_follower" type="semantic_drive_supervisor.py"
+          name="semantic_drive_supervisor" output="screen" required="true">
+      <rosparam file="$(arg semantic_config)" command="load"/>
+      <param name="detection_backend" value="$(arg detection_backend)"/>
+      <param name="boxes_topic" value="$(arg boxes_topic)"/>
+      <param name="output_cmd_vel_topic" value="/cmd_vel"/>
+    </node>
+  </group>
+
+  <node if="$(arg start_path_trail)" pkg="aubo_mobile_follower"
+        type="follower_path.py" name="semantic_line_follower_path" output="screen"/>
+
+  <node if="$(arg start_rviz)" pkg="rviz" type="rviz"
+        name="semantic_line_follow_rviz" output="screen"
+        args="-d $(find aubo_mobile_follower)/rviz/line_follow.rviz">
+    <env name="LIBGL_ALWAYS_SOFTWARE" value="1"/>
+    <env name="__GLX_VENDOR_LIBRARY_NAME" value="mesa"/>
+    <env name="MESA_LOADER_DRIVER_OVERRIDE" value="llvmpipe"/>
+  </node>
+
+  <node if="$(arg start_rqt_reconfigure)" pkg="rqt_reconfigure"
+        type="rqt_reconfigure" name="semantic_line_follow_reconfigure" output="screen"/>
+</launch>
+

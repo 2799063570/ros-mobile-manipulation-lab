@@ -21,10 +21,11 @@
     <arg name="z" value="0.02"/>
   </include>
 
-  <!-- nav_sorting.world owns a fixed camera above the sorting target.  map is
-       the stable scene frame while the robot navigates beneath it. -->
+  <!-- Gazebo world coordinates coincide with odom. Keep the TF of the
+       physically fixed camera in that same frame; attaching it to map would
+       make AMCL corrections virtually move the camera away from its image. -->
   <include file="$(find aubo_description)/launch/eye_to_hand_camera_tf.launch">
-    <arg name="parent_frame" value="map"/>
+    <arg name="parent_frame" value="odom"/>
     <arg name="x" value="2.82"/>
     <arg name="y" value="0.0"/>
     <arg name="z" value="2.0"/>

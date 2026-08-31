@@ -5,6 +5,8 @@ find_package(catkin REQUIRED COMPONENTS
   dynamic_reconfigure
 )
 
+catkin_python_setup()
+
 generate_dynamic_reconfigure_options(
   cfg/ColorFollower.cfg
   cfg/LineFollower.cfg
@@ -21,8 +23,13 @@ catkin_install_python(PROGRAMS
   scripts/line_follower.py
   scripts/follower_path.py
   scripts/target_interactive_marker.py
+  scripts/semantic_drive_supervisor.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
+
+if(CATKIN_ENABLE_TESTING)
+  catkin_add_nosetests(test/test_semantic_drive_core.py)
+endif()
 
 install(DIRECTORY config launch models rviz worlds
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}

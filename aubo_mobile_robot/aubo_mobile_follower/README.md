@@ -44,6 +44,9 @@ roslaunch aubo_mobile_follower color_follow.launch
 
 # 黑线循迹：弯曲黑线场景 + 下视相机 + RViz 轨迹/调试图像
 roslaunch aubo_mobile_follower line_follow.launch
+
+# YOLO交通标志控制循线（检测器需另外启动）
+roslaunch aubo_mobile_follower semantic_line_follow.launch
 ```
 
 需要运行时调参时，在对应启动命令后增加：
@@ -109,6 +112,35 @@ roslaunch aubo_mobile_follower line_follow.launch start_robot:=false \
 
 状态话题为 `/aubo_mobile_follower/state`。首次实机测试应架空驱动轮或使用急停，
 先把最大线速度降到较低值，再标定相机 HSV、目标面积和雷达安全距离。
+
+## YOLO语义循线
+
+`semantic_line_follow.launch` 在普通循线控制器与激光安全过滤器之间加入
+`semantic_drive_supervisor.py`。循线节点只向
+`/aubo_mobile_follower/line_cmd` 发布基础速度；管理器根据YOLO类别执行停车、减速、
+恢复以及基于 `/odom` 的闭环左右转，随后向 `/cmd_vel_raw` 发布。它不会使用固定
+时间估算转角，也不会向差速底盘发送横向速度。
+
+默认订阅 `/darknet_ros/bounding_boxes`，期望类别名为 `stop`、`slow_down`、
+`resume`、`turn_left` 和 `turn_right`。类别映射、置信度、连续确认帧数、冷却时间和
+转向参数均位于 `config/semantic_actions.yaml`。检测器及其模型不由该启动文件启动；
+可以接入现有 `darknet_ros`，或者把类别映射改成自己模型的标签。
+
+没有YOLO环境时，可先用字符串后端验证完整控制链：
+
+```bash
+roslaunch aubo_mobile_follower semantic_line_follow.launch \
+  detection_backend:=string gui:=false start_rviz:=false
+
+# 默认连续4帧确认，因此测试时连续发布同一标签
+rostopic pub -r 10 /aubo_mobile_follower/semantic_detection \
+  std_msgs/String "data: 'stop'"
+```
+
+状态输出为 `/aubo_mobile_follower/semantic_state`。常见状态包括 `FOLLOW_LINE`、
+`SLOW_FOLLOW`、`STOPPED`、`TURN_LEFT`、`TURN_RIGHT`、`WAITING_FOR_ARM`、
+`NOMINAL_CMD_TIMEOUT`、`ODOM_TIMEOUT` 和 `BASE_LOCKED`。该模式与普通跟随模式一样，
+不应和 `move_base` 同时运行；后续如需导航途中响应标志，应先增加速度仲裁器。
 
 激光 RViz 诊断话题为 `/aubo_mobile_follower/laser_debug`：青色球表示通过点数和
 连续性检查的候选点簇，绿色球表示当前控制目标，黄色弧线表示期望跟随距离。

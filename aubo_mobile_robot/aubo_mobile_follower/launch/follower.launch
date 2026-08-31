@@ -11,6 +11,8 @@
   <arg name="start_moveit" default="true"/>
   <arg name="start_scan_merger" default="true"/>
   <arg name="use_laser_safety" default="true"/>
+  <arg name="safe_follower_cmd_vel_topic" default="/cmd_vel_raw"/>
+  <arg name="direct_follower_cmd_vel_topic" default="/cmd_vel"/>
   <arg name="world" default="$(find aubo_mobile_robot)/worlds/empty.world"/>
   <arg name="gui" default="true"/>
 
@@ -47,7 +49,7 @@
       <rosparam file="$(find aubo_mobile_follower)/config/follower.yaml" command="load"/>
       <param name="image_topic" value="$(arg camera_topic)"/>
       <param name="scan_topic" value="$(arg scan_topic)"/>
-      <param name="cmd_vel_topic" value="/cmd_vel_raw"/>
+      <param name="cmd_vel_topic" value="$(arg safe_follower_cmd_vel_topic)"/>
     </node>
     <include file="$(find aubo_mobile_navigation)/launch/laser_safety_filter.launch">
       <arg name="scan_topic" value="$(arg scan_topic)"/>
@@ -67,7 +69,7 @@
       <rosparam file="$(find aubo_mobile_follower)/config/follower.yaml" command="load"/>
       <param name="image_topic" value="$(arg camera_topic)"/>
       <param name="scan_topic" value="$(arg scan_topic)"/>
-      <param name="cmd_vel_topic" value="/cmd_vel"/>
+      <param name="cmd_vel_topic" value="$(arg direct_follower_cmd_vel_topic)"/>
     </node>
   </group>
 </launch>

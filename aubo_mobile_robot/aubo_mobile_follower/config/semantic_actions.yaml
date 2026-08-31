@@ -1,0 +1,40 @@
+# Detector labels are configurable so model class indices are never hard-coded.
+detection_backend: darknet
+boxes_topic: /darknet_ros/bounding_boxes
+string_detection_topic: /aubo_mobile_follower/semantic_detection
+minimum_probability: 0.70
+minimum_box_fraction: 0.0
+detector_image_width: 640
+detector_image_height: 480
+confirmation_frames: 4
+cooldown: 4.0
+
+action_classes:
+  stop: stop
+  slow_down: slow_down
+  resume: resume
+  turn_left: turn_left
+  turn_right: turn_right
+
+# When multiple labels are visible, the safety-related action wins.
+action_priorities:
+  stop: 100
+  turn_left: 80
+  turn_right: 80
+  slow_down: 60
+  resume: 40
+
+control_rate: 20.0
+nominal_timeout: 0.5
+odom_timeout: 0.5
+stop_hold_time: 3.0
+slow_scale: 0.35
+slow_duration: 4.0
+
+# Closed-loop differential-drive turn parameters.
+turn_angle: 1.57079632679
+turn_kp: 1.4
+turn_min_speed: 0.12
+turn_max_speed: 0.45
+turn_tolerance: 0.05236
+turn_settle_time: 0.25

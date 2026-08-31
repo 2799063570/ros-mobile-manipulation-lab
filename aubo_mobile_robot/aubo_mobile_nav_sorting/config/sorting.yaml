@@ -6,18 +6,17 @@ detections_topic: /sorting/detections
 gripper_action: /gripper_controller/follow_joint_trajectory
 
 table_z: 0.14
-# Static Gazebo table pose in map/world coordinates. It is transformed into
-# MoveIt's planning frame both at startup and again after navigation.
-table_frame: map
+# Gazebo world coordinates coincide with odom. Keeping physical scene objects
+# in odom prevents AMCL map->odom corrections from shifting the virtual table.
+table_frame: odom
 table_center: [3.00, 0.0, 0.25]
 table_size: [0.80, 1.20, 0.40]
 # Extra clearance on each horizontal side; vertical size remains exact so the
 # gripper can still approach objects resting on the tabletop.
 table_collision_margin: 0.03
 object_height: 0.04
-# Put the TCP at the centre of the 40 mm block.  The previous +10 mm offset
-# left the fingers too high for a reliable task-specific grasp.
-grasp_height_offset: 0.0
+# Match the proven stationary sorting scene and keep fingertips off the table.
+grasp_height_offset: 0.01
 scene_update_timeout: 10.0
 
 grasp_rpy: [3.141592653589793, 0.0, 0.0]
@@ -27,7 +26,11 @@ work_ready_named_target: work_ready
 auto_move_to_observation: false
 auto_start: false
 pregrasp_height: 0.25
-lift_height: 0.30
+# The navigation dock leaves the farthest block about 5 cm farther from the
+# arm than in the stationary sorting scene.  A 0.30 m lift puts that block just
+# outside the high, tool-down IK envelope; 0.26 m still provides ample table
+# clearance for a 0.04 m block while keeping the transfer pose reachable.
+lift_height: 0.26
 place_clearance: 0.02
 cartesian_step: 0.01
 minimum_cartesian_fraction: 0.90
@@ -44,9 +47,8 @@ grasp_status_topic: /sorting/grasp/status
 grasp_attachment_timeout: 3.0
 
 sort_colors: [red, green, blue]
-# Static pad centres in map coordinates. They are transformed into base_link at
-# execution time, so fine-docking y/yaw adjustments do not offset placement.
-place_frame: map
+# The physical Gazebo pads are fixed in world/odom coordinates.
+place_frame: odom
 place_targets:
   red: [2.66, -0.24]
   green: [2.80, -0.24]
@@ -59,6 +61,16 @@ verify_observation_detections: true
 observation_verification_timeout: 4.0
 grasp_offset_x: 0.0
 grasp_offset_y: 0.0
+
+# Fuse repeated observations into stable map-frame target tracks. A short
+# camera occlusion can reuse a confident track, while large jumps are rejected.
+target_cache_frame: map
+target_cache_min_observations: 5
+target_cache_max_age: 30.0
+target_cache_outlier_distance: 0.12
+target_cache_fallback_enabled: true
+target_cache_fallback_delay: 2.0
+
 moveit_server_timeout: 30.0
 gripper_server_timeout: 30.0
 planning_time: 12.0

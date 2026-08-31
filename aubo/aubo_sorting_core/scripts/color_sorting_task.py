@@ -30,7 +30,7 @@ from std_srvs.srv import Empty, Trigger, TriggerResponse
 from tf.transformations import quaternion_from_euler
 from trajectory_msgs.msg import JointTrajectoryPoint
 
-from aubo_perception.msg import DetectedObjectArray
+from aubo_perception.msg import DetectedObject, DetectedObjectArray
 
 
 class ColorSortingTask(object):
@@ -148,6 +148,24 @@ class ColorSortingTask(object):
         self.base_lock_topic = rospy.get_param(
             "~base_lock_topic", "/sorting/base_locked"
         )
+        self.target_cache_frame = rospy.get_param(
+            "~target_cache_frame", self.target_frame
+        )
+        self.target_cache_min_observations = max(
+            2, int(rospy.get_param("~target_cache_min_observations", 5))
+        )
+        self.target_cache_max_age = max(
+            1.0, float(rospy.get_param("~target_cache_max_age", 30.0))
+        )
+        self.target_cache_outlier_distance = max(
+            0.02, float(rospy.get_param("~target_cache_outlier_distance", 0.12))
+        )
+        self.target_cache_fallback_enabled = bool(
+            rospy.get_param("~target_cache_fallback_enabled", True)
+        )
+        self.target_cache_fallback_delay = max(
+            0.2, float(rospy.get_param("~target_cache_fallback_delay", 2.0))
+        )
         self.failure_topic = rospy.get_param(
             "~failure_topic", "/sorting/failure"
         )
@@ -158,6 +176,7 @@ class ColorSortingTask(object):
             "~workspace_update_topic", "/sorting/workspace_update"
         )
         self._robot_limits_valid = self._verify_loaded_upper_arm_limit()
+        self.tf_listener = tf.TransformListener()
 
         self._detections = None
         self._detections_wall_time = 0.0
@@ -177,6 +196,8 @@ class ColorSortingTask(object):
         self._workspace_id = "default"
         self._pending_workspace = None
         self._completed_colors = set()
+        self._target_tracks = {}
+        self._state = "INITIALIZING"
 
         self._state_publisher = rospy.Publisher(
             "/sorting/state", String, queue_size=1, latch=True
@@ -190,8 +211,12 @@ class ColorSortingTask(object):
         self._failure_publisher = rospy.Publisher(
             self.failure_topic, String, queue_size=1, latch=True
         )
+        self._target_cache_publisher = rospy.Publisher(
+            "/sorting/target_cache", String, queue_size=1, latch=True
+        )
         self._base_lock_publisher.publish(Bool(data=False))
         self._failure_publisher.publish(String(data=""))
+        self._publish_target_cache()
         self._subscriber = rospy.Subscriber(
             self.detections_topic,
             DetectedObjectArray,
@@ -241,7 +266,6 @@ class ColorSortingTask(object):
         self.arm.set_end_effector_link(self.end_effector_link)
         self.arm.set_pose_reference_frame(self.target_frame)
         self.planning_frame = self.arm.get_planning_frame()
-        self.tf_listener = tf.TransformListener()
         self.arm.set_planning_time(float(rospy.get_param("~planning_time", 12.0)))
         self.arm.set_num_planning_attempts(10)
         self.arm.set_max_velocity_scaling_factor(self.velocity_scaling)
@@ -272,6 +296,7 @@ class ColorSortingTask(object):
         worker.start()
 
     def _publish_state(self, state, detail=""):
+        self._state = state
         message = state if not detail else "{} | {}".format(state, detail)
         self._state_publisher.publish(String(data=message))
         rospy.loginfo("Sorting state: %s", message)
@@ -327,6 +352,9 @@ class ColorSortingTask(object):
         )
         self._workspace_id = workspace_id
         self._completed_colors = set()
+        with self._data_lock:
+            self._target_tracks = {}
+        self._publish_target_cache()
         self._observation_ready = False
         if not self._add_table_collision():
             raise RuntimeError("MoveIt did not accept the workspace table")
@@ -354,10 +382,180 @@ class ColorSortingTask(object):
             success=True, message="workspace '{}' configured".format(self._workspace_id)
         )
 
+    def _publish_target_cache(self):
+        now = time.time()
+        with self._data_lock:
+            tracks = dict(
+                (color, dict(track)) for color, track in self._target_tracks.items()
+            )
+        payload = {"frame_id": self.target_cache_frame, "targets": {}}
+        for color, track in tracks.items():
+            count = int(track["count"])
+            spread = math.sqrt(max(0.0, track["m2"]) / max(1, count))
+            observation_confidence = min(
+                1.0, float(count) / float(self.target_cache_min_observations)
+            )
+            stability_confidence = max(
+                0.0, 1.0 - spread / self.target_cache_outlier_distance
+            )
+            payload["targets"][color] = {
+                "position": [track["x"], track["y"]],
+                "observations": count,
+                "confidence": observation_confidence * stability_confidence,
+                "spread": spread,
+                "age": max(0.0, now - track["last_seen"]),
+                "picked": bool(track["picked"]),
+            }
+        self._target_cache_publisher.publish(
+            String(data=json.dumps(payload, sort_keys=True))
+        )
+
+    def _detection_in_cache_frame(self, message, detected):
+        source_frame = message.header.frame_id or self.target_frame
+        pose = PoseStamped()
+        pose.header.frame_id = source_frame
+        pose.header.stamp = message.header.stamp
+        pose.pose = copy.deepcopy(detected.pose)
+        pose.pose.orientation.w = 1.0
+        if source_frame == self.target_cache_frame:
+            return pose.pose.position.x, pose.pose.position.y
+        try:
+            transformed = self.tf_listener.transformPose(
+                self.target_cache_frame, pose
+            )
+        except tf.ExtrapolationException:
+            # During Gazebo load spikes the image timestamp can fall just
+            # outside the TF cache. The base is physically locked while arm
+            # observations run, so the latest transform is still valid.
+            pose.header.stamp = rospy.Time(0)
+            try:
+                transformed = self.tf_listener.transformPose(
+                    self.target_cache_frame, pose
+                )
+            except (tf.Exception, tf.LookupException, tf.ConnectivityException,
+                    tf.ExtrapolationException) as error:
+                rospy.logwarn_throttle(
+                    2.0, "Cannot cache detections in %s: %s",
+                    self.target_cache_frame, str(error),
+                )
+                return None
+        except (tf.Exception, tf.LookupException, tf.ConnectivityException) as error:
+            rospy.logwarn_throttle(
+                2.0, "Cannot cache detections in %s: %s",
+                self.target_cache_frame, str(error),
+            )
+            return None
+        return transformed.pose.position.x, transformed.pose.position.y
+
+    def _update_target_cache(self, message):
+        selected = {}
+        for detected in message.objects:
+            color = str(detected.color)
+            previous = selected.get(color)
+            if previous is None or detected.contour_area > previous.contour_area:
+                selected[color] = detected
+
+        updates = []
+        for color, detected in selected.items():
+            position = self._detection_in_cache_frame(message, detected)
+            if position is not None:
+                updates.append((color, float(position[0]), float(position[1])))
+        if not updates:
+            return
+
+        now = time.time()
+        changed = False
+        with self._data_lock:
+            for color, x_value, y_value in updates:
+                track = self._target_tracks.get(color)
+                if track is None:
+                    self._target_tracks[color] = {
+                        "x": x_value,
+                        "y": y_value,
+                        "count": 1,
+                        "m2": 0.0,
+                        "last_seen": now,
+                        "picked": False,
+                    }
+                    changed = True
+                    continue
+                if track["picked"]:
+                    continue
+                distance = math.hypot(x_value - track["x"], y_value - track["y"])
+                if distance > self.target_cache_outlier_distance:
+                    rospy.logwarn_throttle(
+                        2.0,
+                        "Rejecting %s target-cache outlier %.3f m from track",
+                        color, distance,
+                    )
+                    continue
+                count = int(track["count"]) + 1
+                delta_x = x_value - track["x"]
+                delta_y = y_value - track["y"]
+                track["x"] += delta_x / float(count)
+                track["y"] += delta_y / float(count)
+                track["m2"] += (
+                    delta_x * (x_value - track["x"])
+                    + delta_y * (y_value - track["y"])
+                )
+                track["count"] = count
+                track["last_seen"] = now
+                changed = True
+        if changed:
+            self._publish_target_cache()
+
+    def _mark_target_picked(self, color):
+        with self._data_lock:
+            track = self._target_tracks.get(color)
+            if track is not None:
+                track["picked"] = True
+        self._publish_target_cache()
+
+    def _cached_object(self, color):
+        if not self.target_cache_fallback_enabled:
+            return None
+        now = time.time()
+        with self._data_lock:
+            track = self._target_tracks.get(color)
+            track = dict(track) if track is not None else None
+        if (
+            track is None
+            or track["picked"]
+            or int(track["count"]) < self.target_cache_min_observations
+            or now - track["last_seen"] > self.target_cache_max_age
+        ):
+            return None
+        target_xy = self._xy_in_target_frame(
+            self.target_cache_frame, [track["x"], track["y"]]
+        )
+        if target_xy is None:
+            return None
+        detected = DetectedObject()
+        detected.color = color
+        detected.pose.position.x = target_xy[0]
+        detected.pose.position.y = target_xy[1]
+        detected.pose.position.z = self.table_z + 0.5 * self.object_height
+        detected.pose.orientation.w = 1.0
+        rospy.logwarn(
+            "Using cached %s target after %.1f s without a fresh detection: "
+            "[%0.3f, %0.3f] in %s (%d observations)",
+            color, now - track["last_seen"], track["x"], track["y"],
+            self.target_cache_frame, int(track["count"]),
+        )
+        return detected
+
     def _detection_callback(self, message):
         with self._data_lock:
             self._detections = message
             self._detections_wall_time = time.time()
+        # The arm can temporarily occlude the fixed overhead camera while it
+        # approaches or carries an object. Only learn tracks in deliberate
+        # observation/detection phases; otherwise an occlusion can replace a
+        # stable object location with a pad, gripper, or partial contour.
+        if self._state == "DETECTING" or (
+            self._state == "OBSERVING" and self._observation_ready
+        ):
+            self._update_target_cache(message)
         counts = []
         for color in self.sort_colors:
             count = sum(1 for item in message.objects if item.color == color)
@@ -841,27 +1039,22 @@ class ColorSortingTask(object):
         goal.trajectory.points = [point]
         goal.trajectory.header.stamp = rospy.Time.now() + rospy.Duration(0.1)
 
-        # Closing on a rigid object is expected to leave a position error: the
-        # fingers must stop at contact instead of numerically reaching the
-        # preload angle.  Send the tolerance with every goal so this also works
-        # when a stale controller YAML is still present on the parameter server.
-        closing = position > self.gripper_open + 1.0e-4
-        position_tolerance = self.gripper_contact_tolerance if closing else 0.05
+        # During a simulated grasp the attachment plugin disables contact
+        # between the carried block and the fingers. Both joints can therefore
+        # reach one discrete target without fighting a rigid collision.
+        position_tolerance = 0.03
         for joint_name in goal.trajectory.joint_names:
             path_tolerance = JointTolerance()
             path_tolerance.name = joint_name
-            # A contact-closing motion cannot follow a free-space trajectory
-            # after the fingers touch the object.  In control_msgs, -1 erases
-            # the controller's default tolerance for this goal.
-            path_tolerance.position = -1.0 if closing else position_tolerance
-            path_tolerance.velocity = -1.0 if closing else 0.0
-            path_tolerance.acceleration = -1.0 if closing else 0.0
+            path_tolerance.position = 0.10
+            path_tolerance.velocity = 0.0
+            path_tolerance.acceleration = 0.0
             goal.path_tolerance.append(path_tolerance)
             goal_tolerance = JointTolerance()
             goal_tolerance.name = joint_name
             goal_tolerance.position = position_tolerance
-            goal_tolerance.velocity = -1.0 if closing else 0.0
-            goal_tolerance.acceleration = -1.0 if closing else 0.0
+            goal_tolerance.velocity = 0.0
+            goal_tolerance.acceleration = 0.0
             goal.goal_tolerance.append(goal_tolerance)
         goal.goal_time_tolerance = rospy.Duration(3.0)
 
@@ -962,6 +1155,7 @@ class ColorSortingTask(object):
 
     def _wait_for_object(self, color, not_before):
         deadline = time.time() + self.detection_timeout
+        cache_deadline = time.time() + self.target_cache_fallback_delay
         samples = []
         last_receipt_time = not_before
         while not rospy.is_shutdown() and time.time() < deadline:
@@ -994,7 +1188,18 @@ class ColorSortingTask(object):
                             detected.pose.position.y,
                         )
                         return detected
+            if time.time() >= cache_deadline:
+                cached = self._cached_object(color)
+                if cached is not None:
+                    return cached
             rospy.sleep(0.1)
+        cached = self._cached_object(color)
+        if cached is not None:
+            return cached
+        self._set_failure(
+            "DETECTION_FAILED",
+            "no fresh or confident cached '{}' target".format(color),
+        )
         rospy.logerr(
             "No fresh '%s' object detected within %.1f seconds",
             color,
@@ -1059,7 +1264,14 @@ class ColorSortingTask(object):
         return self._move_named(self.work_ready_named_target)
 
     def _verify_visible_colors(self):
-        required = set(str(color) for color in self.sort_colors)
+        required = set(
+            str(color)
+            for color in self.sort_colors
+            if color not in self._completed_colors
+        )
+        if not required:
+            rospy.loginfo("Observation verification skipped: all colors completed")
+            return True
         not_before = time.time()
         deadline = not_before + self.observation_verification_timeout
         while not rospy.is_shutdown() and time.time() < deadline:
@@ -1108,10 +1320,15 @@ class ColorSortingTask(object):
             self._pose(object_x, object_y, grasp_z), color + " grasp"
         ):
             return False
-        if not self._command_gripper(self.gripper_closed):
-            return False
         object_model_name = "{}_block".format(color)
+        # In Gazebo a lightweight block can be kicked away by the first finger
+        # contact before the close action returns. Secure it at the validated
+        # grasp centre first; the following close remains the visible gripper
+        # motion and the fixed joint is released normally at placement.
         if not self._set_grasp_attachment(object_model_name, True):
+            return False
+        if not self._command_gripper(self.gripper_closed):
+            self._set_grasp_attachment(object_model_name, False)
             return False
         rospy.sleep(0.5)
         if not self._cartesian_to(
@@ -1153,6 +1370,10 @@ class ColorSortingTask(object):
             # A fully completed set means this is a deliberate new run, not a
             # retry of a partially completed table.
             self._completed_colors = set()
+            with self._data_lock:
+                for track in self._target_tracks.values():
+                    track["picked"] = False
+            self._publish_target_cache()
         for index, color in enumerate(self.sort_colors):
             if self._stop_requested.is_set():
                 return False
@@ -1173,6 +1394,7 @@ class ColorSortingTask(object):
             if not self._pick_and_place(detected):
                 return False
             self._completed_colors.add(color)
+            self._mark_target_picked(color)
             if index < len(self.sort_colors) - 1:
                 self._publish_state("OBSERVING", "next object")
                 if not self._observation():

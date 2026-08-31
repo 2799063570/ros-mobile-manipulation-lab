@@ -13,6 +13,9 @@
       <attach_topic>/sorting/grasp/attach</attach_topic>
       <detach_topic>/sorting/grasp/detach</detach_topic>
       <status_topic>/sorting/grasp/status</status_topic>
+      <!-- Gazebo collapses the fixed mobile_base_joint, so base_footprint is
+           the canonical chassis rigid body exposed by Model::GetLink(). -->
+      <base_link>base_footprint</base_link>
     </plugin>
     <include><uri>model://ground_plane</uri></include>
     <include><uri>model://sun</uri></include>

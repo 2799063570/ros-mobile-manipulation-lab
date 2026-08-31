@@ -5,11 +5,20 @@
             filename="libaubo_grasp_attach_plugin.so">
       <robot_model>aubo_mobile_robot</robot_model>
       <palm_link>wrist3_Link</palm_link>
+      <finger_link_1>Link1</finger_link_1>
+      <finger_link_2>Link2</finger_link_2>
       <object_link>block_link</object_link>
       <max_attach_distance>0.18</max_attach_distance>
       <attach_topic>/sorting/grasp/attach</attach_topic>
       <detach_topic>/sorting/grasp/detach</detach_topic>
       <status_topic>/sorting/grasp/status</status_topic>
+      <!-- In simulation, zero cmd_vel cannot resist arm/contact reaction
+           forces. The grasp plugin also holds the chassis pose while this
+           latched topic is true. -->
+      <base_lock_topic>/sorting/base_locked</base_lock_topic>
+      <!-- Gazebo collapses the fixed mobile_base_joint, so base_footprint is
+           the canonical chassis rigid body exposed by Model::GetLink(). -->
+      <base_link>base_footprint</base_link>
     </plugin>
 
     <include><uri>model://ground_plane</uri></include>
