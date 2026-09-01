@@ -1,51 +1,51 @@
-RPLIDAR ROS package
-=====================================================================
+# RPLIDAR ROS 功能包
 
-ROS node and test application for RPLIDAR
+该功能包提供 RPLIDAR 的 ROS 节点和测试程序。
 
-Visit following Website for more details about RPLIDAR:
+## 相关资料
 
-rplidar roswiki: http://wiki.ros.org/rplidar
+- [ROS Wiki](http://wiki.ros.org/rplidar)
+- [RPLIDAR 官网](http://www.slamtec.com/en/Lidar)
+- [RPLIDAR SDK](https://github.com/Slamtec/rplidar_sdk)
+- [使用教程](https://github.com/robopeak/rplidar_ros/wiki)
 
-rplidar HomePage:   http://www.slamtec.com/en/Lidar
+## 编译
 
-rplidar SDK: https://github.com/Slamtec/rplidar_sdk
+1. 把本项目放入 Catkin 工作空间的 `src` 目录。
+2. 在工作空间根目录运行 `catkin_make`，编译 `rplidarNode` 和 `rplidarNodeClient`。
 
-rplidar Tutorial:  https://github.com/robopeak/rplidar_ros/wiki
+## 运行
 
-How to build rplidar ros package
-=====================================================================
-    1) Clone this project to your catkin's workspace src folder
-    2) Running catkin_make to build rplidarNode and rplidarNodeClient
+### 在 RViz 中查看
 
-How to run rplidar ros package
-=====================================================================
-There're two ways to run rplidar ros package
+根据雷达型号选择启动文件：
 
-I. Run rplidar node and view in the rviz
-------------------------------------------------------------
-roslaunch rplidar_ros view_rplidar.launch (for RPLIDAR A1/A2)
-,
-roslaunch rplidar_ros view_rplidar_a3.launch (for RPLIDAR A3)
-or
-roslaunch rplidar_ros view_rplidar_s1.launch (for RPLIDAR S1)
+```bash
+roslaunch rplidar_ros view_rplidar.launch     # RPLIDAR A1/A2
+roslaunch rplidar_ros view_rplidar_a3.launch  # RPLIDAR A3
+roslaunch rplidar_ros view_rplidar_s1.launch  # RPLIDAR S1
+```
 
-You should see rplidar's scan result in the rviz.
+RViz 中应能看到激光扫描结果。
 
-II. Run rplidar node and view using test application
-------------------------------------------------------------
-roslaunch rplidar_ros rplidar.launch (for RPLIDAR A1/A2)
-,
-roslaunch rplidar_ros rplidar_a3.launch (for RPLIDAR A3)
-or
-roslaunch rplidar_ros rplidar_s1.launch (for RPLIDAR S1)
+### 使用测试程序查看
 
+先启动对应型号的雷达节点：
+
+```bash
+roslaunch rplidar_ros rplidar.launch     # RPLIDAR A1/A2
+roslaunch rplidar_ros rplidar_a3.launch  # RPLIDAR A3
+roslaunch rplidar_ros rplidar_s1.launch  # RPLIDAR S1
+```
+
+再启动客户端：
+
+```bash
 rosrun rplidar_ros rplidarNodeClient
+```
 
-You should see rplidar's scan result in the console
+扫描结果会显示在终端中。A1/A2 与 A3/S1 的主要配置差异是串口波特率 `serial_baudrate`。
 
-Notice: the different is serial_baudrate between A1/A2 and A3/S1
+## 坐标系
 
-RPLidar frame
-=====================================================================
-RPLidar frame must be broadcasted according to picture shown in rplidar-frame.png
+RPLIDAR 坐标系必须按照 `rplidar-frame.png` 所示方向发布。

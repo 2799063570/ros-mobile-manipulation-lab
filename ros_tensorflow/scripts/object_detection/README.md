@@ -1,190 +1,71 @@
+# TensorFlow 目标检测 API
 
-# Tensorflow Object Detection API
-Creating accurate machine learning models capable of localizing and identifying
-multiple objects in a single image remains a core challenge in computer vision.
-The TensorFlow Object Detection API is an open source framework built on top of
-TensorFlow that makes it easy to construct, train and deploy object detection
-models.  At Google we’ve certainly found this codebase to be useful for our
-computer vision needs, and we hope that you will as well.
+TensorFlow 目标检测 API 是构建在 TensorFlow 之上的开源框架，用于创建、训练和部署能够在单张图像中定位并识别多个目标的模型。
+
 <p align="center">
-  <img src="g3doc/img/kites_detections_output.jpg" width=676 height=450>
+  <img src="g3doc/img/kites_detections_output.jpg" width="676" height="450" alt="目标检测示例">
 </p>
-Contributions to the codebase are welcome and we would love to hear back from
-you if you find this API useful.  Finally if you use the Tensorflow Object
-Detection API for a research publication, please consider citing:
 
-```
+欢迎为项目贡献代码。如果在论文中使用该 API，请考虑引用：
+
+```text
 "Speed/accuracy trade-offs for modern convolutional object detectors."
 Huang J, Rathod V, Sun C, Zhu M, Korattikara A, Fathi A, Fischer I, Wojna Z,
 Song Y, Guadarrama S, Murphy K, CVPR 2017
 ```
-\[[link](https://arxiv.org/abs/1611.10012)\]\[[bibtex](
-https://scholar.googleusercontent.com/scholar.bib?q=info:l291WsrB-hQJ:scholar.google.com/&output=citation&scisig=AAGBfm0AAAAAWUIIlnPZ_L9jxvPwcC49kDlELtaeIyU-&scisf=4&ct=citation&cd=-1&hl=en&scfhb=1)\]
 
-<p align="center">
-  <img src="g3doc/img/tf-od-api-logo.png" width=140 height=195>
-</p>
+[[论文](https://arxiv.org/abs/1611.10012)] [[BibTeX](https://scholar.googleusercontent.com/scholar.bib?q=info:l291WsrB-hQJ:scholar.google.com/&output=citation)]
 
-## Maintainers
+## 维护者
 
-* Jonathan Huang, github: [jch1](https://github.com/jch1)
-* Vivek Rathod, github: [tombstone](https://github.com/tombstone)
-* Ronny Votel, github: [ronnyvotel](https://github.com/ronnyvotel)
-* Derek Chow, github: [derekjchow](https://github.com/derekjchow)
-* Chen Sun, github: [jesu9](https://github.com/jesu9)
-* Menglong Zhu, github: [dreamdragon](https://github.com/dreamdragon)
-* Alireza Fathi, github: [afathi3](https://github.com/afathi3)
-* Zhichao Lu, github: [pkulzc](https://github.com/pkulzc)
+- Jonathan Huang（[jch1](https://github.com/jch1)）
+- Vivek Rathod（[tombstone](https://github.com/tombstone)）
+- Ronny Votel（[ronnyvotel](https://github.com/ronnyvotel)）
+- Derek Chow（[derekjchow](https://github.com/derekjchow)）
+- Chen Sun（[jesu9](https://github.com/jesu9)）
+- Menglong Zhu（[dreamdragon](https://github.com/dreamdragon)）
+- Alireza Fathi（[afathi3](https://github.com/afathi3)）
+- Zhichao Lu（[pkulzc](https://github.com/pkulzc)）
 
+## 文档目录
 
-## Table of contents
+快速开始：
 
-Quick Start:
+- [使用预训练模型进行推理的 Jupyter Notebook](object_detection_tutorial.ipynb)
+- [训练宠物目标检测器](g3doc/running_pets.md)
 
-  * <a href='object_detection_tutorial.ipynb'>
-      Quick Start: Jupyter notebook for off-the-shelf inference</a><br>
-  * <a href="g3doc/running_pets.md">Quick Start: Training a pet detector</a><br>
+环境配置：
 
-Setup:
+- [安装](g3doc/installation.md)
+- [配置目标检测流水线](g3doc/configuring_jobs.md)
+- [准备输入数据](g3doc/preparing_inputs.md)
 
-  * <a href='g3doc/installation.md'>Installation</a><br>
-  * <a href='g3doc/configuring_jobs.md'>
-      Configuring an object detection pipeline</a><br>
-  * <a href='g3doc/preparing_inputs.md'>Preparing inputs</a><br>
+运行：
 
-Running:
+- [本地运行](g3doc/running_locally.md)
+- [云端运行](g3doc/running_on_cloud.md)
 
-  * <a href='g3doc/running_locally.md'>Running locally</a><br>
-  * <a href='g3doc/running_on_cloud.md'>Running on the cloud</a><br>
+扩展主题：
 
-Extras:
+- [检测模型库](g3doc/detection_model_zoo.md)
+- [导出推理模型](g3doc/exporting_models.md)
+- [自定义模型结构](g3doc/defining_your_own_model.md)
+- [使用自定义数据集](g3doc/using_your_own_dataset.md)
+- [支持的评估协议](g3doc/evaluation_protocols.md)
+- [Open Images 推理和评估](g3doc/oid_inference_and_evaluation.md)
+- [实例分割](g3doc/instance_segmentation.md)
 
-  * <a href='g3doc/detection_model_zoo.md'>Tensorflow detection model zoo</a><br>
-  * <a href='g3doc/exporting_models.md'>
-      Exporting a trained model for inference</a><br>
-  * <a href='g3doc/defining_your_own_model.md'>
-      Defining your own model architecture</a><br>
-  * <a href='g3doc/using_your_own_dataset.md'>
-      Bringing in your own dataset</a><br>
-  * <a href='g3doc/evaluation_protocols.md'>
-      Supported object detection evaluation protocols</a><br>
-  * <a href='g3doc/oid_inference_and_evaluation.md'>
-      Inference and evaluation on the Open Images dataset</a><br>
-  * <a href='g3doc/instance_segmentation.md'>
-      Run an instance segmentation model</a><br>
+## 获取帮助
 
-## Getting Help
+使用问题请在 [Stack Overflow](https://stackoverflow.com/) 提问并添加 `tensorflow` 和 `object-detection` 标签。确认属于代码缺陷后，再到 [TensorFlow Models 问题跟踪器](https://github.com/tensorflow/models/issues)提交，并在标题前加上 `object_detection`。提交前请先查看[常见问题](g3doc/faq.md)。
 
-To get help with issues you may encounter using the Tensorflow Object Detection
-API, create a new question on [StackOverflow](https://stackoverflow.com/) with
-the tags "tensorflow" and "object-detection".
+## 历史版本摘要
 
-Please report bugs (actually broken code, not usage questions) to the
-tensorflow/models GitHub
-[issue tracker](https://github.com/tensorflow/models/issues), prefixing the
-issue name with "object_detection".
-
-Please check [FAQ](g3doc/faq.md) for frequently asked questions before
-reporting an issue.
-
-
-## Release information
-
-### April 30, 2018
-
-We have released a Faster R-CNN detector with ResNet-101 feature extractor trained on [AVA](https://research.google.com/ava/) v2.1.
-Compared with other commonly used object detectors, it changes the action classification loss function to per-class Sigmoid loss to handle boxes with multiple labels.
-The model is trained on the training split of AVA v2.1 for 1.5M iterations, it achieves mean AP of 11.25% over 60 classes on the validation split of AVA v2.1.
-For more details please refer to this [paper](https://arxiv.org/abs/1705.08421).
-
-<b>Thanks to contributors</b>: Chen Sun, David Ross
-
-### April 2, 2018
-
-Supercharge your mobile phones with the next generation mobile object detector!
-We are adding support for MobileNet V2 with SSDLite presented in
-[MobileNetV2: Inverted Residuals and Linear Bottlenecks](https://arxiv.org/abs/1801.04381).
-This model is 35% faster than Mobilenet V1 SSD on a Google Pixel phone CPU (200ms vs. 270ms) at the same accuracy.
-Along with the model definition, we are also releasing a model checkpoint trained on the COCO dataset.
-
-<b>Thanks to contributors</b>: Menglong Zhu, Mark Sandler, Zhichao Lu, Vivek Rathod, Jonathan Huang
-
-### February 9, 2018
-
-We now support instance segmentation!!  In this API update we support a number of instance segmentation models similar to those discussed in the [Mask R-CNN paper](https://arxiv.org/abs/1703.06870). For further details refer to
-[our slides](http://presentations.cocodataset.org/Places17-GMRI.pdf) from the 2017 Coco + Places Workshop.
-Refer to the section on [Running an Instance Segmentation Model](g3doc/instance_segmentation.md) for instructions on how to configure a model
-that predicts masks in addition to object bounding boxes.
-
-<b>Thanks to contributors</b>: Alireza Fathi, Zhichao Lu, Vivek Rathod, Ronny Votel, Jonathan Huang
-
-### November 17, 2017
-
-As a part of the Open Images V3 release we have released:
-
-* An implementation of the Open Images evaluation metric and the [protocol](g3doc/evaluation_protocols.md#open-images).
-* Additional tools to separate inference of detection and evaluation (see [this tutorial](g3doc/oid_inference_and_evaluation.md)).
-* A new detection model trained on the Open Images V2 data release (see [Open Images model](g3doc/detection_model_zoo.md#open-images-models)).
-
-See more information on the [Open Images website](https://github.com/openimages/dataset)!
-
-<b>Thanks to contributors</b>: Stefan Popov, Alina Kuznetsova
-
-### November 6, 2017
-
-We have re-released faster versions of our (pre-trained) models in the
-<a href='g3doc/detection_model_zoo.md'>model zoo</a>.  In addition to what
-was available before, we are also adding Faster R-CNN models trained on COCO
-with Inception V2 and Resnet-50 feature extractors, as well as a Faster R-CNN
-with Resnet-101 model trained on the KITTI dataset.
-
-<b>Thanks to contributors</b>: Jonathan Huang, Vivek Rathod, Derek Chow,
-Tal Remez, Chen Sun.
-
-### October 31, 2017
-
-We have released a new state-of-the-art model for object detection using
-the Faster-RCNN with the
-[NASNet-A image featurization](https://arxiv.org/abs/1707.07012). This
-model achieves mAP of 43.1% on the test-dev validation dataset for COCO,
-improving on the best available model in the zoo by 6% in terms
-of absolute mAP.
-
-<b>Thanks to contributors</b>: Barret Zoph, Vijay Vasudevan, Jonathon Shlens, Quoc Le
-
-### August 11, 2017
-
-We have released an update to the [Android Detect
-demo](https://github.com/tensorflow/tensorflow/tree/master/tensorflow/examples/android)
-which will now run models trained using the Tensorflow Object
-Detection API on an Android device.  By default, it currently runs a
-frozen SSD w/Mobilenet detector trained on COCO, but we encourage
-you to try out other detection models!
-
-<b>Thanks to contributors</b>: Jonathan Huang, Andrew Harp
-
-
-### June 15, 2017
-
-In addition to our base Tensorflow detection model definitions, this
-release includes:
-
-* A selection of trainable detection models, including:
-  * Single Shot Multibox Detector (SSD) with MobileNet,
-  * SSD with Inception V2,
-  * Region-Based Fully Convolutional Networks (R-FCN) with Resnet 101,
-  * Faster RCNN with Resnet 101,
-  * Faster RCNN with Inception Resnet v2
-* Frozen weights (trained on the COCO dataset) for each of the above models to
-  be used for out-of-the-box inference purposes.
-* A [Jupyter notebook](object_detection_tutorial.ipynb) for performing
-  out-of-the-box inference with one of our released models
-* Convenient [local training](g3doc/running_locally.md) scripts as well as
-  distributed training and evaluation pipelines via
-  [Google Cloud](g3doc/running_on_cloud.md).
-
-
-<b>Thanks to contributors</b>: Jonathan Huang, Vivek Rathod, Derek Chow,
-Chen Sun, Menglong Zhu, Matthew Tang, Anoop Korattikara, Alireza Fathi, Ian Fischer, Zbigniew Wojna, Yang Song, Sergio Guadarrama, Jasper Uijlings,
-Viacheslav Kovalevskyi, Kevin Murphy
-
+- 2018-04-30：发布基于 ResNet-101、使用 AVA 2.1 训练的 Faster R-CNN 动作检测器。
+- 2018-04-02：加入 MobileNet V2 + SSDLite 支持并发布 COCO 预训练权重。
+- 2018-02-09：加入 Mask R-CNN 系列实例分割模型支持。
+- 2017-11-17：加入 Open Images 评估协议、推理/评估工具及预训练模型。
+- 2017-11-06：更新模型库，并加入多种 Faster R-CNN 特征提取器。
+- 2017-10-31：发布基于 NASNet-A 的 Faster R-CNN 模型，在当时的 COCO test-dev 上达到 43.1% mAP。
+- 2017-08-11：Android 检测示例支持该 API 训练的模型。
+- 2017-06-15：首批发布 SSD、R-FCN、Faster R-CNN 模型、COCO 权重、Notebook，以及本地和云端训练工具。

@@ -1,95 +1,75 @@
 # lslidar_x10
 
-## Description
-The `lslidar_x10` package is a linux ROS driver for lslidar M10 ,M10_GPS,M10_P,M10_PLUS and N10.
-The package is tested on Ubuntu 20.04 with ROS indigo.
+## 功能说明
 
-## Compling
-This is a Catkin package. Make sure the package is on `ROS_PACKAGE_PATH` after cloning the package to your workspace. And the normal procedure for compling a catkin package will work.
+`lslidar_x10` 是镭神智能 M10、M10_GPS、M10_P、M10_PLUS 和 N10 激光雷达的 Linux ROS 驱动。上游功能包曾在 Ubuntu 20.04 环境中测试。
 
-```
-cd your_work_space
-catkin_make 
+## 编译与启动
+
+这是一个标准 Catkin 功能包。将其放入工作空间并确认该工作空间位于 `ROS_PACKAGE_PATH` 后执行：
+
+```bash
+cd <工作空间>
+catkin_make
 source devel/setup.bash
-roslaunch lslidar_x10_driver lslidar_x10_net.launch 				(网口版雷达)
-roslaunch lslidar_x10_driver lslidar_x10_serial.launch 				(串口版雷达)
+
+# 网口版雷达
+roslaunch lslidar_x10_driver lslidar_x10_net.launch
+
+# 串口版雷达
+roslaunch lslidar_x10_driver lslidar_x10_serial.launch
 ```
-open new terminal
-rostopic pub -1 /lslidar_order std_msgs/Int8 "data: 1"		(open radar)
-rostopic pub -1 /lslidar_order std_msgs/Int8 "data: 0"		(close radar)
 
+通过控制话题开启或关闭雷达：
+
+```bash
+rostopic pub -1 /lslidar_order std_msgs/Int8 "data: 1"  # 开启
+rostopic pub -1 /lslidar_order std_msgs/Int8 "data: 0"  # 关闭
 ```
-open new terminal
-source devel/setup.bash 
-rostopic echo /difop_information					(printf information)
-## Example Usage
 
-### lslidar_m10_driver
+查看设备信息：
 
-**Parameters**
-
-`device_ip` (`string`, `default: 192.168.1.222`)
-
-By default, the IP address of the device is 192.168.1.222.
-
-`frame_id` (`string`, `default: lslidar`)
-
-The frame ID entry for the sent messages.
-
-**Published Topics**
-
-`lslidar_packets` (`lslidar_m10_msgs/LslidarM10Packet`)
-
-Each message corresponds to a lslidar packet sent by the device through the Ethernet.
-
-### lslidar_m10_decoder
-
-**Parameters**
-
-`min_range` (`double`, `0.3`)
-
-`max_range` (`double`, `100.0`)
-
-Points outside this range will be removed.
-
-`frequency` (`frequency`, `20.0`)
-
-Note that the driver does not change the frequency of the sensor. 
-
-`publish_point_cloud` (`bool`, `false`)
-
-If set to true, the decoder will additionally send out a local point cloud consisting of the points in each revolution.
-
-**Published Topics**
-
-`lslidar_sweep` (`lslidar_m10_msgs/LslidarM10Sweep`)
-
-The message arranges the points within each sweep based on its scan index and azimuth.
-
-`lslidar_point_cloud` (`sensor_msgs/PointCloud2`)
-
-This is only published when the `publish_point_cloud` is set to `true` in the launch file.
-
-**Node**
-
+```bash
+rostopic echo /difop_information
 ```
+
+## 节点接口
+
+### `lslidar_m10_driver`
+
+参数：
+
+- `device_ip`（字符串，默认 `192.168.1.222`）：雷达 IP 地址。
+- `frame_id`（字符串，默认 `lslidar`）：输出消息使用的坐标系 ID。
+
+发布话题：
+
+- `lslidar_packets`（`lslidar_m10_msgs/LslidarM10Packet`）：设备通过以太网发送的原始雷达数据包，每条消息对应一个数据包。
+
+### `lslidar_m10_decoder`
+
+参数：
+
+- `min_range`（浮点数，默认 `0.3` 米）和 `max_range`（浮点数，默认 `100.0` 米）：删除范围以外的点。
+- `frequency`（默认 `20.0` Hz）：期望扫描频率；驱动不会主动改变传感器自身频率。
+- `publish_point_cloud`（布尔值，默认 `false`）：设为 `true` 后额外发布每圈扫描的局部点云。
+
+发布话题：
+
+- `lslidar_sweep`（`lslidar_m10_msgs/LslidarM10Sweep`）：按扫描索引和方位角组织的一圈点数据。
+- `lslidar_point_cloud`（`sensor_msgs/PointCloud2`）：仅在 `publish_point_cloud:=true` 时发布。
+
+以下启动文件会同时启动驱动和解码器，通常只需运行这一项：
+
+```bash
 roslaunch lslidar_x10_driver lslidar_x10_net.launch
 ```
 
-Note that this launch file launches both the driver and the decoder, which is the only launch file needed to be used.
+## 问题反馈
 
+建议优先在上游仓库提交 Issue，也可发送邮件至 `shaohuashu@lslidar.com`。
 
-## FAQ
+## 版本记录
 
-
-## Bug Report
-
-Prefer to open an issue. You can also send an E-mail to shaohuashu@lslidar.com
-
-
-
-
-RERTION 
-V0.1 2000 points per circle
-v0.2 1000 points per circle
-
+- V0.1：每圈 2000 个点。
+- V0.2：每圈 1000 个点。

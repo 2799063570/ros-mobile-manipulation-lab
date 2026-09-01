@@ -1,315 +1,163 @@
-# ROS Wrapper for Intel&reg; RealSense&trade; Devices
-These are packages for using Intel RealSense cameras (D400 series SR300 camera and T265 Tracking Module) with ROS. For running in ROS2 environment please switch to the [eloquent branch](https://github.com/IntelRealSense/realsense-ros/tree/eloquent)
+# Intel RealSense 设备的 ROS 驱动
 
-LibRealSense supported version: v2.39.0 (see [realsense2_camera release notes](https://github.com/IntelRealSense/realsense-ros/releases))
+本目录包含 D400 系列、SR300 和 T265 跟踪模块的 ROS 1 功能包。ROS 2 用户应使用对应的 [ROS 2 分支](https://github.com/IntelRealSense/realsense-ros)。当前快照支持的 librealsense 版本为 v2.39.0，详情见 [`realsense2_camera` 发布记录](https://github.com/IntelRealSense/realsense-ros/releases)。
 
-## Installation Instructions
+## 安装
 
-### Ubuntu
-The following instructions are written for ROS Kinetic, on **Ubuntu 16.04** but apply to ROS Melodic on **Ubuntu 18.04** as well, by replacing kinetic with melodic wherever is needed.
+以下步骤适用于 Ubuntu 16.04 + ROS Kinetic，也可将发行版名称替换为 `melodic`，用于 Ubuntu 18.04 + ROS Melodic。Windows 10 请参考 [ROS Windows 安装文档](https://wiki.ros.org/Installation/Windows)。
 
-   #### Step 1: Install the ROS distribution
-   - #### Install [ROS Kinetic](http://wiki.ros.org/kinetic/Installation/Ubuntu), on Ubuntu 16.04 or [ROS Melodic](http://wiki.ros.org/melodic/Installation/Ubuntu) on Ubuntu 18.04.
+### 方法一：安装 ROS 二进制包
 
-### Windows
-   #### Step 1: Install the ROS distribution
-   - #### Install [ROS Melodic or later on Windows 10](https://wiki.ros.org/Installation/Windows)
+```bash
+export ROS_VER=melodic  # Kinetic 环境改为 kinetic
+sudo apt-get install ros-$ROS_VER-realsense2-camera
+sudo apt-get install ros-$ROS_VER-realsense2-description
+```
 
+该方式会安装 `realsense2_camera`、依赖项和 librealsense2。ROS 仓库中的 librealsense2 版本通常落后于 RealSense 官方仓库，且部分发行包使用兼容性更广但稳定性略低的 RS-USB 后端。`realsense2_description` 包含设备三维模型，运行带模型的启动文件时必须安装。
 
-### There are 2 sources to install realsense2_camera from:
+### 方法二：安装官方 SDK 并从源码编译
 
-* ### Method 1: The ROS distribution:
+1. 根据 [librealsense Linux 安装说明](https://github.com/IntelRealSense/librealsense/blob/master/doc/distribution_linux.md#installing-the-packages)安装 RealSense SDK 2.0、`librealsense2-dev` 和 `librealsense2-dkms`，或从 [v2.39.0 源码](https://github.com/IntelRealSense/librealsense/releases/tag/v2.39.0)编译。Windows 可使用 `vcpkg install realsense2:x64-windows`。
+2. 创建工作空间并获取 ROS 驱动：
 
-  *Ubuntu*
-
-    realsense2_camera is available as a debian package of ROS distribution. It can be installed by typing:
-    
-    ```
-    export ROS_VER=kinetic 
-    ```
-    or
-    ```
-    export ROS_VER=melodic 
-    ```
-    
-    Then install the ros packages using the environment variable created above:
-    
-    ```sudo apt-get install ros-$ROS_VER-realsense2-camera```
-
-    This will install both realsense2_camera and its dependents, including librealsense2 library.
-
-    Notice:
-    * The version of librealsense2 is almost always behind the one availeable in RealSense&trade; official repository.
-    * librealsense2 is not built to use native v4l2 driver but the less stable RS-USB protocol. That is because the last is more general and operational on a larger variety of platforms.
-    * realsense2_description is available as a separate debian package of ROS distribution. It includes the 3D-models of the devices and is necessary for running launch files that include these models (i.e. rs_d435_camera_with_model.launch). It can be installed by typing:
-    `sudo apt-get install ros-$ROS_VER-realsense2-description`
-
-  *Windows*
-
-    **Chocolatey distribution Coming soon**
-
-* ### Method 2: The RealSense&trade; distribution:
-     > This option is demonstrated in the [.travis.yml](https://github.com/intel-ros/realsense/blob/development/.travis.yml) file. It basically summerize the elaborate instructions in the following 2 steps:
-
-
-   ### Step 1: Install the latest Intel&reg; RealSense&trade; SDK 2.0
-
-    *Ubuntu*
-
-    * Install from [Debian Package](https://github.com/IntelRealSense/librealsense/blob/master/doc/distribution_linux.md#installing-the-packages)
-      - In that case treat yourself as a developer. Make sure you follow the instructions to also install librealsense2-dev and librealsense-dkms packages.
-
-    *Windows* 
-    Install using vcpkg
-
-        `vcpkg install realsense2:x64-windows` 
-
-   #### OR
-   - #### Build from sources by downloading the latest [Intel&reg; RealSense&trade; SDK 2.0](https://github.com/IntelRealSense/librealsense/releases/tag/v2.39.0) and follow the instructions under [Linux Installation](https://github.com/IntelRealSense/librealsense/blob/master/doc/installation.md)
-
-
-   ### Step 2: Install Intel&reg; RealSense&trade; ROS from Sources
-   - Create a [catkin](http://wiki.ros.org/catkin#Installing_catkin) workspace
-   *Ubuntu*
    ```bash
    mkdir -p ~/catkin_ws/src
-   cd ~/catkin_ws/src/
-   ```
-   *Windows*
-   ```batch
-   mkdir c:\catkin_ws\src
-   cd c:\catkin_ws\src
-   ```
-
-   - Clone the latest Intel&reg; RealSense&trade; ROS from [here](https://github.com/intel-ros/realsense/releases) into 'catkin_ws/src/'
-   ```bashrc
+   cd ~/catkin_ws/src
    git clone https://github.com/IntelRealSense/realsense-ros.git
-   cd realsense-ros/
-   git checkout `git tag | sort -V | grep -P "^2.\d+\.\d+" | tail -1`
-   cd ..
+   cd realsense-ros
+   git checkout "$(git tag | sort -V | grep -P '^2\.\d+\.\d+' | tail -1)"
    ```
-   - Make sure all dependent packages are installed. You can check .travis.yml file for reference.
-   - Specifically, make sure that the ros package *ddynamic_reconfigure* is installed. If *ddynamic_reconfigure* cannot be installed using APT or if you are using *Windows* you may clone it into your workspace 'catkin_ws/src/' from [here](https://github.com/pal-robotics/ddynamic_reconfigure/tree/kinetic-devel) (Version 0.2.2)
 
+3. 确保安装 `ddynamic_reconfigure`。如果软件源中没有，可把 [0.2.2 版本源码](https://github.com/pal-robotics/ddynamic_reconfigure/tree/kinetic-devel)放入工作空间。
+4. 编译并加载环境：
 
    ```bash
-  catkin_init_workspace
-  cd ..
-  catkin_make clean
-  catkin_make -DCATKIN_ENABLE_TESTING=False -DCMAKE_BUILD_TYPE=Release
-  catkin_make install
-  ```
+   cd ~/catkin_ws/src
+   catkin_init_workspace
+   cd ..
+   catkin_make clean
+   catkin_make -DCATKIN_ENABLE_TESTING=False -DCMAKE_BUILD_TYPE=Release
+   catkin_make install
+   source devel/setup.bash
+   ```
 
-  *Ubuntu*
-  ```bash
-  echo "source ~/catkin_ws/devel/setup.bash" >> ~/.bashrc
-  source ~/.bashrc
-  ```
+## 使用方法
 
-  *Windows*
-  ```batch
-  devel\setup.bat
-  ```
-
-## Usage Instructions
-
-### Start the camera node
-To start the camera node in ROS:
+### 启动相机
 
 ```bash
 roslaunch realsense2_camera rs_camera.launch
 ```
 
-This will stream all camera sensors and publish on the appropriate ROS topics.
+启动文件会打开可用传感器并发布相应 ROS 话题。分辨率和帧率可通过启动参数调整。
 
-Other stream resolutions and frame rates can optionally be provided as parameters to the 'rs_camera.launch' file.
+### 常见话题
 
-### Published Topics
-The published topics differ according to the device and parameters.
-After running the above command with D435i attached, the following list of topics will be available (This is a partial list. For full one type `rostopic list`):
-- /camera/color/camera_info
-- /camera/color/image_raw
-- /camera/depth/camera_info
-- /camera/depth/image_rect_raw
-- /camera/extrinsics/depth_to_color
-- /camera/extrinsics/depth_to_infra1
-- /camera/extrinsics/depth_to_infra2
-- /camera/infra1/camera_info
-- /camera/infra1/image_rect_raw
-- /camera/infra2/camera_info
-- /camera/infra2/image_rect_raw
-- /camera/gyro/imu_info
-- /camera/gyro/sample
-- /camera/accel/imu_info
-- /camera/accel/sample
-- /diagnostics
+实际话题取决于设备型号和启动参数。D435i 的常见输出包括：
 
-The "/camera" prefix is the default and can be changed. Check the rs_multiple_devices.launch file for an example.
-If using D435 or D415, the gyro and accel topics wont be available. Likewise, other topics will be available when using T265 (see below).
+- `/camera/color/camera_info`、`/camera/color/image_raw`
+- `/camera/depth/camera_info`、`/camera/depth/image_rect_raw`
+- `/camera/infra1/image_rect_raw`、`/camera/infra2/image_rect_raw`
+- `/camera/gyro/sample`、`/camera/accel/sample`
+- `/camera/extrinsics/depth_to_color`
+- `/diagnostics`
 
-### Launch parameters
-The following parameters are available by the wrapper:
-- **serial_no**: will attach to the device with the given serial number (*serial_no*) number. Default, attach to available RealSense device in random.
-- **usb_port_id**: will attach to the device with the given USB port (*usb_port_id*). i.e 4-1, 4-2 etc. Default, ignore USB port when choosing a device.
-- **device_type**: will attach to a device whose name includes the given *device_type* regular expression pattern. Default, ignore device type. For example, device_type:=d435 will match d435 and d435i. device_type=d435(?!i) will match d435 but not d435i.
+用 `rostopic list` 查看完整列表。默认前缀 `/camera` 可以修改；D415/D435 等不带 IMU 的型号不会发布陀螺仪和加速度计话题。
 
-- **rosbag_filename**: Will publish topics from rosbag file.
-- **initial_reset**: On occasions the device was not closed properly and due to firmware issues needs to reset. If set to true, the device will reset prior to usage.
-- **align_depth**: If set to true, will publish additional topics with the all the images aligned to the depth image.</br>
-The topics are of the form: ```/camera/aligned_depth_to_color/image_raw``` etc.
-- **filters**: any of the following options, separated by commas:</br>
- - ```colorizer```: will color the depth image. On the depth topic an RGB image will be published, instead of the 16bit depth values .
- - ```pointcloud```: will add a pointcloud topic `/camera/depth/color/points`. The texture of the pointcloud can be modified in rqt_reconfigure (see below) or using the parameters: `pointcloud_texture_stream` and `pointcloud_texture_index`. Run rqt_reconfigure to see available values for these parameters.</br>
- The depth FOV and the texture FOV are not similar. By default, pointcloud is limited to the section of depth containing the texture. You can have a full depth to pointcloud, coloring the regions beyond the texture with zeros, by setting `allow_no_texture_points` to true.
+### 主要启动参数
 
- - The following filters have detailed descriptions in : https://github.com/IntelRealSense/librealsense/blob/master/doc/post-processing-filters.md
-   - ```disparity``` - convert depth to disparity before applying other filters and back.
-   - ```spatial``` - filter the depth image spatially.
-   - ```temporal``` - filter the depth image temporally.
-   - ```hole_filling``` - apply hole-filling filter.
-   - ```decimation``` - reduces depth scene complexity.
-- **enable_sync**: gathers closest frames of different sensors, infra red, color and depth, to be sent with the same timetag. This happens automatically when such filters as pointcloud are enabled.
-- ***<stream_type>*_width**, ***<stream_type>*_height**, ***<stream_type>*_fps**: <stream_type> can be any of *infra, color, fisheye, depth, gyro, accel, pose*. Sets the required format of the device. If the specified combination of parameters is not available by the device, the stream will not be published. Setting a value to 0, will choose the first format in the inner list. (i.e. consistent between runs but not defined). Note: for gyro accel and pose, only _fps option is meaningful.
-- **enable_*<stream_name>***: Choose whether to enable a specified stream or not. Default is true. <stream_name> can be any of *infra1, infra2, color, depth, fisheye, fisheye1, fisheye2, gyro, accel, pose*.
-- **tf_prefix**: By default all frame's ids have the same prefix - `camera_`. This allows changing it per camera.
-- **base_frame_id**: defines the frame_id all static transformations refers to.
-- **odom_frame_id**: defines the origin coordinate system in ROS convention (X-Forward, Y-Left, Z-Up). pose topic defines the pose relative to that system.
-- **All the rest of the frame_ids can be found in the template launch file: [nodelet.launch.xml](./realsense2_camera/launch/includes/nodelet.launch.xml)**
-- **unite_imu_method**: The D435i and T265 cameras have built in IMU components which produce 2 unrelated streams: *gyro* - which shows angular velocity and *accel* which shows linear acceleration. Each with it's own frequency. By default, 2 corresponding topics are available, each with only the relevant fields of the message sensor_msgs::Imu are filled out.
-Setting *unite_imu_method* creates a new topic, *imu*, that replaces the default *gyro* and *accel* topics. The *imu* topic is published at the rate of the gyro. All the fields of the Imu message under the *imu* topic are filled out.
-   - **linear_interpolation**: Every gyro message is attached by the an accel message interpolated to the gyro's timestamp.
-   - **copy**: Every gyro message is attached by the last accel message.
-- **clip_distance**: remove from the depth image all values above a given value (meters). Disable by giving negative value (default)
-- **linear_accel_cov**, **angular_velocity_cov**: sets the variance given to the Imu readings. For the T265, these values are being modified by the inner confidence value.
-- **hold_back_imu_for_frames**: Images processing takes time. Therefor there is a time gap between the moment the image arrives at the wrapper and the moment the image is published to the ROS environment. During this time, Imu messages keep on arriving and a situation is created where an image with earlier timestamp is published after Imu message with later timestamp. If that is a problem, setting *hold_back_imu_for_frames* to *true* will hold the Imu messages back while processing the images and then publish them all in a burst, thus keeping the order of publication as the order of arrival. Note that in either case, the timestamp in each message's header reflects the time of it's origin.
-- **topic_odom_in**: For T265, add wheel odometry information through this topic. The code refers only to the *twist.linear* field in the message.
-- **calib_odom_file**: For the T265 to include odometry input, it must be given a [configuration file](https://github.com/IntelRealSense/librealsense/blob/master/unit-tests/resources/calibration_odometry.json). Explanations can be found [here](https://github.com/IntelRealSense/librealsense/pull/3462). The calibration is done in ROS coordinates system.
-- **publish_tf**: boolean, publish or not TF at all. Defaults to True.
-- **tf_publish_rate**: double, positive values mean dynamic transform publication with specified rate, all other values mean static transform publication. Defaults to 0 
-- **publish_odom_tf**: If True (default) publish TF from odom_frame to pose_frame.
+- `serial_no`、`usb_port_id`、`device_type`：分别按序列号、USB 端口或型号正则表达式选择设备。
+- `rosbag_filename`：从 rosbag 文件回放并发布数据。
+- `initial_reset`：启动前复位异常退出的设备。
+- `align_depth`：发布对齐到其他图像流的深度图，如 `/camera/aligned_depth_to_color/image_raw`。
+- `filters`：以逗号分隔启用 `colorizer`、`pointcloud`、`disparity`、`spatial`、`temporal`、`hole_filling`、`decimation` 等滤波器。
+- `enable_sync`：同步不同传感器中时间最接近的帧；点云等滤波器启用时会自动同步。
+- `<stream>_width`、`<stream>_height`、`<stream>_fps`：设置各数据流格式；不支持的组合不会发布。
+- `enable_<stream>`：启用或禁用 `infra1`、`infra2`、`color`、`depth`、`fisheye`、`gyro`、`accel`、`pose` 等数据流。
+- `tf_prefix`、`base_frame_id`、`odom_frame_id`：配置 TF 坐标系名称。
+- `unite_imu_method`：以 `linear_interpolation` 或 `copy` 方式融合加速度计与陀螺仪，并发布统一的 `imu` 话题。
+- `clip_distance`：删除超过指定距离（米）的深度值，负数表示禁用。
+- `linear_accel_cov`、`angular_velocity_cov`：设置 IMU 测量协方差。
+- `hold_back_imu_for_frames`：图像处理期间暂存 IMU 消息，以保持发布顺序与采集顺序一致。
+- `topic_odom_in`、`calib_odom_file`：为 T265 输入轮式里程计及其标定文件。
+- `publish_tf`、`tf_publish_rate`、`publish_odom_tf`：控制 TF 是否发布及发布频率。
 
+全部坐标系参数见 [`nodelet.launch.xml`](./realsense2_camera/launch/includes/nodelet.launch.xml)，后处理滤波说明见 [librealsense 文档](https://github.com/IntelRealSense/librealsense/blob/master/doc/post-processing-filters.md)。
 
-### Point Cloud
-Here is an example of how to start the camera node and make it publish the point cloud using the pointcloud option.
+### 点云、深度对齐和动态参数
+
 ```bash
+# 发布点云
 roslaunch realsense2_camera rs_camera.launch filters:=pointcloud
-```
-Then open rviz to watch the pointcloud:
-<p align="center"><img src="https://user-images.githubusercontent.com/17433152/35396613-ddcb1d6c-01f5-11e8-8887-4debf178d0cc.gif" /></p>
 
-### Aligned Depth Frames
-Here is an example of how to start the camera node and make it publish the aligned depth stream to other available streams such as color or infra-red.
-```bash
+# 发布对齐深度图
 roslaunch realsense2_camera rs_camera.launch align_depth:=true
-```
-<p align="center"><img width=50% src="https://user-images.githubusercontent.com/17433152/35343104-6eede0f0-0132-11e8-8866-e6c7524dd079.png" /></p>
 
-### Set Camera Controls Using Dynamic Reconfigure Params
-The following command allow to change camera control values using [http://wiki.ros.org/rqt_reconfigure].
-```bash
+# 打开相机动态参数界面
 rosrun rqt_reconfigure rqt_reconfigure
 ```
-<p align="center"><img src="https://user-images.githubusercontent.com/40540281/55330573-065d8600-549a-11e9-996a-5d193cbd9a93.PNG" /></p>
 
-### Work with multiple cameras
-**Important Notice:** Launching multiple T265 cameras is currently not supported. This will be addressed in a later version. 
+点云默认仅覆盖深度与纹理视场重叠的区域。设置 `allow_no_texture_points:=true` 可保留无纹理区域，并用零值着色。
 
-Here is an example of how to start the camera node and streaming with two cameras using the [rs_multiple_devices.launch](./realsense2_camera/launch/rs_multiple_devices.launch).
+### 多相机
+
+当前快照不支持同时启动多台 T265。其他型号可使用：
+
 ```bash
-roslaunch realsense2_camera rs_multiple_devices.launch serial_no_camera1:=<serial number of the first camera> serial_no_camera2:=<serial number of the second camera>
+roslaunch realsense2_camera rs_multiple_devices.launch \
+  serial_no_camera1:=<第一台相机序列号> \
+  serial_no_camera2:=<第二台相机序列号>
 ```
-The camera serial number should be provided to `serial_no_camera1` and `serial_no_camera2` parameters. One way to get the serial number is from the [rs-enumerate-devices](https://github.com/IntelRealSense/librealsense/blob/58d99783cc2781b1026eeed959aa3f7b562b20ca/tools/enumerate-devices/readme.md) tool.
+
+获取序列号：
+
 ```bash
 rs-enumerate-devices | grep Serial
 ```
 
-Another way of obtaining the serial number is connecting the camera alone, running
-```bash
-roslaunch realsense2_camera rs_camera.launch
-```
-and looking for the serial number in the log printed to screen under "[INFO][...]Device Serial No:".
-
-Another way to use multiple cameras is running each from a different terminal. Make sure you set a different namespace for each camera using the "camera" argument:
+也可以在不同终端中用不同命名空间分别启动：
 
 ```bash
-roslaunch realsense2_camera rs_camera.launch camera:=cam_1 serial_no:=<serial number of the first camera>
-roslaunch realsense2_camera rs_camera.launch camera:=cam_2 serial_no:=<serial number of the second camera>
-...
-
+roslaunch realsense2_camera rs_camera.launch camera:=cam_1 serial_no:=<序列号1>
+roslaunch realsense2_camera rs_camera.launch camera:=cam_2 serial_no:=<序列号2>
 ```
-## Using T265 ##
-**Important Notice:** For wheeled robots, odometer input is a requirement for robust and accurate tracking. The relevant APIs will be added to librealsense and ROS/realsense in upcoming releases. Currently, the API is available in the [underlying device driver](https://github.com/IntelRealSense/librealsense/blob/master/third-party/libtm/libtm/include/TrackingDevice.h#L508-L515).
 
-### Start the camera node
-To start the camera node in ROS:
+## T265
+
+轮式机器人要获得稳定准确的 T265 跟踪结果，应输入轮式里程计。启动命令：
 
 ```bash
 roslaunch realsense2_camera rs_t265.launch
 ```
 
-This will stream all camera sensors and publish on the appropriate ROS topics.
+常见输出包括 `/camera/odom/sample`、`/camera/accel/sample`、`/camera/gyro/sample` 和两个鱼眼图像话题。使用以下命令在 RViz 中查看位姿和坐标系：
 
-The T265 sets its usb unique ID during initialization and without this parameter it wont be found.
-Once running it will publish, among others, the following topics:
-- /camera/odom/sample
-- /camera/accel/sample
-- /camera/gyro/sample
-- /camera/fisheye1/image_raw
-- /camera/fisheye2/image_raw
-
-To visualize the pose output and frames in RViz, start:
 ```bash
 roslaunch realsense2_camera demo_t265.launch
 ```
 
-### About Frame ID
-The wrapper publishes static transformations(TFs). The Frame Ids are divided into 3 groups:
-- ROS convention frames: follow the format of <tf_prefix>\_<\_stream>"\_frame" for example: camera_depth_frame, camera_infra1_frame, etc.
-- Original frame coordinate system: with the suffix of <\_optical_frame>. For example: camera_infra1_optical_frame. Check the device documentation for specific coordinate system for each stream.
-- base_link: For example: camera_link. A reference frame for the device. In D400 series and SR300 it is the depth frame. In T265, the pose frame.
+坐标系分三类：符合 ROS 约定的 `camera_<stream>_frame`、使用设备原始光学约定的 `camera_<stream>_optical_frame`，以及设备参考坐标系 `camera_link`。
 
+## 模型与测试
 
-### realsense2_description package:
-For viewing included models, a separate package is included. For example:
+显示 D415 模型：
+
 ```bash
 roslaunch realsense2_description view_d415_model.launch
 ```
 
-### Unit tests:
-Unit-tests are based on bag files saved on S3 server. These can be downloaded using the following commands:
-```bash
-cd catkin_ws
-wget "http://realsense-hw-public.s3.amazonaws.com/rs-tests/TestData/outdoors.bag" -P "records/"
-wget "http://realsense-hw-public.s3-eu-west-1.amazonaws.com/rs-tests/D435i_Depth_and_IMU_Stands_still.bag" -P "records/"
-```
-Then, unit-tests can be run using the following command:
+单元测试基于预先录制的 bag 文件，准备好测试数据后运行：
+
 ```bash
 python src/realsense/realsense2_camera/scripts/rs2_test.py --all
 ```
 
-## Packages using RealSense ROS Camera
-| Title | Links |
-| ----- | ----- |
-| ROS Object Analytics | [github](https://github.com/intel/ros_object_analytics) / [ROS Wiki](http://wiki.ros.org/IntelROSProject)
+## 已知限制
 
-## Known Issues
-* This ROS node does not currently support [ROS Lunar Loggerhead](http://wiki.ros.org/lunar).
-* This ROS node does not currently work with [ROS 2](https://github.com/ros2/ros2/wiki).
-* This ROS node currently does not support running multiple T265 cameras at once. This will be addressed in a future update. 
+- 此快照不支持 ROS Lunar Loggerhead 和 ROS 2。
+- 此快照不支持同时运行多台 T265。
 
-## License
-Copyright 2018 Intel Corporation
+## 许可证
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this project except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
-**Other names and brands may be claimed as the property of others*
+Copyright 2018 Intel Corporation。本项目采用 Apache License 2.0，完整条款见 [Apache License 2.0](http://www.apache.org/licenses/LICENSE-2.0)。其他名称和品牌可能归各自所有者所有。

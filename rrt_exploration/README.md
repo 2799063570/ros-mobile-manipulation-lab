@@ -1,212 +1,138 @@
 # rrt_exploration
-It is a ROS package that implements a multi-robot map exploration algorithm for mobile robots. It is based on the Rapidly-Exploring Random Tree (RRT) algorithm. It uses occupancy girds as a map representation.The packgae has 5 different ROS nodes:
 
-  - Global RRT frontier point detector node.
-  
-  - Local RRT frontier point detector node.
-  
-  - Filter node.
-  
-  - Assigner node.
-  
-  - opencv-based frontier detector node.
+该 ROS 功能包基于快速扩展随机树（RRT）实现单机器人和多机器人地图探索，以占据栅格作为地图表示。它包含全局/局部 RRT 边界点检测器、OpenCV 边界点检测器、过滤器和任务分配器五类节点。
 
-This is a [Youtube playlist](https://www.youtube.com/playlist?list=PLoGH52eUIHsc1B_xPLL6ogzYxrWy675kr) showing the package running on single/multiple robots, using real setup (Kobuki robots) and simulation (Gazebo).
+[演示视频列表](https://www.youtube.com/playlist?list=PLoGH52eUIHsc1B_xPLL6ogzYxrWy675kr)展示了 Kobuki 真机和 Gazebo 仿真中的单机器人、多机器人运行效果。
 
+本功能包最初由作者在沙迦美国大学攻读硕士期间开发。如果在研究中使用，请引用[对应论文](http://ieeexplore.ieee.org/document/8202319/)。
 
-Note: This package was written during my master's thesis at the American University of Sharjah. My thesis advisor is Dr. [Shayok Mukhopadhyay](https://sites.google.com/site/shayok/Home). If you are using this package in your research work, please cite this [paper](http://ieeexplore.ieee.org/document/8202319/).
+## 1. 环境要求
 
-## 1. Requirements
-The package has been tested on both ROS Kinetic and ROS Indigo, it should work on other distributions like Jade. The following requirements are needed before installing the package:
+该功能包已在 ROS Indigo 和 Kinetic 上测试，其他相近版本也可能适用。运行前需要：
 
-1- You should have installed a ROS distribution (indigo or later. Recommended is either indigo or kinetic).
+1. ROS Indigo 或更新版本（推荐 Indigo/Kinetic）。
+2. 已创建的 Catkin 工作空间。
+3. GMapping 和 Navigation Stack。
+4. Python 2.7，以及 OpenCV、NumPy、scikit-learn。
 
-2- Created a workspace.
+以 ROS Kinetic 为例：
 
-3- Installed the "gmapping" ROS package: on Ubuntu, and if you are running ROS Kinectic, you can do that by typing the following command in the terminal:
-
-```sh
-$ sudo apt-get install ros-kinetic-gmapping
+```bash
+sudo apt-get install ros-kinetic-gmapping ros-kinetic-navigation
+sudo apt-get install python-opencv python-numpy python-scikits-learn
 ```
-4- Install ROS navigation stack. You can do that with the following command (assuming Ubuntu, ROS Kinetic):
-```sh
-$ sudo apt-get install ros-kinetic-navigation
+
+## 2. 安装
+
+把功能包放入 Catkin 工作空间的 `src` 目录，然后在工作空间根目录执行：
+
+```bash
+catkin_make
 ```
-5- You should have Python 2.7. (it was not tested on Python 3).
 
-6-You should have/install the following python modules:
+如需快速体验，可结合 [`rrt_exploration_tutorials`](https://github.com/hasauino/rrt_exploration_tutorials) 中的单机器人和多机器人 Gazebo 示例使用。
 
--OpenCV (cv2)
-```sh
-$ sudo apt-get install python-opencv
-```
--Numpy
-```sh
-$ sudo apt-get install python-numpy
-```
--Sklearn
-```sh
-$ sudo apt-get install python-scikits-learn
-```
-## 2. Installation
-Download the package and place it inside the ```/src``` folder in your workspace. And then compile using ```catkin_make```.
-## 3. Setting Up Your Robots
-This package provides an exploration strategy for single or multiple robots. However, for it to work, you should have set your robots ready using the [navigation stack](http://wiki.ros.org/navigation). Additionally, the robots must be set and prepared as follows.
+## 3. 机器人配置
 
-Note: If you want to quickly run and test the package, you can try out the [rrt_exploration_tutorials](https://github.com/hasauino/rrt_exploration_tutorials) package which provides Gazebo simulation for single and multiple robots, you can use it to directly with this package.
+### 3.1 网络
 
-### 3.1. Robots Network
-For the multi-robot configuration, the package doesn't require special network configuration, it simply works by having a single ROS master (can be one of the robots). So on the other robots, the ```ROS_MASTER_URI``` parameter should be pointing at the master's address. 
-For more information on setting up ROS on multiple machines, follow [this](http://wiki.ros.org/ROS/NetworkSetup) link.
+多机器人模式只需要一个 ROS Master。其他机器人应通过 `ROS_MASTER_URI` 指向运行 Master 的计算机，并确保所有主机可相互解析和通信。
 
-### 3.2. Robot's frame names in ```tf```
-All robot's frames should be prefixed by its name. Naming of robots starts from "/robot_1", "/robot_2", "/robot_3", .. and so on. Even if you are using the package for single robot, robot's frames should be prefixed by its name (i.e. /robot_1). So for robot_1, the frames in the ```tf``` tree should look like this:
+### 3.2 TF 坐标系
 
-![alt text](https://github.com/hasauino/storage/blob/master/pictures/framesTf.png "robot_1 frames")
+每台机器人的坐标系必须通过命名空间区分，例如 `robot_1/base_link`、`robot_2/base_link`。所有节点和传感器 TF 都应使用相同的机器人前缀，避免多机器人坐标系冲突。
 
-### 3.3. Robot's node and topic names
-All the nodes and topics running on a robot must also be prefixed by its name. For robot 1, node names should look like: ```/robot_1/move_base_node```,  ```/robot_1/slam_gmapping```.
+### 3.3 节点和话题命名
 
-And topic names should be like: ```/robot_1/odom```,  ```/robot_1/map```,  ```/robot_1/base_scan```, ..etc.
+机器人相关节点与话题应放入 `robot_x` 命名空间，其中 `x` 为机器人编号。例如第一台机器人的导航接口为 `robot_1/move_base`。
 
-### 3.4. Setting up the navigation stack on the robots
-The ```move_base_node``` node, which brings up the navigation stack on the robot, must be running. This package (rrt_exploration) generates target exploration goals, each robot must be able to receive these points and move towards them. This is why the navigation stack is needed. Additionally, each robot must have a global and local cost maps. All of these are proivded from the ```move_base_node```. 
+### 3.4 导航栈
 
-### 3.5. A mapping node
-Each robot should have a local map generated from the [gmapping](http://wiki.ros.org/gmapping) package.
-### 3.6. A map merging node
-For the multi-robot case, there should be a node that merges all the local maps into one global map. You can use [this](http://wiki.ros.org/multirobot_map_merge) package.
-## 4. Nodes
-There are 3 types of nodes; nodes for detecting frontier points in an occupancy grid map, a node for filtering the detected points, and a node for assigning the points to the robots. The following figure shows the structure:
-![alt text](https://github.com/hasauino/storage/blob/master/pictures/fullSchematic.png "overview of the exploration strategy")
+每台机器人都必须启动 Navigation Stack，并能独立接收目标、规划路径和发布全局代价地图。开始自主探索前，建议先在 RViz 中手动下发目标验证导航链路。
 
-### 4.1. global_rrt_frontier_detector
-The ```global_rrt_frontier_detector``` node takes an occupancy grid and finds frontier points (which are exploration targets) in it. It publishes the detected points so the filter node can process. In multi-robot configuration, it is intended to have only a single instance of this node running. 
+### 3.5 建图与地图融合
 
-Running additional instances of the global frontier detector can enhance the speed of frontier points detection, if needed.
-#### 4.1.1. Parameters
- - ```~map_topic``` (string, default: "/robot_1/map"): This parameter defines the topic name on which the node will recieve the map.
-  - ```~eta``` (float, default: 0.5): This parameter controls the growth rate of the RRT that is used in the detection of frontier points, the unit is in meters. This parameter should be set according to the map size, a very large value will cause the tree to grow faster and  hence detect frontier points faster, but a large growth rate also implies that the tree will be missing small corners in the map.
+单机器人可直接使用 GMapping 等节点发布的地图。多机器人需要把各机器人局部地图融合为全局地图，并将该地图配置给检测器、过滤器和任务分配器。
 
-#### 4.1.2. Subscribed Topics
- - The map (Topic name is defined by the ```~map_topic``` parameter) ([nav_msgs/OccupancyGrid](http://docs.ros.org/api/nav_msgs/html/msg/OccupancyGrid.html))
+## 4. 节点结构
 
-- ```clicked_point``` ([geometry_msgs/PointStamped Message](http://docs.ros.org/api/geometry_msgs/html/msg/PointStamped.html)): The ```global_rrt_frontier_detector``` node requires that the region to be explored is defined. This topic is where the node recieves five points that define the region. The first four points are four defining a square region to be explored, and the last point is the tree starting point. After publishing those five points on this topic, the RRT will start detecting frontier points. The five points are intended to be published from Rviz using ![alt text](https://github.com/hasauino/storage/blob/master/pictures/publishPointRviz_button.png "Rviz publish point button") button.
+边界检测器产生候选探索点，`filter` 删除无效或重复点，`assigner` 根据收益和行驶代价把目标分配给各机器人。
 
-#### 4.1.3. Published Topics
- - ```detected_points``` ([geometry_msgs/PointStamped Message](http://docs.ros.org/api/geometry_msgs/html/msg/PointStamped.html)): The topic on which the node publishes detected frontier points.
+![探索策略结构](https://github.com/hasauino/storage/blob/master/pictures/fullSchematic.png)
 
-- ```~shapes``` ([visualization_msgs/Marker Message](http://docs.ros.org/api/visualization_msgs/html/msg/Marker.html)): On this topic, the node publishes line shapes to visualize the RRT using Rviz.
+### 4.1 `global_rrt_frontier_detector`
 
+全局 RRT 检测器在占据栅格中扩展随机树并发布边界点。多机器人模式通常只运行一个实例；需要提高检测速度时也可增加实例。
 
-### 4.2. local_rrt_frontier_detector
-This node is similar to the global_rrt_frontier_detector. However, it works differently, as the tree here keeps resetting every time a frontier point is detected. This node is intended to be run along side the global_rrt_frontier_detector node, it is responsible for fast detection of frontier points that lie in the close vicinity of the robot.
+参数：
 
-In multi-robot configuration, each robot runs an instance of the local_rrt_frontier_detector. So for a team of 3 robots, there will be 4 nodes for detecting frontier points; 3 local detectors and 1 global detector.
-Running additional instances of the local frontier detector can enhance the speed of frontier points detection, if needed.
+- `~map_topic`（字符串，默认 `/robot_1/map`）：输入地图话题。
+- `~eta`（浮点数，默认 `0.5` 米）：RRT 单次扩展步长。较大值检测更快，但可能遗漏狭小区域。
 
+订阅：
 
-All detectors will be publishing detected frontier points on the same topic (```/detected_points```).
-#### 4.2.1. Parameters
-- ```~robot_frame``` (string, default: "/robot_1/base_link"): The frame attached to the robot. Every time the tree resets, it will start from the current robot location obtained from this frame.
+- `~map_topic`：`nav_msgs/OccupancyGrid` 地图。
+- `clicked_point`：由 RViz 的“发布点”工具依次发布 5 个点；前 4 个定义探索区域，第 5 个作为树的起点。
 
- - ```~map_topic``` (string, default: "/robot_1/map"): This parameter defines the topic name on which the node will recieve the map.
-  - ```~eta``` (float, default: 0.5): This parameter controls the growth rate of the local RRT.
+发布：
 
-#### 4.2.2. Subscribed Topics
- - The map (Topic name is defined by the ```~map_topic``` parameter) ([nav_msgs/OccupancyGrid](http://docs.ros.org/api/nav_msgs/html/msg/OccupancyGrid.html)).
+- `detected_points`：检测到的 `geometry_msgs/PointStamped` 边界点。
+- `~shapes`：用于在 RViz 中显示 RRT 的 `visualization_msgs/Marker`。
 
-- ```clicked_point``` ([geometry_msgs/PointStamped Message](http://docs.ros.org/api/geometry_msgs/html/msg/PointStamped.html)): The ```lobal_rrt_frontier_detector``` also subscribes to this topic similar to the global_rrt_frontier_detector. 
-#### 4.2.3. Published Topics
- - ```detected_points``` ([geometry_msgs/PointStamped Message](http://docs.ros.org/api/geometry_msgs/html/msg/PointStamped.html)): The topic on which the node publishes detected frontier points.
+### 4.2 `local_rrt_frontier_detector`
 
-- ```~shapes``` ([visualization_msgs/Marker Message](http://docs.ros.org/api/visualization_msgs/html/msg/Marker.html)): On this topic, the node publishes line shapes to visualize the RRT using Rviz.
+局部检测器每发现一个边界点就重置树，用于快速搜索机器人附近区域。多机器人模式下每台机器人运行一个实例，并与全局检测器共同向 `/detected_points` 发布。
 
+参数：
 
-### 4.3. frontier_opencv_detector
-This node is another frontier detector, but it is not based on RRT. This node uses OpenCV tools to detect frontier points. It is intended to be run alone, and in multi-robot configuration only one instance should be run (running additional instances of this node does not make any difference).
+- `~robot_frame`（默认 `/robot_1/base_link`）：机器人坐标系，重置后从当前机器人位置开始扩展。
+- `~map_topic`（默认 `/robot_1/map`）：地图话题。
+- `~eta`（默认 `0.5` 米）：局部 RRT 扩展步长。
 
-Originally this node was implemented for comparison against the RRT-based frontier detectors. Running this node along side the RRT detectors (local and global) may enhance the speed of frotiner points detection.
+订阅和发布接口与全局检测器基本相同。
 
+### 4.3 `frontier_opencv_detector`
 
-Note: You can run any type and any number of detectors, all the detectors will be publishing on the same topic which the filter node (will be explained in the following section) is subscribing to. on the other hand, the filter will pass the filtered forntier points to the assigner in order to command the robots to explore these points. 
+该节点使用 OpenCV 从地图中检测边界点，不依赖 RRT。它原本用于和 RRT 方法对比，也可与全局/局部检测器并行运行。多机器人模式通常只需一个实例。
 
-#### 4.3.1. Parameters
- - ```~map_topic``` (string, default: "/robot_1/map"): This parameter defines the topic name on which the node will recieve the map.
+- 参数 `~map_topic`（默认 `/robot_1/map`）：地图话题。
+- 订阅 `nav_msgs/OccupancyGrid` 地图。
+- 发布 `detected_points` 和用于 RViz 显示的 `shapes`。
 
-#### 4.3.2. Subscribed Topics
- - The map (Topic name is defined by the ```~map_topic``` parameter) ([nav_msgs/OccupancyGrid](http://docs.ros.org/api/nav_msgs/html/msg/OccupancyGrid.html))
+### 4.4 `filter`
 
-#### 4.3.3. Published Topics
- - ```detected_points``` ([geometry_msgs/PointStamped Message](http://docs.ros.org/api/geometry_msgs/html/msg/PointStamped.html)): The topic on which the node publishes detected frontier points.
+过滤器汇总所有检测器产生的候选点，删除过期、不可达和重复点，再把有效目标发送给任务分配器。
 
-- ```shapes``` ([visualization_msgs/Marker Message](http://docs.ros.org/api/visualization_msgs/html/msg/Marker.html)): On this topic, the node publishes detected points to be visualized using Rviz.
+参数：
 
-### 4.4. filter
-The filter nodes receives the detected frontier points from all the detectors, filters the points, and passes them to the assigner node to command the robots. Filtration includes the delection of old and invalid points, and it also dicards redundant points.
+- `~map_topic`（默认 `/robot_1/map`）：用于判断边界点是否仍有效的地图。
+- `~costmap_clearing_threshold`（默认 `70.0`）：代价值超过此阈值的点视为无效。
+- `~info_radius`（默认 `1.0` 米）：计算信息增益时使用的半径。
+- `~goals_topic`（默认 `/detected_points`）：候选点输入话题。
+- `~n_robots`（默认 `1`）：机器人数量。
+- `~rate`（默认 `100` Hz）：节点循环频率。
 
-#### 4.4.1. Parameters
- - ```~map_topic``` (string, default: "/robot_1/map"): This parameter defines the topic name on which the node will recieve the map. The map is used to know which points are no longer frontier points (old points).
-  - ```~costmap_clearing_threshold``` (float, default: 70.0): Any frontier point that has an occupancy value greater than this threshold will be considered invalid. The occupancy value is obtained from the costmap. 
-  - ```~info_radius```(float, default: 1.0): The information radius used in calculating the information gain of frontier points.
-  - ```~goals_topic``` (string, default: "/detected_points"): defines the topic on which the node receives detcted frontier points.
-  - ```~n_robots```(float, default: 1.0): Number of robots.
-  - ```~rate```(float, default: 100): node loop rate (in Hz).
+过滤器还会订阅每台机器人的 `robot_x/move_base_node/global_costmap/costmap`。所有机器人命名空间都必须以 `robot_x` 开头。
 
-#### 4.4.2. Subscribed Topics
- - The map (Topic name is defined by the ```~map_topic``` parameter) ([nav_msgs/OccupancyGrid](http://docs.ros.org/api/nav_msgs/html/msg/OccupancyGrid.html)).
+发布：
 
-- ```robot_x/move_base_node/global_costmap/costmap``` ([nav_msgs/OccupancyGrid](http://docs.ros.org/api/nav_msgs/html/msg/OccupancyGrid.html)): where x (in robot_x) refers to robot's number. 
+- `frontiers`：全部候选边界点的 RViz 标记。
+- `centroids`：过滤后边界点的 RViz 标记。
+- `filtered_points`：发送给任务分配器的 `PointArray`。
 
-The filter node subscribes for all the costmap topics of all the robots, the costmap is required therefore. Normally, costmaps should be published by the navigation stack (after bringing up the navigation stack on the robots, each robot will have a costmap).
-For example, if  ```n_robots=2```, the node will subscribe to:
-```robot_1/move_base_node/global_costmap/costmap``` and ```robot_2/move_base_node/global_costmap/costmap```.
-The costmaps are used to delete invalid points.
+### 4.5 `assigner`
 
-Note: Namespaces of all the nodes corresponding to a robot should start with ```robot_x```. Again ```x``` is the robot number. 
+任务分配器接收过滤后的边界点，通过 Actionlib 向各机器人的 `move_base_node` 下发目标。
 
- - The goals topic (Topic name is defined by the ```~goals_topic``` parameter)([geometry_msgs/PointStamped Message](http://docs.ros.org/api/geometry_msgs/html/msg/PointStamped.html)): The topic on which the filter node receives detected frontier points.
- 
-#### 4.4.3. Published Topics
+参数：
 
- - ```frontiers``` ([visualization_msgs/Marker Message](http://docs.ros.org/api/visualization_msgs/html/msg/Marker.html)): The topic on which the filter node publishes the received frontier points for visualiztion on Rviz.
- 
- - ```centroids``` ([visualization_msgs/Marker Message](http://docs.ros.org/api/visualization_msgs/html/msg/Marker.html)): The topic on which the filter node publishes only the filtered frontier points for visualiztion on Rviz.
+- `~map_topic`（默认 `/robot_1/map`）：单机器人时为本机地图，多机器人时应为融合后的全局地图。
+- `~info_radius`（默认 `1.0` 米）：信息增益计算半径。
+- `~info_multiplier`（默认 `3.0`）：信息增益相对于预计行驶距离的权重。
+- `~hysteresis_radius`（默认 `3.0` 米）和 `~hysteresis_gain`（默认 `2.0`）：滞回区域及增益。
+- `~frontiers_topic`（默认 `/filtered_points`）：过滤后边界点话题。
+- `~n_robots`（默认 `1`）：机器人数量。
+- `~delay_after_assignement`（默认 `0.5` 秒）：每次目标分配后的等待时间。
+- `~rate`（默认 `100` Hz）：节点循环频率。
 
- - ```filtered_points``` ([PointArray](https://github.com/hasauino/rrt_exploration/blob/master/msg/PointArray.msg)): All the filtered points are sent as an array of points to the assigner node on this topic.
-
-### 4.5. Assigner
-This node recieve target exploration goals, which are the filtered frontier points published by the filter node, and commands the robots accordingly. The assigner node commands the robots through the ```move_base_node```. This is why you have bring up the navigation stack on your robots.
-
-#### 4.5.1. Parameters
-- ```~map_topic``` (string, default: "/robot_1/map"): This parameter defines the topic name on which the node will recieve the map. In the single robot case, this topic should be set to the map topic of the robot. In the multi-robot case, this topic must be set to global merged map.
- - ```~info_radius```(float, default: 1.0): The information radius used in calculating the information gain of frontier points.
-  
- - ```~info_multiplier```(float, default: 3.0): The unit is meter. This parameter is used to give importance to information gain of a frontier point over the cost (expected travel distance to a frontier point).
-  
-- ```~hysteresis_radius```(float, default: 3.0): The unit is meter. This parameter defines the hysteresis radius.
-
-- ```~hysteresis_gain```(float, default: 2.0): The unit is meter. This parameter defines the hysteresis gain.
- 
-- ```~frontiers_topic``` (string, default: "/filtered_points"): The topic on which the assigner node receives filtered frontier points.
-
-- ```~n_robots```(float, default: 1.0): Number of robots.
-
--  ```~delay_after_assignement```(float, default: 0.5): The unit is seconds. It defines the amount of delay after each robot assignment.
-
-- ```~rate```(float, default: 100): node loop rate (in Hz).
-
-#### 4.5.2. Subscribed Topics
- - The map (Topic name is defined by the ```~map_topic``` parameter) ([nav_msgs/OccupancyGrid](http://docs.ros.org/api/nav_msgs/html/msg/OccupancyGrid.html)).
- 
-- Filtered frontier points topic (Topic name is defined by the ```~frontiers_topic``` parameter)  ([PointArray](https://github.com/hasauino/rrt_exploration/blob/master/msg/PointArray.msg)).
-
-#### 4.5.3. Published Topics
-The assigner node does not publish anything. It sends the assinged point to the ```move_base_node``` using Actionlib (the assigner node is an actionlib client to the move_base_node actionlib server).
-
-
-
-
-
-
-
+该节点订阅地图和 `PointArray`，本身不发布普通话题，而是作为 Actionlib 客户端向 `move_base` 动作服务器发送目标。

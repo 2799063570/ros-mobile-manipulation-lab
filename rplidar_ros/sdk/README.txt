@@ -1,3 +1,9 @@
+RPLIDAR SDK 说明
+================
+
+本目录包含 RoboPeak 提供的 RPLIDAR SDK 源码。为确保许可证文本准确有效，以下
+BSD 许可证保留英文原文。
+
 Copyright (c) 2009 - 2014 RoboPeak Team
 Copyright (c) 2014 - 2018 Shanghai Slamtec Co., Ltd.
 All rights reserved.
@@ -25,10 +31,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 
-This folder contains RPLIDAR SDK source code which is provided by RoboPeak.
+本目录中的 RPLIDAR SDK 源码由 RoboPeak 提供。
 
-RoboPeak Website: http://www.robopeak.com
-SlamTec HomePage: http://www.slamtec.com
+RoboPeak 网站：http://www.robopeak.com
+SlamTec 官网：http://www.slamtec.com
 RPLIDAR_SDK_VERSION:	1.7.0
-Note: The SDK version may not up-to-date.
-rplidar product: http://www.slamtec.com/en/Lidar
+注意：此 SDK 版本可能不是最新版本。
+RPLIDAR 产品页面：http://www.slamtec.com/en/Lidar

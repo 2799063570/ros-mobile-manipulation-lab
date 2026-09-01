@@ -1,141 +1,102 @@
 # astra_camera
 
-A ROS driver for Orbbec 3D cameras.
+这是 Orbbec 3D 相机的 ROS 驱动，支持 ROS Kinetic 和 Melodic。
 
-## Install
+## 安装
 
-This package supports ROS Kinetic and Melodic.
+1. 安装 [ROS](http://wiki.ros.org/ROS/Installation)。
+2. 安装依赖：
 
-1. Install [ROS](http://wiki.ros.org/ROS/Installation).
+   ```bash
+   sudo apt install ros-$ROS_DISTRO-rgbd-launch \
+     ros-$ROS_DISTRO-libuvc ros-$ROS_DISTRO-libuvc-camera \
+     ros-$ROS_DISTRO-libuvc-ros
+   ```
 
-2. Install dependences
-    ```sh
-    sudo apt install ros-$ROS_DISTRO-rgbd-launch ros-$ROS_DISTRO-libuvc ros-$ROS_DISTRO-libuvc-camera ros-$ROS_DISTRO-libuvc-ros
-    ```
+3. 创建 Catkin 工作空间（已有工作空间可跳过）：
 
-3. Create a [ROS Workspace](http://wiki.ros.org/ROS/Tutorials/InstallingandConfiguringROSEnvironment)(if you don't have one)
-	 ```sh
-    mkdir -p ~/catkin_ws/src
-	cd ~/catkin_ws/
-	catkin_make
-	source devel/setup.bash
-    ```
-	
-4. Pull the repository into your ROS workspace
-    ```sh
-    cd ~/catkin_ws/src
-    git clone https://github.com/orbbec/ros_astra_camera
-    ```
+   ```bash
+   mkdir -p ~/catkin_ws/src
+   cd ~/catkin_ws
+   catkin_make
+   source devel/setup.bash
+   ```
 
-5. Create astra udev rule
-    ```sh
-    roscd astra_camera
-    ./scripts/create_udev_rules
-    ```
+4. 获取源码、创建 udev 规则并编译：
 
-6. Go to catkin workspace and compile astra_camera
-    ```sh
-    cd ~/catkin_ws
-    catkin_make --pkg astra_camera
-    ```
+   ```bash
+   cd ~/catkin_ws/src
+   git clone https://github.com/orbbec/ros_astra_camera
+   roscd astra_camera
+   ./scripts/create_udev_rules
+   cd ~/catkin_ws
+   catkin_make --pkg astra_camera
+   ```
 
-### Filter Enable (To be deprecated: recommend to try master branch at first)
+### 深度滤波
 
-Astra driver provides normal and filtering methods. With filter driver, we can get more precise depth data but it would cost more computing resources. If the program will be executed on embedded systems, we suggest to use normal method. You can use `-DFILTER=ON / OFF` to change the method as below.
+驱动提供普通模式和滤波模式。滤波可提高深度数据精度，但会占用更多计算资源，嵌入式平台建议使用普通模式。通过以下参数选择：
 
-`catkin_make --pkg astra_camera -DFILTER=OFF`
-
-## Run astra_camera
-
-If you didn't add `source $YOUR_WORKSPACE/devel/setup.bash` to your `.bashrc`, remember to source it when open a new terminal :)
-
-### Examples
-
-#### Use Astra
-
-`roslaunch astra_camera astra.launch`
-
-#### Use Astra Stereo S (w/ UVC)
-
-`roslaunch astra_camera stereo_s.launch`
-
-You can use **rviz** or **image_view** to verify the outputs.
-
-## Important Topics
-
-* `*/image_raw`: depth/rgb/ir raw images
-  * If showing IR image is required, it would be more visible to normalize it from 16bit to 8bit (0 to 255)
-* `*/image_rect_raw`: images rectified by intrinsic/extrinsic parameters
-* `*/camera_info`: camera intrinsic/extrinsic parameters
-* `/camera/depth/points`: point cloud without color information
-* `/camera/depth_registered/points`: xyzrgb point cloud
-
-## Useful Services
-
-This package provides multiple [ros services](http://wiki.ros.org/Services) for users to get useful information and set up devices. To know more about using these services, please check [this tutorial](http://wiki.ros.org/rosservice).
-
-* `/camera/get_device_type`: return a string containing astra device type
-* `/camera/get_ir_exposure`: get exposure value of ir camera
-* `/camera/get_ir_gain`: get gain value of ir camera
-* `/camera/get_serial`: get serial number
-* `/camera/get_uvc_exposure`: get exposure value of rgb camera
-* `/camera/get_uvc_gain`: get gain value of rgb camera
-* `/camera/get_uvc_white_balance`: get white balance value of rgb camera
-* `/camera/reset_ir_exposure`: reset ir exposure to default value
-* `/camera/reset_ir_gain`: reset ir gain to default value
-* `/camera/set_ir_exposure`: set ir exposure to specific value
-* `/camera/set_ir_gain`: set ir gain to specific value
-* `/camera/set_laser`: turn on (**true**) or turn off (**false**) laser
-* `/camera/set_ldp`: turn on (**true**) or turn off (**false**) ldp
-* `/camera/set_uvc_exposure`: set uvc exposure. (set **0** indicating auto mode)
-* `/camera/set_uvc_gain`: set uvc gain
-* `/camera/set_uvc_white_balance`: set uvc white balance (set **0** indicating auto mode)
-* `/camera/set_ir_flood`: turn on (**true**) or turn off (**false**) ir flood
-* `/camera/switch_ir_camera`: while using stereo_s/stereo_s_u3, you can switch (left/right) ir camera
-
-### Examples
-
-After launching an astra camera, you can get ir exposure by the following command
-1. ir exposure
-    ```sh
-    rosservice call /camera/get_ir_exposure
-    ```
-    Next, you can change this value in this way
-    ```sh
-    rosservice call /camera/set_ir_exposure "{exposure: 50}" # Press tab to autocomplete
-    ```
-
-2. turn on/off laser
-    ```sh
-    rosservice call /camera/set_laser "{enable: true}" # turn on
-    rosservice call /camera/set_laser "{enable: false}" # turn off
-    ```
-
-3. switch ir
-    ```sh
-    rosservice call /camera/switch_ir_camera "camera: 'left'" # left
-    rosservice call /camera/switch_ir_camera "camera: 'right'" # right
-    ```
-
-For the other services, the usage is same as the above example.
-
-## Multiple Cameras
-
-To launch multiple cameras, you could modify `multi_astra.launch` to match your setting. The important settings are `device_x_id`(serial number of your devices), `3d_sensor`(name of launch file), and `has_uvc_serial`(does your camera's uvc have serial number).
-
-If you received **USB Buffer Error**, you could try to increase your USBFS buffer size by the following command.
-```sh
-echo 64 > /sys/module/usbcore/parameters/usbfs_memory_mb # or maybe 128
+```bash
+catkin_make --pkg astra_camera -DFILTER=OFF  # 或 FILTER=ON
 ```
 
-## License
+该选项计划弃用，建议优先参考上游 `master` 分支的实现。
 
-Copyright 2019 Orbbec Ltd.
+## 启动相机
 
-Licensed under the Apache License, Version 2.0 (the "License"); you may not use this project except in compliance with the License. You may obtain a copy of the License at
+新终端若未在 `.bashrc` 中加载工作空间，应先执行 `source <工作空间>/devel/setup.bash`。
 
-[http://www.apache.org/licenses/LICENSE-2.0](http://www.apache.org/licenses/LICENSE-2.0)
+```bash
+# Astra
+roslaunch astra_camera astra.launch
 
-Unless required by applicable law or agreed to in writing, software distributed under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions and limitations under the License.
+# Astra Stereo S（使用 UVC）
+roslaunch astra_camera stereo_s.launch
+```
 
-*Other names and brands may be claimed as the property of others*
+可使用 RViz 或 `image_view` 检查输出。
+
+## 重要话题
+
+- `*/image_raw`：深度、RGB 或红外原始图像。显示红外图像时，建议把 16 位数据归一化到 0～255。
+- `*/image_rect_raw`：根据内外参校正后的图像。
+- `*/camera_info`：相机内外参。
+- `/camera/depth/points`：不含颜色的点云。
+- `/camera/depth_registered/points`：XYZRGB 点云。
+
+## 常用服务
+
+该驱动通过 [ROS 服务](http://wiki.ros.org/Services)读取设备信息和修改设置：
+
+- `/camera/get_device_type`、`/camera/get_serial`：设备类型和序列号。
+- `/camera/get_ir_exposure`、`/camera/set_ir_exposure`、`/camera/reset_ir_exposure`：红外曝光。
+- `/camera/get_ir_gain`、`/camera/set_ir_gain`、`/camera/reset_ir_gain`：红外增益。
+- `/camera/get_uvc_exposure`、`/camera/set_uvc_exposure`：RGB 曝光；设置为 `0` 表示自动模式。
+- `/camera/get_uvc_gain`、`/camera/set_uvc_gain`：RGB 增益。
+- `/camera/get_uvc_white_balance`、`/camera/set_uvc_white_balance`：白平衡；设置为 `0` 表示自动模式。
+- `/camera/set_laser`、`/camera/set_ldp`、`/camera/set_ir_flood`：激光、LDP 和红外补光开关。
+- `/camera/switch_ir_camera`：Stereo S 系列左右红外相机切换。
+
+调用示例：
+
+```bash
+rosservice call /camera/get_ir_exposure
+rosservice call /camera/set_ir_exposure "{exposure: 50}"
+rosservice call /camera/set_laser "{enable: true}"
+rosservice call /camera/switch_ir_camera "camera: 'left'"
+```
+
+## 多相机
+
+按实际设备修改 `multi_astra.launch` 中的 `device_x_id`（序列号）、`3d_sensor`（启动文件名）和 `has_uvc_serial`（UVC 是否有序列号）。如果出现 USB 缓冲区错误，可适当增大 USBFS 缓冲区：
+
+```bash
+echo 64 | sudo tee /sys/module/usbcore/parameters/usbfs_memory_mb
+```
+
+必要时可把 `64` 调整为 `128`。
+
+## 许可证
+
+Copyright 2019 Orbbec Ltd. 本项目采用 Apache License 2.0，完整条款见 [Apache License 2.0](http://www.apache.org/licenses/LICENSE-2.0)。其他名称和品牌可能归各自所有者所有。

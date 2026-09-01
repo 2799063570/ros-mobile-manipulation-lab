@@ -349,12 +349,19 @@ class ColorObjectDetector(object):
 
         output.objects.sort(key=lambda item: (item.color, -item.contour_area))
         self._detections_publisher.publish(output)
-        try:
-            debug_message = self._bridge.cv2_to_imgmsg(debug_image, "bgr8")
-            debug_message.header = image_message.header
-            self._debug_publisher.publish(debug_message)
-        except CvBridgeError as error:
-            rospy.logwarn_throttle(5.0, "Cannot publish debug image: %s", str(error))
+        # 此处直接构造消息，避免调用 cv2_to_imgmsg。部分机器的用户目录中安装了
+        # 另一版本的 OpenCV，其 CV_8UC3 数值与编译 Noetic cv_bridge 时使用的版本
+        # 不一致。当前像素已经是 BGR uint8 格式，因此无需再执行图像转换。
+        debug_image = np.ascontiguousarray(debug_image, dtype=np.uint8)
+        debug_message = Image()
+        debug_message.header = image_message.header
+        debug_message.height = debug_image.shape[0]
+        debug_message.width = debug_image.shape[1]
+        debug_message.encoding = "bgr8"
+        debug_message.is_bigendian = 0
+        debug_message.step = debug_image.shape[1] * debug_image.shape[2]
+        debug_message.data = debug_image.tobytes()
+        self._debug_publisher.publish(debug_message)
 
 
 def main():

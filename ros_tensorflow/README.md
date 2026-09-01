@@ -1,86 +1,66 @@
 # ros_tensorflow
 
-## Introduction
+## 简介
 
-This repo introduces how to integrate **Tensorflow** framework into **ROS** with object detection API. 
+该功能包演示如何把 TensorFlow 和目标检测 API 集成到 ROS，并提供 MNIST、图像分类和目标检测示例。
 
-And through this repo, you can realize **mnist**, **object recognition**, and **object detection** respectively.
+## 环境要求
 
-## Requirements
+- Ubuntu 16.04、Python 2.7
+- [ROS Kinetic](http://wiki.ros.org/kinetic/Installation/Ubuntu) 与 Catkin 工作空间
+- [TensorFlow](https://www.tensorflow.org/install/) 1.2.0～1.10.0
+- NVIDIA TK1 如需 GPU 加速，可安装 [CUDA 6.5](https://gist.github.com/jetsonhacks/6da905e0675dcb5cba6f)
+- 其他依赖：
 
-- Ubuntu 16.04 with Python2.7
-- [Install ROS(Kinetic)](http://wiki.ros.org/kinetic/Installation/Ubuntu) with [catkin build](http://wiki.ros.org/ROS/Tutorials/InstallingandConfiguringROSEnvironment). Create a catkin workspace.
-- [Install Tensorflow](https://www.tensorflow.org/install/)(1.2.0-1.10.0 all be ok)
-- [Install CUDA 6.5 for NVIDIA TK1](https://gist.github.com/jetsonhacks/6da905e0675dcb5cba6f) (Choosing according to your needs)
-- Some dependencies
-  ```sh
+  ```bash
   sudo apt-get install protobuf-compiler python-pil python-lxml
-  sudo pip install jupyter
-  sudo pip install matplotlib
+  sudo pip install jupyter matplotlib
   ```
 
-## Grab the source
+## 获取源码与编译
 
-```sh
-cd [CATKIN_WS]/src
+```bash
+cd <CATKIN_WS>/src
 git clone https://github.com/cong/ros_tensorflow.git
-```
-
-## Build
-
-Build ROS package by
-
-```sh
-cd [CATKIN_WS]
+cd <CATKIN_WS>
 catkin_make
 ```
 
-PS: Python doesn't seem to need to be compiled.
+Python 脚本本身通常不需要单独编译。
 
-## Run
+## 运行示例
 
-#### For mnist:
+先启动 ROS Master 和 USB 相机（需预先安装 `usb_cam`）：
 
-```sh
-# First, open a terminal, execute
+```bash
 roscore
-
-# Second, Open another terminal, then execute
-# Please install "usb_cam" node before you execute blow
 roslaunch usb_cam usb_cam-test.launch
+```
 
-# Third, open another terminal, then execute
+MNIST 识别：
+
+```bash
 roslaunch ros_tensorflow ros_tensorflow_mnist.launch
-# You can echo a topic to receive the string message.
 rostopic echo /result_ripe
 ```
 
-#### For object recognition:
+图像分类：
 
-```sh
-# Third, open another terminal, then execute
+```bash
 roslaunch ros_tensorflow ros_tensorflow_classify.launch
-# You can echo a topic to receive the string message.
 rostopic echo /result_ripe
 ```
 
-#### For object detection:
+目标检测：
 
-```sh
-# Third, open another terminal, then execute
+```bash
 roslaunch ros_tensorflow ros_tensorflow_detect.launch
-# You can through "image_view" node to receive images detected.
 rosrun image_view image_view image:=/result_ripe
 ```
 
-## ROS Topics
+## ROS 话题
 
-Publish a topic : `/result_ripe`
+- 输出结果：`/result_ripe`
+- 输入图像：`usb_cam/image_raw`
 
-Receive an image : `usb_cam/image_raw`
-
-## Optional setting
-
-- You can realize your project by replacing the files in "ros_tensorflow/include/" with your own files.
-- If you feel that it is helpful to you, please give me a star. Thx!  :)
-- For more information you can visit the [Blog](http://wangcong.net).
+如需使用自己的模型和标签，可替换 `ros_tensorflow/include/` 中的对应文件。更多信息见[原作者博客](http://wangcong.net)。

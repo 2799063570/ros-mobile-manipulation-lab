@@ -1,132 +1,77 @@
 # ddynamic_reconfigure
 
-The ddynamic_reconfigure package is a C++ extension of [dynamic_reconfigure](https://github.com/ros/dynamic_reconfigure) that allows modifying parameters of a ROS node using the dynamic_reconfigure framework without having to write cfg files.
+`ddynamic_reconfigure` 是 [dynamic_reconfigure](https://github.com/ros/dynamic_reconfigure) 的 C++ 扩展。它允许 ROS 节点无需编写 `.cfg` 文件，即可通过动态参数框架修改变量。
 
-## Usage
+## 用法
 
-Modifying in place a variable:
+直接绑定变量：
+
 ```cpp
 #include <ros/ros.h>
 #include <ddynamic_reconfigure/ddynamic_reconfigure.h>
 
 int main(int argc, char **argv) {
-    // ROS init stage
+    // 初始化 ROS 节点
     ros::init(argc, argv, "ddynamic_tutorials");
     ros::NodeHandle nh;
     ddynamic_reconfigure::DDynamicReconfigure ddr;
     int int_param = 0;
-    ddr.registerVariable<int>("int_param", &int_param, "param description");
+    ddr.registerVariable<int>("int_param", &int_param, "参数说明");
     ddr.publishServicesTopics();
-    // Now parameter can be modified from the dynamic_reconfigure GUI or other tools and the variable int_param is updated automatically
-    
-    int_param = 10; //This will also update the dynamic_reconfigure tools with the new value 10
+    // GUI 或其他工具修改参数时，int_param 会自动同步更新。
+    int_param = 10;  // 同时把动态参数界面中的值更新为 10。
     ros::spin();
     return 0;
- }
+}
 ```
 
-Modifying a variable via a callback:
-```cpp
-#include <ros/ros.h>
-#include <ddynamic_reconfigure/ddynamic_reconfigure.h>
+通过回调修改变量：
 
+```cpp
 int global_int;
 
-void paramCb(int new_value)
-{
-   global_int = new_value;
-   ROS_INFO("Param modified");
+void paramCb(int new_value) {
+    global_int = new_value;
+    ROS_INFO("参数已修改");
 }
 
-int main(int argc, char **argv) {
-    // ROS init stage
-    ros::init(argc, argv, "ddynamic_tutorials");
-    ros::NodeHandle nh;
-    ddynamic_reconfigure::DDynamicReconfigure ddr;
-    
-    ddr.registerVariable<int>("int_param", 10 /* initial value */, boost::bind(paramCb, _1), "param description");
-    ddr.publishServicesTopics();
-    // Now parameter can be modified from the dynamic_reconfigure GUI or other tools and the callback is called on each update
-    ros::spin();
-    return 0;
- }
+// 初始值为 10，每次更新都会调用 paramCb。
+ddr.registerVariable<int>("int_param", 10, boost::bind(paramCb, _1), "参数说明");
+ddr.publishServicesTopics();
 ```
 
-Registering an enum:
+注册枚举变量：
 
 ```cpp
-
-#include <ros/ros.h>
-#include <ddynamic_reconfigure/ddynamic_reconfigure.h>
-
-int main(int argc, char **argv) {
-    // ROS init stage
-    ros::init(argc, argv, "ddynamic_tutorials");
-    ros::NodeHandle nh;
-    ddynamic_reconfigure::DDynamicReconfigure ddr;
-    
-    std::map<std::string, std::string> enum_map = {{"Key 1", "Value 1"}, {"Key 2", "Value 2"}};
-    std::string enum_value = enum_map["Key 1"];
-    ddr.registerEnumVariable<std::string>("string_enum", &enum_value,"param description", enum_map);
-    ddr.publishServicesTopics();
-    ros::spin();
-    return 0;
- }
+std::map<std::string, std::string> enum_map = {
+    {"键 1", "值 1"}, {"键 2", "值 2"}
+};
+std::string enum_value = enum_map["键 1"];
+ddr.registerEnumVariable<std::string>(
+    "string_enum", &enum_value, "参数说明", enum_map);
+ddr.publishServicesTopics();
 ```
 
-Registering variables in a private namespace "ddynamic_tutorials/other_namespace/int_param":
+在私有命名空间 `ddynamic_tutorials/other_namespace/int_param` 中注册变量：
 
 ```cpp
-
-#include <ros/ros.h>
-#include <ddynamic_reconfigure/ddynamic_reconfigure.h>
-
-int main(int argc, char **argv) {
-    // ROS init stage
-    ros::init(argc, argv, "ddynamic_tutorials");
-    ros::NodeHandle nh("~/other_namespace");
-    ddynamic_reconfigure::DDynamicReconfigure ddr(nh);
-
-    int int_param = 0;
-    ddr.registerVariable<int>("int_param", &int_param, "param description");
-    ddr.publishServicesTopics();
-    
-    ros::spin();
-    return 0;
-}
+ros::NodeHandle nh("~/other_namespace");
+ddynamic_reconfigure::DDynamicReconfigure ddr(nh);
+int int_param = 0;
+ddr.registerVariable<int>("int_param", &int_param, "参数说明");
+ddr.publishServicesTopics();
 ```
 
-
-Same scenario, but with the NodeHandle created after the ddr instantiation:
+也可以先创建 `DDynamicReconfigure` 指针，之后再用指定的 `NodeHandle` 初始化：
 
 ```cpp
-
-#include <ros/ros.h>
-#include <ddynamic_reconfigure/ddynamic_reconfigure.h>
-
 std::unique_ptr<ddynamic_reconfigure::DDynamicReconfigure> ddr;
-int main(int argc, char **argv) {
-    // ROS init stage
-    ros::init(argc, argv, "ddynamic_tutorials");
-    ros::NodeHandle nh("~/other_namespace");
-
-    ddr.reset(new ddynamic_reconfigure::DDynamicReconfigure(nh));
-    int int_param = 0;
-    ddr->registerVariable<int>("int_param", &int_param, "param description");
-    ddr->publishServicesTopics();
-    
-    ros::spin();
-    return 0;
-}
+ros::NodeHandle nh("~/other_namespace");
+ddr.reset(new ddynamic_reconfigure::DDynamicReconfigure(nh));
 ```
 
+## 常见问题
 
-## Issues
-### Undefined reference to registerVariable or registerEnumVariable
+### `registerVariable` 或 `registerEnumVariable` 出现未定义引用
 
-These methods are templated, but the implementation is hidden, and there are explicit template instantiations for `int`, `bool`, `double` and `std::string`. If you are getting an undefined reference to one of these methods, make sure that you are passing parameters of this type.
-
-
-
-
-
+这两个方法是模板方法，但实现未在头文件中公开。库只为 `int`、`bool`、`double` 和 `std::string` 提供了显式模板实例，请确认传入参数属于这些类型。

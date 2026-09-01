@@ -1,10 +1,11 @@
-The CMake file does not work out of the box, because you will need a few 
-external libraries (all available on ROS) if you want to use the SPA solver for 
-closing loops:
+示例说明
+========
 
-CSparse
-eigen
-sba
+此目录中的 CMake 配置不能直接完成全部示例的构建。若要在闭环检测中使用 SPA
+求解器，需要安装以下外部库（均可通过 ROS 获取）：
 
+- CSparse
+- Eigen
+- SBA
 
-Alternatively, you can just not compile Tutorial2.
+如果不需要 SPA 求解器，也可以跳过 Tutorial2 的编译。

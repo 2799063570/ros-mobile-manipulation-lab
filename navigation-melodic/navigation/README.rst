@@ -1,11 +1,9 @@
 ROS Navigation Stack
 --------------------
 
-A 2D navigation stack that takes in information from odometry, sensor
-streams, and a goal pose and outputs safe velocity commands that are sent
-to a mobile base.
+ROS 二维导航栈接收里程计、传感器数据流和目标位姿，计算并向移动底盘输出安全的速度指令。
 
-Related stacks:
+相关功能包：
 
- * http://github.com/ros-planning/navigation_tutorials
- * http://github.com/ros-planning/navigation_experimental
+* http://github.com/ros-planning/navigation_tutorials
+* http://github.com/ros-planning/navigation_experimental

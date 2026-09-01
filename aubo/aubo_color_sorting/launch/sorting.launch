@@ -13,6 +13,9 @@
 
   <node if="$(arg start_perception)" pkg="aubo_perception"
         type="color_object_detector.py" name="color_object_detector" output="screen">
+    <!-- ROS Noetic 的 cv_bridge 使用系统 OpenCV 4.2 编译。
+         禁止用户目录中的 OpenCV wheel 在运行时覆盖该 ABI。 -->
+    <env name="PYTHONNOUSERSITE" value="1"/>
     <rosparam file="$(find aubo_color_sorting)/config/colors.yaml" command="load"/>
     <param name="image_topic" value="/camera/color/image_raw"/>
     <param name="camera_info_topic" value="/camera/color/camera_info"/>
