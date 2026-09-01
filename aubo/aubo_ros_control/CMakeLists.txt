@@ -6,6 +6,7 @@ set(CMAKE_AUTOMOC ON)
 find_package(catkin REQUIRED COMPONENTS
   aubo_sdk
   controller_manager
+  dynamic_reconfigure
   geometry_msgs
   hardware_interface
   kdl_parser
@@ -24,6 +25,10 @@ find_package(Threads REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(orocos_kdl REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Widgets)
+
+generate_dynamic_reconfigure_options(
+  cfg/VisualServo.cfg
+)
 
 # aubo_sdk exports its source/install resource root through a catkin CMake
 # extra, so this package no longer depends on a particular directory layout.
@@ -55,7 +60,7 @@ endif()
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME} aubo_visual_servo_panel
-  CATKIN_DEPENDS aubo_sdk controller_manager geometry_msgs hardware_interface
+  CATKIN_DEPENDS aubo_sdk controller_manager dynamic_reconfigure geometry_msgs hardware_interface
     kdl_parser pluginlib roscpp rospy roslib rviz sensor_msgs
     std_msgs std_srvs tf2_geometry_msgs tf2_ros
   DEPENDS orocos_kdl
@@ -89,7 +94,11 @@ set_target_properties(aubo_hw_node PROPERTIES
 
 # Unified visual-servo node.  Camera mounting mode and command backend are
 # orthogonal parameters, so all four combinations share one implementation.
-add_executable(aubo_visual_servo_node src/visual_servo_node.cpp)
+add_executable(aubo_visual_servo_node
+  src/visual_servo.cpp
+  src/visual_servo_common.cpp
+  src/direct_sdk_backend.cpp)
+add_dependencies(aubo_visual_servo_node ${PROJECT_NAME}_gencfg)
 target_compile_features(aubo_visual_servo_node PRIVATE cxx_std_14)
 target_include_directories(aubo_visual_servo_node PRIVATE
   include
@@ -106,6 +115,16 @@ set_target_properties(aubo_visual_servo_node PROPERTIES
   BUILD_RPATH "${AUBO_SDK_RUNTIME_DIRS}"
   INSTALL_RPATH "${AUBO_SDK_NODE_INSTALL_RPATH}"
   LINK_FLAGS "-Wl,--disable-new-dtags")
+
+if(CATKIN_ENABLE_TESTING)
+  catkin_add_gtest(visual_servo_common_test
+    test/visual_servo_common_test.cpp
+    src/visual_servo_common.cpp)
+  if(TARGET visual_servo_common_test)
+    target_compile_features(visual_servo_common_test PRIVATE cxx_std_14)
+    target_include_directories(visual_servo_common_test PRIVATE include)
+  endif()
+endif()
 
 add_library(aubo_visual_servo_panel
   include/aubo_ros_control/visual_servo_panel.h
@@ -125,7 +144,7 @@ install(TARGETS ${PROJECT_NAME} aubo_hw_node aubo_visual_servo_node
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 install(DIRECTORY include/${PROJECT_NAME}/
   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION})
-install(DIRECTORY config launch worlds
+install(DIRECTORY cfg config launch worlds
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
 install(FILES VISUAL_SERVO.md plugin_description.xml
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})

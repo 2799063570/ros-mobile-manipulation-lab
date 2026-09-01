@@ -139,21 +139,46 @@ aubo_mobile_robot
 ## 系统架构
 
 ```text
-                         ┌─ GMapping ──────────────── map
-/front/scan ─┐           │
-             ├─ /scan ───┼─ AMCL ── map → odom
-/rear/scan ──┘           │
-                         └─ move_base ────────────── /cmd_vel
-                                                       │
-                          odom ← 差速底盘 ←────────────┘
+【移动底盘：感知、定位与导航】
 
-/workspace_camera/color + aligned_depth ─ YOLO/RGB-D适配 ─ /sorting/detections
-/workspace_camera/depth/color/points ─ 点云过滤 ─ MoveIt OctoMap       │
-                                                                     ▼
-导航任务编排 ─ 底盘互锁/OctoMap就绪检查 ─ aubo_sorting_core ─ MoveIt
-                                                          │
-                                                          ├─ 机械臂轨迹控制器
-                                                          └─ 夹爪轨迹控制器
+/front/scan (15 Hz) ─┐
+                     ├─ 双雷达融合 (15 Hz) ─ /scan ─┬─ GMapping ─ /map (0.5 Hz)
+/rear/scan  (15 Hz) ─┘                              │              └─ map → odom
+                                                    ├─ AMCL (≤15 Hz) ─ map → odom
+                                                    └─ move_base
+                                                       ├─ 全局规划 (1 Hz)
+                                                       ├─ 全局代价地图 更新/发布 (5/2 Hz)
+                                                       ├─ 局部代价地图 更新/发布 (10/5 Hz)
+                                                       └─ 局部控制 (10 Hz) ─ /cmd_vel_raw
+                                                                              │
+                                                               激光安全过滤 (20 Hz)
+                                                                              │
+                             /odom + odom → base_footprint (50 Hz) ← 差速底盘 ← /cmd_vel
+
+【作业感知、避障与任务决策】
+
+RGB 图像 + 对齐深度 (15/20 Hz) ─ 目标检测 (YOLO 默认 10 Hz) ─ RGB-D 三维定位
+                                                                    │
+                                                                    └─ /sorting/detections
+点云 (15/20 Hz) ─ 工作区过滤 (≤15/20 Hz) ─ MoveIt OctoMap (最高 3 Hz)          │
+                                                                                ▼
+导航任务编排 (事件驱动) ─ 底盘互锁 ─ OctoMap 就绪检查 ─ aubo_sorting_core (事件驱动)
+                                                               │
+                                                               ├─ MoveIt 运动规划/执行
+                                                               └─ 夹爪轨迹控制器
+
+【视觉伺服闭环：眼在手上或眼在手外】
+
+RGB 图像 + 对齐深度 (20 Hz) ─ 目标分割/深度投影 (≤20 Hz)
+                                      │
+                                      └─ /visual_servo/target_pose (≤20 Hz)
+                                                        │
+         /joint_states (100 Hz) ─ 坐标误差 + TF ─ 雅可比阻尼逆解 (100 Hz)
+                                                        │
+                                             限速/限加速度 + 有界队列
+                                                        │
+                                  关节位置指令 (200 Hz) ─┴─ Gazebo 控制器
+                                                        └─ AUBO SDK（真机）
 ```
 
 移动底盘由 Navigation Stack 控制，机械臂由 MoveIt 控制。当前的复合任务采用
@@ -161,6 +186,37 @@ aubo_mobile_robot
 底盘到站后会清空并等待重建 OctoMap，机械臂规划和执行期间通过
 `/sorting/base_locked` 禁止底盘运动。Gazebo 中的小物体夹持由
 `aubo_gazebo_plugins` 辅助，真实机械臂不加载该插件。
+
+视觉伺服是与 MoveIt 离散轨迹执行并列的机械臂控制路径：MoveIt 负责观察位、预抓取、
+抓取和放置等大范围运动，视觉伺服利用连续 RGB-D 反馈完成末端局部对准。眼在手上模式
+把目标变换到运动相机坐标系，眼在手外模式把目标变换到 `base_link` 后控制 `tcp_link`；
+两种模式共用 `/visual_servo/target_pose`、误差计算、安全限幅和执行后端。视觉伺服的
+Gazebo 单关节位置控制器与 MoveIt 的机械臂轨迹控制器会占用同一组关节资源，因此不能
+同时启动，任务编排必须先切换控制器再进入闭环。
+
+### 默认运行频率
+
+| 子系统 | 数据或处理环节 | 默认频率 | 配置位置/说明 |
+| --- | --- | ---: | --- |
+| 激光雷达 | `/front/scan`、`/rear/scan` | 15 Hz | 移动机器人 URDF 中两个雷达的 `update_rate` |
+| 雷达融合 | `/scan` | 15 Hz | `scan_merger.launch` 的 `publish_rate` |
+| 差速底盘 | 控制更新、`/odom` 与里程计 TF | 50 Hz | Gazebo 差速驱动插件 `updateRate` |
+| GMapping | 激光处理 / `/map` 更新 | ≤15 Hz / 0.5 Hz | 扫描触发；`map_update_interval: 2.0` |
+| AMCL | 粒子滤波更新 / 可视化更新 | ≤15 Hz / 10 Hz | 扫描与运动阈值触发；`gui_publish_rate` 为 10 Hz |
+| move_base | 全局规划 / 局部控制 | 1 Hz / 10 Hz | `planner_frequency` / `controller_frequency` |
+| 代价地图 | 全局更新/发布；局部更新/发布 | 5/2 Hz；10/5 Hz | `global_costmap.yaml` / `local_costmap.yaml` |
+| 底盘安全层 | `/cmd_vel_raw` → `/cmd_vel` | 20 Hz | 激光急停、减速和命令超时检查 |
+| RGB-D 相机 | 移动复合场景 / 独立分拣与视觉伺服场景 | 15 Hz / 20 Hz | 对应 Gazebo world；真机频率由相机驱动决定 |
+| 目标感知 | YOLO 推理 / RGB-D 位姿输出 | 10 Hz / ≤相机帧率 | 位姿仅在彩色图和深度图同步且检测有效时发布 |
+| 三维避障 | 点云过滤 / MoveIt OctoMap 更新 | ≤相机帧率 / 最高 3 Hz | OctoMap 通过 `max_update_rate` 限频 |
+| 常规机械臂控制 | `/joint_states` / MoveIt 轨迹命令 | 50 Hz / 事件驱动 | 轨迹控制器按规划结果执行，不是周期性规划 |
+| 视觉伺服 | 误差闭环 / 关节指令输出 | 100 Hz / 200 Hz | `control_rate` / `output_rate`；视觉反馈仍受相机帧率限制 |
+| 视觉伺服关节状态 | `/joint_states` | 100 Hz | 视觉伺服专用控制器配置 |
+| 任务编排与分拣 | 导航、互锁、抓放状态机 | 事件驱动 | 由 action、service、检测消息和超时条件推进 |
+
+表中 `≤` 表示模块由上游消息触发，实际频率不会高于输入频率；`15/20 Hz` 分别对应
+移动复合场景和独立固定工位场景。GMapping 与 AMCL 是两种互斥工作模式：在线建图时
+由 GMapping 发布 `map → odom`，加载已有地图导航时由 AMCL 发布，不能同时运行。
 
 ## 安装、编译与环境加载
 

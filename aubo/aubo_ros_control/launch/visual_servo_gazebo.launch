@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <launch>
-  <!-- Deprecated compatibility entry. Use eye_in_hand_visual_servo_gazebo.launch. -->
+  <!-- 已弃用的兼容入口：新配置请直接使用 eye_in_hand_visual_servo_gazebo.launch。 -->
+  <!-- 本文件只透传旧参数，不包含独立控制逻辑。 -->
   <arg name="gui" default="true"/>
   <arg name="target_topic" default="/visual_servo/target_pose"/>
   <arg name="loss_strategy" default="coast_then_open"/>
@@ -9,6 +10,7 @@
   <arg name="start_perception" default="true"/>
   <arg name="rviz" default="true"/>
   <arg name="debug_view" default="false"/>
+  <!-- 保留旧命令行调用方式，并统一转发到眼在手上仿真入口。 -->
   <include file="$(find aubo_ros_control)/launch/eye_in_hand_visual_servo_gazebo.launch">
     <arg name="gui" value="$(arg gui)"/>
     <arg name="target_topic" value="$(arg target_topic)"/>

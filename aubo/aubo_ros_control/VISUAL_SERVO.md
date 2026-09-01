@@ -98,6 +98,12 @@ roslaunch aubo_ros_control eye_to_hand_visual_servo_real.launch \
 - `visual_servo_eye_in_hand.yaml`：运动相机坐标误差和搜索策略；
 - `visual_servo_eye_to_hand.yaml`：固定相机 TCP 偏移和遮挡策略。
 
+控制增益、笛卡尔速度上限、期望位姿、安全深度以及目标丢失恢复参数支持通过
+`rqt_reconfigure` 在线调整。启动节点后运行
+`rosrun rqt_reconfigure rqt_reconfigure`，选择 `/aubo_visual_servo`。动态修改仅在
+当前进程中生效，不会回写上述 YAML；确认参数后需手动保存。后端、坐标系、话题、
+频率、关节硬限制和 SDK 连接参数仍需修改 YAML/launch 并重启节点。
+
 ## 安全调试顺序
 
 1. 先保持 `auto_start:=false`，检查相机话题和 TF 连通性。

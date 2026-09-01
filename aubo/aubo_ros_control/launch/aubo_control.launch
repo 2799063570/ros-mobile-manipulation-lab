@@ -1,5 +1,7 @@
 <?xml version="1.0"?>
 <launch>
+  <!-- 真机 ros_control 底层入口：连接控制柜、加载控制器并启动轨迹执行通道。 -->
+  <!-- robot_ip、账号和碰撞等级必须与实际控制柜配置一致。 -->
   <arg name="robot_ip" default="192.168.1.2"/>
   <arg name="server_port" default="8899"/>
   <arg name="username" default="aubo"/>
@@ -11,6 +13,7 @@
   <arg name="robot_xacro" default="aubo_i5_with_camera.xacro"/>
   <arg name="robot_srdf" default="aubo_i5_with_camera.srdf"/>
 
+  <!-- 可独立关闭模型加载，供已经由上层 launch 提供 robot_description 的场景复用。 -->
   <param name="/aubo_driver/server_host" value="$(arg robot_ip)"/>
   <include if="$(arg load_robot_description)"
            file="$(find aubo_moveit_config)/launch/planning_context.launch">
@@ -19,6 +22,7 @@
     <arg name="robot_srdf" value="$(arg robot_srdf)"/>
   </include>
 
+  <!-- 控制器统一放在 /aubo_i5 命名空间，避免与其他机械臂实例冲突。 -->
   <group ns="aubo_i5">
     <rosparam file="$(find aubo_ros_control)/config/controllers.yaml" command="load"/>
     <node name="aubo_hw_node" pkg="aubo_ros_control" type="aubo_hw_node"
@@ -32,6 +36,7 @@
       <param name="collision_class" value="$(arg collision_class)"/>
       <param name="control_frequency" value="$(arg control_frequency)"/>
       <param name="require_real_robot" value="$(arg require_real_robot)"/>
+      <!-- 启用真机运动及指令平滑；硬件节点异常退出时 required 会终止整个 launch。 -->
       <param name="enable_motion_control" value="true"/>
       <param name="enable_command_smoothing" value="true"/>
       <param name="command_filter_alpha" value="0.25"/>
@@ -42,6 +47,7 @@
          wrist1_joint, wrist2_joint, wrist3_joint]
       </rosparam>
     </node>
+    <!-- 同时启动关节状态发布器和 MoveIt 使用的六轴轨迹控制器。 -->
     <node name="controller_spawner" pkg="controller_manager" type="spawner"
           output="screen" args="joint_state_controller aubo_i5_controller"/>
   </group>

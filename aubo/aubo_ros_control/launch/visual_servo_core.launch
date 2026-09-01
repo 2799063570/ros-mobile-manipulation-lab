@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <launch>
-  <!-- Shared controller entry. Robot model, joint states and camera target
-       publisher must already exist. -->
+  <!-- 视觉伺服公共控制入口：上层必须已经提供机器人模型、关节状态和目标位姿。 -->
+  <!-- mode_config 决定眼在手上/眼在手外误差模型，backend 决定仿真/真机执行链。 -->
   <arg name="mode_config"/>
   <arg name="backend" default="gazebo"/>
   <arg name="robot_ip" default="192.168.1.2"/>
@@ -10,10 +10,13 @@
   <arg name="loss_strategy" default=""/>
   <arg name="start_enabled" default="false"/>
 
+  <!-- required=true：控制核心异常退出时终止所属 launch，避免其余节点继续误导操作者。 -->
   <node name="aubo_visual_servo" pkg="aubo_ros_control"
         type="aubo_visual_servo_node" output="screen" required="true">
+    <!-- 只有 SDK 后端需要控制柜动态库搜索路径。 -->
     <env if="$(eval arg('backend') == 'sdk')" name="LD_LIBRARY_PATH"
          value="$(find aubo_sdk)/lib/lib64/aubocontroller:$(find aubo_sdk)/lib/lib64/log4cplus:$(find aubo_sdk)/lib/lib64/config:$(optenv LD_LIBRARY_PATH)"/>
+    <!-- 先加载公共安全/频率参数，再由安装方式配置覆盖几何与丢失策略。 -->
     <rosparam file="$(find aubo_ros_control)/config/visual_servo_common.yaml"
               command="load"/>
     <rosparam file="$(arg mode_config)" command="load"/>
@@ -24,6 +27,7 @@
     <param name="start_enabled" value="$(arg start_enabled)"/>
     <param if="$(eval arg('loss_strategy') != '')"
            name="loss_strategy" value="$(arg loss_strategy)"/>
+    <!-- Gazebo 后端向六个独立位置控制器发布 200 Hz 关节位置指令。 -->
     <rosparam if="$(eval arg('backend') == 'gazebo')" param="gazebo_command_topics">
       [/aubo_i5/shoulder_position_controller/command,
        /aubo_i5/upper_arm_position_controller/command,

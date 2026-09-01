@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <launch>
-  <!-- Fixed RGB-D camera with one TF authority. Replace xyz/rpy with the
-       measured eye-to-hand calibration before commanding the real arm. -->
+  <!-- 固定 RGB-D 相机启动入口，并确保外参 TF 只有一个发布源。 -->
+  <!-- 真机运动前必须将 xyz/rpy 替换为实际眼在手外标定结果。 -->
   <arg name="serial_no" default=""/>
   <arg name="camera_name" default="workspace_camera"/>
   <arg name="parent_frame" default="base_link"/>
@@ -13,6 +13,7 @@
   <arg name="yaw" default="0.0"/>
   <arg name="enable_pointcloud" default="true"/>
 
+  <!-- 相机驱动负责彩色、深度、对齐深度及可选点云，但不发布安装外参。 -->
   <include file="$(find realsense2_camera)/launch/rs_camera.launch">
     <arg name="serial_no" value="$(arg serial_no)"/>
     <arg name="camera" value="$(arg camera_name)"/>
@@ -23,6 +24,7 @@
     <arg name="enable_pointcloud" value="$(arg enable_pointcloud)"/>
     <arg name="publish_tf" value="false"/>
   </include>
+  <!-- 由统一静态 TF 入口发布 base_link 到固定相机光学坐标系的标定链。 -->
   <include file="$(find aubo_description)/launch/eye_to_hand_camera_tf.launch">
     <arg name="parent_frame" value="$(arg parent_frame)"/>
     <arg name="camera_name" value="$(arg camera_name)"/>

@@ -436,12 +436,20 @@ class RgbdVisualTargetNode(object):
                 1,
                 cv2.LINE_AA,
             )
-        try:
-            debug_message = self.bridge.cv2_to_imgmsg(image, encoding="bgr8")
-            debug_message.header = header
-            self.debug_publisher.publish(debug_message)
-        except CvBridgeError as error:
-            rospy.logwarn_throttle(2.0, "Cannot publish debug image: %s", str(error))
+        # Build the message directly because an OpenCV installed outside the
+        # ROS packages can use a different numeric value for CV_8UC3 than the
+        # one Noetic's cv_bridge was compiled against.  Calling cv2_to_imgmsg
+        # in that environment raises KeyError before it can publish the frame.
+        image = np.ascontiguousarray(image, dtype=np.uint8)
+        debug_message = Image()
+        debug_message.header = header
+        debug_message.height = image.shape[0]
+        debug_message.width = image.shape[1]
+        debug_message.encoding = "bgr8"
+        debug_message.is_bigendian = 0
+        debug_message.step = image.shape[1] * image.shape[2]
+        debug_message.data = image.tobytes()
+        self.debug_publisher.publish(debug_message)
 
     def _images_callback(self, color_message, depth_message):
         with self.camera_info_lock:

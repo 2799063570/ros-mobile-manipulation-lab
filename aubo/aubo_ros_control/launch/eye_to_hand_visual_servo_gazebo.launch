@@ -1,5 +1,7 @@
 <?xml version="1.0"?>
 <launch>
+  <!-- 眼在手外视觉伺服仿真入口：固定工作区相机观测目标，TCP 在 base_link 下对准。 -->
+  <!-- 默认丢失策略为 stop，且 auto_start=false，便于先检查固定相机外参。 -->
   <arg name="gui" default="true"/>
   <arg name="rviz" default="true"/>
   <arg name="debug_view" default="false"/>
@@ -11,8 +13,7 @@
   <arg name="start_perception" default="true"/>
   <arg name="world" default="$(find aubo_color_sorting)/worlds/sorting.world"/>
 
-  <!-- The fixed workcell camera is provided by the world. Use the camera-free
-       arm model so the hand sensor and its image topics remain disabled. -->
+  <!-- 固定相机由 world 提供；机械臂使用无腕部相机模型，避免产生重复图像话题。 -->
   <include file="$(find aubo_gazebo)/launch/aubo_world_gazebo.launch">
     <arg name="world_name" value="$(arg world)"/>
     <arg name="gui" value="$(arg gui)"/>
@@ -21,6 +22,7 @@
          value="$(find xacro)/xacro --inorder '$(find aubo_description)/urdf/aubo_i5.xacro'"/>
   </include>
 
+  <!-- 六个单关节位置控制器专供视觉伺服使用，不与 MoveIt 轨迹控制器并行启动。 -->
   <group ns="aubo_i5">
     <rosparam file="$(find aubo_ros_control)/config/visual_servo_controllers.yaml"
               command="load"/>
@@ -28,14 +30,16 @@
           type="spawner" output="screen"
           args="joint_state_controller shoulder_position_controller upper_arm_position_controller fore_arm_position_controller wrist1_position_controller wrist2_position_controller wrist3_position_controller"/>
   </group>
+  <!-- 将命名空间内关节状态汇聚到全局 TF 链。 -->
   <node name="aubo_joint_state_relay" pkg="joint_state_publisher"
         type="joint_state_publisher" output="screen">
     <rosparam param="source_list">[/aubo_i5/joint_states]</rosparam>
   </node>
 
-  <!-- Calibrated TFs mirror the scene-owned camera pose. -->
+  <!-- 静态外参必须与 Gazebo 场景中固定相机的位姿保持一致。 -->
   <include file="$(find aubo_description)/launch/eye_to_hand_camera_tf.launch"/>
 
+  <!-- 加载眼在手外 TCP 偏移、姿态目标和安全策略。 -->
   <include file="$(find aubo_ros_control)/launch/visual_servo_core.launch">
     <arg name="mode_config"
          value="$(find aubo_ros_control)/config/visual_servo_eye_to_hand.yaml"/>
@@ -46,6 +50,7 @@
     <arg name="start_enabled" value="$(arg auto_start)"/>
   </include>
 
+  <!-- 固定相机 RGB-D 前端输出 base_link 可变换的目标位姿。 -->
   <node if="$(arg start_perception)" name="rgbd_visual_target"
         pkg="aubo_perception" type="rgbd_visual_target_node.py" output="screen">
     <rosparam file="$(find aubo_perception)/config/rgbd_target_eye_to_hand.yaml"

@@ -1,5 +1,7 @@
 <?xml version="1.0"?>
 <launch>
+  <!-- 只读状态入口：连接控制柜并发布关节状态，不开放机械臂运动命令。 -->
+  <!-- 适合网络连通性、关节反馈和 TF 检查，不可替代完整控制入口。 -->
   <arg name="robot_ip" default="192.168.1.2"/>
   <arg name="server_port" default="8899"/>
   <group ns="aubo_i5">
@@ -10,9 +12,11 @@
            value="$(find aubo_sdk)/lib/lib64/aubocontroller:$(find aubo_sdk)/lib/lib64/log4cplus:$(find aubo_sdk)/lib/lib64/config:$(optenv LD_LIBRARY_PATH)"/>
       <param name="server_host" value="$(arg robot_ip)"/>
       <param name="server_port" value="$(arg server_port)"/>
+      <!-- 明确关闭运动控制，同时允许在无真实机械臂环境下检查节点启动流程。 -->
       <param name="enable_motion_control" value="false"/>
       <param name="require_real_robot" value="false"/>
     </node>
+    <!-- 只加载 joint_state_controller，不占用轨迹控制资源。 -->
     <node name="controller_spawner" pkg="controller_manager" type="spawner"
           output="screen" args="joint_state_controller"/>
   </group>

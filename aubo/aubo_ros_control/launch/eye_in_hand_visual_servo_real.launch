@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <launch>
-  <!-- Eye-in-hand real-robot entry. -->
+  <!-- 眼在手上视觉伺服真机入口，控制命令由节点直接通过 AUBO SDK 下发。 -->
+  <!-- 安全要求：首次运行保持 auto_start=false，并确保没有其他节点占用控制柜。 -->
   <arg name="robot_ip" default="192.168.1.2"/>
   <arg name="target_topic" default="/visual_servo/target_pose"/>
   <arg name="loss_strategy" default="coast_then_open"/>
@@ -10,15 +11,17 @@
   <arg name="target_label" default="red"/>
   <arg name="auto_start" default="false"/>
 
+  <!-- 启动腕部 RealSense；相机安装 TF 由机器人 URDF 唯一发布，避免重复 TF。 -->
   <include if="$(arg start_realsense)"
            file="$(find realsense2_camera)/launch/rs_camera.launch">
     <arg name="enable_color" value="true"/>
     <arg name="enable_depth" value="true"/>
     <arg name="align_depth" value="true"/>
-    <!-- Robot URDF owns the eye-in-hand TF tree and calibrated mount. -->
+    <!-- 关闭相机驱动 TF，使用 URDF 中已经标定的眼在手上变换。 -->
     <arg name="publish_tf" value="false"/>
   </include>
 
+  <!-- 加载带腕部相机的模型，供 KDL、TF 和视觉伺服雅可比计算使用。 -->
   <include if="$(arg load_robot_description)"
            file="$(find aubo_moveit_config)/launch/planning_context.launch">
     <arg name="load_robot_description" value="true"/>
@@ -28,7 +31,7 @@
   <node name="robot_state_publisher" pkg="robot_state_publisher"
         type="robot_state_publisher" output="screen"/>
 
-  <!-- No controller_manager and no ros_control hardware node in real mode. -->
+  <!-- SDK 模式不启动 controller_manager 或 ros_control 硬件节点，避免双重下发。 -->
   <include file="$(find aubo_ros_control)/launch/visual_servo_core.launch">
     <arg name="mode_config"
          value="$(find aubo_ros_control)/config/visual_servo_eye_in_hand.yaml"/>
@@ -40,6 +43,7 @@
     <arg name="start_enabled" value="$(arg auto_start)"/>
   </include>
 
+  <!-- 感知与控制默认同步保持禁用，由 auto_start 或服务显式开启。 -->
   <node if="$(arg start_perception)" name="rgbd_visual_target"
         pkg="aubo_perception" type="rgbd_visual_target_node.py" output="screen">
     <rosparam file="$(find aubo_perception)/config/rgbd_target_eye_in_hand.yaml"

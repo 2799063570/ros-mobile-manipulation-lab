@@ -1,11 +1,13 @@
 <?xml version="1.0"?>
 <launch>
+  <!-- AUBO 真机完整启动入口：硬件接口、TF、MoveIt，以及可选 RViz。 -->
   <arg name="robot_ip" default="192.168.1.2"/>
   <arg name="use_rviz" default="true"/>
   <arg name="robot_xacro" default="aubo_i5_with_camera.xacro"/>
   <arg name="robot_srdf" default="aubo_i5_with_camera.srdf"/>
   <arg name="use_sensor_manager" default="false"/>
 
+  <!-- 先建立真机 ros_control 通道，并由该入口统一加载 URDF/SRDF。 -->
   <include file="$(find aubo_ros_control)/launch/aubo_control.launch">
     <arg name="robot_ip" value="$(arg robot_ip)"/>
     <arg name="load_robot_description" value="true"/>
@@ -17,13 +19,14 @@
   <node name="robot_state_publisher" pkg="robot_state_publisher"
         type="robot_state_publisher" output="screen"/>
 
-  <!-- MoveIt and robot_state_publisher consume /joint_states; the hardware
-       controller publishes inside /aubo_i5. Merge it into the global topic. -->
+  <!-- 硬件控制器发布 /aubo_i5/joint_states，而 MoveIt 和 TF 使用全局
+       /joint_states，因此在这里做一次话题汇聚。 -->
   <node name="aubo_joint_state_relay" pkg="joint_state_publisher"
         type="joint_state_publisher" output="screen">
     <rosparam param="source_list">[/aubo_i5/joint_states]</rosparam>
   </node>
 
+  <!-- move_group 使用真实轨迹执行，不能在此入口启用 fake_execution。 -->
   <include file="$(find aubo_moveit_config)/launch/move_group.launch">
     <arg name="load_robot_description" value="false"/>
     <arg name="allow_trajectory_execution" value="true"/>

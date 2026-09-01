@@ -1,5 +1,7 @@
 <?xml version="1.0"?>
 <launch>
+  <!-- 眼在手上视觉伺服仿真入口：腕部相机随末端运动并持续闭环对准目标。 -->
+  <!-- 默认不自动使能，确认目标、TF 和关节状态正确后再启动伺服。 -->
   <arg name="gui" default="true"/>
   <arg name="target_topic" default="/visual_servo/target_pose"/>
   <arg name="loss_strategy" default="coast_then_open"/>
@@ -11,13 +13,14 @@
   <arg name="paused" default="false"/>
   <arg name="world" default="$(find aubo_color_sorting)/worlds/sorting.world"/>
 
-  <!-- Loads the eye-in-hand model, Gazebo and robot_state_publisher. -->
+  <!-- 加载带腕部相机的机械臂模型、Gazebo 场景和 robot_state_publisher。 -->
   <include file="$(find aubo_gazebo)/launch/aubo_world_gazebo.launch">
     <arg name="gui" value="$(arg gui)"/>
     <arg name="paused" value="$(arg paused)"/>
     <arg name="world_name" value="$(arg world)"/>
   </include>
 
+  <!-- 视觉伺服使用六个单关节位置控制器，不能与 MoveIt 轨迹控制器同时占用关节。 -->
   <group ns="aubo_i5">
     <rosparam file="$(find aubo_ros_control)/config/visual_servo_controllers.yaml"
               command="load"/>
@@ -26,15 +29,14 @@
           args="joint_state_controller shoulder_position_controller upper_arm_position_controller fore_arm_position_controller wrist1_position_controller wrist2_position_controller wrist3_position_controller"/>
   </group>
 
-  <!-- The Gazebo controller publishes inside /aubo_i5, while the global
-       robot_state_publisher started by aubo_world_gazebo listens on
-       /joint_states.  Relay the namespaced state so the complete arm/camera
-       TF tree is connected to base_link. -->
+  <!-- Gazebo 控制器发布 /aubo_i5/joint_states，而全局 robot_state_publisher
+       订阅 /joint_states；通过汇聚节点连接 base_link 到腕部相机的完整 TF 链。 -->
   <node name="aubo_joint_state_relay" pkg="joint_state_publisher"
         type="joint_state_publisher" output="screen">
     <rosparam param="source_list">[/aubo_i5/joint_states]</rosparam>
   </node>
 
+  <!-- 加载眼在手上几何参数，并选择 Gazebo 指令后端。 -->
   <include file="$(find aubo_ros_control)/launch/visual_servo_core.launch">
     <arg name="mode_config"
          value="$(find aubo_ros_control)/config/visual_servo_eye_in_hand.yaml"/>
@@ -45,6 +47,7 @@
     <arg name="start_enabled" value="$(arg auto_start)"/>
   </include>
 
+  <!-- RGB-D 前端只在目标与深度都有效时发布 /visual_servo/target_pose。 -->
   <node if="$(arg start_perception)" name="rgbd_visual_target"
         pkg="aubo_perception" type="rgbd_visual_target_node.py" output="screen">
     <rosparam file="$(find aubo_perception)/config/rgbd_target_eye_in_hand.yaml"
@@ -53,6 +56,7 @@
     <param name="target_pose_topic" value="$(arg target_topic)"/>
     <param name="start_enabled" value="$(arg auto_start)"/>
   </node>
+  <!-- RViz 和调试图像窗口均为可选项，关闭后可用于无桌面环境。 -->
   <node if="$(arg rviz)" name="visual_servo_rviz" pkg="rviz" type="rviz"
         args="-d $(find aubo_ros_control)/config/visual_servo.rviz" output="screen"/>
   <node if="$(arg debug_view)" name="visual_servo_debug_view"
