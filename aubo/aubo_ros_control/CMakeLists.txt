@@ -30,6 +30,11 @@ generate_dynamic_reconfigure_options(
   cfg/VisualServo.cfg
 )
 
+catkin_install_python(PROGRAMS
+  scripts/handeye_tf_publisher.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
 # aubo_sdk exports its source/install resource root through a catkin CMake
 # extra, so this package no longer depends on a particular directory layout.
 if(NOT AUBO_SDK_RESOURCE_ROOT)

@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- 腕部 RGB-D 相机启动入口；安装外参由机器人 URDF 唯一发布。 -->
+  <arg name="serial_no" default=""/>
+  <arg name="camera_name" default="camera"/>
+  <arg name="enable_pointcloud" default="true"/>
+
+  <include file="$(find realsense2_camera)/launch/rs_camera.launch">
+    <arg name="serial_no" value="$(arg serial_no)"/>
+    <arg name="camera" value="$(arg camera_name)"/>
+    <arg name="tf_prefix" value="$(arg camera_name)"/>
+    <arg name="enable_color" value="true"/>
+    <arg name="enable_depth" value="true"/>
+    <arg name="align_depth" value="true"/>
+    <arg name="enable_pointcloud" value="$(arg enable_pointcloud)"/>
+    <!-- robot_state_publisher 已发布腕部安装链，驱动不得重复发布 TF。 -->
+    <arg name="publish_tf" value="false"/>
+  </include>
+</launch>

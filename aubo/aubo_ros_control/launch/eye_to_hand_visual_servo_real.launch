@@ -4,6 +4,8 @@
   <!-- 首次调试保持 auto_start=false，并确认相机外参和 target_offset 方向。 -->
   <arg name="robot_ip" default="192.168.1.2"/>
   <arg name="camera_serial_no" default=""/>
+  <arg name="calibration_file"
+       default="$(find aubo_ros_control)/config/aubo_realsense_handeye_eye_on_base.yaml"/>
   <arg name="start_camera" default="true"/>
   <arg name="start_perception" default="true"/>
   <arg name="target_label" default="red"/>
@@ -22,6 +24,7 @@
   <include if="$(arg start_camera)"
            file="$(find aubo_ros_control)/launch/eye_to_hand_camera_real.launch">
     <arg name="serial_no" value="$(arg camera_serial_no)"/>
+    <arg name="calibration_file" value="$(arg calibration_file)"/>
   </include>
   <!-- 感知模块可单独关闭，以便接入其他兼容 /visual_servo/target_pose 的检测器。 -->
   <node if="$(arg start_perception)" name="rgbd_visual_target"

@@ -7,6 +7,7 @@
   <arg name="loss_strategy" default="coast_then_open"/>
   <arg name="load_robot_description" default="true"/>
   <arg name="start_realsense" default="true"/>
+  <arg name="camera_serial_no" default=""/>
   <arg name="start_perception" default="true"/>
   <arg name="target_label" default="red"/>
   <arg name="auto_start" default="false"/>
@@ -17,6 +18,7 @@
     <arg name="loss_strategy" value="$(arg loss_strategy)"/>
     <arg name="load_robot_description" value="$(arg load_robot_description)"/>
     <arg name="start_realsense" value="$(arg start_realsense)"/>
+    <arg name="camera_serial_no" value="$(arg camera_serial_no)"/>
     <arg name="start_perception" value="$(arg start_perception)"/>
     <arg name="target_label" value="$(arg target_label)"/>
     <arg name="auto_start" value="$(arg auto_start)"/>

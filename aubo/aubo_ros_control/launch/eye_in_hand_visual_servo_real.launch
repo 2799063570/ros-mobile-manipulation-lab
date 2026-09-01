@@ -7,18 +7,15 @@
   <arg name="loss_strategy" default="coast_then_open"/>
   <arg name="load_robot_description" default="true"/>
   <arg name="start_realsense" default="true"/>
+  <arg name="camera_serial_no" default=""/>
   <arg name="start_perception" default="true"/>
   <arg name="target_label" default="red"/>
   <arg name="auto_start" default="false"/>
 
   <!-- 启动腕部 RealSense；相机安装 TF 由机器人 URDF 唯一发布，避免重复 TF。 -->
   <include if="$(arg start_realsense)"
-           file="$(find realsense2_camera)/launch/rs_camera.launch">
-    <arg name="enable_color" value="true"/>
-    <arg name="enable_depth" value="true"/>
-    <arg name="align_depth" value="true"/>
-    <!-- 关闭相机驱动 TF，使用 URDF 中已经标定的眼在手上变换。 -->
-    <arg name="publish_tf" value="false"/>
+           file="$(find aubo_ros_control)/launch/eye_in_hand_camera_real.launch">
+    <arg name="serial_no" value="$(arg camera_serial_no)"/>
   </include>
 
   <!-- 加载带腕部相机的模型，供 KDL、TF 和视觉伺服雅可比计算使用。 -->

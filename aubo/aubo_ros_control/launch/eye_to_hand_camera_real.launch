@@ -1,16 +1,13 @@
 <?xml version="1.0"?>
 <launch>
   <!-- 固定 RGB-D 相机启动入口，并确保外参 TF 只有一个发布源。 -->
-  <!-- 真机运动前必须将 xyz/rpy 替换为实际眼在手外标定结果。 -->
+  <!-- 真机运动前应确认 calibration_file 是当前相机安装位置的标定结果。 -->
   <arg name="serial_no" default=""/>
   <arg name="camera_name" default="workspace_camera"/>
   <arg name="parent_frame" default="base_link"/>
-  <arg name="x" default="0.55"/>
-  <arg name="y" default="0.0"/>
-  <arg name="z" default="1.60"/>
-  <arg name="roll" default="0.0"/>
-  <arg name="pitch" default="1.57079632679"/>
-  <arg name="yaw" default="0.0"/>
+  <arg name="tracking_base_frame" default="$(arg camera_name)_color_optical_frame"/>
+  <arg name="calibration_file"
+       default="$(find aubo_ros_control)/config/aubo_realsense_handeye_eye_on_base.yaml"/>
   <arg name="enable_pointcloud" default="true"/>
 
   <!-- 相机驱动负责彩色、深度、对齐深度及可选点云，但不发布安装外参。 -->
@@ -24,12 +21,11 @@
     <arg name="enable_pointcloud" value="$(arg enable_pointcloud)"/>
     <arg name="publish_tf" value="false"/>
   </include>
-  <!-- 由统一静态 TF 入口发布 base_link 到固定相机光学坐标系的标定链。 -->
-  <include file="$(find aubo_description)/launch/eye_to_hand_camera_tf.launch">
-    <arg name="parent_frame" value="$(arg parent_frame)"/>
-    <arg name="camera_name" value="$(arg camera_name)"/>
-    <arg name="x" value="$(arg x)"/><arg name="y" value="$(arg y)"/>
-    <arg name="z" value="$(arg z)"/><arg name="roll" value="$(arg roll)"/>
-    <arg name="pitch" value="$(arg pitch)"/><arg name="yaw" value="$(arg yaw)"/>
-  </include>
+  <!-- 每次从 easy_handeye 兼容 YAML 读取并发布唯一的安装外参。 -->
+  <node name="eye_to_hand_calibration_tf" pkg="aubo_ros_control"
+        type="handeye_tf_publisher.py" output="screen" required="true">
+    <param name="calibration_file" value="$(arg calibration_file)"/>
+    <param name="parent_frame" value="$(arg parent_frame)"/>
+    <param name="child_frame" value="$(arg tracking_base_frame)"/>
+  </node>
 </launch>

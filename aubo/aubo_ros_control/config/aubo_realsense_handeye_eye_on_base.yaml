@@ -1,0 +1,20 @@
+# easy_handeye result imported from arm_ws on 2026-09-01.
+# This file is the source of truth for the fixed-camera installation TF.
+parameters:
+  eye_on_hand: false
+  freehand_robot_movement: true
+  move_group: arm
+  move_group_namespace: /
+  namespace: /aubo_realsense_handeye_eye_on_base/
+  robot_base_frame: base_link
+  robot_effector_frame: gripper_link
+  tracking_base_frame: camera_color_optical_frame
+  tracking_marker_frame: aruco_marker_frame
+transformation:
+  qw: 0.008311631045905047
+  qx: 0.6912777304911206
+  qy: 0.7225362558260416
+  qz: -0.0027157196628248654
+  x: -0.02923796383642016
+  y: -0.6524278933371906
+  z: 0.9094763530288582
