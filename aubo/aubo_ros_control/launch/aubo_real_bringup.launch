@@ -6,6 +6,11 @@
   <arg name="robot_xacro" default="aubo_i5_with_camera.xacro"/>
   <arg name="robot_srdf" default="aubo_i5_with_camera.srdf"/>
   <arg name="use_sensor_manager" default="false"/>
+  <!-- 运动指令源：move_group（ROS/MoveIt 接管）或 teach_pendant（示教器接管）。
+       使用映射表可令非法取值在 roslaunch 解析阶段直接报错。 -->
+  <arg name="motion_source" default="move_group"/>
+  <arg name="enable_motion_control"
+       value="$(eval {'move_group': true, 'teach_pendant': false}[arg('motion_source')])"/>
 
   <!-- 先建立真机 ros_control 通道，并由该入口统一加载 URDF/SRDF。 -->
   <include file="$(find aubo_ros_control)/launch/aubo_control.launch">
@@ -14,6 +19,7 @@
     <arg name="require_real_robot" value="true"/>
     <arg name="robot_xacro" value="$(arg robot_xacro)"/>
     <arg name="robot_srdf" value="$(arg robot_srdf)"/>
+    <arg name="enable_motion_control" value="$(arg enable_motion_control)"/>
   </include>
 
   <node name="robot_state_publisher" pkg="robot_state_publisher"
@@ -26,10 +32,11 @@
     <rosparam param="source_list">[/aubo_i5/joint_states]</rosparam>
   </node>
 
-  <!-- move_group 使用真实轨迹执行，不能在此入口启用 fake_execution。 -->
+  <!-- 示教器模式仍启动 move_group 供规划/可视化使用，但关闭轨迹执行，
+       从而不会向未加载的 aubo_i5_controller 下发动作。 -->
   <include file="$(find aubo_moveit_config)/launch/move_group.launch">
     <arg name="load_robot_description" value="false"/>
-    <arg name="allow_trajectory_execution" value="true"/>
+    <arg name="allow_trajectory_execution" value="$(arg enable_motion_control)"/>
     <arg name="fake_execution" value="false"/>
     <arg name="robot_xacro" value="$(arg robot_xacro)"/>
     <arg name="robot_srdf" value="$(arg robot_srdf)"/>

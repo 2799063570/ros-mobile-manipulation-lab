@@ -8,6 +8,8 @@
   <arg name="password" default="123456"/>
   <arg name="collision_class" default="6"/>
   <arg name="control_frequency" default="250.0"/>
+  <!-- true: ros_control/MoveIt 接管运动；false: 仅读取状态，运动由示教器控制。 -->
+  <arg name="enable_motion_control" default="true"/>
   <arg name="load_robot_description" default="true"/>
   <arg name="require_real_robot" default="true"/>
   <arg name="robot_xacro" default="aubo_i5_with_camera.xacro"/>
@@ -36,8 +38,8 @@
       <param name="collision_class" value="$(arg collision_class)"/>
       <param name="control_frequency" value="$(arg control_frequency)"/>
       <param name="require_real_robot" value="$(arg require_real_robot)"/>
-      <!-- 启用真机运动及指令平滑；硬件节点异常退出时 required 会终止整个 launch。 -->
-      <param name="enable_motion_control" value="true"/>
+      <!-- 是否由 ros_control 接管真机运动；硬件节点异常退出时 required 会终止整个 launch。 -->
+      <param name="enable_motion_control" value="$(arg enable_motion_control)"/>
       <param name="enable_command_smoothing" value="true"/>
       <param name="command_filter_alpha" value="0.25"/>
       <param name="command_deadband" value="0.0005"/>
@@ -47,8 +49,12 @@
          wrist1_joint, wrist2_joint, wrist3_joint]
       </rosparam>
     </node>
-    <!-- 同时启动关节状态发布器和 MoveIt 使用的六轴轨迹控制器。 -->
+    <!-- 两种模式都发布关节状态；仅上层运动模式加载六轴轨迹控制器。 -->
     <node name="controller_spawner" pkg="controller_manager" type="spawner"
-          output="screen" args="joint_state_controller aubo_i5_controller"/>
+          output="screen" args="joint_state_controller aubo_i5_controller"
+          if="$(arg enable_motion_control)"/>
+    <node name="controller_spawner" pkg="controller_manager" type="spawner"
+          output="screen" args="joint_state_controller"
+          unless="$(arg enable_motion_control)"/>
   </group>
 </launch>
