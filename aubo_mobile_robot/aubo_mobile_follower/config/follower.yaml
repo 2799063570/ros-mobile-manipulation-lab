@@ -15,7 +15,14 @@ laser:
   angle_deadband: 0.06
   distance_deadband: 0.08
   linear_kp: 0.55
+  linear_ki: 0.0
+  linear_kd: 0.0
   angular_kp: 1.4
+  angular_ki: 0.0
+  angular_kd: 0.0
+  derivative_filter_alpha: 0.25
+  linear_integral_limit: 1.0
+  angular_integral_limit: 1.0
   max_linear_speed: 0.30
   max_reverse_speed: 0.12
   max_angular_speed: 0.65
@@ -29,7 +36,14 @@ color:
   x_deadband: 0.06
   area_deadband: 0.012
   linear_kp: 1.2
+  linear_ki: 0.0
+  linear_kd: 0.0
   angular_kp: 1.1
+  angular_ki: 0.0
+  angular_kd: 0.0
+  derivative_filter_alpha: 0.25
+  linear_integral_limit: 1.0
+  angular_integral_limit: 1.0
   max_linear_speed: 0.24
   max_reverse_speed: 0.08
   max_angular_speed: 0.55
@@ -42,5 +56,8 @@ line:
   min_mask_fraction: 0.006
   linear_speed: 0.16
   angular_kp: 0.9
+  angular_ki: 0.0
   angular_kd: 0.12
+  derivative_filter_alpha: 0.25
+  angular_integral_limit: 1.0
   max_angular_speed: 0.55

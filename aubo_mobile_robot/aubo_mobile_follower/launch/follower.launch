@@ -3,9 +3,20 @@
   <!-- Internal reusable entry. Use laser_follow.launch, color_follow.launch or
        line_follow.launch instead of invoking this file directly. -->
   <arg name="follower_type"/>
+  <arg name="controller_namespace"/>
   <arg name="arm_target"/>
+  <arg name="linear_kp"/>
+  <arg name="linear_ki"/>
+  <arg name="linear_kd"/>
+  <arg name="angular_kp"/>
+  <arg name="angular_ki"/>
+  <arg name="angular_kd"/>
+  <arg name="derivative_filter_alpha"/>
+  <arg name="linear_integral_limit"/>
+  <arg name="angular_integral_limit"/>
   <arg name="wait_for_camera" default="false"/>
   <arg name="camera_topic" default="/hand_camera/image_raw"/>
+  <arg name="move_group_wait_timeout" default="60.0"/>
   <arg name="scan_topic" default="/scan"/>
   <arg name="start_robot" default="false"/>
   <arg name="start_moveit" default="true"/>
@@ -40,6 +51,7 @@
     <param name="target" value="$(arg arm_target)"/>
     <param name="wait_for_camera" value="$(arg wait_for_camera)"/>
     <param name="camera_topic" value="$(arg camera_topic)"/>
+    <param name="move_group_wait_timeout" value="$(arg move_group_wait_timeout)"/>
     <param name="ready_topic" value="/aubo_mobile_follower/arm_ready"/>
   </node>
 
@@ -50,6 +62,15 @@
       <param name="image_topic" value="$(arg camera_topic)"/>
       <param name="scan_topic" value="$(arg scan_topic)"/>
       <param name="cmd_vel_topic" value="$(arg safe_follower_cmd_vel_topic)"/>
+      <param name="$(arg controller_namespace)/linear_kp" value="$(arg linear_kp)"/>
+      <param name="$(arg controller_namespace)/linear_ki" value="$(arg linear_ki)"/>
+      <param name="$(arg controller_namespace)/linear_kd" value="$(arg linear_kd)"/>
+      <param name="$(arg controller_namespace)/angular_kp" value="$(arg angular_kp)"/>
+      <param name="$(arg controller_namespace)/angular_ki" value="$(arg angular_ki)"/>
+      <param name="$(arg controller_namespace)/angular_kd" value="$(arg angular_kd)"/>
+      <param name="$(arg controller_namespace)/derivative_filter_alpha" value="$(arg derivative_filter_alpha)"/>
+      <param name="$(arg controller_namespace)/linear_integral_limit" value="$(arg linear_integral_limit)"/>
+      <param name="$(arg controller_namespace)/angular_integral_limit" value="$(arg angular_integral_limit)"/>
     </node>
     <include file="$(find aubo_mobile_navigation)/launch/laser_safety_filter.launch">
       <arg name="scan_topic" value="$(arg scan_topic)"/>
@@ -70,6 +91,15 @@
       <param name="image_topic" value="$(arg camera_topic)"/>
       <param name="scan_topic" value="$(arg scan_topic)"/>
       <param name="cmd_vel_topic" value="$(arg direct_follower_cmd_vel_topic)"/>
+      <param name="$(arg controller_namespace)/linear_kp" value="$(arg linear_kp)"/>
+      <param name="$(arg controller_namespace)/linear_ki" value="$(arg linear_ki)"/>
+      <param name="$(arg controller_namespace)/linear_kd" value="$(arg linear_kd)"/>
+      <param name="$(arg controller_namespace)/angular_kp" value="$(arg angular_kp)"/>
+      <param name="$(arg controller_namespace)/angular_ki" value="$(arg angular_ki)"/>
+      <param name="$(arg controller_namespace)/angular_kd" value="$(arg angular_kd)"/>
+      <param name="$(arg controller_namespace)/derivative_filter_alpha" value="$(arg derivative_filter_alpha)"/>
+      <param name="$(arg controller_namespace)/linear_integral_limit" value="$(arg linear_integral_limit)"/>
+      <param name="$(arg controller_namespace)/angular_integral_limit" value="$(arg angular_integral_limit)"/>
     </node>
   </group>
 </launch>

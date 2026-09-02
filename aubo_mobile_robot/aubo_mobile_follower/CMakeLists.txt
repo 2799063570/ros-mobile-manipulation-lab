@@ -29,6 +29,8 @@ catkin_install_python(PROGRAMS
 
 if(CATKIN_ENABLE_TESTING)
   catkin_add_nosetests(test/test_semantic_drive_core.py)
+  catkin_add_nosetests(test/test_image_message.py)
+  catkin_add_nosetests(test/test_pid.py)
 endif()
 
 install(DIRECTORY config launch models rviz worlds

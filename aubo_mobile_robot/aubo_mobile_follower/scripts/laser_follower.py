@@ -9,16 +9,12 @@ import math
 import threading
 
 import rospy
+from aubo_mobile_follower.pid import FilteredPid
 from geometry_msgs.msg import Point
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Bool, String
 from visualization_msgs.msg import Marker, MarkerArray
-
-
-def clamp(value, lower, upper):
-    return max(lower, min(upper, value))
-
 
 class LaserFollower(object):
     def __init__(self):
@@ -48,7 +44,20 @@ class LaserFollower(object):
         self.angle_deadband = float(rospy.get_param("~laser/angle_deadband", 0.06))
         self.distance_deadband = float(rospy.get_param("~laser/distance_deadband", 0.08))
         self.linear_kp = float(rospy.get_param("~laser/linear_kp", 0.55))
+        self.linear_ki = float(rospy.get_param("~laser/linear_ki", 0.0))
+        self.linear_kd = float(rospy.get_param("~laser/linear_kd", 0.0))
         self.angular_kp = float(rospy.get_param("~laser/angular_kp", 1.4))
+        self.angular_ki = float(rospy.get_param("~laser/angular_ki", 0.0))
+        self.angular_kd = float(rospy.get_param("~laser/angular_kd", 0.0))
+        self.derivative_filter_alpha = float(
+            rospy.get_param("~laser/derivative_filter_alpha", 0.25)
+        )
+        self.linear_integral_limit = float(
+            rospy.get_param("~laser/linear_integral_limit", 1.0)
+        )
+        self.angular_integral_limit = float(
+            rospy.get_param("~laser/angular_integral_limit", 1.0)
+        )
         self.max_linear_speed = float(rospy.get_param("~laser/max_linear_speed", 0.30))
         self.max_reverse_speed = float(rospy.get_param("~laser/max_reverse_speed", 0.12))
         self.max_angular_speed = float(rospy.get_param("~laser/max_angular_speed", 0.65))
@@ -58,6 +67,20 @@ class LaserFollower(object):
         self._target = None
         self._last_target = None
         self._last_scan_time = None
+        self._linear_pid = FilteredPid(
+            self.linear_kp,
+            self.linear_ki,
+            self.linear_kd,
+            self.derivative_filter_alpha,
+            self.linear_integral_limit,
+        )
+        self._angular_pid = FilteredPid(
+            self.angular_kp,
+            self.angular_ki,
+            self.angular_kd,
+            self.derivative_filter_alpha,
+            self.angular_integral_limit,
+        )
 
         self._command_publisher = rospy.Publisher(
             self.cmd_vel_topic, Twist, queue_size=2
@@ -260,15 +283,15 @@ class LaserFollower(object):
             scan_time = self._last_scan_time
 
         if not ready:
-            self._stop()
+            self._stop(reset_pid=True)
             rospy.logwarn_throttle(2.0, "Laser follower waiting for the arm transport pose")
             return
         if scan_time is None or (now - scan_time).to_sec() > self.sensor_timeout:
-            self._stop()
+            self._stop(reset_pid=True)
             rospy.logwarn_throttle(2.0, "Laser follower scan timeout")
             return
         if target is None:
-            self._stop()
+            self._stop(reset_pid=True)
             self._state_publisher.publish(String(data="laser_target_lost"))
             return
 
@@ -279,20 +302,30 @@ class LaserFollower(object):
             distance_error = 0.0
 
         command = Twist()
-        command.angular.z = clamp(
-            self.angular_kp * angle_error,
+        measurement_time = scan_time.to_sec()
+        if angle_error == 0.0:
+            self._angular_pid.reset()
+        command.angular.z = self._angular_pid.update(
+            angle_error,
+            measurement_time,
             -self.max_angular_speed,
             self.max_angular_speed,
         )
-        command.linear.x = clamp(
-            self.linear_kp * distance_error,
+        if distance_error == 0.0:
+            self._linear_pid.reset()
+        command.linear.x = self._linear_pid.update(
+            distance_error,
+            measurement_time,
             -self.max_reverse_speed,
             self.max_linear_speed,
         )
         self._command_publisher.publish(command)
         self._state_publisher.publish(String(data="laser_following"))
 
-    def _stop(self):
+    def _stop(self, reset_pid=False):
+        if reset_pid:
+            self._linear_pid.reset()
+            self._angular_pid.reset()
         self._command_publisher.publish(Twist())
 
 

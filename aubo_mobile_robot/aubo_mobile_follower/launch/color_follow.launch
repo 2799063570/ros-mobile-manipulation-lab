@@ -7,19 +7,40 @@
   <arg name="start_scan_merger" default="true"/>
   <arg name="use_laser_safety" default="true"/>
   <arg name="camera_topic" default="/hand_camera/image_raw"/>
+  <arg name="move_group_wait_timeout" default="60.0"/>
   <arg name="world" default="$(find aubo_mobile_follower)/worlds/color_follow.world"/>
   <arg name="gui" default="true"/>
   <arg name="start_rviz" default="true"/>
   <arg name="start_rqt_reconfigure" default="false"/>
   <arg name="start_path_trail" default="true"/>
   <arg name="start_target_control" default="true"/>
+  <arg name="linear_kp" default="1.2"/>
+  <arg name="linear_ki" default="0.0"/>
+  <arg name="linear_kd" default="0.0"/>
+  <arg name="angular_kp" default="1.1"/>
+  <arg name="angular_ki" default="0.0"/>
+  <arg name="angular_kd" default="0.0"/>
+  <arg name="derivative_filter_alpha" default="0.25"/>
+  <arg name="linear_integral_limit" default="1.0"/>
+  <arg name="angular_integral_limit" default="1.0"/>
 
   <include file="$(find aubo_mobile_follower)/launch/follower.launch">
     <arg name="follower_type" value="color_follower.py"/>
+    <arg name="controller_namespace" value="color"/>
     <!-- Dedicated joint state: hand-camera axis is aligned with mobile-base +X. -->
     <arg name="arm_target" value="follow_forward"/>
+    <arg name="linear_kp" value="$(arg linear_kp)"/>
+    <arg name="linear_ki" value="$(arg linear_ki)"/>
+    <arg name="linear_kd" value="$(arg linear_kd)"/>
+    <arg name="angular_kp" value="$(arg angular_kp)"/>
+    <arg name="angular_ki" value="$(arg angular_ki)"/>
+    <arg name="angular_kd" value="$(arg angular_kd)"/>
+    <arg name="derivative_filter_alpha" value="$(arg derivative_filter_alpha)"/>
+    <arg name="linear_integral_limit" value="$(arg linear_integral_limit)"/>
+    <arg name="angular_integral_limit" value="$(arg angular_integral_limit)"/>
     <arg name="wait_for_camera" value="true"/>
     <arg name="camera_topic" value="$(arg camera_topic)"/>
+    <arg name="move_group_wait_timeout" value="$(arg move_group_wait_timeout)"/>
     <arg name="start_robot" value="$(arg start_robot)"/>
     <arg name="start_moveit" value="$(arg start_moveit)"/>
     <arg name="start_scan_merger" value="$(arg start_scan_merger)"/>

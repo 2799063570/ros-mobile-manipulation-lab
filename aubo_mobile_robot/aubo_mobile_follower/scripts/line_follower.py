@@ -12,6 +12,8 @@ import cv_bridge
 import numpy as np
 import rospy
 from aubo_mobile_follower.cfg import LineFollowerConfig
+from aubo_mobile_follower.image_message import bgr8_to_imgmsg
+from aubo_mobile_follower.pid import FilteredPid
 from dynamic_reconfigure.server import Server
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import Image
@@ -55,7 +57,14 @@ class LineFollower(object):
         )
         self.linear_speed = float(rospy.get_param("~line/linear_speed", 0.16))
         self.angular_kp = float(rospy.get_param("~line/angular_kp", 0.9))
+        self.angular_ki = float(rospy.get_param("~line/angular_ki", 0.0))
         self.angular_kd = float(rospy.get_param("~line/angular_kd", 0.12))
+        self.derivative_filter_alpha = float(
+            rospy.get_param("~line/derivative_filter_alpha", 0.25)
+        )
+        self.angular_integral_limit = float(
+            rospy.get_param("~line/angular_integral_limit", 1.0)
+        )
         self.max_angular_speed = float(
             rospy.get_param("~line/max_angular_speed", 0.55)
         )
@@ -64,10 +73,8 @@ class LineFollower(object):
         self._lock = threading.Lock()
         self._arm_ready = not self.require_arm_ready
         self._line_error = None
-        self._error_derivative = 0.0
-        self._previous_error = None
-        self._previous_time = None
         self._last_image_time = None
+        self._angular_pid = FilteredPid()
 
         initial_configuration = {
             "h_min": int(self.hsv_lower[0]),
@@ -80,7 +87,10 @@ class LineFollower(object):
             "min_mask_fraction": self.min_mask_fraction,
             "linear_speed": self.linear_speed,
             "angular_kp": self.angular_kp,
+            "angular_ki": self.angular_ki,
             "angular_kd": self.angular_kd,
+            "derivative_filter_alpha": self.derivative_filter_alpha,
+            "angular_integral_limit": self.angular_integral_limit,
             "max_angular_speed": self.max_angular_speed,
         }
         self._reconfigure_server = Server(
@@ -126,14 +136,24 @@ class LineFollower(object):
             self.min_mask_fraction = config["min_mask_fraction"]
             self.linear_speed = config["linear_speed"]
             self.angular_kp = config["angular_kp"]
+            self.angular_ki = config["angular_ki"]
             self.angular_kd = config["angular_kd"]
+            self.derivative_filter_alpha = config["derivative_filter_alpha"]
+            self.angular_integral_limit = config["angular_integral_limit"]
+            self._angular_pid.set_gains(
+                self.angular_kp,
+                self.angular_ki,
+                self.angular_kd,
+                self.derivative_filter_alpha,
+                self.angular_integral_limit,
+            )
             self.max_angular_speed = config["max_angular_speed"]
         return config
 
     def _image_callback(self, message):
         try:
             frame = self.bridge.imgmsg_to_cv2(message, desired_encoding="bgr8")
-        except cv_bridge.CvBridgeError as error:
+        except (cv_bridge.CvBridgeError, KeyError, TypeError, ValueError) as error:
             rospy.logwarn_throttle(2.0, "Cannot decode line image: %s", str(error))
             return
 
@@ -169,57 +189,39 @@ class LineFollower(object):
         cv2.line(frame, (0, roi_top), (width - 1, roi_top), (0, 255, 255), 1)
 
         now = rospy.Time.now()
-        derivative = 0.0
-        if (
-            error is not None
-            and self._previous_error is not None
-            and self._previous_time is not None
-        ):
-            delta = (now - self._previous_time).to_sec()
-            if delta > 1.0e-4:
-                derivative = (error - self._previous_error) / delta
-
         with self._lock:
             self._line_error = error
-            self._error_derivative = derivative
             self._last_image_time = now
-            if error is not None:
-                self._previous_error = error
-                self._previous_time = now
-            else:
-                self._previous_error = None
-                self._previous_time = None
 
         if self._debug_publisher.get_num_connections() > 0:
             try:
                 self._debug_publisher.publish(
-                    self.bridge.cv2_to_imgmsg(frame, encoding="bgr8")
+                    bgr8_to_imgmsg(frame, header=message.header)
                 )
-            except cv_bridge.CvBridgeError:
-                pass
+            except (TypeError, ValueError) as error:
+                rospy.logwarn_throttle(
+                    2.0, "Cannot encode line debug image: %s", str(error)
+                )
 
     def _control(self, _event):
         now = rospy.Time.now()
         with self._lock:
             ready = self._arm_ready
             error = self._line_error
-            derivative = self._error_derivative
             image_time = self._last_image_time
             linear_speed = self.linear_speed
-            angular_kp = self.angular_kp
-            angular_kd = self.angular_kd
             max_angular_speed = self.max_angular_speed
 
         if not ready:
-            self._stop()
+            self._stop(reset_pid=True)
             rospy.logwarn_throttle(2.0, "Line follower waiting for downward camera pose")
             return
         if image_time is None or (now - image_time).to_sec() > self.sensor_timeout:
-            self._stop()
+            self._stop(reset_pid=True)
             rospy.logwarn_throttle(2.0, "Line follower image timeout")
             return
         if error is None:
-            self._stop()
+            self._stop(reset_pid=True)
             self._state_publisher.publish(String(data="line_lost"))
             return
 
@@ -228,15 +230,20 @@ class LineFollower(object):
         command.linear.x = linear_speed * max(0.35, 1.0 - abs(error))
         # With the wrist-mounted camera in the ``observe`` pose, increasing
         # image x corresponds to a positive base yaw correction.
-        command.angular.z = clamp(
-            angular_kp * error + angular_kd * derivative,
-            -max_angular_speed,
-            max_angular_speed,
-        )
+        with self._lock:
+            command.angular.z = self._angular_pid.update(
+                error,
+                image_time.to_sec(),
+                -max_angular_speed,
+                max_angular_speed,
+            )
         self._command_publisher.publish(command)
         self._state_publisher.publish(String(data="line_following"))
 
-    def _stop(self):
+    def _stop(self, reset_pid=False):
+        if reset_pid:
+            with self._lock:
+                self._angular_pid.reset()
         self._command_publisher.publish(Twist())
 
 

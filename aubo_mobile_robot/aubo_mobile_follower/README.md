@@ -36,8 +36,8 @@ source devel/setup.bash
 # 激光目标跟随
 roslaunch aubo_mobile_follower laser_follow.launch
 
-# 激光跟随 + RViz 诊断（默认同时启动 Gazebo）
-roslaunch aubo_mobile_follower laser_follow_debug.launch
+# 激光仿真调参时生成可拖动的测试目标
+roslaunch aubo_mobile_follower laser_follow.launch spawn_test_target:=true
 
 # 红色色块跟随：红色目标场景 + 前视相机 + RViz 目标控制/轨迹/调试图像
 roslaunch aubo_mobile_follower color_follow.launch
@@ -49,6 +49,10 @@ roslaunch aubo_mobile_follower line_follow.launch
 roslaunch aubo_mobile_follower semantic_line_follow.launch
 ```
 
+`laser_follow.launch` 与颜色、循线入口一样默认启动 Gazebo 机器人。只有已经通过其他
+bringup 启动机器人、加载 `/robot_description`、控制器和前后雷达时，才使用
+`start_robot:=false`；否则 MoveIt 无法构造机器人模型，`/scan` 也不会有数据。
+
 需要运行时调参时，在对应启动命令后增加：
 
 ```bash
@@ -57,13 +61,32 @@ roslaunch aubo_mobile_follower line_follow.launch  start_rqt_reconfigure:=true
 ```
 
 在 `rqt_reconfigure` 左侧选择 `/aubo_mobile_follower`。颜色模式可以动态调整 HSV、
-目标面积、死区、速度和比例增益；循线模式可以动态调整 HSV、ROI、最小掩码面积、
-速度及 PD 增益。修改会立即作用于控制器，不需要重启节点。RViz 中的相机调试图像
+目标面积、死区、速度和 PID 参数；循线模式可以动态调整 HSV、ROI、最小掩码面积、
+速度及转向 PID 参数。修改会立即作用于控制器，不需要重启节点。RViz 中的相机调试图像
 可用于观察阈值和 ROI 调整结果。
+
+常用控制参数也可由 launch 命令直接覆盖。例如：
+
+```bash
+# 激光距离使用 P、转向启用带滤波的 PD
+roslaunch aubo_mobile_follower laser_follow.launch \
+  linear_kp:=0.55 angular_kp:=1.4 angular_kd:=0.08
+
+# 循线 PID（默认 ki=0，仍为 PD）
+roslaunch aubo_mobile_follower line_follow.launch \
+  angular_kp:=0.9 angular_ki:=0.0 angular_kd:=0.12 \
+  derivative_filter_alpha:=0.25 angular_integral_limit:=1.0
+```
+
+`derivative_filter_alpha` 范围为 0～1，越小滤波越强。积分项带状态限幅和输出饱和
+保护；目标丢失、传感器超时、机械臂未就绪或误差进入死区时会清空控制器状态。
+建议先调 P，再逐渐增加 D；只有确认存在持续静差时才使用很小的 I。所有 `ki`
+默认均为 0，以避免目标跳变或速度限幅期间的积分累积。
 
 无桌面环境或只做自动验证时，可以关闭 Gazebo 客户端和 RViz，物理仿真仍会运行：
 
 ```bash
+roslaunch aubo_mobile_follower laser_follow.launch gui:=false start_rviz:=false
 roslaunch aubo_mobile_follower color_follow.launch gui:=false start_rviz:=false
 roslaunch aubo_mobile_follower line_follow.launch  gui:=false start_rviz:=false
 ```
@@ -104,7 +127,7 @@ roslaunch aubo_mobile_follower line_follow.launch start_robot:=false \
 
 ## 参数调整
 
-所有速度、PID、目标距离、HSV 和丢失超时参数都在
+所有速度、PID、D 项滤波、积分限幅、目标距离、HSV 和丢失超时参数都在
 `config/follower.yaml`。调试图像话题：
 
 - `/aubo_mobile_follower/color_debug`
@@ -144,8 +167,7 @@ rostopic pub -r 10 /aubo_mobile_follower/semantic_detection \
 
 激光 RViz 诊断话题为 `/aubo_mobile_follower/laser_debug`：青色球表示通过点数和
 连续性检查的候选点簇，绿色球表示当前控制目标，黄色弧线表示期望跟随距离。
-`laser_follow_debug.launch` 默认还会在车前生成名为 `follower_target` 的红色测试
-立柱，可以通过 `/gazebo/set_model_state` 服务移动；不需要测试目标时传入
-`spawn_test_target:=false`。
+`laser_follow.launch` 默认启动 RViz；传入 `start_rviz:=false` 可关闭。仿真调参时
+传入 `spawn_test_target:=true`，会在车前生成名为 `follower_target` 的红色测试立柱。
 RViz 中的 `Target Control` 使用标准 Interactive Markers 插件显示 X/Y 拉杆；选择
 顶部的 Interact 工具后拖动拉杆，即可实时移动 Gazebo 中的测试立柱。

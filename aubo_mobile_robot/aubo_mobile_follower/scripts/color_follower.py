@@ -12,15 +12,12 @@ import cv_bridge
 import numpy as np
 import rospy
 from aubo_mobile_follower.cfg import ColorFollowerConfig
+from aubo_mobile_follower.image_message import bgr8_to_imgmsg
+from aubo_mobile_follower.pid import FilteredPid
 from dynamic_reconfigure.server import Server
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import Image
 from std_msgs.msg import Bool, String
-
-
-def clamp(value, lower, upper):
-    return max(lower, min(upper, value))
-
 
 class ColorFollower(object):
     def __init__(self):
@@ -56,7 +53,20 @@ class ColorFollower(object):
         self.x_deadband = float(rospy.get_param("~color/x_deadband", 0.06))
         self.area_deadband = float(rospy.get_param("~color/area_deadband", 0.012))
         self.linear_kp = float(rospy.get_param("~color/linear_kp", 1.2))
+        self.linear_ki = float(rospy.get_param("~color/linear_ki", 0.0))
+        self.linear_kd = float(rospy.get_param("~color/linear_kd", 0.0))
         self.angular_kp = float(rospy.get_param("~color/angular_kp", 1.1))
+        self.angular_ki = float(rospy.get_param("~color/angular_ki", 0.0))
+        self.angular_kd = float(rospy.get_param("~color/angular_kd", 0.0))
+        self.derivative_filter_alpha = float(
+            rospy.get_param("~color/derivative_filter_alpha", 0.25)
+        )
+        self.linear_integral_limit = float(
+            rospy.get_param("~color/linear_integral_limit", 1.0)
+        )
+        self.angular_integral_limit = float(
+            rospy.get_param("~color/angular_integral_limit", 1.0)
+        )
         self.max_linear_speed = float(
             rospy.get_param("~color/max_linear_speed", 0.24)
         )
@@ -72,6 +82,8 @@ class ColorFollower(object):
         self._arm_ready = not self.require_arm_ready
         self._target = None
         self._last_image_time = None
+        self._linear_pid = FilteredPid()
+        self._angular_pid = FilteredPid()
 
         initial_configuration = {
             "h_min": int(self.hsv_lower[0]),
@@ -85,7 +97,14 @@ class ColorFollower(object):
             "x_deadband": self.x_deadband,
             "area_deadband": self.area_deadband,
             "linear_kp": self.linear_kp,
+            "linear_ki": self.linear_ki,
+            "linear_kd": self.linear_kd,
             "angular_kp": self.angular_kp,
+            "angular_ki": self.angular_ki,
+            "angular_kd": self.angular_kd,
+            "derivative_filter_alpha": self.derivative_filter_alpha,
+            "linear_integral_limit": self.linear_integral_limit,
+            "angular_integral_limit": self.angular_integral_limit,
             "max_linear_speed": self.max_linear_speed,
             "max_reverse_speed": self.max_reverse_speed,
             "max_angular_speed": self.max_angular_speed,
@@ -134,7 +153,28 @@ class ColorFollower(object):
             self.x_deadband = config["x_deadband"]
             self.area_deadband = config["area_deadband"]
             self.linear_kp = config["linear_kp"]
+            self.linear_ki = config["linear_ki"]
+            self.linear_kd = config["linear_kd"]
             self.angular_kp = config["angular_kp"]
+            self.angular_ki = config["angular_ki"]
+            self.angular_kd = config["angular_kd"]
+            self.derivative_filter_alpha = config["derivative_filter_alpha"]
+            self.linear_integral_limit = config["linear_integral_limit"]
+            self.angular_integral_limit = config["angular_integral_limit"]
+            self._linear_pid.set_gains(
+                self.linear_kp,
+                self.linear_ki,
+                self.linear_kd,
+                self.derivative_filter_alpha,
+                self.linear_integral_limit,
+            )
+            self._angular_pid.set_gains(
+                self.angular_kp,
+                self.angular_ki,
+                self.angular_kd,
+                self.derivative_filter_alpha,
+                self.angular_integral_limit,
+            )
             self.max_linear_speed = config["max_linear_speed"]
             self.max_reverse_speed = config["max_reverse_speed"]
             self.max_angular_speed = config["max_angular_speed"]
@@ -143,7 +183,7 @@ class ColorFollower(object):
     def _image_callback(self, message):
         try:
             frame = self.bridge.imgmsg_to_cv2(message, desired_encoding="bgr8")
-        except cv_bridge.CvBridgeError as error:
+        except (cv_bridge.CvBridgeError, KeyError, TypeError, ValueError) as error:
             rospy.logwarn_throttle(2.0, "Cannot decode follower image: %s", str(error))
             return
 
@@ -185,10 +225,12 @@ class ColorFollower(object):
         if self._debug_publisher.get_num_connections() > 0:
             try:
                 self._debug_publisher.publish(
-                    self.bridge.cv2_to_imgmsg(frame, encoding="bgr8")
+                    bgr8_to_imgmsg(frame, header=message.header)
                 )
-            except cv_bridge.CvBridgeError:
-                pass
+            except (TypeError, ValueError) as error:
+                rospy.logwarn_throttle(
+                    2.0, "Cannot encode follower debug image: %s", str(error)
+                )
 
     def _control(self, _event):
         now = rospy.Time.now()
@@ -199,22 +241,20 @@ class ColorFollower(object):
             target_area_fraction = self.target_area_fraction
             x_deadband = self.x_deadband
             area_deadband = self.area_deadband
-            linear_kp = self.linear_kp
-            angular_kp = self.angular_kp
             max_linear_speed = self.max_linear_speed
             max_reverse_speed = self.max_reverse_speed
             max_angular_speed = self.max_angular_speed
 
         if not ready:
-            self._stop()
+            self._stop(reset_pid=True)
             rospy.logwarn_throttle(2.0, "Colour follower waiting for forward camera pose")
             return
         if image_time is None or (now - image_time).to_sec() > self.sensor_timeout:
-            self._stop()
+            self._stop(reset_pid=True)
             rospy.logwarn_throttle(2.0, "Colour follower image timeout")
             return
         if target is None:
-            self._stop()
+            self._stop(reset_pid=True)
             self._state_publisher.publish(String(data="color_target_lost"))
             return
 
@@ -226,20 +266,32 @@ class ColorFollower(object):
             area_error = 0.0
 
         command = Twist()
-        command.angular.z = clamp(
-            -angular_kp * x_error,
-            -max_angular_speed,
-            max_angular_speed,
-        )
-        command.linear.x = clamp(
-            linear_kp * area_error,
-            -max_reverse_speed,
-            max_linear_speed,
-        )
+        measurement_time = image_time.to_sec()
+        with self._lock:
+            if x_error == 0.0:
+                self._angular_pid.reset()
+            command.angular.z = self._angular_pid.update(
+                -x_error,
+                measurement_time,
+                -max_angular_speed,
+                max_angular_speed,
+            )
+            if area_error == 0.0:
+                self._linear_pid.reset()
+            command.linear.x = self._linear_pid.update(
+                area_error,
+                measurement_time,
+                -max_reverse_speed,
+                max_linear_speed,
+            )
         self._command_publisher.publish(command)
         self._state_publisher.publish(String(data="color_following"))
 
-    def _stop(self):
+    def _stop(self, reset_pid=False):
+        if reset_pid:
+            with self._lock:
+                self._linear_pid.reset()
+                self._angular_pid.reset()
         self._command_publisher.publish(Twist())
 
 

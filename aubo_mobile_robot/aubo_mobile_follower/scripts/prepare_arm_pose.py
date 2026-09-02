@@ -29,6 +29,11 @@ class ArmPosePreparer(object):
         )
         self.camera_timeout = float(rospy.get_param("~camera_timeout", 5.0))
         self.planning_time = float(rospy.get_param("~planning_time", 10.0))
+        self.move_group_wait_timeout = float(
+            rospy.get_param("~move_group_wait_timeout", 60.0)
+        )
+        if self.move_group_wait_timeout <= 0.0:
+            raise ValueError("move_group_wait_timeout must be greater than zero")
 
         self.ready_publisher = rospy.Publisher(
             self.ready_topic, Bool, queue_size=1, latch=True
@@ -39,7 +44,18 @@ class ArmPosePreparer(object):
         self.ready_publisher.publish(Bool(data=False))
         self.state_publisher.publish(String(data="preparing_arm"))
 
-        self.arm = moveit_commander.MoveGroupCommander(self.group_name)
+        rospy.loginfo(
+            "Waiting up to %.1fs for MoveIt group '%s'",
+            self.move_group_wait_timeout,
+            self.group_name,
+        )
+        # Gazebo, ros_control and move_group are started in parallel by the
+        # follower launch.  MoveIt's Python default is only five seconds,
+        # which is shorter than a normal cold Gazebo startup on this robot.
+        self.arm = moveit_commander.MoveGroupCommander(
+            self.group_name,
+            wait_for_servers=self.move_group_wait_timeout,
+        )
         self.arm.set_planning_time(self.planning_time)
         self.arm.set_num_planning_attempts(10)
         self.arm.set_max_velocity_scaling_factor(

@@ -1,16 +1,44 @@
 <?xml version="1.0"?>
 <launch>
-  <arg name="start_robot" default="false"/>
+  <!-- Standalone by default, consistent with color_follow and line_follow.
+       Use start_robot:=false only after an external simulation/robot bringup
+       has loaded robot_description, controllers and lidar publishers. -->
+  <arg name="start_robot" default="true"/>
   <arg name="start_moveit" default="true"/>
   <arg name="start_scan_merger" default="true"/>
   <arg name="use_laser_safety" default="true"/>
+  <arg name="move_group_wait_timeout" default="60.0"/>
   <arg name="world" default="$(find aubo_mobile_robot)/worlds/empty.world"/>
   <arg name="gui" default="true"/>
+  <arg name="start_rviz" default="true"/>
+  <arg name="spawn_test_target" default="false"/>
+  <arg name="target_x" default="2.5"/>
+  <arg name="target_y" default="0.0"/>
+  <arg name="linear_kp" default="0.55"/>
+  <arg name="linear_ki" default="0.0"/>
+  <arg name="linear_kd" default="0.0"/>
+  <arg name="angular_kp" default="1.4"/>
+  <arg name="angular_ki" default="0.0"/>
+  <arg name="angular_kd" default="0.0"/>
+  <arg name="derivative_filter_alpha" default="0.25"/>
+  <arg name="linear_integral_limit" default="1.0"/>
+  <arg name="angular_integral_limit" default="1.0"/>
 
   <include file="$(find aubo_mobile_follower)/launch/follower.launch">
     <arg name="follower_type" value="laser_follower.py"/>
+    <arg name="controller_namespace" value="laser"/>
     <arg name="arm_target" value="transport"/>
+    <arg name="linear_kp" value="$(arg linear_kp)"/>
+    <arg name="linear_ki" value="$(arg linear_ki)"/>
+    <arg name="linear_kd" value="$(arg linear_kd)"/>
+    <arg name="angular_kp" value="$(arg angular_kp)"/>
+    <arg name="angular_ki" value="$(arg angular_ki)"/>
+    <arg name="angular_kd" value="$(arg angular_kd)"/>
+    <arg name="derivative_filter_alpha" value="$(arg derivative_filter_alpha)"/>
+    <arg name="linear_integral_limit" value="$(arg linear_integral_limit)"/>
+    <arg name="angular_integral_limit" value="$(arg angular_integral_limit)"/>
     <arg name="wait_for_camera" value="false"/>
+    <arg name="move_group_wait_timeout" value="$(arg move_group_wait_timeout)"/>
     <arg name="start_robot" value="$(arg start_robot)"/>
     <arg name="start_moveit" value="$(arg start_moveit)"/>
     <arg name="start_scan_merger" value="$(arg start_scan_merger)"/>
@@ -18,4 +46,26 @@
     <arg name="world" value="$(arg world)"/>
     <arg name="gui" value="$(arg gui)"/>
   </include>
+
+  <!-- Optional deterministic target for simulation tuning. -->
+  <node if="$(arg spawn_test_target)" pkg="gazebo_ros" type="spawn_model"
+        name="spawn_follower_test_target" output="screen"
+        args="-sdf -file $(find aubo_mobile_follower)/models/laser_target/model.sdf
+              -model follower_target -x $(arg target_x) -y $(arg target_y) -z 0.5"/>
+
+  <node if="$(arg spawn_test_target)" pkg="aubo_mobile_follower"
+        type="target_interactive_marker.py" name="follower_target_control"
+        output="screen">
+    <param name="model_name" value="follower_target"/>
+    <param name="marker_frame" value="odom"/>
+    <param name="target_z" value="0.5"/>
+  </node>
+
+  <node if="$(arg start_rviz)" pkg="rviz" type="rviz"
+        name="laser_follow_rviz" output="screen"
+        args="-d $(find aubo_mobile_follower)/rviz/laser_follow.rviz">
+    <env name="LIBGL_ALWAYS_SOFTWARE" value="1"/>
+    <env name="__GLX_VENDOR_LIBRARY_NAME" value="mesa"/>
+    <env name="MESA_LOADER_DRIVER_OVERRIDE" value="llvmpipe"/>
+  </node>
 </launch>

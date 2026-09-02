@@ -5,6 +5,7 @@
   <arg name="start_scan_merger" default="true"/>
   <arg name="use_laser_safety" default="true"/>
   <arg name="camera_topic" default="/hand_camera/image_raw"/>
+  <arg name="move_group_wait_timeout" default="60.0"/>
   <arg name="world" default="$(find aubo_mobile_follower)/worlds/line_follow.world"/>
   <arg name="gui" default="true"/>
   <arg name="start_rviz" default="true"/>
@@ -14,12 +15,28 @@
   <arg name="boxes_topic" default="/darknet_ros/bounding_boxes"/>
   <arg name="semantic_config"
        default="$(find aubo_mobile_follower)/config/semantic_actions.yaml"/>
+  <arg name="angular_kp" default="0.9"/>
+  <arg name="angular_ki" default="0.0"/>
+  <arg name="angular_kd" default="0.12"/>
+  <arg name="derivative_filter_alpha" default="0.25"/>
+  <arg name="angular_integral_limit" default="1.0"/>
 
   <include file="$(find aubo_mobile_follower)/launch/follower.launch">
     <arg name="follower_type" value="line_follower.py"/>
+    <arg name="controller_namespace" value="line"/>
     <arg name="arm_target" value="observe"/>
+    <arg name="linear_kp" value="0.0"/>
+    <arg name="linear_ki" value="0.0"/>
+    <arg name="linear_kd" value="0.0"/>
+    <arg name="angular_kp" value="$(arg angular_kp)"/>
+    <arg name="angular_ki" value="$(arg angular_ki)"/>
+    <arg name="angular_kd" value="$(arg angular_kd)"/>
+    <arg name="derivative_filter_alpha" value="$(arg derivative_filter_alpha)"/>
+    <arg name="linear_integral_limit" value="0.0"/>
+    <arg name="angular_integral_limit" value="$(arg angular_integral_limit)"/>
     <arg name="wait_for_camera" value="true"/>
     <arg name="camera_topic" value="$(arg camera_topic)"/>
+    <arg name="move_group_wait_timeout" value="$(arg move_group_wait_timeout)"/>
     <arg name="start_robot" value="$(arg start_robot)"/>
     <arg name="start_moveit" value="$(arg start_moveit)"/>
     <arg name="start_scan_merger" value="$(arg start_scan_merger)"/>
@@ -63,4 +80,3 @@
   <node if="$(arg start_rqt_reconfigure)" pkg="rqt_reconfigure"
         type="rqt_reconfigure" name="semantic_line_follow_reconfigure" output="screen"/>
 </launch>
-
