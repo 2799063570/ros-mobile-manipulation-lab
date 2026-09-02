@@ -12,6 +12,7 @@
   <arg name="goal_x" default="2.15"/>
   <arg name="goal_y" default="0.0"/>
   <arg name="goal_yaw" default="0.0"/>
+  <arg name="mission_implementation" default="python"/>
 
   <include if="$(arg start_rgbd_camera)"
            file="$(find aubo_ros_control)/launch/eye_to_hand_camera_real.launch">
@@ -46,5 +47,6 @@
     <arg name="goal_x" value="$(arg goal_x)"/>
     <arg name="goal_y" value="$(arg goal_y)"/>
     <arg name="goal_yaw" value="$(arg goal_yaw)"/>
+    <arg name="implementation" value="$(arg mission_implementation)"/>
   </include>
 </launch>

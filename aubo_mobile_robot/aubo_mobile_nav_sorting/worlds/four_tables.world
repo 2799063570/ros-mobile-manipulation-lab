@@ -1,0 +1,91 @@
+<?xml version="1.0"?>
+<sdf version="1.6">
+  <world name="aubo_four_table_sorting">
+    <plugin name="aubo_mobile_sorting_grasp" filename="libaubo_grasp_attach_plugin.so">
+      <robot_model>aubo_mobile_robot</robot_model>
+      <palm_link>wrist3_Link</palm_link>
+      <finger_link_1>Link1</finger_link_1>
+      <finger_link_2>Link2</finger_link_2>
+      <object_link>block_link</object_link>
+      <max_attach_distance>0.18</max_attach_distance>
+      <attach_topic>/sorting/grasp/attach</attach_topic>
+      <detach_topic>/sorting/grasp/detach</detach_topic>
+      <status_topic>/sorting/grasp/status</status_topic>
+      <base_lock_topic>/sorting/base_locked</base_lock_topic>
+      <base_link>base_footprint</base_link>
+    </plugin>
+
+    <include><uri>model://ground_plane</uri></include>
+    <include><uri>model://sun</uri></include>
+
+    <model name="boundary_walls">
+      <static>true</static>
+      <link name="walls_link">
+        <collision name="north"><pose>1 4 0.5 0 0 0</pose><geometry><box><size>14 0.12 1</size></box></geometry></collision>
+        <visual name="north_visual"><pose>1 4 0.5 0 0 0</pose><geometry><box><size>14 0.12 1</size></box></geometry></visual>
+        <collision name="south"><pose>1 -4 0.5 0 0 0</pose><geometry><box><size>14 0.12 1</size></box></geometry></collision>
+        <visual name="south_visual"><pose>1 -4 0.5 0 0 0</pose><geometry><box><size>14 0.12 1</size></box></geometry></visual>
+        <collision name="east"><pose>8 0 0.5 0 0 0</pose><geometry><box><size>0.12 8 1</size></box></geometry></collision>
+        <visual name="east_visual"><pose>8 0 0.5 0 0 0</pose><geometry><box><size>0.12 8 1</size></box></geometry></visual>
+        <collision name="west"><pose>-6 0 0.5 0 0 0</pose><geometry><box><size>0.12 8 1</size></box></geometry></collision>
+        <visual name="west_visual"><pose>-6 0 0.5 0 0 0</pose><geometry><box><size>0.12 8 1</size></box></geometry></visual>
+      </link>
+    </model>
+
+    <!-- This wall joins the north boundary. The robot starts to its left and
+         must use the wide southern opening to reach the sorting area. -->
+    <model name="navigation_detour_wall">
+      <static>true</static><pose>-1.20 1.45 0.50 0 0 0</pose>
+      <link name="wall_link">
+        <collision name="collision"><geometry><box><size>0.20 5.10 1.00</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>0.20 5.10 1.00</size></box></geometry><material><ambient>0.28 0.32 0.38 1</ambient><diffuse>0.38 0.44 0.52 1</diffuse></material></visual>
+      </link>
+    </model>
+
+    <!-- The colored 14 cm squares are placement targets. -->
+    <model name="table_1"><static>true</static><pose>1.5 2 0.25 0 0 0</pose><link name="table_link">
+      <collision name="collision"><geometry><box><size>0.8 0.8 0.4</size></box></geometry></collision>
+      <visual name="top"><geometry><box><size>0.8 0.8 0.4</size></box></geometry><material><ambient>0.45 0.45 0.47 1</ambient><diffuse>0.55 0.55 0.57 1</diffuse></material></visual>
+      <visual name="red_pad"><pose>0.24 -0.34 0.202 0 0 0</pose><geometry><box><size>0.14 0.10 0.004</size></box></geometry><material><ambient>0.45 0.02 0.02 1</ambient><diffuse>0.8 0.03 0.03 1</diffuse></material></visual>
+      <visual name="green_pad"><pose>0.24 -0.20 0.202 0 0 0</pose><geometry><box><size>0.14 0.10 0.004</size></box></geometry><material><ambient>0.02 0.40 0.02 1</ambient><diffuse>0.03 0.8 0.03 1</diffuse></material></visual>
+      <visual name="blue_pad"><pose>-0.24 -0.34 0.202 0 0 0</pose><geometry><box><size>0.14 0.10 0.004</size></box></geometry><material><ambient>0.02 0.02 0.45 1</ambient><diffuse>0.03 0.03 0.8 1</diffuse></material></visual>
+    </link></model>
+    <model name="table_2"><static>true</static><pose>5 2 0.25 0 0 0</pose><link name="table_link">
+      <collision name="collision"><geometry><box><size>0.8 0.8 0.4</size></box></geometry></collision>
+      <visual name="top"><geometry><box><size>0.8 0.8 0.4</size></box></geometry><material><ambient>0.45 0.45 0.47 1</ambient><diffuse>0.55 0.55 0.57 1</diffuse></material></visual>
+      <visual name="red_pad"><pose>-0.34 -0.24 0.202 0 0 0</pose><geometry><box><size>0.10 0.14 0.004</size></box></geometry><material><ambient>0.45 0.02 0.02 1</ambient><diffuse>0.8 0.03 0.03 1</diffuse></material></visual>
+      <visual name="green_pad"><pose>-0.20 -0.24 0.202 0 0 0</pose><geometry><box><size>0.10 0.14 0.004</size></box></geometry><material><ambient>0.02 0.40 0.02 1</ambient><diffuse>0.03 0.8 0.03 1</diffuse></material></visual>
+      <visual name="blue_pad"><pose>-0.34 0.24 0.202 0 0 0</pose><geometry><box><size>0.10 0.14 0.004</size></box></geometry><material><ambient>0.02 0.02 0.45 1</ambient><diffuse>0.03 0.03 0.8 1</diffuse></material></visual>
+    </link></model>
+    <model name="table_3"><static>true</static><pose>5 -2 0.25 0 0 0</pose><link name="table_link">
+      <collision name="collision"><geometry><box><size>0.8 0.8 0.4</size></box></geometry></collision>
+      <visual name="top"><geometry><box><size>0.8 0.8 0.4</size></box></geometry><material><ambient>0.45 0.45 0.47 1</ambient><diffuse>0.55 0.55 0.57 1</diffuse></material></visual>
+      <visual name="red_pad"><pose>-0.24 0.34 0.202 0 0 0</pose><geometry><box><size>0.14 0.10 0.004</size></box></geometry><material><ambient>0.45 0.02 0.02 1</ambient><diffuse>0.8 0.03 0.03 1</diffuse></material></visual>
+      <visual name="green_pad"><pose>-0.24 0.20 0.202 0 0 0</pose><geometry><box><size>0.14 0.10 0.004</size></box></geometry><material><ambient>0.02 0.40 0.02 1</ambient><diffuse>0.03 0.8 0.03 1</diffuse></material></visual>
+      <visual name="blue_pad"><pose>0.24 0.34 0.202 0 0 0</pose><geometry><box><size>0.14 0.10 0.004</size></box></geometry><material><ambient>0.02 0.02 0.45 1</ambient><diffuse>0.03 0.03 0.8 1</diffuse></material></visual>
+    </link></model>
+    <model name="table_4"><static>true</static><pose>1.5 -2 0.25 0 0 0</pose><link name="table_link">
+      <collision name="collision"><geometry><box><size>0.8 0.8 0.4</size></box></geometry></collision>
+      <visual name="top"><geometry><box><size>0.8 0.8 0.4</size></box></geometry><material><ambient>0.45 0.45 0.47 1</ambient><diffuse>0.55 0.55 0.57 1</diffuse></material></visual>
+      <visual name="red_pad"><pose>0.34 0.24 0.202 0 0 0</pose><geometry><box><size>0.10 0.14 0.004</size></box></geometry><material><ambient>0.45 0.02 0.02 1</ambient><diffuse>0.8 0.03 0.03 1</diffuse></material></visual>
+      <visual name="green_pad"><pose>0.20 0.24 0.202 0 0 0</pose><geometry><box><size>0.10 0.14 0.004</size></box></geometry><material><ambient>0.02 0.40 0.02 1</ambient><diffuse>0.03 0.8 0.03 1</diffuse></material></visual>
+      <visual name="blue_pad"><pose>0.34 -0.24 0.202 0 0 0</pose><geometry><box><size>0.10 0.14 0.004</size></box></geometry><material><ambient>0.02 0.02 0.45 1</ambient><diffuse>0.03 0.03 0.8 1</diffuse></material></visual>
+    </link></model>
+
+    <!-- Unique names let the grasp plugin select the current table's block. -->
+    <model name="table_1_red_block"><pose>1.62 1.78 0.47 0 0 0</pose><link name="block_link"><gravity>true</gravity><kinematic>false</kinematic><inertial><mass>0.04</mass><inertia><ixx>0.000011</ixx><iyy>0.000011</iyy><izz>0.000011</izz></inertia></inertial><collision name="collision"><max_contacts>20</max_contacts><geometry><box><size>0.04 0.04 0.04</size></box></geometry><surface><friction><ode><mu>20.0</mu><mu2>20.0</mu2></ode></friction><contact><ode><kp>1000000</kp><kd>100</kd><max_vel>0.01</max_vel><min_depth>0.001</min_depth></ode></contact></surface></collision><visual name="visual"><geometry><box><size>0.04 0.04 0.04</size></box></geometry><material><ambient>0.8 0.02 0.02 1</ambient><diffuse>1 0.02 0.02 1</diffuse></material></visual></link></model>
+    <model name="table_1_green_block"><pose>1.50 1.86 0.47 0 0 0</pose><link name="block_link"><gravity>true</gravity><kinematic>false</kinematic><inertial><mass>0.04</mass><inertia><ixx>0.000011</ixx><iyy>0.000011</iyy><izz>0.000011</izz></inertia></inertial><collision name="collision"><max_contacts>20</max_contacts><geometry><box><size>0.04 0.04 0.04</size></box></geometry><surface><friction><ode><mu>20.0</mu><mu2>20.0</mu2></ode></friction><contact><ode><kp>1000000</kp><kd>100</kd><max_vel>0.01</max_vel><min_depth>0.001</min_depth></ode></contact></surface></collision><visual name="visual"><geometry><box><size>0.04 0.04 0.04</size></box></geometry><material><ambient>0.02 0.8 0.02 1</ambient><diffuse>0.02 1 0.02 1</diffuse></material></visual></link></model>
+    <model name="table_1_blue_block"><pose>1.38 1.78 0.47 0 0 0</pose><link name="block_link"><gravity>true</gravity><kinematic>false</kinematic><inertial><mass>0.04</mass><inertia><ixx>0.000011</ixx><iyy>0.000011</iyy><izz>0.000011</izz></inertia></inertial><collision name="collision"><max_contacts>20</max_contacts><geometry><box><size>0.04 0.04 0.04</size></box></geometry><surface><friction><ode><mu>20.0</mu><mu2>20.0</mu2></ode></friction><contact><ode><kp>1000000</kp><kd>100</kd><max_vel>0.01</max_vel><min_depth>0.001</min_depth></ode></contact></surface></collision><visual name="visual"><geometry><box><size>0.04 0.04 0.04</size></box></geometry><material><ambient>0.02 0.02 0.8 1</ambient><diffuse>0.02 0.02 1 1</diffuse></material></visual></link></model>
+    <model name="table_2_red_block"><pose>4.78 1.88 0.47 0 0 0</pose><link name="block_link"><gravity>true</gravity><kinematic>false</kinematic><inertial><mass>0.04</mass><inertia><ixx>0.000011</ixx><iyy>0.000011</iyy><izz>0.000011</izz></inertia></inertial><collision name="collision"><max_contacts>20</max_contacts><geometry><box><size>0.04 0.04 0.04</size></box></geometry><surface><friction><ode><mu>20.0</mu><mu2>20.0</mu2></ode></friction><contact><ode><kp>1000000</kp><kd>100</kd><max_vel>0.01</max_vel><min_depth>0.001</min_depth></ode></contact></surface></collision><visual name="visual"><geometry><box><size>0.04 0.04 0.04</size></box></geometry><material><ambient>0.8 0.02 0.02 1</ambient><diffuse>1 0.02 0.02 1</diffuse></material></visual></link></model>
+    <model name="table_2_green_block"><pose>4.86 2.00 0.47 0 0 0</pose><link name="block_link"><gravity>true</gravity><kinematic>false</kinematic><inertial><mass>0.04</mass><inertia><ixx>0.000011</ixx><iyy>0.000011</iyy><izz>0.000011</izz></inertia></inertial><collision name="collision"><max_contacts>20</max_contacts><geometry><box><size>0.04 0.04 0.04</size></box></geometry><surface><friction><ode><mu>20.0</mu><mu2>20.0</mu2></ode></friction><contact><ode><kp>1000000</kp><kd>100</kd><max_vel>0.01</max_vel><min_depth>0.001</min_depth></ode></contact></surface></collision><visual name="visual"><geometry><box><size>0.04 0.04 0.04</size></box></geometry><material><ambient>0.02 0.8 0.02 1</ambient><diffuse>0.02 1 0.02 1</diffuse></material></visual></link></model>
+    <model name="table_2_blue_block"><pose>4.78 2.12 0.47 0 0 0</pose><link name="block_link"><gravity>true</gravity><kinematic>false</kinematic><inertial><mass>0.04</mass><inertia><ixx>0.000011</ixx><iyy>0.000011</iyy><izz>0.000011</izz></inertia></inertial><collision name="collision"><max_contacts>20</max_contacts><geometry><box><size>0.04 0.04 0.04</size></box></geometry><surface><friction><ode><mu>20.0</mu><mu2>20.0</mu2></ode></friction><contact><ode><kp>1000000</kp><kd>100</kd><max_vel>0.01</max_vel><min_depth>0.001</min_depth></ode></contact></surface></collision><visual name="visual"><geometry><box><size>0.04 0.04 0.04</size></box></geometry><material><ambient>0.02 0.02 0.8 1</ambient><diffuse>0.02 0.02 1 1</diffuse></material></visual></link></model>
+    <model name="table_3_red_block"><pose>4.88 -1.78 0.47 0 0 0</pose><link name="block_link"><gravity>true</gravity><kinematic>false</kinematic><inertial><mass>0.04</mass><inertia><ixx>0.000011</ixx><iyy>0.000011</iyy><izz>0.000011</izz></inertia></inertial><collision name="collision"><max_contacts>20</max_contacts><geometry><box><size>0.04 0.04 0.04</size></box></geometry><surface><friction><ode><mu>20.0</mu><mu2>20.0</mu2></ode></friction><contact><ode><kp>1000000</kp><kd>100</kd><max_vel>0.01</max_vel><min_depth>0.001</min_depth></ode></contact></surface></collision><visual name="visual"><geometry><box><size>0.04 0.04 0.04</size></box></geometry><material><ambient>0.8 0.02 0.02 1</ambient><diffuse>1 0.02 0.02 1</diffuse></material></visual></link></model>
+    <model name="table_3_green_block"><pose>5.00 -1.86 0.47 0 0 0</pose><link name="block_link"><gravity>true</gravity><kinematic>false</kinematic><inertial><mass>0.04</mass><inertia><ixx>0.000011</ixx><iyy>0.000011</iyy><izz>0.000011</izz></inertia></inertial><collision name="collision"><max_contacts>20</max_contacts><geometry><box><size>0.04 0.04 0.04</size></box></geometry><surface><friction><ode><mu>20.0</mu><mu2>20.0</mu2></ode></friction><contact><ode><kp>1000000</kp><kd>100</kd><max_vel>0.01</max_vel><min_depth>0.001</min_depth></ode></contact></surface></collision><visual name="visual"><geometry><box><size>0.04 0.04 0.04</size></box></geometry><material><ambient>0.02 0.8 0.02 1</ambient><diffuse>0.02 1 0.02 1</diffuse></material></visual></link></model>
+    <model name="table_3_blue_block"><pose>5.12 -1.78 0.47 0 0 0</pose><link name="block_link"><gravity>true</gravity><kinematic>false</kinematic><inertial><mass>0.04</mass><inertia><ixx>0.000011</ixx><iyy>0.000011</iyy><izz>0.000011</izz></inertia></inertial><collision name="collision"><max_contacts>20</max_contacts><geometry><box><size>0.04 0.04 0.04</size></box></geometry><surface><friction><ode><mu>20.0</mu><mu2>20.0</mu2></ode></friction><contact><ode><kp>1000000</kp><kd>100</kd><max_vel>0.01</max_vel><min_depth>0.001</min_depth></ode></contact></surface></collision><visual name="visual"><geometry><box><size>0.04 0.04 0.04</size></box></geometry><material><ambient>0.02 0.02 0.8 1</ambient><diffuse>0.02 0.02 1 1</diffuse></material></visual></link></model>
+    <model name="table_4_red_block"><pose>1.72 -1.88 0.47 0 0 0</pose><link name="block_link"><gravity>true</gravity><kinematic>false</kinematic><inertial><mass>0.04</mass><inertia><ixx>0.000011</ixx><iyy>0.000011</iyy><izz>0.000011</izz></inertia></inertial><collision name="collision"><max_contacts>20</max_contacts><geometry><box><size>0.04 0.04 0.04</size></box></geometry><surface><friction><ode><mu>20.0</mu><mu2>20.0</mu2></ode></friction><contact><ode><kp>1000000</kp><kd>100</kd><max_vel>0.01</max_vel><min_depth>0.001</min_depth></ode></contact></surface></collision><visual name="visual"><geometry><box><size>0.04 0.04 0.04</size></box></geometry><material><ambient>0.8 0.02 0.02 1</ambient><diffuse>1 0.02 0.02 1</diffuse></material></visual></link></model>
+    <model name="table_4_green_block"><pose>1.64 -2.00 0.47 0 0 0</pose><link name="block_link"><gravity>true</gravity><kinematic>false</kinematic><inertial><mass>0.04</mass><inertia><ixx>0.000011</ixx><iyy>0.000011</iyy><izz>0.000011</izz></inertia></inertial><collision name="collision"><max_contacts>20</max_contacts><geometry><box><size>0.04 0.04 0.04</size></box></geometry><surface><friction><ode><mu>20.0</mu><mu2>20.0</mu2></ode></friction><contact><ode><kp>1000000</kp><kd>100</kd><max_vel>0.01</max_vel><min_depth>0.001</min_depth></ode></contact></surface></collision><visual name="visual"><geometry><box><size>0.04 0.04 0.04</size></box></geometry><material><ambient>0.02 0.8 0.02 1</ambient><diffuse>0.02 1 0.02 1</diffuse></material></visual></link></model>
+    <model name="table_4_blue_block"><pose>1.72 -2.12 0.47 0 0 0</pose><link name="block_link"><gravity>true</gravity><kinematic>false</kinematic><inertial><mass>0.04</mass><inertia><ixx>0.000011</ixx><iyy>0.000011</iyy><izz>0.000011</izz></inertia></inertial><collision name="collision"><max_contacts>20</max_contacts><geometry><box><size>0.04 0.04 0.04</size></box></geometry><surface><friction><ode><mu>20.0</mu><mu2>20.0</mu2></ode></friction><contact><ode><kp>1000000</kp><kd>100</kd><max_vel>0.01</max_vel><min_depth>0.001</min_depth></ode></contact></surface></collision><visual name="visual"><geometry><box><size>0.04 0.04 0.04</size></box></geometry><material><ambient>0.02 0.02 0.8 1</ambient><diffuse>0.02 0.02 1 1</diffuse></material></visual></link></model>
+
+    <physics name="four_table_physics" type="ode"><max_step_size>0.001</max_step_size><real_time_update_rate>1000</real_time_update_rate><ode><solver><type>quick</type><iters>150</iters><sor>1.3</sor></solver></ode></physics>
+  </world>
+</sdf>

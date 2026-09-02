@@ -1,74 +1,83 @@
-# 第一阶段四桌任务模板。坐标均在 map 下，部署前必须用现场地图重新标定。
+# Four-table Gazebo mission. Fixed-scene coordinates use odom, which coincides
+# with the Gazebo world. Each final dock uses the mission's low-speed cmd_vel.
 navigation_frame: map
 
-# 每张桌子完成后，机械臂收回 transport，再由 move_base 导航到下一张桌子。
-# objects 是“已知物体”接口：当前分拣仍可使用 /sorting/detections；后续感知模块
-# 可更新本参数并调用 /sorting/configure_workspace，或订阅当前工位话题进行融合。
 workstations:
   - id: table_1
-    navigation_goal: [2.00, 0.20, 1.5708]
-    table_frame: map
-    table_center: [2.00, 1.00, 0.25]
+    navigation_goal_frame: odom
+    pre_dock_goal: [1.50, 0.80, 1.5708]
+    navigation_goal: [1.50, 1.15, 1.5708]
+    table_frame: odom
+    table_center: [1.50, 2.00, 0.25]
     table_size: [0.80, 0.80, 0.40]
-    # 抓取高度使用 sorting 核心 target_frame(base_link) 下的标定值。
     table_z: 0.14
-    place_frame: map
+    place_frame: odom
     place_targets:
-      red: [1.82, 0.88]
-      green: [2.00, 0.88]
-      blue: [2.18, 0.88]
+      red: [1.74, 1.66]
+      green: [1.74, 1.80]
+      blue: [1.26, 1.66]
+    grasp_model_names: {red: table_1_red_block, green: table_1_green_block, blue: table_1_blue_block}
     objects:
-      - {id: table_1_red, color: red, position: [1.88, 1.08, 0.49]}
-      - {id: table_1_green, color: green, position: [2.00, 1.08, 0.49]}
-      - {id: table_1_blue, color: blue, position: [2.12, 1.08, 0.49]}
+      - {id: table_1_red_block, color: red, position: [1.62, 1.78, 0.47]}
+      - {id: table_1_green_block, color: green, position: [1.50, 1.86, 0.47]}
+      - {id: table_1_blue_block, color: blue, position: [1.38, 1.78, 0.47]}
 
   - id: table_2
-    navigation_goal: [3.20, 1.00, 0.0]
-    table_frame: map
-    table_center: [4.00, 1.00, 0.25]
+    navigation_goal_frame: odom
+    pre_dock_goal: [3.80, 2.00, 0.0]
+    navigation_goal: [4.15, 2.00, 0.0]
+    table_frame: odom
+    table_center: [5.00, 2.00, 0.25]
     table_size: [0.80, 0.80, 0.40]
     table_z: 0.14
-    place_frame: map
+    place_frame: odom
     place_targets:
-      red: [3.88, 0.82]
-      green: [3.88, 1.00]
-      blue: [3.88, 1.18]
+      red: [4.66, 1.76]
+      green: [4.80, 1.76]
+      blue: [4.66, 2.24]
+    grasp_model_names: {red: table_2_red_block, green: table_2_green_block, blue: table_2_blue_block}
     objects:
-      - {id: table_2_red, color: red, position: [4.08, 0.88, 0.49]}
-      - {id: table_2_green, color: green, position: [4.08, 1.00, 0.49]}
-      - {id: table_2_blue, color: blue, position: [4.08, 1.12, 0.49]}
+      - {id: table_2_red_block, color: red, position: [4.78, 1.88, 0.47]}
+      - {id: table_2_green_block, color: green, position: [4.86, 2.00, 0.47]}
+      - {id: table_2_blue_block, color: blue, position: [4.78, 2.12, 0.47]}
 
   - id: table_3
-    navigation_goal: [4.00, -0.20, -1.5708]
-    table_frame: map
-    table_center: [4.00, -1.00, 0.25]
+    navigation_goal_frame: odom
+    pre_dock_goal: [5.00, -0.80, -1.5708]
+    navigation_goal: [5.00, -1.15, -1.5708]
+    table_frame: odom
+    table_center: [5.00, -2.00, 0.25]
     table_size: [0.80, 0.80, 0.40]
     table_z: 0.14
-    place_frame: map
+    place_frame: odom
     place_targets:
-      red: [4.18, -0.88]
-      green: [4.00, -0.88]
-      blue: [3.82, -0.88]
+      red: [4.76, -1.66]
+      green: [4.76, -1.80]
+      blue: [5.24, -1.66]
+    grasp_model_names: {red: table_3_red_block, green: table_3_green_block, blue: table_3_blue_block}
     objects:
-      - {id: table_3_red, color: red, position: [4.12, -1.08, 0.49]}
-      - {id: table_3_green, color: green, position: [4.00, -1.08, 0.49]}
-      - {id: table_3_blue, color: blue, position: [3.88, -1.08, 0.49]}
+      - {id: table_3_red_block, color: red, position: [4.88, -1.78, 0.47]}
+      - {id: table_3_green_block, color: green, position: [5.00, -1.86, 0.47]}
+      - {id: table_3_blue_block, color: blue, position: [5.12, -1.78, 0.47]}
 
   - id: table_4
-    navigation_goal: [2.80, -1.00, 3.14159]
-    table_frame: map
-    table_center: [2.00, -1.00, 0.25]
+    navigation_goal_frame: odom
+    pre_dock_goal: [2.70, -2.00, 3.14159]
+    navigation_goal: [2.35, -2.00, 3.14159]
+    table_frame: odom
+    table_center: [1.50, -2.00, 0.25]
     table_size: [0.80, 0.80, 0.40]
     table_z: 0.14
-    place_frame: map
+    place_frame: odom
     place_targets:
-      red: [2.12, -1.18]
-      green: [2.12, -1.00]
-      blue: [2.12, -0.82]
+      red: [1.84, -1.76]
+      green: [1.70, -1.76]
+      blue: [1.84, -2.24]
+    grasp_model_names: {red: table_4_red_block, green: table_4_green_block, blue: table_4_blue_block}
     objects:
-      - {id: table_4_red, color: red, position: [1.92, -1.12, 0.49]}
-      - {id: table_4_green, color: green, position: [1.92, -1.00, 0.49]}
-      - {id: table_4_blue, color: blue, position: [1.92, -0.88, 0.49]}
+      - {id: table_4_red_block, color: red, position: [1.72, -1.88, 0.47]}
+      - {id: table_4_green_block, color: green, position: [1.64, -2.00, 0.47]}
+      - {id: table_4_blue_block, color: blue, position: [1.72, -2.12, 0.47]}
 
 navigation_action: /move_base
 navigation_timeout: 180.0
@@ -78,17 +87,32 @@ sorting_initialization_timeout: 60.0
 sorting_operation_timeout: 300.0
 home_before_navigation: true
 
-# 机械臂明确发布 PLANNING_FAILED 后，才暂停导航并使用以下 cmd_vel 直移。
-# 每一步只能沿 base_link 的 x 或 y 单轴移动；列表是连续增量，不是绝对坐标。
+# Mandatory table exit: transport pose first, then reverse through cmd_vel.
+post_sort_retreat_enabled: true
+post_sort_retreat_distance: 0.30
+
+near_field_direct_dock_enabled: true
+near_field_direct_dock_max_distance: 0.50
+near_field_direct_dock_lateral_tolerance: 0.08
+near_field_direct_dock_yaw_tolerance: 0.06
+near_field_direct_dock_goal_tolerance: 0.08
+near_field_heading_alignment_enabled: true
+near_field_heading_max_correction: 0.12
+near_field_heading_speed: 0.12
+near_field_heading_goal_tolerance: 0.015
+near_field_heading_final_tolerance: 0.025
+near_field_heading_timeout: 4.0
+near_field_heading_stall_timeout: 1.5
+near_field_direct_dock_timeout: 15.0
+near_field_direct_dock_stall_timeout: 2.5
+near_field_direct_dock_progress_epsilon: 0.005
+
 base_recovery_enabled: true
 base_recovery_cmd_vel_topic: /cmd_vel_raw
 base_recovery_speed: 0.04
 base_recovery_rate: 20.0
 base_recovery_settle_time: 0.8
 base_recovery_steps:
-  - [0.00, 0.06]
-  - [0.00, -0.12]
-  - [0.00, 0.06]
   - [0.05, 0.00]
   - [-0.10, 0.00]
 

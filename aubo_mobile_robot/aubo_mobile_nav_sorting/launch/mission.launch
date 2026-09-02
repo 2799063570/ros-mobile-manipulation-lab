@@ -7,8 +7,20 @@
   <arg name="goal_y" default="0.0"/>
   <arg name="goal_yaw" default="0.0"/>
   <arg name="direct_dock" default="true"/>
+  <!-- python and cpp expose the same parameters, topics and services. -->
+  <arg name="implementation" default="python"/>
 
-  <node pkg="aubo_mobile_nav_sorting" type="nav_sorting_mission.py"
+  <node if="$(eval arg('implementation') == 'python')"
+        pkg="aubo_mobile_nav_sorting" type="nav_sorting_mission.py"
+        name="nav_sorting_mission" output="screen">
+    <rosparam file="$(arg config)" command="load"/>
+    <rosparam param="sorting_goal" subst_value="true">[$(arg goal_x), $(arg goal_y), $(arg goal_yaw)]</rosparam>
+    <param name="near_field_direct_dock_enabled" value="$(arg direct_dock)"/>
+    <param name="auto_start" value="$(arg auto_start)"/>
+  </node>
+
+  <node if="$(eval arg('implementation') == 'cpp')"
+        pkg="aubo_mobile_nav_sorting" type="nav_sorting_mission_cpp"
         name="nav_sorting_mission" output="screen">
     <rosparam file="$(arg config)" command="load"/>
     <rosparam param="sorting_goal" subst_value="true">[$(arg goal_x), $(arg goal_y), $(arg goal_yaw)]</rosparam>

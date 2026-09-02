@@ -59,6 +59,9 @@ detection_samples: 8
 detection_settle_time: 1.0
 verify_observation_detections: true
 observation_verification_timeout: 4.0
+# Validate each color over several camera messages instead of requiring all
+# HSV contours to survive filtering in one identical frame.
+observation_verification_min_frames: 3
 grasp_offset_x: 0.0
 grasp_offset_y: 0.0
 

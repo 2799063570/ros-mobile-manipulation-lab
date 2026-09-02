@@ -10,13 +10,16 @@
   <arg name="auto_start" default="false"/>
   <arg name="use_grasp_attachment" default="true"/>
   <arg name="start_octomap_cloud_filter" default="false"/>
+  <arg name="color_detector_config" default="$(find aubo_mobile_perception)/config/colors.yaml"/>
 
   <include if="$(arg start_octomap_cloud_filter)"
            file="$(find aubo_mobile_perception)/launch/workspace_cloud_filter.launch"/>
 
   <group if="$(arg start_perception)">
     <group if="$(eval arg('perception_mode') == 'color')">
-      <include file="$(find aubo_mobile_perception)/launch/color_detector.launch"/>
+      <include file="$(find aubo_mobile_perception)/launch/color_detector.launch">
+        <arg name="config" value="$(arg color_detector_config)"/>
+      </include>
     </group>
     <group if="$(eval arg('perception_mode') == 'yolo')">
       <include file="$(find aubo_mobile_perception)/launch/yolo_rgbd_detector.launch"/>

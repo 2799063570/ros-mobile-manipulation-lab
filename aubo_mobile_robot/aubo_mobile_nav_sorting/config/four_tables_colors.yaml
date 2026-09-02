@@ -1,0 +1,37 @@
+colors:
+  red:
+    ranges:
+      - {lower: [0, 110, 70], upper: [12, 255, 255]}
+      - {lower: [168, 110, 70], upper: [179, 255, 255]}
+    draw_bgr: [0, 0, 255]
+  green:
+    ranges:
+      - {lower: [38, 70, 55], upper: [88, 255, 255]}
+    draw_bgr: [0, 255, 0]
+  blue:
+    ranges:
+      - {lower: [95, 90, 55], upper: [132, 255, 255]}
+    draw_bgr: [255, 0, 0]
+
+# A 40 mm cube is roughly 700-1800 px^2 from the observation pose. The
+# 100x140 mm placement pads are much larger, so reject them before publishing.
+min_contour_area: 180.0
+max_contour_area: 3000.0
+max_aspect_ratio: 1.6
+morphology_kernel: 5
+
+use_depth: false
+target_frame: base_link
+table_z: 0.14
+object_height: 0.04
+projection_plane_z: 0.18
+object_center_z: 0.16
+workspace_min_x: 0.40
+workspace_max_x: 0.82
+# The three source cubes span 0.24 m laterally. Keep another 0.06 m on each
+# side for the residual base-pose error accepted at the pre-dock goal. Large
+# placement pads remain rejected independently by max_contour_area above.
+workspace_min_y: -0.30
+workspace_max_y: 0.30
+position_offset_x: 0.0
+position_offset_y: 0.0

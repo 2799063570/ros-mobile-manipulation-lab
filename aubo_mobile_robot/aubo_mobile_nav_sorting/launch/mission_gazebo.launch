@@ -11,6 +11,7 @@
   <arg name="goal_y" default="0.0"/>
   <arg name="goal_yaw" default="0.0"/>
   <arg name="direct_dock" default="true"/>
+  <arg name="mission_implementation" default="python"/>
 
   <include file="$(find aubo_mobile_robot)/launch/gazebo.launch">
     <arg name="world" value="$(arg world)"/>
@@ -73,5 +74,6 @@
     <arg name="goal_y" value="$(arg goal_y)"/>
     <arg name="goal_yaw" value="$(arg goal_yaw)"/>
     <arg name="direct_dock" value="$(arg direct_dock)"/>
+    <arg name="implementation" value="$(arg mission_implementation)"/>
   </include>
 </launch>

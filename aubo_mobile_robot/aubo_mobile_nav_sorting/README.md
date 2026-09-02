@@ -67,6 +67,19 @@ RGB-D 相机。相机固定在场景中，不连接移动底盘，也不修改�
 rosservice call /nav_sorting/start
 ```
 
+任务编排节点同时提供 Python 和 C++ 两种实现，对外话题、服务和 YAML 参数兼容。
+默认继续使用 Python；选择 C++ 实现时执行：
+
+```bash
+roslaunch aubo_mobile_nav_sorting four_tables_gazebo.launch \
+  mission_implementation:=cpp
+```
+
+通用 `mission.launch` 对应参数为 `implementation:=python|cpp`。两个实现不能同时启动，
+因为它们有意提供相同的 `/nav_sorting/start`、`/nav_sorting/stop` 和状态话题。
+原单桌入口 `mission_gazebo.launch` 和实机入口 `navigation_sorting.launch` 也支持
+`mission_implementation:=cpp`。
+
 需要启动后自动执行一次：
 
 ```bash
@@ -117,8 +130,37 @@ rostopic echo /sorting/state
 
 ## 5. 四张桌子的第一阶段配置
 
-`config/four_tables.yaml` 提供与手绘路线一致的四工位模板。模板坐标只是接口示例，
-必须按现场 `map` 重新标定后再让真机执行：
+四桌 Gazebo 场景已经包含四张桌子、每桌三种颜色方块、配套静态地图和连续任务入口：
+
+场地范围为 `14 x 8 m`。机器人从左侧 `(-4, 0)` 出发，纵向隔墙连接北侧边界，
+因此前往第一桌时必须从墙体南端绕行；四桌之间保留了足够的局部规划和转向空间。
+
+```bash
+roslaunch aubo_mobile_nav_sorting four_tables_gazebo.launch
+rosservice call /nav_sorting/start
+```
+
+四桌场景默认使用适合差速底盘和窄通道轨迹优化的 TEB 局部规划器；需要和原来的
+DWA 做对照或回退时，可以在启动时选择：
+
+```bash
+roslaunch aubo_mobile_nav_sorting four_tables_gazebo.launch local_planner:=teb
+roslaunch aubo_mobile_nav_sorting four_tables_gazebo.launch local_planner:=dwa
+```
+
+TEB 和 DWA 共用相同的全局路径、预停靠点与最终直线精停逻辑，参数分别位于
+`config/four_tables_navigation.yaml` 的 `TebLocalPlannerROS` 和 `DWAPlannerROS`
+命名空间。
+
+也可以用 `auto_start:=true` 自动开始。每个工位都先由 `move_base` 到预停靠点，随后用
+低速 `/cmd_vel_raw` 直行精靠。每桌完成后的固定顺序为：机械臂回到 `transport`
+移动姿态、底盘通过 `/cmd_vel_raw` 后退 0.30 m、再导航到下一桌；最后一桌也会后退。
+后退过程读取 TF 闭环判断距离，并保留激光安全过滤及无进展超时。
+四桌入口使用独立的 `config/four_tables_colors.yaml`，通过轮廓面积上限排除桌面上的
+大尺寸红绿蓝放置区，只发布 40 mm 待抓取方块。
+
+`config/four_tables.yaml` 同时可作为实机四工位模板。Gazebo 中的坐标已经标定，迁移到
+真机时仍必须按现场 `map` 重新标定：
 
 ```bash
 roslaunch aubo_mobile_nav_sorting mission.launch \
@@ -128,10 +170,15 @@ rosservice call /nav_sorting/start
 
 每个 `workstations` 条目包含：
 
-- `navigation_goal`：完成上一桌后发给 `move_base` 的 `[x, y, yaw]`；
+- `navigation_goal_frame`：预停靠和精停目标的标定坐标系；Gazebo 固定桌面使用
+  `odom`，避免 AMCL 的 `map -> odom` 修正改变机器人与桌子的物理间距；
+- `pre_dock_goal`：交给 `move_base` 的安全预停靠位姿；
+- `navigation_goal`：从预停靠点低速直行到达的最终工作位姿 `[x, y, yaw]`；
 - `table_center/table_size/table_z`：桌子碰撞体与抓取高度；
 - `place_targets`：该桌红、绿、蓝放置点；
 - `objects`：第一阶段的已知物体清单，后续感知模块可更新；
+- `grasp_model_names`：Gazebo 中当前桌红、绿、蓝方块的唯一模型名；
+- `retreat_enabled/retreat_distance`（可选）：覆盖该桌完成后的后退策略；
 - `enabled`（可选）：是否跳过该桌。
 
 当前工位的完整 JSON 会锁存发布到 `/nav_sorting/current_workstation`。任务节点同时把

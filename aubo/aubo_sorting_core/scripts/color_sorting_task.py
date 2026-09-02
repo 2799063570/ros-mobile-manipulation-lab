@@ -100,6 +100,7 @@ class ColorSortingTask(object):
             rospy.get_param("~grasp_attachment_timeout", 3.0)
         )
         self.sort_colors = rospy.get_param("~sort_colors", ["red", "green", "blue"])
+        self.grasp_model_names = rospy.get_param("~grasp_model_names", {})
         self.place_frame = rospy.get_param("~place_frame", self.target_frame)
         self.place_targets = rospy.get_param("~place_targets")
         self.detection_timeout = float(rospy.get_param("~detection_timeout", 15.0))
@@ -114,6 +115,10 @@ class ColorSortingTask(object):
         )
         self.observation_verification_timeout = float(
             rospy.get_param("~observation_verification_timeout", 4.0)
+        )
+        self.observation_verification_min_frames = max(
+            1,
+            int(rospy.get_param("~observation_verification_min_frames", 1)),
         )
         self.grasp_offset_x = float(rospy.get_param("~grasp_offset_x", 0.0))
         self.grasp_offset_y = float(rospy.get_param("~grasp_offset_y", 0.0))
@@ -333,6 +338,11 @@ class ColorSortingTask(object):
         table_z = float(workspace.get("table_z", self.table_z))
         place_frame = str(workspace.get("place_frame", self.place_frame))
         place_targets = workspace.get("place_targets", self.place_targets)
+        grasp_model_names = workspace.get(
+            "grasp_model_names", self.grasp_model_names
+        )
+        if not isinstance(grasp_model_names, dict):
+            raise ValueError("workspace 'grasp_model_names' must be a mapping")
         if not isinstance(place_targets, dict):
             raise ValueError("workspace 'place_targets' must be a mapping")
         for color in self.sort_colors:
@@ -349,6 +359,10 @@ class ColorSortingTask(object):
         self.place_targets = dict(
             (str(color), [float(value) for value in target])
             for color, target in place_targets.items()
+        )
+        self.grasp_model_names = dict(
+            (str(color), str(model_name))
+            for color, model_name in grasp_model_names.items()
         )
         self._workspace_id = workspace_id
         self._completed_colors = set()
@@ -1274,24 +1288,53 @@ class ColorSortingTask(object):
             return True
         not_before = time.time()
         deadline = not_before + self.observation_verification_timeout
+        visible_counts = dict((color, 0) for color in required)
+        last_receipt_time = not_before
         while not rospy.is_shutdown() and time.time() < deadline:
             if self._stop_requested.is_set():
                 return False
             with self._data_lock:
                 detections = self._detections
                 receipt_time = self._detections_wall_time
-            if detections is not None and receipt_time > not_before:
+            # Count each detector message only once. Required colors do not
+            # need to occur in the very same frame: Gazebo lighting and brief
+            # self-occlusion can make otherwise stable HSV contours alternate.
+            if detections is not None and receipt_time > last_receipt_time:
+                last_receipt_time = receipt_time
                 visible = set(str(item.color) for item in detections.objects)
-                if required.issubset(visible):
+                for color in required.intersection(visible):
+                    visible_counts[color] += 1
+                stable = set(
+                    color
+                    for color, count in visible_counts.items()
+                    if count >= self.observation_verification_min_frames
+                )
+                if required.issubset(stable):
                     rospy.loginfo(
-                        "Observation verified all colors: %s",
-                        ", ".join(sorted(required)),
+                        "Observation verified all colors across frames: %s",
+                        ", ".join(
+                            "{}={}".format(color, visible_counts[color])
+                            for color in sorted(required)
+                        ),
                     )
                     return True
             rospy.sleep(0.1)
+        stable = set(
+            color
+            for color, count in visible_counts.items()
+            if count >= self.observation_verification_min_frames
+        )
+        missing = required.difference(stable)
         rospy.logwarn(
-            "Observation pose did not show all required colors within %.1f seconds",
+            "Observation pose did not show all required colors within %.1f "
+            "seconds: required_frames=%d, counts=[%s], missing=[%s]",
             self.observation_verification_timeout,
+            self.observation_verification_min_frames,
+            ", ".join(
+                "{}:{}".format(color, visible_counts[color])
+                for color in sorted(required)
+            ),
+            ", ".join(sorted(missing)) or "none",
         )
         return False
 
@@ -1320,7 +1363,9 @@ class ColorSortingTask(object):
             self._pose(object_x, object_y, grasp_z), color + " grasp"
         ):
             return False
-        object_model_name = "{}_block".format(color)
+        object_model_name = self.grasp_model_names.get(
+            color, "{}_block".format(color)
+        )
         # In Gazebo a lightweight block can be kicked away by the first finger
         # contact before the close action returns. Secure it at the validated
         # grasp centre first; the following close remains the visible gripper

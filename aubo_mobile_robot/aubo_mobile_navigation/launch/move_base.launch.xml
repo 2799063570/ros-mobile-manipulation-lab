@@ -1,11 +1,15 @@
 <?xml version="1.0"?>
 <launch>
   <arg name="cmd_vel_topic" default="/cmd_vel"/>
+  <arg name="base_local_planner" default="dwa_local_planner/DWAPlannerROS"/>
   <arg name="clearing_rotation_allowed" default="true"/>
   <arg name="max_vel_theta" default="0.80"/>
   <arg name="min_vel_theta" default="0.08"/>
   <arg name="xy_goal_tolerance" default="0.04"/>
   <arg name="yaw_goal_tolerance" default="0.06"/>
+  <arg name="use_navigation_profile" default="false"/>
+  <arg name="navigation_profile_file"
+       default="$(find aubo_mobile_navigation)/config/move_base.yaml"/>
   <node pkg="move_base" type="move_base" name="move_base"
         clear_params="true" output="screen">
     <remap from="cmd_vel" to="$(arg cmd_vel_topic)"/>
@@ -20,9 +24,14 @@
     <!-- Launch-specific profiles can override the common defaults without
          changing navigation behaviour for every consumer of this package. -->
     <param name="clearing_rotation_allowed" value="$(arg clearing_rotation_allowed)"/>
+    <param name="base_local_planner" value="$(arg base_local_planner)"/>
     <param name="DWAPlannerROS/max_vel_theta" value="$(arg max_vel_theta)"/>
     <param name="DWAPlannerROS/min_vel_theta" value="$(arg min_vel_theta)"/>
     <param name="DWAPlannerROS/xy_goal_tolerance" value="$(arg xy_goal_tolerance)"/>
     <param name="DWAPlannerROS/yaw_goal_tolerance" value="$(arg yaw_goal_tolerance)"/>
+    <!-- A scenario profile supplies additional tuning. The four scalar DWA
+         arguments above remain explicit launch-level overrides. -->
+    <rosparam if="$(arg use_navigation_profile)"
+              file="$(arg navigation_profile_file)" command="load"/>
   </node>
 </launch>

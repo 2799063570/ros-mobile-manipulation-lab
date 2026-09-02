@@ -174,6 +174,12 @@ class NavigationSortingMission(object):
             [[0.0, 0.06], [0.0, -0.12], [0.0, 0.06], [0.05, 0.0], [-0.10, 0.0]],
         )
         self._validate_recovery_steps(self.base_recovery_steps)
+        self.post_sort_retreat_enabled = bool(
+            rospy.get_param("~post_sort_retreat_enabled", False)
+        )
+        self.post_sort_retreat_distance = max(
+            0.0, float(rospy.get_param("~post_sort_retreat_distance", 0.30))
+        )
 
         self.sorting_state_topic = rospy.get_param(
             "~sorting_state_topic", "/sorting/state"
@@ -282,10 +288,27 @@ class NavigationSortingMission(object):
             if not identifier or identifier in identifiers:
                 raise ValueError("each workstation needs a unique non-empty id")
             identifiers.add(identifier)
+            if "navigation_goal_frame" in workspace and not str(
+                workspace["navigation_goal_frame"]
+            ).strip():
+                raise ValueError(
+                    "workstation '{}' navigation_goal_frame cannot be empty".format(
+                        identifier
+                    )
+                )
             goal = workspace.get("navigation_goal")
             if not isinstance(goal, list) or len(goal) != 3:
                 raise ValueError(
                     "workstation '{}' navigation_goal must be [x, y, yaw]".format(
+                        identifier
+                    )
+                )
+            pre_dock = workspace.get("pre_dock_goal")
+            if pre_dock is not None and (
+                not isinstance(pre_dock, list) or len(pre_dock) != 3
+            ):
+                raise ValueError(
+                    "workstation '{}' pre_dock_goal must be [x, y, yaw]".format(
                         identifier
                     )
                 )
@@ -315,6 +338,15 @@ class NavigationSortingMission(object):
                             identifier
                         )
                     )
+            model_names = workspace.get("grasp_model_names", {})
+            if not isinstance(model_names, dict) or any(
+                not str(color).strip() or not str(model_name).strip()
+                for color, model_name in model_names.items()
+            ):
+                raise ValueError(
+                    "workstation '{}' grasp_model_names must map colors to "
+                    "non-empty Gazebo model names".format(identifier)
+                )
 
     @staticmethod
     def _validate_recovery_steps(steps):
@@ -519,6 +551,7 @@ class NavigationSortingMission(object):
         payload = dict(workspace)
         payload.pop("navigation_goal", None)
         payload.pop("pre_dock_goal", None)
+        payload.pop("navigation_goal_frame", None)
         payload.pop("enabled", None)
         rospy.set_param(self.sorting_workspace_param, payload)
         self.workspace_publisher.publish(
@@ -578,16 +611,17 @@ class NavigationSortingMission(object):
     def _angle_error(target, actual):
         return math.atan2(math.sin(target - actual), math.cos(target - actual))
 
-    def _current_base_pose(self):
+    def _current_base_pose(self, pose_frame=None):
+        pose_frame = pose_frame or self.navigation_frame
         try:
             self.tf_listener.waitForTransform(
-                self.navigation_frame,
+                pose_frame,
                 self.base_frame,
                 rospy.Time(0),
                 rospy.Duration(1.0),
             )
             translation, rotation = self.tf_listener.lookupTransform(
-                self.navigation_frame, self.base_frame, rospy.Time(0)
+                pose_frame, self.base_frame, rospy.Time(0)
             )
             yaw = euler_from_quaternion(rotation)[2]
             return [translation[0], translation[1], yaw]
@@ -616,9 +650,9 @@ class NavigationSortingMission(object):
             and abs(yaw_error) <= self.direct_dock_yaw_tolerance
         )
 
-    def _align_heading_for_direct_dock(self, target_yaw, label):
+    def _align_heading_for_direct_dock(self, target_yaw, label, pose_frame=None):
         """Apply one bounded heading correction while still at pre-dock."""
-        actual = self._current_base_pose()
+        actual = self._current_base_pose(pose_frame)
         if actual is None:
             return False
         initial_error = self._angle_error(target_yaw, actual[2])
@@ -651,7 +685,7 @@ class NavigationSortingMission(object):
             while not rospy.is_shutdown() and time.time() < deadline:
                 if self._stop_requested.is_set():
                     return False
-                actual = self._current_base_pose()
+                actual = self._current_base_pose(pose_frame)
                 if actual is None:
                     rate.sleep()
                     continue
@@ -685,8 +719,11 @@ class NavigationSortingMission(object):
         rospy.logwarn("%s heading alignment timed out", label)
         return False
 
-    def _drive_straight_to(self, target, label):
-        start = self._current_base_pose()
+    def _drive_straight_to(
+        self, target, label, state="DIRECT_DOCKING", pose_frame=None
+    ):
+        pose_frame = pose_frame or self.navigation_frame
+        start = self._current_base_pose(pose_frame)
         if start is None:
             return False
         longitudinal, lateral, yaw_error = self._direct_dock_geometry(start, target)
@@ -701,9 +738,9 @@ class NavigationSortingMission(object):
             )
             return False
 
-        if not self._align_heading_for_direct_dock(target[2], label):
+        if not self._align_heading_for_direct_dock(target[2], label, pose_frame):
             return False
-        start = self._current_base_pose()
+        start = self._current_base_pose(pose_frame)
         if start is None:
             return False
         longitudinal, lateral, yaw_error = self._direct_dock_geometry(start, target)
@@ -720,9 +757,9 @@ class NavigationSortingMission(object):
             return False
 
         self._publish_state(
-            "DIRECT_DOCKING",
-            "{} {:.3f} m closed-loop at {:.3f} m/s through lidar safety".format(
-                label, longitudinal, self.base_recovery_speed
+            state,
+            "{} {:.3f} m in {} at {:.3f} m/s through lidar safety".format(
+                label, longitudinal, pose_frame, self.base_recovery_speed
             ),
         )
         self.navigation_client.cancel_all_goals()
@@ -737,7 +774,7 @@ class NavigationSortingMission(object):
             while not rospy.is_shutdown() and time.time() < deadline:
                 if self._stop_requested.is_set():
                     return False
-                actual = self._current_base_pose()
+                actual = self._current_base_pose(pose_frame)
                 if actual is None:
                     rate.sleep()
                     continue
@@ -790,6 +827,50 @@ class NavigationSortingMission(object):
             self._stop_base()
         rospy.logwarn("%s timed out after %.1f seconds", label, self.direct_dock_timeout)
         return False
+
+    def _retreat_after_sorting(self, workspace):
+        """Stow the arm, then back away from the completed workstation."""
+        self._publish_state(
+            "STOWING_ARM",
+            "{} before post-sort retreat".format(workspace["id"]),
+        )
+        if not self._call_sorting_operation(
+            self.home_client, ("HOMING",), "arm stow before post-sort retreat"
+        ):
+            return False
+
+        enabled = bool(
+            workspace.get("retreat_enabled", self.post_sort_retreat_enabled)
+        )
+        distance = max(
+            0.0,
+            float(
+                workspace.get(
+                    "retreat_distance", self.post_sort_retreat_distance
+                )
+            ),
+        )
+        if not enabled or distance <= 1.0e-6:
+            return True
+
+        pose_frame = str(
+            workspace.get("navigation_goal_frame", self.navigation_frame)
+        ).strip() or self.navigation_frame
+        current = self._current_base_pose(pose_frame)
+        if current is None:
+            rospy.logerr("Cannot determine the base pose for post-sort retreat")
+            return False
+        target = [
+            current[0] - distance * math.cos(current[2]),
+            current[1] - distance * math.sin(current[2]),
+            current[2],
+        ]
+        return self._drive_straight_to(
+            target,
+            "{} post-sort retreat".format(workspace["id"]),
+            state="RETREATING_BASE",
+            pose_frame=pose_frame,
+        )
 
     def _prepare_and_observe_once(self):
         self._publish_state("PREPARING_ARM", "moving arm to work-ready pose")
@@ -858,11 +939,12 @@ class NavigationSortingMission(object):
         rospy.logerr("No direct base adjustment produced a valid sorting plan")
         return False
 
-    def _navigate_once(self, target):
+    def _navigate_once(self, target, goal_frame=None):
+        goal_frame = goal_frame or self.navigation_frame
         target_x, target_y, target_yaw = target
         quaternion = quaternion_from_euler(0.0, 0.0, target_yaw)
         goal = MoveBaseGoal()
-        goal.target_pose.header.frame_id = self.navigation_frame
+        goal.target_pose.header.frame_id = goal_frame
         goal.target_pose.header.stamp = rospy.Time.now()
         goal.target_pose.pose.position.x = target_x
         goal.target_pose.pose.position.y = target_y
@@ -882,23 +964,25 @@ class NavigationSortingMission(object):
         self.navigation_client.cancel_goal()
         return False
 
-    def _navigate(self, target, stage="navigation"):
+    def _navigate(self, target, stage="navigation", goal_frame=None):
+        goal_frame = goal_frame or self.navigation_frame
         if not self.navigation_client.wait_for_server(rospy.Duration(self.server_timeout)):
             rospy.logerr("Navigation action %s is unavailable", self.navigation_action)
             return False
         for attempt in range(self.navigation_retries + 1):
             self._publish_state(
                 "NAVIGATING",
-                "{} attempt {}/{} to [{:.2f}, {:.2f}, {:.2f}]".format(
+                "{} attempt {}/{} to [{:.2f}, {:.2f}, {:.2f}] in {}".format(
                     stage,
                     attempt + 1,
                     self.navigation_retries + 1,
                     target[0],
                     target[1],
                     target[2],
+                    goal_frame,
                 ),
             )
-            if self._navigate_once(target):
+            if self._navigate_once(target, goal_frame):
                 return True
             if self._stop_requested.is_set():
                 return False
@@ -1078,7 +1162,29 @@ class NavigationSortingMission(object):
                 return False
 
             goal = [float(value) for value in workspace["navigation_goal"]]
-            if not self._navigate(goal, "workstation '{}'".format(identifier)):
+            goal_frame = str(
+                workspace.get("navigation_goal_frame", self.navigation_frame)
+            ).strip() or self.navigation_frame
+            pre_dock = workspace.get("pre_dock_goal")
+            if pre_dock is not None:
+                pre_dock = [float(value) for value in pre_dock]
+                if not self._navigate(
+                    pre_dock,
+                    "workstation '{}' pre-dock".format(identifier),
+                    goal_frame=goal_frame,
+                ):
+                    return False
+                if not self._drive_straight_to(
+                    goal,
+                    "workstation '{}' fine-dock".format(identifier),
+                    pose_frame=goal_frame,
+                ):
+                    return False
+            elif not self._navigate(
+                goal,
+                "workstation '{}'".format(identifier),
+                goal_frame=goal_frame,
+            ):
                 return False
             self._publish_state(
                 "AT_WORKSTATION", "{}; validating arm reach".format(identifier)
@@ -1087,6 +1193,8 @@ class NavigationSortingMission(object):
                 return False
             self._publish_state("SORTING", "workstation '{}'".format(identifier))
             if not self._sort_with_recovery():
+                return False
+            if not self._retreat_after_sorting(workspace):
                 return False
             self._publish_state(
                 "WORKSTATION_COMPLETE", "{} ({}/{})".format(

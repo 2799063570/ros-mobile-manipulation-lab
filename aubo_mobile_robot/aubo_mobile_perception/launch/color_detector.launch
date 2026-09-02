@@ -4,10 +4,11 @@
   <arg name="camera_info_topic" default="/hand_camera/camera_info"/>
   <arg name="detections_topic" default="/sorting/detections"/>
   <arg name="debug_image_topic" default="/sorting/debug_image"/>
+  <arg name="config" default="$(find aubo_mobile_perception)/config/colors.yaml"/>
 
   <node pkg="aubo_perception" type="color_object_detector.py"
         name="color_object_detector" output="screen">
-    <rosparam file="$(find aubo_mobile_perception)/config/colors.yaml" command="load"/>
+    <rosparam file="$(arg config)" command="load"/>
     <param name="image_topic" value="$(arg image_topic)"/>
     <param name="camera_info_topic" value="$(arg camera_info_topic)"/>
     <param name="detections_topic" value="$(arg detections_topic)"/>

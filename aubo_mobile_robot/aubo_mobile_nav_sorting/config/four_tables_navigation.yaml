@@ -1,0 +1,129 @@
+# Navigation tuning used only by four_tables_gazebo.launch.
+#
+# The mission has a separate low-speed controller for the final straight dock.
+# move_base therefore stops at a pre-dock pose and should not keep producing
+# new global paths while trying to remove centimetre-level pose errors.
+
+# Plan on receipt of a goal and again only when the current path becomes invalid.
+# This removes the 1 Hz global-plan churn visible as repeated "Got new plan".
+planner_frequency: 0.0
+controller_frequency: 12.0
+controller_patience: 8.0
+
+# Detect a real lack of progress sooner, but do not trigger rotate recovery in
+# the narrow pre-dock region (rotation recovery is disabled by the launch file).
+oscillation_timeout: 7.0
+oscillation_distance: 0.10
+
+DWAPlannerROS:
+  # Slower motion near furniture. A small reverse range lets DWA undo an
+  # overshoot instead of turning the whole robot and oscillating left/right.
+  max_vel_x: 0.22
+  min_vel_x: -0.06
+  max_vel_trans: 0.22
+  min_vel_trans: 0.01
+  max_vel_theta: 0.35
+  min_vel_theta: 0.03
+  acc_lim_x: 0.35
+  acc_lim_theta: 0.70
+
+  # A shorter horizon and denser velocity sampling behave more predictably
+  # close to table corners and the detour wall.
+  sim_time: 1.30
+  vx_samples: 20
+  vtheta_samples: 40
+  path_distance_bias: 28.0
+  goal_distance_bias: 24.0
+  occdist_scale: 0.08
+  forward_point_distance: 0.15
+  stop_time_buffer: 0.30
+
+  # The mission's heading-align/direct-dock stages perform the final precision
+  # correction, so move_base does not need to chase a 4 cm / 0.04 rad target.
+  xy_goal_tolerance: 0.08
+  yaw_goal_tolerance: 0.08
+  latch_xy_goal_tolerance: true
+  trans_stopped_vel: 0.02
+  theta_stopped_vel: 0.03
+
+# Default local planner for the four-table scene. The same launch file can
+# still select DWA; keeping both namespaces here makes A/B testing repeatable.
+TebLocalPlannerROS:
+  odom_topic: odom
+  map_frame: map
+
+  # Trajectory timing and adherence to the global route around the wall.
+  teb_autosize: true
+  dt_ref: 0.25
+  dt_hysteresis: 0.05
+  global_plan_overwrite_orientation: true
+  allow_init_with_backwards_motion: true
+  max_global_plan_lookahead_dist: 2.50
+  global_plan_prune_distance: 0.60
+  global_plan_viapoint_sep: 0.30
+  via_points_ordered: true
+  feasibility_check_no_poses: 8
+  exact_arc_length: false
+  publish_feedback: false
+
+  # Differential-drive limits. Reverse is available for small corrections but
+  # the optimizer is weighted to prefer forward driving on normal route legs.
+  max_vel_x: 0.22
+  max_vel_x_backwards: 0.06
+  max_vel_y: 0.0
+  max_vel_theta: 0.35
+  acc_lim_x: 0.35
+  acc_lim_y: 0.0
+  acc_lim_theta: 0.70
+  min_turning_radius: 0.0
+  cmd_angle_instead_rotvel: false
+
+  # Precision docking is handled by the mission node after move_base reaches
+  # the pre-dock pose, so TEB does not chase centimetre-level errors here.
+  xy_goal_tolerance: 0.08
+  yaw_goal_tolerance: 0.08
+  free_goal_vel: false
+  complete_global_plan: true
+
+  # The costmap robot_radius is 0.35 m. This explicit optimization footprint
+  # prevents TEB's point-model fallback from cutting too close to a table.
+  footprint_model:
+    type: circular
+    radius: 0.35
+  min_obstacle_dist: 0.06
+  inflation_dist: 0.16
+  dynamic_obstacle_inflation_dist: 0.16
+  include_costmap_obstacles: true
+  include_dynamic_obstacles: false
+  costmap_obstacles_behind_robot_dist: 1.00
+  obstacle_poses_affected: 20
+  legacy_obstacle_association: false
+  obstacle_association_force_inclusion_factor: 1.5
+  obstacle_association_cutoff_factor: 5.0
+
+  no_inner_iterations: 5
+  no_outer_iterations: 4
+  optimization_activate: true
+  optimization_verbose: false
+  penalty_epsilon: 0.04
+  weight_max_vel_x: 2.0
+  weight_max_vel_theta: 2.0
+  weight_acc_lim_x: 1.0
+  weight_acc_lim_theta: 1.0
+  weight_kinematics_nh: 1000.0
+  weight_kinematics_forward_drive: 8.0
+  weight_kinematics_turning_radius: 1.0
+  weight_optimaltime: 1.0
+  weight_shortest_path: 0.2
+  weight_obstacle: 60.0
+  weight_inflation: 0.2
+  weight_viapoint: 10.0
+  weight_adapt_factor: 2.0
+
+  # The global planner already chooses which side of the wall to use. Keeping
+  # one TEB avoids left/right homotopy switching close to furniture.
+  enable_homotopy_class_planning: false
+  enable_multithreading: false
+  max_number_classes: 1
+  shrink_horizon_backup: true
+  oscillation_recovery: true

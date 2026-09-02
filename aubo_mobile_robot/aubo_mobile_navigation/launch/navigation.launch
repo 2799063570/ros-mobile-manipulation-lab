@@ -8,11 +8,15 @@
   <arg name="nav_goal_topic" default="/move_base_simple/goal"/>
   <arg name="laser_safety" default="true"/>
   <arg name="raw_cmd_vel_topic" default="/cmd_vel_raw"/>
+  <arg name="base_local_planner" default="dwa_local_planner/DWAPlannerROS"/>
   <arg name="clearing_rotation_allowed" default="true"/>
   <arg name="max_vel_theta" default="0.80"/>
   <arg name="min_vel_theta" default="0.08"/>
   <arg name="xy_goal_tolerance" default="0.04"/>
   <arg name="yaw_goal_tolerance" default="0.06"/>
+  <arg name="use_navigation_profile" default="false"/>
+  <arg name="navigation_profile_file"
+       default="$(find aubo_mobile_navigation)/config/move_base.yaml"/>
 
   <include file="$(find aubo_mobile_navigation)/launch/scan_merger.launch"/>
 
@@ -27,11 +31,14 @@
   <group if="$(arg laser_safety)">
     <include file="$(find aubo_mobile_navigation)/launch/move_base.launch.xml">
       <arg name="cmd_vel_topic" value="$(arg raw_cmd_vel_topic)"/>
+      <arg name="base_local_planner" value="$(arg base_local_planner)"/>
       <arg name="clearing_rotation_allowed" value="$(arg clearing_rotation_allowed)"/>
       <arg name="max_vel_theta" value="$(arg max_vel_theta)"/>
       <arg name="min_vel_theta" value="$(arg min_vel_theta)"/>
       <arg name="xy_goal_tolerance" value="$(arg xy_goal_tolerance)"/>
       <arg name="yaw_goal_tolerance" value="$(arg yaw_goal_tolerance)"/>
+      <arg name="use_navigation_profile" value="$(arg use_navigation_profile)"/>
+      <arg name="navigation_profile_file" value="$(arg navigation_profile_file)"/>
     </include>
     <include file="$(find aubo_mobile_navigation)/launch/laser_safety_filter.launch">
       <arg name="scan_topic" value="/scan"/>
@@ -42,11 +49,14 @@
   <group unless="$(arg laser_safety)">
     <include file="$(find aubo_mobile_navigation)/launch/move_base.launch.xml">
       <arg name="cmd_vel_topic" value="/cmd_vel"/>
+      <arg name="base_local_planner" value="$(arg base_local_planner)"/>
       <arg name="clearing_rotation_allowed" value="$(arg clearing_rotation_allowed)"/>
       <arg name="max_vel_theta" value="$(arg max_vel_theta)"/>
       <arg name="min_vel_theta" value="$(arg min_vel_theta)"/>
       <arg name="xy_goal_tolerance" value="$(arg xy_goal_tolerance)"/>
       <arg name="yaw_goal_tolerance" value="$(arg yaw_goal_tolerance)"/>
+      <arg name="use_navigation_profile" value="$(arg use_navigation_profile)"/>
+      <arg name="navigation_profile_file" value="$(arg navigation_profile_file)"/>
     </include>
   </group>
 
