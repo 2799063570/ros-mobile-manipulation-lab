@@ -20,6 +20,14 @@ README展示图统一生成到 `readme/`：画布为960×600，原图按比例�
 .\tools\create_readme_thumbnails.ps1
 ```
 
+## 分拣场景展示
+
+| Gazebo分拣场景 | RViz分拣场景 |
+| --- | --- |
+| ![Gazebo中的机械臂分拣场景](readme/分拣场景gazebo.png) | ![RViz中的机械臂分拣场景](readme/分拣场景rviz.png) |
+| **颜色识别与跟踪** | **分拣控制** |
+| ![颜色识别与目标跟踪效果](readme/颜色识别跟踪.png) | ![RViz分拣控制界面](sorting_control.png) |
+
 ## 图片索引
 
 | 文件 | 展示内容 |
@@ -33,6 +41,9 @@ README展示图统一生成到 `readme/`：画布为960×600，原图按比例�
 | [`octmap.png`](octmap.png) | MoveIt PlanningScene中的OctoMap环境建模 |
 | [`sorting_control.png`](sorting_control.png) | RViz分拣控制面板和MoveIt交互 |
 | [`grasp_gazebo.png`](grasp_gazebo.png) | Gazebo中的机械臂抓取过程 |
+| [`分拣场景gazebo.png`](分拣场景gazebo.png) | Gazebo中的机械臂分拣场景 |
+| [`分拣场景rviz.png`](分拣场景rviz.png) | RViz中的机械臂分拣场景 |
+| [`颜色识别跟踪.png`](颜色识别跟踪.png) | 颜色识别与目标跟踪效果 |
 
 ## 素材维护约定
 
