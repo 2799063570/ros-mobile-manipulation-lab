@@ -15,7 +15,7 @@ aubo_ros_control: 坐标误差 -> 雅可比逆解 -> 限速/限加速度 -> 有�
 
 `servo_mode` 只改变坐标误差的计算：
 
-- `eye_in_hand`：目标变换到运动相机光学坐标系，控制相机到期望观测位姿；
+- `eye_in_hand`：目标由运动相机光学坐标系变换到 `tcp_link`，控制夹爪 TCP 与目标对齐；
 - `eye_to_hand`：目标变换到 `base_link`，控制 `tcp_link` 到目标加偏移的位置。
 
 感知接口、状态机、关节限制、Gazebo/真机执行链完全共用。不要同时启动两个视觉
@@ -77,8 +77,9 @@ roslaunch aubo_ros_control eye_to_hand_visual_servo_real.launch \
   独立的 `recovery_posture`，两者不再复用通用 `open_posture`。默认丢失策略为
   `coast_then_open` 且 `coast_duration: 0.0`：目标超时后直接向观测姿态移动；移动中
   任意一帧重新获得有效目标都会立即中断恢复动作并回到 `TRACKING`。
-- 眼在手上的期望观测深度默认为 `0.15 m`。腕部相机光心沿接近方向比 TCP 后缩约
-  `0.035 m`，因此最终 TCP 到目标约为 `0.115 m`，这是预抓取对准距离而不是接触距离。
+- 眼在手上的期望目标位置默认为 TCP 坐标系下 `[0, 0, 0.115] m`，即目标
+  对齐夹爪中心线。腕部相机光心沿接近方向比 TCP 后缩约 `0.035 m`，因此
+  对应的相机深度仍约为 `0.15 m`。这是预抓取对准距离而不是接触距离。
   `TRACKING` 仅表示持续收到有效目标，不代表已经收敛；是否停止由三维位置误差和
   `position_deadband` 决定。
 - 眼在手外不需要机械臂搜索。`target_offset` 默认包含横向避遮挡分量和抓取上方的
@@ -95,7 +96,7 @@ roslaunch aubo_ros_control eye_to_hand_visual_servo_real.launch \
 配置分为三份：
 
 - `visual_servo_common.yaml`：关节限制、队列、频率和 SDK 参数；
-- `visual_servo_eye_in_hand.yaml`：运动相机坐标误差和搜索策略；
+- `visual_servo_eye_in_hand.yaml`：夹爪 TCP 对齐误差和搜索策略；
 - `visual_servo_eye_to_hand.yaml`：固定相机 TCP 偏移和遮挡策略。
 
 控制增益、笛卡尔速度上限、期望位姿、安全深度以及目标丢失恢复参数支持通过

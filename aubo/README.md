@@ -85,7 +85,7 @@ roslaunch aubo_ros_control eye_in_hand_visual_servo_gazebo.launch
 roslaunch aubo_ros_control eye_to_hand_visual_servo_gazebo.launch
 ```
 
-两种安装方式使用同一个 `aubo_visual_servo_node`；只在相机/TCP坐标误差上分支，
+两种安装方式使用同一个 `aubo_visual_servo_node`；只在目标坐标变换和误差模型上分支，
 Gazebo 与真机只在输出后端上分支。详细设计与真机入口见
 [`aubo_ros_control/VISUAL_SERVO.md`](aubo_ros_control/VISUAL_SERVO.md)。
 

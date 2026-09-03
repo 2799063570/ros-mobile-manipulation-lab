@@ -1,11 +1,12 @@
 servo_mode: eye_in_hand
 camera_link: camera_color_optical_frame
-control_link: camera_color_optical_frame
+control_link: tcp_link
 
-# Desired observed-object pose in the moving camera optical frame. The camera
-# centre is about 35 mm behind the TCP along the approach axis, so 0.15 m here
-# leaves roughly 0.115 m between the TCP and the target for a safe pre-grasp.
-desired_target_position: [0.0, 0.0, 0.15]
+# Desired object pose in the gripper TCP frame.  Keeping X/Y at zero aligns the
+# object with the gripper centreline instead of the laterally-offset camera
+# optical axis.  The camera is about 35 mm behind the TCP, so a 0.115 m TCP
+# standoff still produces approximately 0.15 m of camera depth.
+desired_target_position: [0.0, 0.0, 0.115]
 # Independent controller-side guard. This remains below the desired distance
 # and matches the perception frontend's minimum valid depth.
 minimum_safe_target_distance: 0.10

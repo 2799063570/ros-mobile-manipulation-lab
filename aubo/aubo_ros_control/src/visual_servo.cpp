@@ -189,8 +189,7 @@ bool VisualServo::loadParameters() {
   private_nh_.param<std::string>("camera_link", camera_link_,
                                  "camera_color_optical_frame");// 相机坐标系
   private_nh_.param<std::string>("control_link", control_link_,
-                                 servo_mode_ == "eye_to_hand" ? "tcp_link"
-                                                              : camera_link_);// 控制坐标系：计算误差的参考坐标系
+                                 "tcp_link");// 控制坐标系：夹爪 TCP，也是雅可比链末端
   private_nh_.param<std::string>("target_topic", target_topic_,
                                  "/visual_servo/target_pose");
   private_nh_.param<std::string>("state_topic", state_topic_,
@@ -426,32 +425,49 @@ bool VisualServo::setupGazeboPublishers() {
 
 void VisualServo::targetCallback(
     const geometry_msgs::PoseStamped::ConstPtr &message) {
+  geometry_msgs::PoseStamped source_target = *message;
   geometry_msgs::PoseStamped control_target;
-  const std::string target_frame =
-      servo_mode_ == "eye_in_hand" ? camera_link_ : base_link_;
+  geometry_msgs::PoseStamped camera_target;
   try {
-    if (message->header.frame_id.empty()) {
+    if (source_target.header.frame_id.empty()) {
       if (servo_mode_ == "eye_to_hand") {
         ROS_WARN_THROTTLE(1.0, "[visual_servo] 眼在手外目标必须提供 frame_id");
         return;
       }
-      control_target = *message;
-      control_target.header.frame_id = target_frame;
-    } else if (message->header.frame_id == target_frame) {
-      control_target = *message;
+      // 眼在手上感知默认输出相机光学坐标。
+      source_target.header.frame_id = camera_link_;
+    }
+
+    if (servo_mode_ == "eye_in_hand") {
+      // 相机只是测量坐标系。先保留相机深度作安全检查，
+      // 再把目标变换到夹爪/TCP 坐标系计算对齐误差。
+      camera_target = source_target.header.frame_id == camera_link_
+                          ? source_target
+                          : tf_buffer_.transform(source_target, camera_link_,
+                                                 ros::Duration(0.03));
+      control_target = camera_target.header.frame_id == control_link_
+                           ? camera_target
+                           : tf_buffer_.transform(camera_target, control_link_,
+                                                  ros::Duration(0.03));
+    } else if (source_target.header.frame_id == base_link_) {
+      control_target = source_target;
     } else {
       control_target =
-          tf_buffer_.transform(*message, target_frame, ros::Duration(0.03));
+          tf_buffer_.transform(source_target, base_link_, ros::Duration(0.03));
     }
   } catch (const tf2::TransformException &exception) {
     ROS_WARN_THROTTLE(1.0, "[visual_servo] 目标无法变换到 %s: %s",
-                      target_frame.c_str(), exception.what());
+                      servo_mode_ == "eye_in_hand" ? control_link_.c_str()
+                                                   : base_link_.c_str(),
+                      exception.what());
     return;
   }
   if (!std::isfinite(control_target.pose.position.x) ||
       !std::isfinite(control_target.pose.position.y) ||
       !std::isfinite(control_target.pose.position.z) ||
-      (servo_mode_ == "eye_in_hand" && control_target.pose.position.z <= 0.0)) {
+      (servo_mode_ == "eye_in_hand" &&
+       (!std::isfinite(camera_target.pose.position.z) ||
+        camera_target.pose.position.z <= 0.0))) {
     ROS_WARN_THROTTLE(1.0, "[visual_servo] 忽略无效或位于相机后方的目标");
     return;
   }
@@ -461,7 +477,7 @@ void VisualServo::targetCallback(
     minimum_safe_distance = minimum_safe_target_distance_;
   }
   if (servo_mode_ == "eye_in_hand" && minimum_safe_distance > 0.0 &&
-      control_target.pose.position.z < minimum_safe_distance) {
+      camera_target.pose.position.z < minimum_safe_distance) {
     safety_stop_.store(true);
     queue_.clear();
     {
@@ -471,7 +487,7 @@ void VisualServo::targetCallback(
     ROS_ERROR_THROTTLE(1.0,
                        "[visual_servo] 目标距离 %.3f m 小于安全阈值 %.3f "
                        "m，锁存停止；请排除危险后复位",
-                       control_target.pose.position.z, minimum_safe_distance);
+                       camera_target.pose.position.z, minimum_safe_distance);
     return;
   }
   const ros::Time now = ros::Time::now();
@@ -606,9 +622,9 @@ VisualServo::trackingVelocity(const JointPoint &position,
   const Eigen::Matrix3d base_from_control = kdlRotationToEigen(base_control.M);// 转化格式
   if (servo_mode_ == "eye_in_hand") {
     const Eigen::Vector3d observed(target.position.x, target.position.y,
-                                   target.position.z);// 眼在手上：目标位置的相机坐标系下的位置
+                                   target.position.z);// 眼在手上：目标在夹爪/TCP 坐标系下的位置
     Eigen::Vector3d control_linear =
-        linear_gain_ * (observed - desired_position_);// 目前这个observed是目标位置的相机坐标系下的位置 移动末端：目标会反向移动
+        linear_gain_ * (observed - desired_position_);// 移动夹爪时，目标在夹爪系中反向移动
     if ((observed - desired_position_).norm() < position_deadband_)// 小于死区的时候 速度置零 防止震荡
       control_linear.setZero();
     base_linear = base_from_control * control_linear;// 转化为基坐标系下的速度
