@@ -46,7 +46,7 @@ https://github.com/user-attachments/assets/b636e380-9148-4471-b0e5-202318e15bf4
 
 | 颜色识别与目标跟踪 | RViz 分拣控制界面 |
 | --- | --- |
-| ![颜色识别与目标跟踪效果](aubo/video_or_img/readme/颜色识别跟踪.png) | ![RViz 分拣控制界面](aubo/video_or_img/sorting_control.png) |
+| ![颜色识别与目标跟踪效果](aubo/video_or_img/readme/颜色识别跟踪.png) | ![RViz 分拣控制界面](aubo/video_or_img/readme/sorting_control.png) |
 
 ## 项目演进路线
 
