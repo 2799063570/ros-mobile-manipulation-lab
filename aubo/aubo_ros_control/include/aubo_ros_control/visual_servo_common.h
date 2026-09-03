@@ -18,6 +18,8 @@ using JointPoint = std::array<double, kDof>;
 
 // 数值和关节点的基础校验工具，由控制器与 SDK 后端共同使用。
 double clampValue(double value, double low, double high);
+// 连续软死区：区间内为零，区间外扣除死区宽度，避免边界处指令突跳。
+double applyDeadband(double value, double deadband);
 bool finitePoint(const JointPoint& point);
 
 // 有界命令队列：生产速度过快时丢弃最旧指令，避免视觉伺服延迟累积。

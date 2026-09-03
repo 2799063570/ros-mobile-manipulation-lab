@@ -14,7 +14,10 @@ start_enabled: false
 target_label: red              # empty string accepts every configured color
 selection_policy: image_center # largest | image_center | nearest
 minimum_contour_area: 180.0
-maximum_contour_area: 50000.0
+# At 1280x720 the close-range 4 cm cube can exceed 50000 pixels. Keep this
+# pixel-space guard loose and use maximum_projected_contour_area below as the
+# resolution-independent rejection criterion.
+maximum_contour_area: 250000.0
 # Depth-normalized projected area (m^2). A 4 cm block is about 0.0016 m^2;
 # reject large same-colour surfaces without losing the block as it approaches.
 maximum_projected_contour_area: 0.006
@@ -22,12 +25,11 @@ maximum_aspect_ratio: 1.5      # configured targets are approximately square
 minimum_fill_ratio: 0.70       # reject irregular robot/link colour patches
 image_border_margin: 4         # reject contours touching an image edge
 morphology_kernel: 5
-# Normalized image coordinates. The wrist/arm occupies the lower part of the
-# hand-camera image; masked pixels are never allowed to become servo targets.
-ignored_regions:
-  - {x_min: 0.0, y_min: 0.65, x_max: 1.0, y_max: 1.0}
+# The camera moves with the gripper, so do not remove a fixed image region:
+# targets must remain detectable across the full eye-in-hand view.
+ignored_regions: []
 depth_mask_erosion: 3
-minimum_depth: 0.10            # sensor validity; controller owns the 0.22 m safety stop
+minimum_depth: 0.10            # sensor validity; controller owns the independent safety stop
 maximum_depth: 2.50
 depth_scale_16u: 0.001         # RealSense 16UC1 millimetres -> metres
 position_filter_alpha: 0.35    # 1.0=no filtering; lower values reduce depth jitter

@@ -33,12 +33,14 @@
 #include <atomic>
 #include <clocale>
 #include <cmath>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <vector>
 
 namespace {
+using aubo_ros_control::visual_servo_internal::applyDeadband;
 using aubo_ros_control::visual_servo_internal::clampValue;
 using aubo_ros_control::visual_servo_internal::CommandQueue;
 using aubo_ros_control::visual_servo_internal::DirectSdkBackend;
@@ -101,6 +103,8 @@ const char *VisualServo::stateName(ServoState state) {
     return "SEARCH_INITIAL";
   case ServoState::TRACKING:
     return "TRACKING";
+  case ServoState::ALIGNED:
+    return "ALIGNED";
   case ServoState::COAST:
     return "COAST";
   case ServoState::SEARCH_RECOVERY:
@@ -209,6 +213,11 @@ bool VisualServo::loadParameters() {
     private_nh_.param<double>("max_camera_angular_velocity",
                               max_angular_velocity_, 0.2);
   private_nh_.param<double>("position_deadband", position_deadband_, 0.004);
+  private_nh_.param<double>("orientation_deadband", orientation_deadband_,
+                            0.02);
+  private_nh_.param<double>("alignment_hold_time", alignment_hold_time_, 0.35);
+  private_nh_.param<double>("alignment_release_multiplier",
+                            alignment_release_multiplier_, 2.0);
   private_nh_.param<double>("dls_lambda", dls_lambda_, 0.04);
   private_nh_.param<double>("joint_limit_margin", joint_limit_margin_, 0.08);
   private_nh_.param<double>("target_timeout", target_timeout_, 0.2);
@@ -216,6 +225,8 @@ bool VisualServo::loadParameters() {
                             minimum_safe_target_distance_, 0.0);
   private_nh_.param<double>("coast_duration", coast_duration_, 0.35);
   private_nh_.param<double>("coast_decay_time", coast_decay_time_, 0.18);
+  private_nh_.param<double>("recovery_delay", recovery_delay_, 1.0);
+  private_nh_.param<double>("reacquire_hold_time", reacquire_hold_time_, 0.3);
   private_nh_.param<double>("search_timeout", search_timeout_, 8.0);
   private_nh_.param<double>("open_posture_gain", open_posture_gain_, 0.7);
   private_nh_.param<double>("search_velocity_limit", search_velocity_limit_,
@@ -245,6 +256,15 @@ bool VisualServo::loadParameters() {
   }
   if (minimum_safe_target_distance_ < 0.0) {
     ROS_ERROR("[visual_servo] minimum_safe_target_distance 不能为负数");
+    return false;
+  }
+  if (orientation_deadband_ < 0.0 || alignment_hold_time_ < 0.0 ||
+      alignment_release_multiplier_ < 1.0) {
+    ROS_ERROR("[visual_servo] 对齐死区/保持时间不能为负，退出倍数必须 >= 1");
+    return false;
+  }
+  if (recovery_delay_ < 0.0 || reacquire_hold_time_ < 0.0) {
+    ROS_ERROR("[visual_servo] 恢复等待和重捕获稳定时间不能为负数");
     return false;
   }
 
@@ -309,6 +329,10 @@ void VisualServo::setupDynamicReconfigure() {
   private_nh_.setParam("max_linear_velocity", max_linear_velocity_);
   private_nh_.setParam("max_angular_velocity", max_angular_velocity_);
   private_nh_.setParam("position_deadband", position_deadband_);
+  private_nh_.setParam("orientation_deadband", orientation_deadband_);
+  private_nh_.setParam("alignment_hold_time", alignment_hold_time_);
+  private_nh_.setParam("alignment_release_multiplier",
+                       alignment_release_multiplier_);
   private_nh_.setParam("dls_lambda", dls_lambda_);
   private_nh_.setParam("feedback_blend", feedback_blend_);
   private_nh_.setParam("desired_target_x", desired_position_.x());
@@ -327,6 +351,8 @@ void VisualServo::setupDynamicReconfigure() {
   private_nh_.setParam("target_timeout", target_timeout_);
   private_nh_.setParam("coast_duration", coast_duration_);
   private_nh_.setParam("coast_decay_time", coast_decay_time_);
+  private_nh_.setParam("recovery_delay", recovery_delay_);
+  private_nh_.setParam("reacquire_hold_time", reacquire_hold_time_);
   private_nh_.setParam("search_timeout", search_timeout_);
   private_nh_.setParam("open_posture_gain", open_posture_gain_);
   private_nh_.setParam("search_velocity_limit", search_velocity_limit_);
@@ -350,6 +376,9 @@ void VisualServo::reconfigureCallback(VisualServoConfig &config,
   max_linear_velocity_ = config.max_linear_velocity;
   max_angular_velocity_ = config.max_angular_velocity;
   position_deadband_ = config.position_deadband;
+  orientation_deadband_ = config.orientation_deadband;
+  alignment_hold_time_ = config.alignment_hold_time;
+  alignment_release_multiplier_ = config.alignment_release_multiplier;
   dls_lambda_ = config.dls_lambda;
   feedback_blend_ = config.feedback_blend;
 
@@ -379,6 +408,8 @@ void VisualServo::reconfigureCallback(VisualServoConfig &config,
   target_timeout_ = config.target_timeout;
   coast_duration_ = config.coast_duration;
   coast_decay_time_ = config.coast_decay_time;
+  recovery_delay_ = config.recovery_delay;
+  reacquire_hold_time_ = config.reacquire_hold_time;
   search_timeout_ = config.search_timeout;
   open_posture_gain_ = config.open_posture_gain;
   search_velocity_limit_ = config.search_velocity_limit;
@@ -508,6 +539,10 @@ bool VisualServo::setEnabled(std_srvs::SetBool::Request &request,
   safety_stop_.store(false);
   queue_.clear();
   last_tracking_velocity_.setZero();
+  alignment_candidate_ = false;
+  aligned_latched_ = false;
+  search_reacquire_pending_ = false;
+  reacquire_candidate_ = false;
   if (!enabled_)
     transitionTo(ServoState::DISABLED);
   else {
@@ -535,6 +570,10 @@ bool VisualServo::reset(std_srvs::Trigger::Request &,
   queue_.clear();
   safety_stop_.store(false);
   last_tracking_velocity_.setZero();
+  alignment_candidate_ = false;
+  aligned_latched_ = false;
+  search_reacquire_pending_ = false;
+  reacquire_candidate_ = false;
   transitionTo(enabled_ ? ServoState::WAITING : ServoState::DISABLED);
   response.success = true;
   response.message = "visual target and loss-recovery state cleared";
@@ -589,7 +628,10 @@ VisualServo::ServoState VisualServo::selectState(bool fresh_target,
   if (safety_stop_.load())
     return ServoState::HOLD;
   if (fresh_target)
-    return ServoState::TRACKING;
+    return aligned_latched_ ? ServoState::ALIGNED : ServoState::TRACKING;
+  // 已对齐后的短时遮挡不应触发回退搜索。
+  if (aligned_latched_)
+    return ServoState::HOLD;
   if (!have_ever_tracked_)
     return initial_search_enabled_ ? ServoState::SEARCH_INITIAL
                                    : ServoState::WAITING;
@@ -598,15 +640,20 @@ VisualServo::ServoState VisualServo::selectState(bool fresh_target,
     return ServoState::HOLD;
   if (lost_for < coast_duration_)
     return ServoState::COAST;
+  // 短时漏检先原地保持，不要立刻抬臂回观察位。
+  if (lost_for < coast_duration_ + recovery_delay_)
+    return ServoState::HOLD;
   if (loss_strategy_ == "coast_then_open" &&
-      lost_for < coast_duration_ + search_timeout_)
+      lost_for < coast_duration_ + recovery_delay_ + search_timeout_)
     return ServoState::SEARCH_RECOVERY;
   return ServoState::HOLD;
 }
 
 Eigen::VectorXd
 VisualServo::trackingVelocity(const JointPoint &position,
-                              const geometry_msgs::Pose &target) {
+                              const geometry_msgs::Pose &target,
+                              Eigen::Vector3d *raw_position_error,
+                              Eigen::Vector3d *raw_angular_error) {
   KDL::JntArray joints(kDof);
   for (std::size_t i = 0; i < kDof; ++i)
     joints(i) = position[i];
@@ -623,10 +670,16 @@ VisualServo::trackingVelocity(const JointPoint &position,
   if (servo_mode_ == "eye_in_hand") {
     const Eigen::Vector3d observed(target.position.x, target.position.y,
                                    target.position.z);// 眼在手上：目标在夹爪/TCP 坐标系下的位置
-    Eigen::Vector3d control_linear =
-        linear_gain_ * (observed - desired_position_);// 移动夹爪时，目标在夹爪系中反向移动
-    if ((observed - desired_position_).norm() < position_deadband_)// 小于死区的时候 速度置零 防止震荡
-      control_linear.setZero();
+    Eigen::Vector3d position_error = observed - desired_position_;
+    if (raw_position_error)
+      *raw_position_error = position_error;
+    // 三轴独立的软死区会屏蔽像素/深度小噪声，并让速度在
+    // 死区边界连续衰减到零，避免夹爪在目标两侧来回切换。
+    for (int axis = 0; axis < 3; ++axis)
+      position_error(axis) =
+          applyDeadband(position_error(axis), position_deadband_);
+    const Eigen::Vector3d control_linear =
+        linear_gain_ * position_error;// 移动夹爪时，目标在夹爪系中反向移动
     base_linear = base_from_control * control_linear;// 转化为基坐标系下的速度
     if (use_orientation_control_) {
       const Eigen::Quaterniond observed_q(
@@ -635,10 +688,14 @@ VisualServo::trackingVelocity(const JointPoint &position,
       if (observed_q.norm() > 1e-6) {
         const Eigen::Matrix3d observed_rotation =
             observed_q.normalized().toRotationMatrix();
+        const Eigen::Vector3d angular_error =
+            rotationLog(desired_rotation_ * observed_rotation.transpose());
+        if (raw_angular_error)
+          *raw_angular_error = angular_error;
         base_angular =
             base_from_control *
             (-angular_gain_ *     // 相机自己正方向旋转时，目标在相机坐标系里看起来会反方向旋转
-             rotationLog(desired_rotation_ * observed_rotation.transpose()));// 计算旋转误差 R_d * R_o^T
+             angular_error);// 计算旋转误差 R_d * R_o^T
       }
     }
   } else {
@@ -646,13 +703,21 @@ VisualServo::trackingVelocity(const JointPoint &position,
                                          target.position.z);// 眼在手外：目标位置的基坐标系下的位置
     const Eigen::Vector3d current_tcp(base_control.p.x(), base_control.p.y(),
                                       base_control.p.z());
-    const Eigen::Vector3d position_error =
+    Eigen::Vector3d position_error =
         target_in_base + target_offset_ - current_tcp;
-    if (position_error.norm() >= position_deadband_)
-      base_linear = linear_gain_ * position_error;
-    if (use_orientation_control_)
-      base_angular = angular_gain_ * rotationLog(desired_rotation_ *
-                                                 base_from_control.transpose());
+    if (raw_position_error)
+      *raw_position_error = position_error;
+    for (int axis = 0; axis < 3; ++axis)
+      position_error(axis) =
+          applyDeadband(position_error(axis), position_deadband_);
+    base_linear = linear_gain_ * position_error;
+    if (use_orientation_control_) {
+      const Eigen::Vector3d angular_error =
+          rotationLog(desired_rotation_ * base_from_control.transpose());
+      if (raw_angular_error)
+        *raw_angular_error = angular_error;
+      base_angular = angular_gain_ * angular_error;
+    }
   }
   if (base_linear.norm() > max_linear_velocity_)
     base_linear *= max_linear_velocity_ / base_linear.norm();
@@ -676,7 +741,7 @@ Eigen::VectorXd VisualServo::desiredVelocity(ServoState state,
                                              double target_age) {
   Eigen::VectorXd velocity = Eigen::VectorXd::Zero(kDof);
   if (state == ServoState::TRACKING) {      // 正在跟踪中
-    velocity = trackingVelocity(position, target);    // 计算跟踪速度
+    velocity = trackingVelocity(position, target, nullptr, nullptr);    // 计算跟踪速度
     last_tracking_velocity_ = velocity;
     have_ever_tracked_ = true;
   } else if (state == ServoState::COAST) {    // 失去目标 继续沿着上一次的速度运动一段时间
@@ -746,10 +811,101 @@ void VisualServo::controlLoop(const ros::TimerEvent &event) {
     }
   }
 
-  const ServoState next = selectState(fresh_target, target_age);// 选择下一个状态
+  ServoState next = selectState(fresh_target, target_age);// 选择下一个状态
+  bool entering_reacquire_hold = false;
+  if (next == ServoState::SEARCH_INITIAL ||
+      next == ServoState::SEARCH_RECOVERY) {
+    if (!search_reacquire_pending_)
+      reacquire_candidate_ = false;
+    search_reacquire_pending_ = true;
+  }
+
+  // 搜索运动中看到一帧目标时先刹停。只有目标连续稳定存在一段时间，
+  // 才退出搜索并恢复闭环，避免“看到就下、丢失就上”的状态振荡。
+  if (fresh_target && search_reacquire_pending_) {
+    const ros::Time now = ros::Time::now();
+    if (!reacquire_candidate_) {
+      reacquire_candidate_ = true;
+      reacquire_candidate_since_ = now;
+    }
+    if ((now - reacquire_candidate_since_).toSec() < reacquire_hold_time_) {
+      next = ServoState::HOLD;
+      entering_reacquire_hold = state_ != ServoState::HOLD;
+    } else {
+      search_reacquire_pending_ = false;
+      reacquire_candidate_ = false;
+      next = aligned_latched_ ? ServoState::ALIGNED : ServoState::TRACKING;
+    }
+  } else if (!fresh_target) {
+    reacquire_candidate_ = false;
+  }
+
+  Eigen::VectorXd requested = Eigen::VectorXd::Zero(kDof);
+  if (fresh_target &&
+      (next == ServoState::TRACKING || next == ServoState::ALIGNED)) {
+    Eigen::Vector3d raw_position_error =
+        Eigen::Vector3d::Constant(std::numeric_limits<double>::infinity());
+    Eigen::Vector3d raw_angular_error =
+        Eigen::Vector3d::Constant(std::numeric_limits<double>::infinity());
+    const Eigen::VectorXd tracking_request = trackingVelocity(
+        feedback, target, &raw_position_error, &raw_angular_error);
+    const double release_scale =
+        aligned_latched_ ? alignment_release_multiplier_ : 1.0;
+    const bool position_aligned =
+        raw_position_error.allFinite() &&
+        (raw_position_error.array().abs() <=
+         position_deadband_ * release_scale).all();
+    const bool orientation_aligned =
+        !use_orientation_control_ ||
+        (raw_angular_error.allFinite() &&
+         raw_angular_error.norm() <= orientation_deadband_ * release_scale);
+    const bool inside_alignment_window =
+        position_aligned && orientation_aligned;
+    const ros::Time now = ros::Time::now();
+
+    if (inside_alignment_window) {
+      if (aligned_latched_) {
+        next = ServoState::ALIGNED;
+      } else {
+        if (!alignment_candidate_) {
+          alignment_candidate_ = true;
+          alignment_candidate_since_ = now;
+        }
+        if ((now - alignment_candidate_since_).toSec() >=
+            alignment_hold_time_) {
+          aligned_latched_ = true;
+          next = ServoState::ALIGNED;
+        } else {
+          next = ServoState::TRACKING;
+        }
+      }
+    } else {
+      alignment_candidate_ = false;
+      aligned_latched_ = false;
+      next = ServoState::TRACKING;
+    }
+
+    if (next == ServoState::TRACKING)
+      requested = tracking_request;
+    last_tracking_velocity_ = requested;
+    have_ever_tracked_ = true;
+  } else {
+    alignment_candidate_ = false;
+    requested = desiredVelocity(next, feedback, target, target_age);
+  }
+
+  const bool entering_aligned =
+      next == ServoState::ALIGNED && state_ != ServoState::ALIGNED;
   transitionTo(next);
-  Eigen::VectorXd requested =
-      desiredVelocity(state_, feedback, target, target_age);
+  if (entering_aligned || entering_reacquire_hold) {
+    // 到达后立即以实际反馈位置作为保持点，清除积分和
+    // Gazebo 输出端的残留速度；重捕获确认阶段也立即停止搜索运动。
+    queue_.clear();
+    command_position_ = feedback;
+    command_velocity_.fill(0.0);
+    backend_velocity_.fill(0.0);
+    last_output_ = feedback;
+  }
   if (!requested.allFinite())
     requested.setZero();
 

@@ -108,10 +108,12 @@
         <visualize>false</visualize>
         <update_rate>20</update_rate>
         <camera name="hand_realsense_sensor">
-          <horizontal_fov>1.047</horizontal_fov>
+          <!-- 80 deg horizontal FOV: wide enough to acquire targets during
+               eye-in-hand search without excessive edge perspective. -->
+          <horizontal_fov>1.3962634016</horizontal_fov>
           <image>
-            <width>640</width>
-            <height>480</height>
+            <width>1280</width>
+            <height>720</height>
             <format>R8G8B8</format>
           </image>
           <clip><near>0.05</near><far>20.0</far></clip>

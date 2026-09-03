@@ -52,12 +52,13 @@ private:
   using DirectSdkBackend = visual_servo_internal::DirectSdkBackend;
   using ReconfigureServer = dynamic_reconfigure::Server<VisualServoConfig>;
 
-  // 视觉伺服状态机：覆盖等待、跟踪、短时续行、搜索恢复和安全保持。
+  // 视觉伺服状态机：覆盖等待、跟踪、稳定对齐、丢失恢复和安全保持。
   enum class ServoState {
     DISABLED,
     WAITING,
     SEARCH_INITIAL,
     TRACKING,
+    ALIGNED,
     COAST,
     SEARCH_RECOVERY,
     HOLD
@@ -86,7 +87,9 @@ private:
   // 状态决策、PBVS 速度求解及周期控制输出。
   ServoState selectState(bool fresh_target, double target_age);
   Eigen::VectorXd trackingVelocity(const JointPoint &position,
-                                   const geometry_msgs::Pose &target);
+                                   const geometry_msgs::Pose &target,
+                                   Eigen::Vector3d *raw_position_error,
+                                   Eigen::Vector3d *raw_angular_error);
   Eigen::VectorXd desiredVelocity(ServoState state, const JointPoint &position,
                                   const geometry_msgs::Pose &target,
                                   double target_age);
@@ -111,7 +114,10 @@ private:
   double max_linear_velocity_{0.08}, max_angular_velocity_{0.2};
   double position_deadband_{0.004}, dls_lambda_{0.04},
       joint_limit_margin_{0.08};
+  double orientation_deadband_{0.02}, alignment_hold_time_{0.35},
+      alignment_release_multiplier_{2.0};
   double target_timeout_{0.2}, coast_duration_{0.35}, coast_decay_time_{0.18};
+  double recovery_delay_{1.0}, reacquire_hold_time_{0.3};
   double minimum_safe_target_distance_{0.0};
   double search_timeout_{8.0}, open_posture_gain_{0.7},
       search_velocity_limit_{0.2};
@@ -145,6 +151,10 @@ private:
   bool have_target_{false}, have_joint_state_{false},
       integrator_initialized_{false};
   bool have_ever_tracked_{false};
+  bool alignment_candidate_{false}, aligned_latched_{false};
+  ros::Time alignment_candidate_since_;
+  bool search_reacquire_pending_{false}, reacquire_candidate_{false};
+  ros::Time reacquire_candidate_since_;
   std::atomic<bool> safety_stop_{false};
   ServoState state_{ServoState::DISABLED};
 

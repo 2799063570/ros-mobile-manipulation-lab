@@ -69,24 +69,32 @@ roslaunch aubo_ros_control eye_to_hand_visual_servo_real.launch \
 
 启动后也可以在共用 RViz“视觉伺服控制”面板的“跟踪目标”下拉框中切换红、绿、蓝；
 该选择通过 `/visual_servo/target_selection` 同时适用于眼在手上和眼在手外。
+眼在手上使用完整画面，`ignored_regions` 为空；眼在手外保留固定相机画面
+下方的机械臂屏蔽区，并在调试图中标记为 `ROBOT MASK`。
+Gazebo 腕部相机使用 `1280×720` 分辨率和 80° 水平视场角；真实相机的视场角由镜头和采集模式决定，
+不使用该仿真参数。
+眼在手上的 `maximum_contour_area` 已按该分辨率放宽为 `250000 px²`，近距离目标主要由
+与分辨率无关的 `maximum_projected_contour_area` 继续限制，避免目标接近时因像素面积增大而断检。
 
 ## 初始化、遮挡与目标丢失
 
 - 眼在手上在第一次看到目标前进入 `SEARCH_INITIAL`，缓慢移动到经过相机光轴验证的
   `initial_search_posture`；目标出现后立即进入 `TRACKING`。丢失后的可选恢复动作使用
   独立的 `recovery_posture`，两者不再复用通用 `open_posture`。默认丢失策略为
-  `coast_then_open` 且 `coast_duration: 0.0`：目标超时后直接向观测姿态移动；移动中
-  任意一帧重新获得有效目标都会立即中断恢复动作并回到 `TRACKING`。
+  `coast_then_open` 且 `coast_duration: 0.0`：目标超时后先原地保持
+  `recovery_delay`，持续丢失才向观测姿态移动；移动中重新识别到目标会先刹停，连续
+  稳定达到 `reacquire_hold_time` 后才恢复跟踪，防止观察位与目标位之间循环振荡。
 - 眼在手上的期望目标位置默认为 TCP 坐标系下 `[0, 0, 0.115] m`，即目标
   对齐夹爪中心线。腕部相机光心沿接近方向比 TCP 后缩约 `0.035 m`，因此
   对应的相机深度仍约为 `0.15 m`。这是预抓取对准距离而不是接触距离。
-  `TRACKING` 仅表示持续收到有效目标，不代表已经收敛；是否停止由三维位置误差和
-  `position_deadband` 决定。
+  `TRACKING` 仅表示持续收到有效目标。误差在死区内持续
+  `alignment_hold_time` 后进入 `ALIGNED`，停止积分并保持当前位置；只有误差超过
+  `position_deadband * alignment_release_multiplier` 才会恢复 `TRACKING`。
 - 眼在手外不需要机械臂搜索。`target_offset` 默认包含横向避遮挡分量和抓取上方的
   高度分量，使机械臂尽量不挡住相机到目标的视线。实际工位必须标定方向和大小。
-- 两种模式都拒绝超时目标。状态依次可能为 `TRACKING`、`COAST`、
+- 两种模式都拒绝超时目标。状态依次可能为 `TRACKING`、`ALIGNED`、`COAST`、
   `SEARCH_RECOVERY`、`HOLD`。眼在手外默认保持；眼在手上会在丢失后回到观测姿态
-  重新搜索。
+  重新搜索，但已进入 `ALIGNED` 后的目标丢失只会保持，不会回退搜索。
 - 检测器在目标或深度无效时不发布旧位姿；否则看门狗无法识别目标丢失。
 - 检测器先用 `minimum_contour_area` / `maximum_contour_area` 过滤像素轮廓，再结合
   深度和相机内参计算投影物理面积。默认
@@ -104,6 +112,8 @@ roslaunch aubo_ros_control eye_to_hand_visual_servo_real.launch \
 `rosrun rqt_reconfigure rqt_reconfigure`，选择 `/aubo_visual_servo`。动态修改仅在
 当前进程中生效，不会回写上述 YAML；确认参数后需手动保存。后端、坐标系、话题、
 频率、关节硬限制和 SDK 连接参数仍需修改 YAML/launch 并重启节点。
+位置误差采用三轴独立的连续软死区：死区内不输出速度，超出后从零连续增长，
+避免图像和深度小噪声驱动夹爪在目标附近来回震荡。
 
 ## 安全调试顺序
 

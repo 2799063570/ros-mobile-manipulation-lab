@@ -39,6 +39,7 @@ classDiagram
         WAITING
         SEARCH_INITIAL
         TRACKING
+        ALIGNED
         COAST
         SEARCH_RECOVERY
         HOLD
@@ -113,6 +114,7 @@ classDiagram
 | `WAITING` | 已启用，但还没有新目标 | 保持当前位置 |
 | `SEARCH_INITIAL` | 第一次看到目标前，移动到初始观察姿态 | 搜索目标 |
 | `TRACKING` | 目标新鲜，按视觉误差闭环跟踪 | 闭环运动 |
+| `ALIGNED` | 位置/姿态误差持续满足对齐阈值 | 停止积分并保持反馈位置 |
 | `COAST` | 目标刚丢失，短时间沿上一速度衰减续行 | 衰减运动 |
 | `SEARCH_RECOVERY` | 目标持续丢失，移动到恢复观察姿态 | 恢复搜索 |
 | `HOLD` | 停止策略、生效的安全锁存或搜索超时 | 保持当前位置 |

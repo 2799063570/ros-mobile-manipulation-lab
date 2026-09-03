@@ -62,6 +62,15 @@ TEST(VisualServoCommon, ClampsValuesAtBothLimits)
   EXPECT_DOUBLE_EQ(1.0, vsi::clampValue(2.0, -1.0, 1.0));
 }
 
+TEST(VisualServoCommon, AppliesContinuousSymmetricDeadband)
+{
+  EXPECT_DOUBLE_EQ(0.0, vsi::applyDeadband(0.003, 0.004));
+  EXPECT_DOUBLE_EQ(0.0, vsi::applyDeadband(-0.004, 0.004));
+  EXPECT_NEAR(0.002, vsi::applyDeadband(0.006, 0.004), 1e-12);
+  EXPECT_NEAR(-0.002, vsi::applyDeadband(-0.006, 0.004), 1e-12);
+  EXPECT_DOUBLE_EQ(0.006, vsi::applyDeadband(0.006, -1.0));
+}
+
 }  // namespace
 
 int main(int argc, char** argv)

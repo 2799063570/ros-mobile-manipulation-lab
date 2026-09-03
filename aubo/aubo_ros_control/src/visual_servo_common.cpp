@@ -13,6 +13,16 @@ double clampValue(double value, double low, double high)
   return std::max(low, std::min(high, value));
 }
 
+double applyDeadband(double value, double deadband)
+{
+  const double width = std::max(0.0, deadband);
+  if (value > width)
+    return value - width;
+  if (value < -width)
+    return value + width;
+  return 0.0;
+}
+
 bool finitePoint(const JointPoint& point)
 {
   return std::all_of(point.begin(), point.end(),
