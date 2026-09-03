@@ -52,10 +52,10 @@ Eigen::MatrixXd dampedPseudoInverse(const Eigen::MatrixXd &jacobian,
   const Eigen::MatrixXd regularized =
       jacobian * jacobian.transpose() +
       lambda * lambda *
-          Eigen::MatrixXd::Identity(jacobian.rows(), jacobian.rows());
+          Eigen::MatrixXd::Identity(jacobian.rows(), jacobian.rows());// P*P^T + λ^2*I
   return jacobian.transpose() *
          regularized.ldlt().solve(
-             Eigen::MatrixXd::Identity(jacobian.rows(), jacobian.rows()));
+             Eigen::MatrixXd::Identity(jacobian.rows(), jacobian.rows()));// P(P*P^T + λ^2*I)^-1
 }
 
 Eigen::Matrix3d kdlRotationToEigen(const KDL::Rotation &rotation) {
@@ -129,15 +129,17 @@ VisualServo::VisualServo()
       nh_.advertiseService("/visual_servo/reset", &VisualServo::reset, this);
 
   if (backend_ == "gazebo") {
+    // 对于gazebo模式 直接借助于ros_control 通过关节状态控制器和关节位置控制器
     joint_sub_ = nh_.subscribe(joint_states_topic_, 2,
-                               &VisualServo::jointStateCallback, this);
-    if (!setupGazeboPublishers()) {
+                               &VisualServo::jointStateCallback, this); // 订阅关节位置话题
+    if (!setupGazeboPublishers()) {   // 设置六个关节位置的话题发布者
       valid_ = false;
       return;
     }
     output_timer_ = nh_.createTimer(ros::Duration(1.0 / output_rate_),
-                                    &VisualServo::gazeboOutput, this);
+                                    &VisualServo::gazeboOutput, this);  // 创建输出定时器
   } else if (backend_ == "sdk") {
+    // 对于sdk实机模式 直接通过SDK下发关节位置 缓冲队列+限速限加速度+向控制柜发送的频率
     sdk_.reset(new DirectSdkBackend(queue_, velocity_limits_,
                                     acceleration_limits_, output_rate_));
     if (!sdk_->connect(private_nh_)) {
@@ -176,19 +178,19 @@ bool VisualServo::healthy() const {
 
 std::size_t VisualServo::readQueueCapacity() {
   int capacity = 80;
-  private_nh_.param<int>("command_queue_capacity", capacity, 80);
+  private_nh_.param<int>("command_queue_capacity", capacity, 80);// 获取参数服务器中 控制队列的长度
   return static_cast<std::size_t>(std::max(2, capacity));
 }
 
 bool VisualServo::loadParameters() {
   private_nh_.param<std::string>("backend", backend_, "gazebo");
   private_nh_.param<std::string>("servo_mode", servo_mode_, "eye_in_hand");
-  private_nh_.param<std::string>("base_link", base_link_, "base_link");
+  private_nh_.param<std::string>("base_link", base_link_, "base_link");// 基坐标系
   private_nh_.param<std::string>("camera_link", camera_link_,
-                                 "camera_color_optical_frame");
+                                 "camera_color_optical_frame");// 相机坐标系
   private_nh_.param<std::string>("control_link", control_link_,
                                  servo_mode_ == "eye_to_hand" ? "tcp_link"
-                                                              : camera_link_);
+                                                              : camera_link_);// 控制坐标系：计算误差的参考坐标系
   private_nh_.param<std::string>("target_topic", target_topic_,
                                  "/visual_servo/target_pose");
   private_nh_.param<std::string>("state_topic", state_topic_,
@@ -221,11 +223,11 @@ bool VisualServo::loadParameters() {
                             0.2);
   private_nh_.param<double>("feedback_blend", feedback_blend_, 0.02);
   private_nh_.param<bool>("use_orientation_control", use_orientation_control_,
-                          false);
+                          false);// 是否使用姿态控制(计算角度误差)
   private_nh_.param<bool>("initial_search_enabled", initial_search_enabled_,
-                          servo_mode_ == "eye_in_hand");
-  private_nh_.param<bool>("start_enabled", enabled_, false);
-
+                          servo_mode_ == "eye_in_hand");// 是否机械臂初始化到观察姿态
+  private_nh_.param<bool>("start_enabled", enabled_, false);// 是否启动视觉伺服器
+  
   if (servo_mode_ != "eye_in_hand" && servo_mode_ != "eye_to_hand") {
     ROS_ERROR("[visual_servo] servo_mode 必须是 eye_in_hand 或 eye_to_hand");
     return false;
@@ -593,23 +595,23 @@ VisualServo::trackingVelocity(const JointPoint &position,
   for (std::size_t i = 0; i < kDof; ++i)
     joints(i) = position[i];
 
-  KDL::Frame base_control;
-  KDL::Jacobian kdl_jacobian(kDof);
+  KDL::Frame base_control;                  // 计算控制坐标系在基坐标系下的位姿 位置 p   旋转矩阵 M
+  KDL::Jacobian kdl_jacobian(kDof);         // 计算控制坐标系在基坐标系下的雅可比矩阵
   if (fk_solver_->JntToCart(joints, base_control) < 0 ||
       jacobian_solver_->JntToJac(joints, kdl_jacobian) < 0)
     return Eigen::VectorXd::Zero(kDof);
 
   Eigen::Vector3d base_linear = Eigen::Vector3d::Zero();
   Eigen::Vector3d base_angular = Eigen::Vector3d::Zero();
-  const Eigen::Matrix3d base_from_control = kdlRotationToEigen(base_control.M);
+  const Eigen::Matrix3d base_from_control = kdlRotationToEigen(base_control.M);// 转化格式
   if (servo_mode_ == "eye_in_hand") {
     const Eigen::Vector3d observed(target.position.x, target.position.y,
-                                   target.position.z);
+                                   target.position.z);// 眼在手上：目标位置的相机坐标系下的位置
     Eigen::Vector3d control_linear =
-        linear_gain_ * (observed - desired_position_);
-    if ((observed - desired_position_).norm() < position_deadband_)
+        linear_gain_ * (observed - desired_position_);// 目前这个observed是目标位置的相机坐标系下的位置 移动末端：目标会反向移动
+    if ((observed - desired_position_).norm() < position_deadband_)// 小于死区的时候 速度置零 防止震荡
       control_linear.setZero();
-    base_linear = base_from_control * control_linear;
+    base_linear = base_from_control * control_linear;// 转化为基坐标系下的速度
     if (use_orientation_control_) {
       const Eigen::Quaterniond observed_q(
           target.orientation.w, target.orientation.x, target.orientation.y,
@@ -619,13 +621,13 @@ VisualServo::trackingVelocity(const JointPoint &position,
             observed_q.normalized().toRotationMatrix();
         base_angular =
             base_from_control *
-            (-angular_gain_ *
-             rotationLog(desired_rotation_ * observed_rotation.transpose()));
+            (-angular_gain_ *     // 相机自己正方向旋转时，目标在相机坐标系里看起来会反方向旋转
+             rotationLog(desired_rotation_ * observed_rotation.transpose()));// 计算旋转误差 R_d * R_o^T
       }
     }
   } else {
     const Eigen::Vector3d target_in_base(target.position.x, target.position.y,
-                                         target.position.z);
+                                         target.position.z);// 眼在手外：目标位置的基坐标系下的位置
     const Eigen::Vector3d current_tcp(base_control.p.x(), base_control.p.y(),
                                       base_control.p.z());
     const Eigen::Vector3d position_error =
@@ -649,7 +651,7 @@ VisualServo::trackingVelocity(const JointPoint &position,
   for (int row = 0; row < 6; ++row)
     for (int col = 0; col < static_cast<int>(kDof); ++col)
       jacobian(row, col) = kdl_jacobian(row, col);
-  return dampedPseudoInverse(jacobian, dls_lambda_) * base_twist;
+  return dampedPseudoInverse(jacobian, dls_lambda_) * base_twist;// 雅可比矩阵最小二乘解
 }
 
 Eigen::VectorXd VisualServo::desiredVelocity(ServoState state,
@@ -657,11 +659,11 @@ Eigen::VectorXd VisualServo::desiredVelocity(ServoState state,
                                              const geometry_msgs::Pose &target,
                                              double target_age) {
   Eigen::VectorXd velocity = Eigen::VectorXd::Zero(kDof);
-  if (state == ServoState::TRACKING) {
-    velocity = trackingVelocity(position, target);
+  if (state == ServoState::TRACKING) {      // 正在跟踪中
+    velocity = trackingVelocity(position, target);    // 计算跟踪速度
     last_tracking_velocity_ = velocity;
     have_ever_tracked_ = true;
-  } else if (state == ServoState::COAST) {
+  } else if (state == ServoState::COAST) {    // 失去目标 继续沿着上一次的速度运动一段时间
     const double lost_for = std::max(0.0, target_age - target_timeout_);
     const double decay =
         std::exp(-lost_for / std::max(0.01, coast_decay_time_));
@@ -728,7 +730,7 @@ void VisualServo::controlLoop(const ros::TimerEvent &event) {
     }
   }
 
-  const ServoState next = selectState(fresh_target, target_age);
+  const ServoState next = selectState(fresh_target, target_age);// 选择下一个状态
   transitionTo(next);
   Eigen::VectorXd requested =
       desiredVelocity(state_, feedback, target, target_age);

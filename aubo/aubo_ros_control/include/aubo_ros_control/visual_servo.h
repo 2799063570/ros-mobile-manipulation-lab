@@ -36,7 +36,7 @@ namespace aubo_ros_control {
  */
 class VisualServo {
 public:
-  VisualServo();
+  VisualServo();// 构造函数：读取参数服务器中的参数，初始化运动学链、后端和 ROS 通信通道。
   VisualServo(const VisualServo &) = delete;
   VisualServo &operator=(const VisualServo &) = delete;
 
@@ -133,7 +133,7 @@ private:
       Eigen::VectorXd::Zero(visual_servo_internal::kDof)};
 
   // KDL 正运动学、雅可比求解器以及真实机械臂 SDK 后端。
-  KDL::Chain chain_;
+  KDL::Chain chain_; // 机械臂运动学链 从 base_link_ 到 control_link_ 的链
   std::unique_ptr<KDL::ChainFkSolverPos_recursive> fk_solver_;
   std::unique_ptr<KDL::ChainJntToJacSolver> jacobian_solver_;
   std::unique_ptr<DirectSdkBackend> sdk_;

@@ -52,7 +52,7 @@ bool DirectSdkBackend::connect(ros::NodeHandle& nh)
   }
 
   bool real_robot = false;
-  state_service_.robotServiceGetIsRealRobotExist(real_robot);
+  state_service_.robotServiceGetIsRealRobotExist(real_robot); // 获取控制柜是否报告真实机械臂
   if (require_real_robot_ && !real_robot)
   {
     ROS_ERROR("[visual_servo/sdk] 控制柜未报告真实机械臂，拒绝下发运动");
@@ -63,7 +63,7 @@ bool DirectSdkBackend::connect(ros::NodeHandle& nh)
   aubo_robot_namespace::ToolDynamicsParam tool{};
   aubo_robot_namespace::ROBOT_SERVICE_STATE startup_state;
   int result = control_service_.rootServiceRobotStartup(
-      tool, static_cast<uint8>(collision_class_), true, true, 1000, startup_state);
+      tool, static_cast<uint8>(collision_class_), true, true, 1000, startup_state);// 启动机械臂（上电 + 松刹车）
   if (result != aubo_robot_namespace::InterfaceCallSuccCode)
   {
     ROS_ERROR("[visual_servo/sdk] 机器人启动失败，错误码 %d", result);
@@ -85,7 +85,7 @@ bool DirectSdkBackend::connect(ros::NodeHandle& nh)
     if (state_service_.robotServiceGetRobotDiagnosisInfo(diagnosis) ==
             aubo_robot_namespace::InterfaceCallSuccCode &&
         diagnosis.armPowerStatus && !diagnosis.softEmergency &&
-        !diagnosis.remoteEmergency && !diagnosis.robotCollision)
+        !diagnosis.remoteEmergency && !diagnosis.robotCollision)// 获取诊断信息 判断电压、软件紧急、远程紧急、碰撞是否正常
     {
       ready = true;
       break;
@@ -99,7 +99,7 @@ bool DirectSdkBackend::connect(ros::NodeHandle& nh)
     return false;
   }
 
-  aubo_robot_namespace::wayPoint_S waypoint{};
+  aubo_robot_namespace::wayPoint_S waypoint{};// 状态点序列 （位置(xyz, orientation), 关节位置
   if (state_service_.robotServiceGetCurrentWaypointInfo(waypoint) !=
       aubo_robot_namespace::InterfaceCallSuccCode)
   {
@@ -108,7 +108,7 @@ bool DirectSdkBackend::connect(ros::NodeHandle& nh)
     return false;
   }
   for (std::size_t i = 0; i < kDof; ++i)
-    last_position_[i] = waypoint.jointpos[i];
+    last_position_[i] = waypoint.jointpos[i];   // 获取机械臂的当前状态 更新到 last_position_ 中
   have_last_position_ = true;
 
   // 预填一段静止轨迹，为 ROS 的常规调度抖动预留缓冲，再接收实时伺服点。
@@ -116,7 +116,7 @@ bool DirectSdkBackend::connect(ros::NodeHandle& nh)
   for (int i = 0; i < lead_in_points; ++i)
     queue_.push(last_position_);
 
-  result = control_service_.robotServiceEnterTcp2CanbusMode();
+  result = control_service_.robotServiceEnterTcp2CanbusMode();// 进入 TCP2CANBUS 模式，直接下发轨迹点到控制柜
   if (result == aubo_robot_namespace::ErrCode_ResponseReturnError)
   {
     control_service_.robotServiceLeaveTcp2CanbusMode();
@@ -213,10 +213,10 @@ void DirectSdkBackend::outputLoop()
 {
   while (running_.load() && ros::ok())
   {
-    aubo_robot_namespace::RobotDiagnosis diagnosis{};
+    aubo_robot_namespace::RobotDiagnosis diagnosis{};// 机器人诊断信息 包含mac缓冲区的大小
     const int result = mac_service_.robotServiceGetRobotDiagnosisInfo(diagnosis);
     if (result != aubo_robot_namespace::InterfaceCallSuccCode ||
-        diagnosis.softEmergency || diagnosis.remoteEmergency || diagnosis.robotCollision)
+        diagnosis.softEmergency || diagnosis.remoteEmergency || diagnosis.robotCollision)// 急停 或者 碰撞
     {
       ROS_ERROR("[visual_servo/sdk] 诊断失败或安全状态触发，停止 SDK 下发");
       running_.store(false);
@@ -237,7 +237,7 @@ void DirectSdkBackend::outputLoop()
           break;
         if (!finitePoint(requested))
           continue;
-        const JointPoint safe = optimize(requested);
+        const JointPoint safe = optimize(requested);// 优化关节位置，限速限加速度
         aubo_robot_namespace::wayPoint_S waypoint{};
         std::copy(safe.begin(), safe.end(), waypoint.jointpos);
         batch.push_back(waypoint);
