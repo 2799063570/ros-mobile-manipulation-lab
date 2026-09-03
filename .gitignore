@@ -15,3 +15,5 @@ logs/
 aubo/aubo_sdk/logfiles/
 *.py[cod]
 __pycache__/
+*.avi
+*.avi
