@@ -45,7 +45,7 @@ public:
 private:
   using GripperClient = actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction>;
 
-  struct TargetTrack
+  struct TargetTrack     // 目标跟踪结构体 
   {
     double x{0.0};
     double y{0.0};

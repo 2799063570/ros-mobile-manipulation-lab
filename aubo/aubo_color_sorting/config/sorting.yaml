@@ -1,7 +1,7 @@
 planning_group: aubo_i5
 end_effector_link: tcp_link
 target_frame: base_link
-detections_topic: /sorting/detections
+detections_topic: /sorting/detections       # 注意和检测节点的发布话题保持一致
 gripper_action: /aubo_i5/gripper_controller/follow_joint_trajectory
 
 table_z: 0.10

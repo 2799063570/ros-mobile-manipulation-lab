@@ -102,7 +102,7 @@ ColorSortingTask::ColorSortingTask(ros::NodeHandle nh, ros::NodeHandle private_n
   loadParameters();
   robot_limits_valid_ = verifyLoadedUpperArmLimit();
 
-  arm_.reset(new moveit::planning_interface::MoveGroupInterface(group_name_));
+  arm_.reset(new moveit::planning_interface::MoveGroupInterface(group_name_));// 初始化MoveGroupInterface
   arm_->setEndEffectorLink(end_effector_link_);
   arm_->setPoseReferenceFrame(target_frame_);
   arm_->setPlanningTime(planning_time_);
@@ -110,39 +110,39 @@ ColorSortingTask::ColorSortingTask(ros::NodeHandle nh, ros::NodeHandle private_n
   arm_->setMaxVelocityScalingFactor(velocity_scaling_);
   arm_->setMaxAccelerationScalingFactor(acceleration_scaling_);
   planning_frame_ = arm_->getPlanningFrame();
-  gripper_client_.reset(new GripperClient(gripper_action_name_, true));
+  gripper_client_.reset(new GripperClient(gripper_action_name_, true));// 初始化夹爪动作客户端
 
-  state_publisher_ = nh_.advertise<std_msgs::String>("/sorting/state", 1, true);
-  detection_summary_publisher_ = nh_.advertise<std_msgs::String>("/sorting/detection_summary", 1, true);
-  base_lock_publisher_ = nh_.advertise<std_msgs::Bool>(base_lock_topic_, 1, true);
-  failure_publisher_ = nh_.advertise<std_msgs::String>(failure_topic_, 1, true);
-  target_cache_publisher_ = nh_.advertise<std_msgs::String>("/sorting/target_cache", 1, true);
-  grasp_attach_publisher_ = nh_.advertise<std_msgs::String>(grasp_attach_topic_, 1);
-  grasp_detach_publisher_ = nh_.advertise<std_msgs::String>(grasp_detach_topic_, 1);
+  state_publisher_ = nh_.advertise<std_msgs::String>("/sorting/state", 1, true);// 状态机
+  detection_summary_publisher_ = nh_.advertise<std_msgs::String>("/sorting/detection_summary", 1, true);// 检测结果汇总 例如：红1,绿0,蓝1
+  base_lock_publisher_ = nh_.advertise<std_msgs::Bool>(base_lock_topic_, 1, true);// 机械臂是否在执行任务 移动底盘是否需要被锁住
+  failure_publisher_ = nh_.advertise<std_msgs::String>(failure_topic_, 1, true);// 任务失败原因
+  target_cache_publisher_ = nh_.advertise<std_msgs::String>("/sorting/target_cache", 1, true);// 目标的信息目标颜色、平均位置、观测次数、置信度、离散程度、目标年龄以及是否已抓取
+  grasp_attach_publisher_ = nh_.advertise<std_msgs::String>(grasp_attach_topic_, 1);// 将目标吸附到夹爪上
+  grasp_detach_publisher_ = nh_.advertise<std_msgs::String>(grasp_detach_topic_, 1);// 从夹爪上分离目标
 
   detection_subscriber_ = nh_.subscribe(detections_topic_, 2, &ColorSortingTask::detectionCallback, this);
   grasp_status_subscriber_ = nh_.subscribe(grasp_status_topic_, 5,
-                                           &ColorSortingTask::graspStatusCallback, this);
+                                           &ColorSortingTask::graspStatusCallback, this);// 抓取状态的反馈
   workspace_subscriber_ = nh_.subscribe(workspace_update_topic_, 1,
-                                        &ColorSortingTask::workspaceUpdateCallback, this);
+                                        &ColorSortingTask::workspaceUpdateCallback, this);// 动态接收新的工作区配置 例如换工作台、换桌子位置、换放置区域、换物体模型名称
   if (require_octomap_)
   {
-    cloud_subscriber_ = nh_.subscribe(point_cloud_topic_, 1, &ColorSortingTask::cloudCallback, this);
+    cloud_subscriber_ = nh_.subscribe(point_cloud_topic_, 1, &ColorSortingTask::cloudCallback, this);// 订阅点云话题
     planning_scene_subscriber_ = nh_.subscribe(planning_scene_topic_, 5,
-                                               &ColorSortingTask::planningSceneCallback, this);
-    clear_octomap_client_ = nh_.serviceClient<std_srvs::Empty>(clear_octomap_service_);
+                                               &ColorSortingTask::planningSceneCallback, this);// 订阅规划场景话题
+    clear_octomap_client_ = nh_.serviceClient<std_srvs::Empty>(clear_octomap_service_);// 初始化清除Octomap服务客户端
   }
 
   services_.push_back(nh_.advertiseService("/sorting/move_to_observation",
-                                            &ColorSortingTask::observeService, this));
-  services_.push_back(nh_.advertiseService("/sorting/start", &ColorSortingTask::startService, this));
-  services_.push_back(nh_.advertiseService("/sorting/stop", &ColorSortingTask::stopService, this));
-  services_.push_back(nh_.advertiseService("/sorting/open_gripper", &ColorSortingTask::openService, this));
+                                            &ColorSortingTask::observeService, this));// 请求机械臂移动到观测位置
+  services_.push_back(nh_.advertiseService("/sorting/start", &ColorSortingTask::startService, this));// 开始执行分拣任务请求
+  services_.push_back(nh_.advertiseService("/sorting/stop", &ColorSortingTask::stopService, this));// 停止执行分拣任务请求
+  services_.push_back(nh_.advertiseService("/sorting/open_gripper", &ColorSortingTask::openService, this));// 打开夹爪请求
   services_.push_back(nh_.advertiseService("/sorting/prepare_work",
-                                            &ColorSortingTask::prepareWorkService, this));
-  services_.push_back(nh_.advertiseService("/sorting/home", &ColorSortingTask::homeService, this));
+                                            &ColorSortingTask::prepareWorkService, this));//让机械臂移动跑动模式
+  services_.push_back(nh_.advertiseService("/sorting/home", &ColorSortingTask::homeService, this));// 请求机械臂移动到home
   services_.push_back(nh_.advertiseService("/sorting/configure_workspace",
-                                            &ColorSortingTask::configureWorkspaceService, this));
+                                            &ColorSortingTask::configureWorkspaceService, this));// 配置工作区请求
 
   std_msgs::Bool unlocked;
   unlocked.data = false;
