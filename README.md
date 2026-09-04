@@ -40,7 +40,7 @@ https://github.com/user-attachments/assets/b636e380-9148-4471-b0e5-202318e15bf4
 | --- | --- |
 | ![YOLO OBB 目标检测和抓取参数](aubo/video_or_img/readme/object_detector.png) | ![MoveIt OctoMap 环境建模](aubo/video_or_img/readme/octmap.png) |
 
-| AUBO Gazebo 分拣场景 | AUBO RViz 分拣场景 |
+| AUBO 复合机器人 Gazebo 分拣场景 | AUBO 复合机器人 RViz 分拣场景 |
 | --- | --- |
 | ![AUBO 复合机器人 Gazebo 分拣场景](aubo/video_or_img/readme/分拣场景gazebo.png) | ![AUBO 复合机器人 RViz 分拣场景](aubo/video_or_img/readme/分拣场景rviz.png) |
 
