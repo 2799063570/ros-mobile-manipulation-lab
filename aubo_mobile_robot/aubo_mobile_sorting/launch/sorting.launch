@@ -4,6 +4,7 @@
   <arg name="start_perception" default="true"/>
   <arg name="perception_mode" default="color"/>
   <arg name="start_task" default="true"/>
+  <arg name="task_executable" default="color_sorting_task_cpp"/>
   <arg name="config" default="$(find aubo_mobile_sorting)/config/sorting.yaml"/>
   <arg name="debug_view" default="true"/>
   <arg name="auto_move_to_observation" default="true"/>
@@ -26,7 +27,7 @@
     </group>
   </group>
 
-  <node if="$(arg start_task)" pkg="aubo_sorting_core" type="color_sorting_task.py"
+  <node if="$(arg start_task)" pkg="aubo_sorting_core" type="$(arg task_executable)"
         name="color_sorting_task" output="screen">
     <rosparam file="$(arg config)" command="load"/>
     <param name="auto_move_to_observation" value="$(arg auto_move_to_observation)"/>

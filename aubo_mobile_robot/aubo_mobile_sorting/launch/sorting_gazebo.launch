@@ -7,6 +7,7 @@
   <arg name="paused" default="false"/>
   <arg name="auto_move_to_observation" default="true"/>
   <arg name="auto_start" default="false"/>
+  <arg name="task_executable" default="color_sorting_task_cpp"/>
 
   <include file="$(find aubo_mobile_robot)/launch/gazebo.launch">
     <arg name="world" value="$(arg world)"/>
@@ -36,6 +37,7 @@
   </include>
 
   <include file="$(find aubo_mobile_sorting)/launch/sorting.launch">
+    <arg name="task_executable" value="$(arg task_executable)"/>
     <arg name="debug_view" value="$(arg debug_view)"/>
     <arg name="auto_move_to_observation" value="$(arg auto_move_to_observation)"/>
     <arg name="auto_start" value="$(arg auto_start)"/>

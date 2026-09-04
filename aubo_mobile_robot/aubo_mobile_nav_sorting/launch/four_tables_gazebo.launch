@@ -9,6 +9,7 @@
   <arg name="paused" default="false"/>
   <arg name="auto_start" default="false"/>
   <arg name="mission_implementation" default="cpp"/><!-- Accepted values: python, cpp -->
+  <arg name="task_executable" default="color_sorting_task_cpp"/>
   <!-- Accepted values: teb, dwa. An unknown value intentionally fails while
        roslaunch evaluates this lookup instead of silently selecting a planner. -->
   <arg name="local_planner" default="teb"/>
@@ -53,6 +54,7 @@
   </include>
 
   <include file="$(find aubo_mobile_sorting)/launch/sorting.launch">
+    <arg name="task_executable" value="$(arg task_executable)"/>
     <arg name="config" value="$(find aubo_mobile_nav_sorting)/config/sorting.yaml"/>
     <arg name="debug_view" value="$(arg debug_view)"/>
     <arg name="auto_move_to_observation" value="false"/>

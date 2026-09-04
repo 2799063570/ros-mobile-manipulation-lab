@@ -6,6 +6,12 @@
 请从 `aubo_color_sorting` 或 `aubo_mobile_sorting` 的 launch 文件启动，不要直接
 启动核心脚本。
 
+核心同时提供 Python 和 C++ 两个等价实现。固定平台和移动平台的分拣 launch 默认
+使用 `color_sorting_task_cpp`；如需回退 Python 版本，可在 launch 命令后增加
+`task_executable:=color_sorting_task.py`。C++ 类声明位于
+`include/aubo_sorting_core/color_sorting_task.hpp`，实现和节点入口分别位于
+`src/color_sorting_task.cpp` 与 `src/color_sorting_task_node.cpp`。
+
 ## 输入与输出
 
 - 订阅 `/sorting/detections`，类型为

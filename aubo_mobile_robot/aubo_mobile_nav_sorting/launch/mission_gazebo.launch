@@ -12,6 +12,7 @@
   <arg name="goal_yaw" default="0.0"/>
   <arg name="direct_dock" default="true"/>
   <arg name="mission_implementation" default="python"/>
+  <arg name="task_executable" default="color_sorting_task_cpp"/>
 
   <include file="$(find aubo_mobile_robot)/launch/gazebo.launch">
     <arg name="world" value="$(arg world)"/>
@@ -62,6 +63,7 @@
   </include>
 
   <include file="$(find aubo_mobile_sorting)/launch/sorting.launch">
+    <arg name="task_executable" value="$(arg task_executable)"/>
     <arg name="config" value="$(find aubo_mobile_nav_sorting)/config/sorting.yaml"/>
     <arg name="debug_view" value="$(arg debug_view)"/>
     <arg name="auto_move_to_observation" value="false"/>
