@@ -113,9 +113,9 @@ private:
   double linear_gain_{0.8}, angular_gain_{0.5};
   double max_linear_velocity_{0.08}, max_angular_velocity_{0.2};
   double position_deadband_{0.004}, dls_lambda_{0.04},
-      joint_limit_margin_{0.08};
+      joint_limit_margin_{0.08};// 死区阈值、DLS最小二乘阈值、关节位置限位余量
   double orientation_deadband_{0.02}, alignment_hold_time_{0.35},
-      alignment_release_multiplier_{2.0};
+      alignment_release_multiplier_{2.0};// 姿态死区阈值、对齐保持时间、迟滞因子
   double target_timeout_{0.2}, coast_duration_{0.35}, coast_decay_time_{0.18};
   double recovery_delay_{1.0}, reacquire_hold_time_{0.3};
   double minimum_safe_target_distance_{0.0};

@@ -456,6 +456,7 @@ bool VisualServo::setupGazeboPublishers() {
 
 void VisualServo::targetCallback(
     const geometry_msgs::PoseStamped::ConstPtr &message) {
+  // 根据message的frame_id和servo_mode_，将目标位姿变换到控制坐标系下，并进行有效性检查。
   geometry_msgs::PoseStamped source_target = *message;
   geometry_msgs::PoseStamped control_target;
   geometry_msgs::PoseStamped camera_target;
@@ -475,13 +476,13 @@ void VisualServo::targetCallback(
       camera_target = source_target.header.frame_id == camera_link_
                           ? source_target
                           : tf_buffer_.transform(source_target, camera_link_,
-                                                 ros::Duration(0.03));
+                                                 ros::Duration(0.03));// 变换到相机坐标系
       control_target = camera_target.header.frame_id == control_link_
                            ? camera_target
                            : tf_buffer_.transform(camera_target, control_link_,
-                                                  ros::Duration(0.03));
+                                                  ros::Duration(0.03));// 变换到夹爪/TCP 坐标系
     } else if (source_target.header.frame_id == base_link_) {
-      control_target = source_target;
+      control_target = source_target;// 眼在手外感知直接使用基坐标系下的目标
     } else {
       control_target =
           tf_buffer_.transform(source_target, base_link_, ros::Duration(0.03));
@@ -505,10 +506,10 @@ void VisualServo::targetCallback(
   double minimum_safe_distance = 0.0;
   {
     std::lock_guard<std::mutex> control_lock(control_mutex_);
-    minimum_safe_distance = minimum_safe_target_distance_;
+    minimum_safe_distance = minimum_safe_target_distance_;// 获取安全距离阈值
   }
   if (servo_mode_ == "eye_in_hand" && minimum_safe_distance > 0.0 &&
-      camera_target.pose.position.z < minimum_safe_distance) {
+      camera_target.pose.position.z < minimum_safe_distance) {// 如果目标距离小于安全阈值，锁存停止 
     safety_stop_.store(true);
     queue_.clear();
     {
@@ -526,7 +527,7 @@ void VisualServo::targetCallback(
       message->header.stamp.isZero() ? now : message->header.stamp;
   if (measurement_time > now)
     measurement_time = now;
-  std::lock_guard<std::mutex> lock(target_mutex_);
+  std::lock_guard<std::mutex> lock(target_mutex_);// 上锁 存入target位置、timestamp、have_target_标志
   target_pose_ = control_target.pose;
   last_target_time_ = measurement_time;
   have_target_ = true;
@@ -534,6 +535,7 @@ void VisualServo::targetCallback(
 
 bool VisualServo::setEnabled(std_srvs::SetBool::Request &request,
                              std_srvs::SetBool::Response &response) {
+  // 接收rviz端发送的服务请求
   std::lock_guard<std::mutex> control_lock(control_mutex_);
   enabled_ = request.data;
   safety_stop_.store(false);
@@ -773,7 +775,7 @@ void VisualServo::transitionTo(ServoState next) {
 }
 
 void VisualServo::publishState() {
-  std_msgs::String message;
+  std_msgs::String message;   // 把当前的状态发布给rviz端
   message.data = stateName(state_);
   state_pub_.publish(message);
   legacy_state_pub_.publish(message);
@@ -789,9 +791,9 @@ void VisualServo::controlLoop(const ros::TimerEvent &event) {
       ROS_WARN_THROTTLE(1.0, "[visual_servo] 等待有效关节状态");
       return;
     }
-    feedback = feedback_position_;
+    feedback = feedback_position_;// 获取当前关节位置 
   }
-  if (!integrator_initialized_) {
+  if (!integrator_initialized_) {   // 初始化速度到位置积分器
     command_position_ = feedback;
     command_velocity_.fill(0.0);
     backend_velocity_.fill(0.0);
@@ -806,17 +808,17 @@ void VisualServo::controlLoop(const ros::TimerEvent &event) {
     std::lock_guard<std::mutex> lock(target_mutex_);
     if (have_target_) {
       target = target_pose_;
-      target_age = (ros::Time::now() - last_target_time_).toSec();
-      fresh_target = target_age <= target_timeout_;
+      target_age = (ros::Time::now() - last_target_time_).toSec();// 距离上次获取到目标之间的时间间隔
+      fresh_target = target_age <= target_timeout_;// 如果目标年龄小于超时时间，认为目标新鲜
     }
   }
 
   ServoState next = selectState(fresh_target, target_age);// 选择下一个状态
   bool entering_reacquire_hold = false;
   if (next == ServoState::SEARCH_INITIAL ||
-      next == ServoState::SEARCH_RECOVERY) {
-    if (!search_reacquire_pending_)
-      reacquire_candidate_ = false;
+      next == ServoState::SEARCH_RECOVERY) {    // 如果机械臂要进入观察位置
+    if (!search_reacquire_pending_)     // 如果不是重捕获阶段，说明是初始搜索阶段
+      reacquire_candidate_ = false;     // 还未进入重捕获阶段，重捕获候选标志置为false
     search_reacquire_pending_ = true;
   }
 
@@ -824,15 +826,15 @@ void VisualServo::controlLoop(const ros::TimerEvent &event) {
   // 才退出搜索并恢复闭环，避免“看到就下、丢失就上”的状态振荡。
   if (fresh_target && search_reacquire_pending_) {
     const ros::Time now = ros::Time::now();
-    if (!reacquire_candidate_) {
+    if (!reacquire_candidate_) {    // 在重捕获阶段 发现了新的目标 捕获候选标志置为true
       reacquire_candidate_ = true;
-      reacquire_candidate_since_ = now;
+      reacquire_candidate_since_ = now; // 记录重捕获阶段 发现目标的时间
     }
     if ((now - reacquire_candidate_since_).toSec() < reacquire_hold_time_) {
       next = ServoState::HOLD;
-      entering_reacquire_hold = state_ != ServoState::HOLD;
+      entering_reacquire_hold = state_ != ServoState::HOLD; // 一定时间段内先保持静止
     } else {
-      search_reacquire_pending_ = false;
+      search_reacquire_pending_ = false;// 关闭重捕获阶段，进入跟踪阶段
       reacquire_candidate_ = false;
       next = aligned_latched_ ? ServoState::ALIGNED : ServoState::TRACKING;
     }
@@ -848,17 +850,17 @@ void VisualServo::controlLoop(const ros::TimerEvent &event) {
     Eigen::Vector3d raw_angular_error =
         Eigen::Vector3d::Constant(std::numeric_limits<double>::infinity());
     const Eigen::VectorXd tracking_request = trackingVelocity(
-        feedback, target, &raw_position_error, &raw_angular_error);
+        feedback, target, &raw_position_error, &raw_angular_error);// 计算速度和误差
     const double release_scale =
-        aligned_latched_ ? alignment_release_multiplier_ : 1.0;
+        aligned_latched_ ? alignment_release_multiplier_ : 1.0;// 引入迟滞因子 对于对齐状态 这个位置误差的阈值会放大
     const bool position_aligned =
         raw_position_error.allFinite() &&
         (raw_position_error.array().abs() <=
-         position_deadband_ * release_scale).all();
+         position_deadband_ * release_scale).all(); // 判断位置误差是否在死区阈值内
     const bool orientation_aligned =
         !use_orientation_control_ ||
         (raw_angular_error.allFinite() &&
-         raw_angular_error.norm() <= orientation_deadband_ * release_scale);
+         raw_angular_error.norm() <= orientation_deadband_ * release_scale); // 判断角度误差是否在死区阈值内
     const bool inside_alignment_window =
         position_aligned && orientation_aligned;
     const ros::Time now = ros::Time::now();
@@ -884,6 +886,8 @@ void VisualServo::controlLoop(const ros::TimerEvent &event) {
       aligned_latched_ = false;
       next = ServoState::TRACKING;
     }
+    // 上述程序 就是判断是否是在 TRACKING状态下对齐还是ALIGNED状态下对齐 设置不同的迟滞因子
+    // 然后根据是否对齐 判断是否需要保持对齐状态 还是继续跟踪
 
     if (next == ServoState::TRACKING)
       requested = tracking_request;
@@ -916,23 +920,23 @@ void VisualServo::controlLoop(const ros::TimerEvent &event) {
 
   const double callback_dt =
       clampValue((event.current_real - event.last_real).toSec(),
-                 0.5 / control_rate_, 2.0 / control_rate_);
+                 0.5 / control_rate_, 2.0 / control_rate_);// 测量真实的控制循环时间
   const int substeps =
-      std::max(1, static_cast<int>(std::round(callback_dt * output_rate_)));
-  const double dt = callback_dt / substeps;
+      std::max(1, static_cast<int>(std::round(callback_dt * output_rate_)));// 计算控制周期内需要产生几个输出点
+  const double dt = callback_dt / substeps;// 每个点之间的时间间隔
   for (int step = 0; step < substeps; ++step) {
     for (std::size_t i = 0; i < kDof; ++i) {
       const double wanted =
-          clampValue(requested(i), -velocity_limits_[i], velocity_limits_[i]);
+          clampValue(requested(i), -velocity_limits_[i], velocity_limits_[i]);// 速度限位
       command_velocity_[i] = clampValue(
           wanted, command_velocity_[i] - acceleration_limits_[i] * dt,
-          command_velocity_[i] + acceleration_limits_[i] * dt);
+          command_velocity_[i] + acceleration_limits_[i] * dt);// 加速度限位
 
       const double low = lower_limits_[i] + joint_limit_margin_;
       const double high = upper_limits_[i] - joint_limit_margin_;
       const double integrated =
-          command_position_[i] + command_velocity_[i] * dt;
-      command_position_[i] = clampValue(integrated, low, high);
+          command_position_[i] + command_velocity_[i] * dt;// 前向积分计算下一时刻位置
+      command_position_[i] = clampValue(integrated, low, high);// 位置限位
       if (command_position_[i] == low || command_position_[i] == high)
         command_velocity_[i] = 0.0;
     }
