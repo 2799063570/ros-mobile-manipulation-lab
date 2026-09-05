@@ -31,8 +31,6 @@ public:
   bool readState(JointPoint& position);
   bool healthy() const;
   void shutdown();
-  // Stop accepting new commands; the node exits and leaves stream mode.
-  void requestStop() { running_.store(false); queue_.clear(); }
 
 private:
   bool login(ServiceInterface& service);

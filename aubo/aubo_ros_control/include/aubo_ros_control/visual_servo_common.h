@@ -22,20 +22,6 @@ double clampValue(double value, double low, double high);
 double applyDeadband(double value, double deadband);
 bool finitePoint(const JointPoint& point);
 
-enum class ServoState { DISABLED, HOLD, TRACKING, FAULT };
-ServoState selectServoState(bool enabled, bool fault, bool fresh_target);
-
-// Arrival reporting is independent of the velocity command.
-class AlignmentTracker {
-public:
-  bool update(bool inside_window, double now, double hold_time);
-  void reset();
-  bool aligned() const { return aligned_; }
-private:
-  bool candidate_{false}, aligned_{false};
-  double since_{0.0}, last_update_{0.0};
-};
-
 // 有界命令队列：生产速度过快时丢弃最旧指令，避免视觉伺服延迟累积。
 class CommandQueue
 {

@@ -18,7 +18,6 @@ VisualServoPanel::VisualServoPanel(QWidget* parent)
   : rviz::Panel(parent)
   , target_combo_(new QComboBox())
   , servo_state_label_(new QLabel(tr("等待控制器...")))
-  , aligned_label_(new QLabel(tr("尚未到位")))
   , perception_state_label_(new QLabel(tr("等待视觉识别...")))
   , target_pose_label_(new QLabel(tr("尚无有效三维目标")))
   , command_label_(new QLabel(tr("请选择目标，然后启动视觉伺服")))
@@ -36,7 +35,7 @@ VisualServoPanel::VisualServoPanel(QWidget* parent)
 
   QPushButton* start_button = new QPushButton(tr("启动闭环跟踪"));
   QPushButton* stop_button = new QPushButton(tr("停止并保持"));
-  QPushButton* reset_button = new QPushButton(tr("清除目标 / 故障复位"));
+  QPushButton* reset_button = new QPushButton(tr("清除目标 / 重新搜索"));
   start_button->setStyleSheet(
       "font-weight: bold; color: white; background-color: #2d8a45;");
   stop_button->setStyleSheet(
@@ -58,7 +57,6 @@ VisualServoPanel::VisualServoPanel(QWidget* parent)
   layout->addWidget(target_combo_);
   layout->addWidget(new QLabel(tr("伺服状态：")));
   layout->addWidget(servo_state_label_);
-  layout->addWidget(aligned_label_);
   layout->addWidget(new QLabel(tr("识别状态：")));
   layout->addWidget(perception_state_label_);
   layout->addWidget(new QLabel(tr("相机系目标位置：")));
@@ -80,8 +78,6 @@ VisualServoPanel::VisualServoPanel(QWidget* parent)
       "/visual_servo/target_selection", 1, true);
   servo_state_subscriber_ = node_handle_.subscribe(
       "/visual_servo/state", 1, &VisualServoPanel::servoStateCallback, this);
-  aligned_subscriber_ = node_handle_.subscribe(
-      "/visual_servo/aligned", 1, &VisualServoPanel::alignedCallback, this);
   perception_state_subscriber_ = node_handle_.subscribe(
       "/visual_servo/perception_state", 1,
       &VisualServoPanel::perceptionStateCallback, this);
@@ -93,8 +89,6 @@ VisualServoPanel::VisualServoPanel(QWidget* parent)
   connect(reset_button, SIGNAL(clicked()), this, SLOT(resetServo()));
   connect(target_combo_, SIGNAL(currentIndexChanged(QString)),
           this, SLOT(selectTarget(QString)));
-  connect(this, SIGNAL(alignedReceived(bool)),
-          this, SLOT(showAligned(bool)), Qt::QueuedConnection);
   connect(this, SIGNAL(servoStateReceived(QString)),
           this, SLOT(showServoState(QString)), Qt::QueuedConnection);
   connect(this, SIGNAL(perceptionStateReceived(QString)),
@@ -170,7 +164,7 @@ void VisualServoPanel::resetServo()
   const bool servo_ok = callReset(servo_reset_client_, &servo_response);
   const bool perception_ok = callReset(perception_reset_client_, &perception_response);
   command_label_->setText(
-      (servo_ok && perception_ok) ? tr("复位完成，伺服已停用；请重新启动闭环跟踪")
+      (servo_ok && perception_ok) ? tr("历史目标已清除，将等待新的图像观测")
                                   : tr("复位未完全执行：") + servo_response + " / " + perception_response);
 }
 
@@ -202,23 +196,17 @@ void VisualServoPanel::targetPoseCallback(const geometry_msgs::PoseStamped::Cons
   Q_EMIT targetPoseReceived(text);
 }
 
-void VisualServoPanel::alignedCallback(const std_msgs::Bool::ConstPtr& message)
-{
-  Q_EMIT alignedReceived(message->data);
-}
-
-void VisualServoPanel::showAligned(bool aligned)
-{
-  aligned_label_->setText(aligned ? tr("已到位 / 持续修正") : tr("尚未到位"));
-}
-
 void VisualServoPanel::showServoState(const QString& text)
 {
   QString translated = text;
   if (text == "DISABLED") translated = tr("已停用 / 保持当前位置");
+  else if (text == "WAITING") translated = tr("等待新目标");
+  else if (text == "SEARCH_INITIAL") translated = tr("初始化 / 移向可观测姿态");
   else if (text == "TRACKING") translated = tr("正在闭环跟踪");
-  else if (text == "HOLD") translated = tr("等待有效目标 / 减速保持");
-  else if (text == "FAULT") translated = tr("故障锁存 / 排除原因后复位；SDK 后端需重启");
+  else if (text == "ALIGNED") translated = tr("已到达 / 稳定对齐");
+  else if (text == "COAST") translated = tr("目标短暂丢失 / 减速滑行");
+  else if (text == "SEARCH_RECOVERY") translated = tr("目标丢失 / 重新搜索");
+  else if (text == "HOLD") translated = tr("搜索超时 / 保持");
   servo_state_label_->setText(translated);
 }
 

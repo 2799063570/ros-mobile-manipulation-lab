@@ -29,38 +29,6 @@ bool finitePoint(const JointPoint& point)
                      [](double value) { return std::isfinite(value); });
 }
 
-ServoState selectServoState(bool enabled, bool fault, bool fresh_target)
-{
-  if (fault) return ServoState::FAULT;
-  if (!enabled) return ServoState::DISABLED;
-  return fresh_target ? ServoState::TRACKING : ServoState::HOLD;
-}
-
-bool AlignmentTracker::update(bool inside_window, double now, double hold_time)
-{
-  if (!inside_window || !std::isfinite(now)) {
-    reset();
-    return false;
-  }
-  if (!candidate_ || now < last_update_) {
-    candidate_ = true;
-    aligned_ = false;
-    since_ = now;
-  }
-  last_update_ = now;
-  if (now - since_ >= hold_time)
-    aligned_ = true;
-  return aligned_;
-}
-
-void AlignmentTracker::reset()
-{
-  candidate_ = false;
-  aligned_ = false;
-  since_ = 0.0;
-  last_update_ = 0.0;
-}
-
 CommandQueue::CommandQueue(std::size_t capacity)
   : capacity_(std::max<std::size_t>(2, capacity))
 {

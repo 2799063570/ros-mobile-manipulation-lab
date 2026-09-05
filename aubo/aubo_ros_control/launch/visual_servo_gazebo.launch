@@ -4,7 +4,7 @@
   <!-- 本文件只透传旧参数，不包含独立控制逻辑。 -->
   <arg name="gui" default="true"/>
   <arg name="target_topic" default="/visual_servo/target_pose"/>
-  <arg name="loss_strategy" default="stop"/>
+  <arg name="loss_strategy" default="coast_then_open"/>
   <arg name="target_label" default="red"/>
   <arg name="auto_start" default="false"/>
   <arg name="start_perception" default="true"/>

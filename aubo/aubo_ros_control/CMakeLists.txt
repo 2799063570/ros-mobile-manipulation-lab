@@ -122,12 +122,6 @@ set_target_properties(aubo_visual_servo_node PROPERTIES
   LINK_FLAGS "-Wl,--disable-new-dtags")
 
 if(CATKIN_ENABLE_TESTING)
-  add_executable(servo_policy_test
-    test/servo_policy_test.cpp src/visual_servo_common.cpp)
-  target_compile_features(servo_policy_test PRIVATE cxx_std_14)
-  target_include_directories(servo_policy_test PRIVATE include)
-  target_link_libraries(servo_policy_test Threads::Threads)
-  add_test(NAME servo_policy_test COMMAND servo_policy_test)
   catkin_add_gtest(visual_servo_common_test
     test/visual_servo_common_test.cpp
     src/visual_servo_common.cpp)
