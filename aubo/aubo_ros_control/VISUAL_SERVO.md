@@ -76,30 +76,66 @@ Gazebo 腕部相机使用 `1280×720` 分辨率和 80° 水平视场角；真实
 眼在手上的 `maximum_contour_area` 已按该分辨率放宽为 `250000 px²`，近距离目标主要由
 与分辨率无关的 `maximum_projected_contour_area` 继续限制，避免目标接近时因像素面积增大而断检。
 
-## 初始化、遮挡与目标丢失
+## 控制状态与到位标志
 
-- 眼在手上在第一次看到目标前进入 `SEARCH_INITIAL`，缓慢移动到经过相机光轴验证的
-  `initial_search_posture`；目标出现后立即进入 `TRACKING`。丢失后的可选恢复动作使用
-  独立的 `recovery_posture`，两者不再复用通用 `open_posture`。默认丢失策略为
-  `coast_then_open` 且 `coast_duration: 0.0`：目标超时后先原地保持
-  `recovery_delay`，持续丢失才向观测姿态移动；移动中重新识别到目标会先刹停，连续
-  稳定达到 `reacquire_hold_time` 后才恢复跟踪，防止观察位与目标位之间循环振荡。
-- 眼在手上的期望目标位置默认为 TCP 坐标系下 `[0, 0, 0.115] m`，即目标
-  对齐夹爪中心线。腕部相机光心沿接近方向比 TCP 后缩约 `0.035 m`，因此
-  对应的相机深度仍约为 `0.15 m`。这是预抓取对准距离而不是接触距离。
-  `TRACKING` 仅表示持续收到有效目标。误差在死区内持续
-  `alignment_hold_time` 后进入 `ALIGNED`，停止积分并保持当前位置；只有误差超过
-  `position_deadband * alignment_release_multiplier` 才会恢复 `TRACKING`。
-- 眼在手外不需要机械臂搜索。`target_offset` 默认包含横向避遮挡分量和抓取上方的
-  高度分量，使机械臂尽量不挡住相机到目标的视线。实际工位必须标定方向和大小。
-- 两种模式都拒绝超时目标。状态依次可能为 `TRACKING`、`ALIGNED`、`COAST`、
-  `SEARCH_RECOVERY`、`HOLD`。眼在手外默认保持；眼在手上会在丢失后回到观测姿态
-  重新搜索，但已进入 `ALIGNED` 后的目标丢失只会保持，不会回退搜索。
-- 检测器在目标或深度无效时不发布旧位姿；否则看门狗无法识别目标丢失。
-- 检测器先用 `minimum_contour_area` / `maximum_contour_area` 过滤像素轮廓，再结合
-  深度和相机内参计算投影物理面积。默认
-  `maximum_projected_contour_area: 0.006`（平方米），用于排除大块同色区域，同时
-  避免目标靠近相机后仅因像素面积变大而丢失。
+控制核心只保留四个状态：
+
+| 状态 | 行为 |
+| --- | --- |
+| `DISABLED` | 未使能，按加速度限制减速并保持 |
+| `HOLD` | 已使能但没有有效目标，减速保持，等待新目标 |
+| `TRACKING` | 使用有效目标持续闭环修正 |
+| `FAULT` | 安全深度触发或运行中的关节反馈超过 0.5 秒未更新，锁存故障 |
+
+`/visual_servo/aligned`（`std_msgs/Bool`）是独立的到位报告。误差在阈值内持续
+`alignment_hold_time` 后置位；误差超过阈值乘 `alignment_release_multiplier` 后清除。
+迟滞只影响报告，不影响速度求解。因此眼在手上默认 6 mm 死区、2 倍报告迟滞下，
+到位后误差增长到 10 mm 仍会产生修正速度。目标丢失、禁用、复位和动态调参都会
+清除到位报告。任务层如需冻结姿态，应调用 `set_enabled(false)`，不应依赖到位标志停机。
+
+核心不再执行初始搜索、丢失续行或返回观察位。眼在手上的上层任务应先用运动规划
+到达观察姿态，再启动视觉伺服；需要恢复搜索时，先停用伺服并按系统的命令通道所有权
+规则切换到任务规划器，避免两个控制器同时输出。此包不自动新增任务规划节点。
+
+旧 `loss_strategy` launch 参数仅保留调用兼容性，所有取值均按目标丢失保持处理。
+旧搜索/续行参数不再被读取，也不再出现在动态参数面板中。
+
+普通禁用和目标丢失通过现有限加速度链路减速，不是瞬时机械制动。
+反馈故障会清除软件队列；Gazebo 停止发布新命令，既有位置控制器保留最后设定值。
+SDK 故障会请求停止新批次下发，节点退出时离开流模式，需排除原因后重新启动节点。
+软件停止无法撤回控制柜已接收或正在发送的批次，不等同于硬件急停。
+`set_enabled(true)` 不能清除故障。`reset` 要求故障时有新鲜关节反馈且后端健康，
+复位后保持禁用，需重新使能并等待新的目标。
+
+眼在手上目标期望位置仍为 TCP 系 `[0, 0, 0.115] m`，眼在手外仍使用
+`target_offset`。本次未改增益、死区阈值、DLS 阻尼、速度/加速度限制、队列容量或 SDK 缓冲量。
+姿态控制也使用连续软死区，避免取消到位停机后持续追逐阈值内的姿态噪声。
+感知器在目标或深度无效时不发布旧位姿，控制器根据测量时间判断目标超时。
+
+## 诊断与回归验证
+
+新增默认话题（节点私有话题随节点名变化）：
+
+| 话题 | 类型 | 含义 |
+| --- | --- | --- |
+| `/visual_servo/aligned` | `std_msgs/Bool` | 到位标志，控制仍持续修正 |
+| `/aubo_visual_servo/position_error` | `geometry_msgs/Vector3Stamped` | TRACKING 时软死区前的误差；frame 为 TCP 或 base |
+| `/aubo_visual_servo/target_age` | `std_msgs/Float64` | 目标年龄（秒），尚无目标时为 `1e9` |
+| `/aubo_visual_servo/queue_size` | `std_msgs/UInt32` | 本周期生产前的软件队列长度，不含控制柜缓冲 |
+
+在 ROS 工作空间运行 `catkin_make servo_policy_test`，然后执行
+`devel/lib/aubo_ros_control/servo_policy_test`。该测试也注册为 CTest 测试。
+已有 gtest 可用 `catkin_make run_tests_aubo_ros_control` 和 `catkin_test_results` 检查。
+新增的 `servo_policy_test` 检查故障优先级、丢失保持、重获恢复、到位计时及迟滞区内
+仍有非零修正的行为。它可脱离 ROS 独立编译，不替代整节点或真机测试。
+
+Gazebo 验收顺序：先将机械臂移到可观测位置；使能后确认 TRACKING；目标稳定后确认
+aligned=true；小幅移动目标使误差超出死区但仍在报告迟滞内，确认关节指令继续变化；
+遮挡超过 target_timeout 后确认 HOLD、到位清除、无回观察位动作；恢复目标后确认
+TRACKING；中断关节反馈超过 0.5 秒确认 FAULT，重新使能不能绕过故障。
+
+记录相同目标阶跃、缓慢移动和遮挡过程的误差、目标年龄、队列长度及关节位置，比较
+收敛时间、稳态误差和超调。双层轨迹限制仍保留，后续根据数据单独优化输出链路。
 
 配置分为三份：
 
@@ -107,7 +143,7 @@ Gazebo 腕部相机使用 `1280×720` 分辨率和 80° 水平视场角；真实
 - `visual_servo_eye_in_hand.yaml`：夹爪 TCP 对齐误差和搜索策略；
 - `visual_servo_eye_to_hand.yaml`：固定相机 TCP 偏移和遮挡策略。
 
-控制增益、笛卡尔速度上限、期望位姿、安全深度以及目标丢失恢复参数支持通过
+控制增益、笛卡尔速度上限、期望位姿、安全深度以及目标超时参数支持通过
 `rqt_reconfigure` 在线调整。启动节点后运行
 `rosrun rqt_reconfigure rqt_reconfigure`，选择 `/aubo_visual_servo`。动态修改仅在
 当前进程中生效，不会回写上述 YAML；确认参数后需手动保存。后端、坐标系、话题、
@@ -120,5 +156,5 @@ Gazebo 腕部相机使用 `1280×720` 分辨率和 80° 水平视场角；真实
 1. 先保持 `auto_start:=false`，检查相机话题和 TF 连通性。
 2. 在 RViz 中确认目标位姿在正确的物体上，外部相机目标可变换到 `base_link`。
 3. 眼在手外先把 `target_offset` 的高度设大，确认横向避遮挡方向正确。
-4. 真机首次运行将 `loss_strategy` 临时设为 `stop`，并降低速度与加速度限制。
-5. 确认目标丢失后机械臂按预期减速，再启用恢复搜索。
+4. 真机首次运行降低速度与加速度限制，测量命令到执行的延迟。
+5. 确认丢失保持和故障锁存通过，再由上层任务接入观察位和恢复动作。

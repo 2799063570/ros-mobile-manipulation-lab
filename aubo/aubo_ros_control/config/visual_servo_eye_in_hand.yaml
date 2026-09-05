@@ -24,15 +24,5 @@ alignment_hold_time: 0.35
 alignment_release_multiplier: 2.0
 dls_lambda: 0.08
 
-# The shared sorting scene puts all targets on the table. Use the same joint
-# posture as the sorting "observe" SRDF target so the wrist camera faces that
-# workspace before first detection and after target loss.
-initial_search_posture: [0.08648, -0.54623, 0.06780, -0.91058, 1.58105, 1.82491]
-recovery_posture: [0.08648, -0.54623, 0.06780, -0.91058, 1.58105, 1.82491]
-initial_search_enabled: true
-# Brief dropouts hold the current pose. Only a sustained loss returns toward
-# the observation posture, and tracking resumes after a stable reacquisition.
-loss_strategy: coast_then_open
-coast_duration: 0.0
-recovery_delay: 1.5
-reacquire_hold_time: 0.40
+# Move to the observation posture with the task planner before enabling servo.
+# Target loss holds position; no autonomous arm search is performed here.

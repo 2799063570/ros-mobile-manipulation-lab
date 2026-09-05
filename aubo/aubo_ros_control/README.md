@@ -36,13 +36,9 @@ classDiagram
     class ServoState {
         <<enumeration>>
         DISABLED
-        WAITING
-        SEARCH_INITIAL
-        TRACKING
-        ALIGNED
-        COAST
-        SEARCH_RECOVERY
         HOLD
+        TRACKING
+        FAULT
     }
 
     class CommandQueue {
@@ -90,16 +86,16 @@ classDiagram
 
 它的职责可以按方法分成五组：
 
-1. **初始化**：`loadParameters()` 读取控制频率、关节限制、视觉模式和丢失策略；
+1. **初始化**：`loadParameters()` 读取控制频率、关节限制、视觉模式和目标超时；
    `initializeKinematics()` 从 `robot_description` 建立 KDL 链；
    `setupGazeboPublishers()` 创建六个 Gazebo 关节控制话题。
 2. **接收输入**：`targetCallback()` 接收目标位姿、执行 TF 变换并检查目标是否有效；
    `jointStateCallback()` 接收 Gazebo 关节反馈；`sdkStateUpdate()` 从真机 SDK 读取
    关节位置并发布 ROS `JointState`。
-3. **状态管理**：`selectState()` 根据是否启用、目标是否超时和恢复策略选择状态；
+3. **状态管理**：公共函数 `selectServoState()` 根据故障、使能和目标有效性选择状态；
    `transitionTo()` 在状态变化时清空旧指令，防止上一状态的命令继续执行。
 4. **控制计算**：`trackingVelocity()` 根据位姿误差、KDL 雅可比矩阵和阻尼伪逆
-   计算关节速度；`desiredVelocity()` 再根据跟踪、续行或搜索状态选择最终速度；
+   计算关节速度；跟踪时始终使用此速度，其他正常状态请求零速度以减速保持；
    `controlLoop()` 负责限速、限加速度、关节限位和位置积分，并把结果写入
    `CommandQueue`。
 5. **输出与管理接口**：Gazebo 模式由 `gazeboOutput()` 消费队列并发布六个关节
@@ -110,14 +106,14 @@ classDiagram
 
 | 状态 | 含义 | 控制行为 |
 | --- | --- | --- |
-| `DISABLED` | 控制器未启用 | 保持当前位置 |
-| `WAITING` | 已启用，但还没有新目标 | 保持当前位置 |
-| `SEARCH_INITIAL` | 第一次看到目标前，移动到初始观察姿态 | 搜索目标 |
-| `TRACKING` | 目标新鲜，按视觉误差闭环跟踪 | 闭环运动 |
-| `ALIGNED` | 位置/姿态误差持续满足对齐阈值 | 停止积分并保持反馈位置 |
-| `COAST` | 目标刚丢失，短时间沿上一速度衰减续行 | 衰减运动 |
-| `SEARCH_RECOVERY` | 目标持续丢失，移动到恢复观察姿态 | 恢复搜索 |
-| `HOLD` | 停止策略、生效的安全锁存或搜索超时 | 保持当前位置 |
+| `DISABLED` | 控制器未启用 | 减速保持 |
+| `HOLD` | 已启用但目标无效或超时 | 减速保持，无自主搜索 |
+| `TRACKING` | 目标新鲜 | 持续闭环修正 |
+| `FAULT` | 安全深度或关节反馈超时故障 | 锁存，停止新输出 |
+
+到位由独立的 `/visual_servo/aligned` 布尔话题报告，不再作为控制状态，也不再
+冻结积分或清空队列。`AlignmentTracker` 只负责到位计时；搜索和观察位运动由
+上层任务负责。故障处理、诊断接口与迁移说明见 [VISUAL_SERVO.md](VISUAL_SERVO.md)。
 
 ### `CommandQueue`：有界关节指令队列
 

@@ -15,7 +15,7 @@ from actionlib_msgs.msg import GoalStatus
 from dynamic_reconfigure.server import Server
 from geometry_msgs.msg import Twist
 from move_base_msgs.msg import MoveBaseAction, MoveBaseGoal
-from std_msgs.msg import String
+from std_msgs.msg import Bool, String
 from std_srvs.srv import Empty, Trigger, TriggerResponse
 from tf.transformations import euler_from_quaternion, quaternion_from_euler
 
@@ -142,6 +142,12 @@ class NavigationSortingMission(object):
         self.operation_timeout = float(
             rospy.get_param("~sorting_operation_timeout", 300.0)
         )
+        self.stop_timeout = float(rospy.get_param("~sorting_stop_timeout", 5.0))
+        self.tf_max_age = float(rospy.get_param("~base_pose_max_age", 0.5))
+        for name, value in (("sorting_stop_timeout", self.stop_timeout),
+                            ("base_pose_max_age", self.tf_max_age)):
+            if not math.isfinite(value) or value <= 0.0:
+                raise ValueError("~{} must be finite and positive".format(name))
         self.startup_delay = float(rospy.get_param("~startup_delay", 3.0))
         self.home_before_navigation = bool(
             rospy.get_param("~home_before_navigation", True)
@@ -231,6 +237,13 @@ class NavigationSortingMission(object):
         self._sorting_failure = ""
         self._busy = False
         self._stop_requested = threading.Event()
+        self._stop_unconfirmed = False
+        self._operation_active = False
+        self._operation_start_sequence = 0
+        self._base_locked = True
+        self._base_lock_sequence = 0
+        self._operation_lock_sequence = 0
+        self._base_pose_failed = False
 
         # dynamic_reconfigure uses scalar parameters. Seed those parameters from
         # the list-based scenario file before constructing the server so launch
@@ -257,6 +270,10 @@ class NavigationSortingMission(object):
             String,
             self._sorting_failure_callback,
             queue_size=5,
+        )
+        self.base_lock_subscriber = rospy.Subscriber(
+            rospy.get_param("~sorting_base_lock_topic", "/sorting/base_locked"),
+            Bool, self._base_lock_callback, queue_size=5
         )
         self.start_service = rospy.Service(
             "/nav_sorting/start", Trigger, self._start_callback
@@ -461,6 +478,18 @@ class NavigationSortingMission(object):
             self._sorting_failure = message.data
             self._condition.notify_all()
 
+    def _base_lock_callback(self, message):
+        with self._condition:
+            self._base_locked = message.data
+            self._base_lock_sequence += 1
+            self._condition.notify_all()
+
+    def _operation_unlocked(self):
+        # Called under _condition. ERROR can precede the core's cleanup, so a
+        # terminal state alone does not prove that the arm worker has finished.
+        return (not self._base_locked and
+                self._base_lock_sequence > self._operation_lock_sequence)
+
     def _auto_start(self, _event):
         self._submit_mission()
 
@@ -470,10 +499,13 @@ class NavigationSortingMission(object):
 
     def _submit_mission(self):
         with self._condition:
+            if self._stop_unconfirmed:
+                return False, "stop unconfirmed; resolve the sorting service fault before restarting this node"
             if self._busy:
                 return False, "a mission is already running"
             self._busy = True
             self._stop_requested.clear()
+            self._base_pose_failed = False
         worker = threading.Thread(target=self._run_mission)
         worker.daemon = True
         worker.start()
@@ -481,23 +513,90 @@ class NavigationSortingMission(object):
 
     def _stop_callback(self, _request):
         with self._condition:
-            was_busy = self._busy
-        if not was_busy:
-            return TriggerResponse(success=True, message="no mission is running")
-        self._stop_requested.set()
-        self.navigation_client.cancel_all_goals()
-        self._stop_base()
-        try:
-            self.sorting_stop_client()
-        except rospy.ServiceException as error:
-            rospy.logwarn("Could not stop sorting service: %s", str(error))
-        self._publish_state("STOPPING", "cancelling active operation")
+            if not self._busy:
+                if self._stop_unconfirmed:
+                    return TriggerResponse(success=False, message="stop remains unconfirmed; resolve the service fault")
+                return TriggerResponse(success=True, message="no mission is running")
+            self._stop_requested.set()
+            self.navigation_client.cancel_all_goals()
+            self._stop_base()
+            self._condition.notify_all()
         return TriggerResponse(success=True, message="stop requested")
 
-    def _wait_for_sorting_ready(self):
-        deadline = time.time() + self.initialization_timeout
+    def _bounded_call(self, call, timeout, label, cancelable=True, late_stop=False):
+        """Bound caller latency; an abandoned RPC is never assumed cancelled."""
+        condition = threading.Condition()
+        result = {"done": False, "abandoned": False, "response": None}
+        stop_service = self.sorting_stop_service_name
+
+        def invoke():
+            try:
+                response = call()
+            except Exception as error:
+                rospy.logerr("%s failed: %s", label, str(error))
+                response = None
+            with condition:
+                result["response"] = response
+                result["done"] = True
+                abandoned = result["abandoned"]
+                condition.notify_all()
+            # A delayed start may arrive AFTER our first stop request. Cancel it
+            # again when the RPC finally returns; the restart interlock stays set.
+            if abandoned and late_stop:
+                try:
+                    rospy.ServiceProxy(stop_service, Trigger)()
+                except Exception as error:
+                    rospy.logerr("Late sorting cancellation failed: %s", str(error))
+
+        if cancelable and self._stop_requested.is_set():
+            return None
+        worker = threading.Thread(target=invoke)
+        worker.daemon = True
+        worker.start()
+        deadline = time.monotonic() + max(0.0, timeout)
+        with condition:
+            while not result["done"]:
+                if (rospy.is_shutdown() or time.monotonic() >= deadline or
+                        (cancelable and self._stop_requested.is_set())):
+                    result["abandoned"] = True
+                    if late_stop:
+                        self._stop_unconfirmed = True
+                    rospy.logerr("%s interrupted or timed out; RPC may still be pending", label)
+                    return None
+                condition.wait(timeout=min(0.05, max(0.0, deadline - time.monotonic())))
+            return result["response"]
+
+    def _cancel_sorting_and_wait(self):
+        self._publish_state("STOPPING", "waiting for sorting cancellation")
+        self._stop_base()
+        deadline = time.monotonic() + self.stop_timeout
+        response = self._bounded_call(
+            self.sorting_stop_client, self.stop_timeout, "sorting stop", cancelable=False
+        )
+        if response is None or not response.success:
+            self._stop_unconfirmed = True
+            return False
         with self._condition:
-            while not rospy.is_shutdown() and time.time() < deadline:
+            while not rospy.is_shutdown():
+                state = self._sorting_state.split("|", 1)[0].strip()
+                if (self._sorting_sequence > self._operation_start_sequence and
+                        state in ("READY", "ERROR", "STOPPED") and
+                        self._operation_unlocked()):
+                    self._operation_active = False
+                    return not self._stop_unconfirmed
+                remaining = deadline - time.monotonic()
+                if remaining <= 0.0:
+                    break
+                self._condition.wait(timeout=min(0.05, remaining))
+        self._stop_unconfirmed = True
+        return False
+
+    def _wait_for_sorting_ready(self):
+        deadline = time.monotonic() + self.initialization_timeout
+        with self._condition:
+            while not rospy.is_shutdown() and time.monotonic() < deadline:
+                if self._stop_requested.is_set():
+                    return False
                 state = self._sorting_state.split("|", 1)[0].strip()
                 if state in ("IDLE", "READY", "STOPPED"):
                     return True
@@ -509,32 +608,42 @@ class NavigationSortingMission(object):
         return False
 
     def _call_sorting_operation(self, client, running_states, label):
-        if self._stop_requested.is_set():
+        if (self._stop_requested.is_set() or self._operation_active or
+                self._stop_unconfirmed):
             return False
         with self._condition:
             start_sequence = self._sorting_sequence
-        try:
-            response = client()
-        except rospy.ServiceException as error:
-            rospy.logerr("%s service call failed: %s", label, str(error))
+            self._operation_start_sequence = start_sequence
+            self._operation_lock_sequence = self._base_lock_sequence
+            self._sorting_failure = ""
+        self._operation_active = True
+        deadline = time.monotonic() + self.operation_timeout
+        response = self._bounded_call(
+            client, self.operation_timeout, label, late_stop=True
+        )
+        if response is None:
             return False
         if not response.success:
+            self._operation_active = False
             rospy.logerr("%s command rejected: %s", label, response.message)
             return False
 
-        deadline = time.time() + self.operation_timeout
         saw_operation = False
         with self._condition:
-            while not rospy.is_shutdown() and time.time() < deadline:
+            while not rospy.is_shutdown() and time.monotonic() < deadline:
+                if self._stop_requested.is_set():
+                    return False
                 state = self._sorting_state.split("|", 1)[0].strip()
                 if self._sorting_sequence > start_sequence:
                     if state in running_states:
                         saw_operation = True
                     elif state == "READY" and (
                         saw_operation or self._sorting_sequence > start_sequence + 1
-                    ):
+                    ) and self._operation_unlocked():
+                        self._operation_active = False
                         return True
-                    elif state in ("ERROR", "STOPPED"):
+                    elif state in ("ERROR", "STOPPED") and self._operation_unlocked():
+                        self._operation_active = False
                         rospy.logerr("%s failed: %s", label, self._sorting_state)
                         return False
                 if self._stop_requested.is_set():
@@ -545,7 +654,9 @@ class NavigationSortingMission(object):
 
     def _planning_failed(self):
         with self._condition:
-            return self._sorting_failure.startswith("PLANNING_FAILED")
+            return (not self._operation_active and not self._stop_unconfirmed and
+                    not self._stop_requested.is_set() and
+                    self._sorting_failure.startswith("PLANNING_FAILED"))
 
     def _configure_workspace(self, workspace):
         payload = dict(workspace)
@@ -557,13 +668,16 @@ class NavigationSortingMission(object):
         self.workspace_publisher.publish(
             String(data=json.dumps(workspace, sort_keys=True))
         )
-        try:
+        def configure():
             rospy.wait_for_service(
                 self.sorting_configure_service_name, timeout=self.server_timeout
             )
-            response = self.configure_workspace_client()
-        except (rospy.ROSException, rospy.ServiceException) as error:
-            rospy.logerr("Cannot configure workstation: %s", str(error))
+            return self.configure_workspace_client()
+
+        response = self._bounded_call(
+            configure, self.server_timeout, "configure workstation", late_stop=True
+        )
+        if response is None:
             return False
         if not response.success:
             rospy.logerr("Workstation configuration rejected: %s", response.message)
@@ -574,6 +688,8 @@ class NavigationSortingMission(object):
         self.base_recovery_publisher.publish(Twist())
 
     def _move_base_direct(self, step, attempt, total):
+        if self._stop_requested.is_set() or self._base_pose_failed:
+            return False
         dx, dy = float(step[0]), float(step[1])
         distance = max(abs(dx), abs(dy))
         if distance <= 1.0e-6:
@@ -593,18 +709,17 @@ class NavigationSortingMission(object):
                 attempt, total, dx, dy
             ),
         )
-        rate = rospy.Rate(self.base_recovery_rate)
-        deadline = time.time() + duration
+        deadline = time.monotonic() + duration
         try:
-            while not rospy.is_shutdown() and time.time() < deadline:
+            while not rospy.is_shutdown() and time.monotonic() < deadline:
                 if self._stop_requested.is_set():
                     return False
                 self.base_recovery_publisher.publish(command)
-                rate.sleep()
+                self._stop_requested.wait(1.0 / self.base_recovery_rate)
         finally:
             self._stop_base()
         if self.base_recovery_settle_time > 0.0:
-            rospy.sleep(self.base_recovery_settle_time)
+            self._stop_requested.wait(self.base_recovery_settle_time)
         return not self._stop_requested.is_set()
 
     @staticmethod
@@ -614,19 +729,24 @@ class NavigationSortingMission(object):
     def _current_base_pose(self, pose_frame=None):
         pose_frame = pose_frame or self.navigation_frame
         try:
-            self.tf_listener.waitForTransform(
-                pose_frame,
-                self.base_frame,
-                rospy.Time(0),
-                rospy.Duration(1.0),
-            )
+            stamp = self.tf_listener.getLatestCommonTime(pose_frame, self.base_frame)
+            age = (rospy.Time.now() - stamp).to_sec()
+            if stamp.to_sec() <= 0.0 or age < -0.05 or age > self.tf_max_age:
+                rospy.logerr("Base pose is stale or future-dated (age %.3f s)", age)
+                self._base_pose_failed = True
+                self._stop_base()
+                return None
             translation, rotation = self.tf_listener.lookupTransform(
-                pose_frame, self.base_frame, rospy.Time(0)
+                pose_frame, self.base_frame, stamp
             )
             yaw = euler_from_quaternion(rotation)[2]
+            if not all(math.isfinite(value) for value in (translation[0], translation[1], yaw)):
+                raise ValueError("base pose contains non-finite coordinates")
             return [translation[0], translation[1], yaw]
         except (tf.LookupException, tf.ConnectivityException,
-                tf.ExtrapolationException, tf.Exception) as error:
+                tf.ExtrapolationException, tf.Exception, ValueError) as error:
+            self._base_pose_failed = True
+            self._stop_base()
             rospy.logwarn("Cannot read base pose for direct docking: %s", str(error))
             return None
 
@@ -652,6 +772,9 @@ class NavigationSortingMission(object):
 
     def _align_heading_for_direct_dock(self, target_yaw, label, pose_frame=None):
         """Apply one bounded heading correction while still at pre-dock."""
+        if self._stop_requested.is_set() or self._base_pose_failed:
+            self._stop_base()
+            return False
         actual = self._current_base_pose(pose_frame)
         if actual is None:
             return False
@@ -670,25 +793,23 @@ class NavigationSortingMission(object):
 
         self.navigation_client.cancel_all_goals()
         self._stop_base()
-        rospy.sleep(0.2)
+        self._stop_requested.wait(0.2)
         self._publish_state(
             "ALIGNING_BASE",
             "{} heading correction {:.3f} rad before straight docking".format(
                 label, initial_error
             ),
         )
-        deadline = time.time() + self.heading_timeout
+        deadline = time.monotonic() + self.heading_timeout
         best_error = abs(initial_error)
-        last_progress_time = time.time()
-        rate = rospy.Rate(self.base_recovery_rate)
+        last_progress_time = time.monotonic()
         try:
-            while not rospy.is_shutdown() and time.time() < deadline:
+            while not rospy.is_shutdown() and time.monotonic() < deadline:
                 if self._stop_requested.is_set():
                     return False
                 actual = self._current_base_pose(pose_frame)
                 if actual is None:
-                    rate.sleep()
-                    continue
+                    return False
                 yaw_error = self._angle_error(target_yaw, actual[2])
                 absolute_error = abs(yaw_error)
                 if absolute_error <= self.heading_goal_tolerance:
@@ -699,8 +820,8 @@ class NavigationSortingMission(object):
                     return True
                 if absolute_error < best_error - 0.002:
                     best_error = absolute_error
-                    last_progress_time = time.time()
-                elif time.time() - last_progress_time > self.heading_stall_timeout:
+                    last_progress_time = time.monotonic()
+                elif time.monotonic() - last_progress_time > self.heading_stall_timeout:
                     rospy.logwarn(
                         "%s heading made no progress for %.1f s; "
                         "lidar safety may be blocking rotation",
@@ -713,7 +834,7 @@ class NavigationSortingMission(object):
                     min(self.heading_speed, max(0.04, absolute_error)), yaw_error
                 )
                 self.base_recovery_publisher.publish(command)
-                rate.sleep()
+                self._stop_requested.wait(1.0 / self.base_recovery_rate)
         finally:
             self._stop_base()
         rospy.logwarn("%s heading alignment timed out", label)
@@ -722,6 +843,9 @@ class NavigationSortingMission(object):
     def _drive_straight_to(
         self, target, label, state="DIRECT_DOCKING", pose_frame=None
     ):
+        if self._stop_requested.is_set() or self._base_pose_failed:
+            self._stop_base()
+            return False
         pose_frame = pose_frame or self.navigation_frame
         start = self._current_base_pose(pose_frame)
         if start is None:
@@ -764,20 +888,18 @@ class NavigationSortingMission(object):
         )
         self.navigation_client.cancel_all_goals()
         self._stop_base()
-        rospy.sleep(0.2)
+        self._stop_requested.wait(0.2)
 
-        deadline = time.time() + self.direct_dock_timeout
-        last_progress_time = time.time()
+        deadline = time.monotonic() + self.direct_dock_timeout
+        last_progress_time = time.monotonic()
         best_error = abs(longitudinal)
-        rate = rospy.Rate(self.base_recovery_rate)
         try:
-            while not rospy.is_shutdown() and time.time() < deadline:
+            while not rospy.is_shutdown() and time.monotonic() < deadline:
                 if self._stop_requested.is_set():
                     return False
                 actual = self._current_base_pose(pose_frame)
                 if actual is None:
-                    rate.sleep()
-                    continue
+                    return False
                 longitudinal, lateral, yaw_error = self._direct_dock_geometry(
                     actual, target
                 )
@@ -807,8 +929,8 @@ class NavigationSortingMission(object):
                 current_error = abs(longitudinal)
                 if current_error <= best_error - self.direct_dock_progress_epsilon:
                     best_error = current_error
-                    last_progress_time = time.time()
-                elif time.time() - last_progress_time > self.direct_dock_stall_timeout:
+                    last_progress_time = time.monotonic()
+                elif time.monotonic() - last_progress_time > self.direct_dock_stall_timeout:
                     rospy.logwarn(
                         "%s made no progress for %.1f s (remaining %.3f m); "
                         "lidar safety may be blocking the path",
@@ -822,7 +944,7 @@ class NavigationSortingMission(object):
                     longitudinal,
                 )
                 self.base_recovery_publisher.publish(command)
-                rate.sleep()
+                self._stop_requested.wait(1.0 / self.base_recovery_rate)
         finally:
             self._stop_base()
         rospy.logwarn("%s timed out after %.1f seconds", label, self.direct_dock_timeout)
@@ -940,6 +1062,8 @@ class NavigationSortingMission(object):
         return False
 
     def _navigate_once(self, target, goal_frame=None):
+        if self._stop_requested.is_set() or self._base_pose_failed:
+            return False
         goal_frame = goal_frame or self.navigation_frame
         target_x, target_y, target_yaw = target
         quaternion = quaternion_from_euler(0.0, 0.0, target_yaw)
@@ -954,19 +1078,24 @@ class NavigationSortingMission(object):
         goal.target_pose.pose.orientation.w = quaternion[3]
         self.navigation_client.send_goal(goal)
 
-        deadline = time.time() + self.navigation_timeout
-        while not rospy.is_shutdown() and time.time() < deadline:
+        deadline = time.monotonic() + self.navigation_timeout
+        while not rospy.is_shutdown() and time.monotonic() < deadline:
             if self._stop_requested.is_set():
                 self.navigation_client.cancel_goal()
                 return False
-            if self.navigation_client.wait_for_result(rospy.Duration(0.2)):
-                return self.navigation_client.get_state() == GoalStatus.SUCCEEDED
+            state = self.navigation_client.get_state()
+            if state in (GoalStatus.SUCCEEDED, GoalStatus.ABORTED, GoalStatus.REJECTED,
+                         GoalStatus.PREEMPTED, GoalStatus.RECALLED, GoalStatus.LOST):
+                return state == GoalStatus.SUCCEEDED
+            self._stop_requested.wait(0.05)
         self.navigation_client.cancel_goal()
         return False
 
     def _navigate(self, target, stage="navigation", goal_frame=None):
         goal_frame = goal_frame or self.navigation_frame
-        if not self.navigation_client.wait_for_server(rospy.Duration(self.server_timeout)):
+        if not self._bounded_call(
+                lambda: self.navigation_client.wait_for_server(rospy.Duration(self.server_timeout)),
+                self.server_timeout, "navigation server wait"):
             rospy.logerr("Navigation action %s is unavailable", self.navigation_action)
             return False
         for attempt in range(self.navigation_retries + 1):
@@ -987,10 +1116,10 @@ class NavigationSortingMission(object):
             if self._stop_requested.is_set():
                 return False
             rospy.logwarn("Navigation attempt %d failed", attempt + 1)
-            try:
-                self.clear_costmaps()
-            except rospy.ServiceException as error:
-                rospy.logwarn("Could not clear costmaps before retry: %s", str(error))
+            if attempt < self.navigation_retries:
+                if self._bounded_call(self.clear_costmaps, self.server_timeout,
+                                      "clear costmaps", late_stop=True) is None:
+                    return False
         return False
 
     @staticmethod
@@ -1096,6 +1225,8 @@ class NavigationSortingMission(object):
                 docked = self._navigate(candidate, "fine-dock")
             if not docked:
                 rospy.logwarn("Fine-dock candidate %d motion failed", index + 1)
+                if self._base_pose_failed or self._stop_requested.is_set():
+                    return False
                 if used_direct_dock:
                     self._drive_straight_to(self.pre_dock_goal, "pre-dock retreat")
                 continue
@@ -1237,14 +1368,19 @@ class NavigationSortingMission(object):
             rospy.logerr("Navigation-sorting mission failed: %s", str(error))
         finally:
             self._stop_base()
-            with self._condition:
-                self._busy = False
-            if self._stop_requested.is_set():
+            if self._operation_active:
+                self._cancel_sorting_and_wait()
+            if self._stop_unconfirmed:
+                self._publish_state("STOP_UNCONFIRMED", "sorting stop not confirmed; new missions blocked")
+            elif self._stop_requested.is_set():
                 self._publish_state("STOPPED", "mission cancelled")
             elif success:
                 self._publish_state("SUCCEEDED", "navigation and sorting complete")
             else:
-                self._publish_state("FAILED", "inspect move_base and /sorting/state")
+                self._publish_state("FAILED", "base pose unavailable or stale" if self._base_pose_failed
+                                    else "inspect move_base and /sorting/state")
+            with self._condition:
+                self._busy = False
 
 
 def main():

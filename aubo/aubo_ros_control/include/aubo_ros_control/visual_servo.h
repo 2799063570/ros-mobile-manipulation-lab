@@ -52,17 +52,8 @@ private:
   using DirectSdkBackend = visual_servo_internal::DirectSdkBackend;
   using ReconfigureServer = dynamic_reconfigure::Server<VisualServoConfig>;
 
-  // 视觉伺服状态机：覆盖等待、跟踪、稳定对齐、丢失恢复和安全保持。
-  enum class ServoState {
-    DISABLED,
-    WAITING,
-    SEARCH_INITIAL,
-    TRACKING,
-    ALIGNED,
-    COAST,
-    SEARCH_RECOVERY,
-    HOLD
-  };
+  // Task motions (observation/search/grasp) belong to the caller.
+  using ServoState = visual_servo_internal::ServoState;
 
   static const char *stateName(ServoState state);
 
@@ -85,14 +76,11 @@ private:
   void sdkStateUpdate(const ros::TimerEvent &event);
 
   // 状态决策、PBVS 速度求解及周期控制输出。
-  ServoState selectState(bool fresh_target, double target_age);
+  void latchFault();
   Eigen::VectorXd trackingVelocity(const JointPoint &position,
                                    const geometry_msgs::Pose &target,
                                    Eigen::Vector3d *raw_position_error,
                                    Eigen::Vector3d *raw_angular_error);
-  Eigen::VectorXd desiredVelocity(ServoState state, const JointPoint &position,
-                                  const geometry_msgs::Pose &target,
-                                  double target_age);
   void transitionTo(ServoState next);
   void publishState();
   void controlLoop(const ros::TimerEvent &event);
@@ -107,7 +95,7 @@ private:
 
   // 运行模式、坐标系、话题及控制器参数。
   std::string backend_, servo_mode_, base_link_, camera_link_, control_link_;
-  std::string target_topic_, state_topic_, joint_states_topic_, loss_strategy_;
+  std::string target_topic_, state_topic_, joint_states_topic_;
   std::vector<std::string> joint_names_, gazebo_topics_;
   double control_rate_{100.0}, output_rate_{200.0};
   double linear_gain_{0.8}, angular_gain_{0.5};
@@ -116,28 +104,21 @@ private:
       joint_limit_margin_{0.08};// 死区阈值、DLS最小二乘阈值、关节位置限位余量
   double orientation_deadband_{0.02}, alignment_hold_time_{0.35},
       alignment_release_multiplier_{2.0};// 姿态死区阈值、对齐保持时间、迟滞因子
-  double target_timeout_{0.2}, coast_duration_{0.35}, coast_decay_time_{0.18};
-  double recovery_delay_{1.0}, reacquire_hold_time_{0.3};
+  double target_timeout_{0.2};
   double minimum_safe_target_distance_{0.0};
-  double search_timeout_{8.0}, open_posture_gain_{0.7},
-      search_velocity_limit_{0.2};
   double feedback_blend_{0.02};
-  bool use_orientation_control_{false}, initial_search_enabled_{false},
+  bool use_orientation_control_{false},
       enabled_{false};
 
-  // 关节约束、搜索姿态、反馈状态和积分命令。
+  // 关节约束、反馈状态和积分命令。
   JointPoint lower_limits_{}, upper_limits_{}, velocity_limits_{},
       acceleration_limits_;
-  JointPoint open_posture_{}, initial_search_posture_{}, recovery_posture_;
   JointPoint feedback_position_{}, command_position_{}, command_velocity_;
   JointPoint backend_velocity_{}, last_output_;
   Eigen::Vector3d desired_position_{Eigen::Vector3d::Zero()};
   Eigen::Vector3d target_offset_{Eigen::Vector3d::Zero()};
   Eigen::Vector3d desired_rpy_{Eigen::Vector3d::Zero()};
   Eigen::Matrix3d desired_rotation_{Eigen::Matrix3d::Identity()};
-  Eigen::VectorXd last_tracking_velocity_{
-      Eigen::VectorXd::Zero(visual_servo_internal::kDof)};
-
   // KDL 正运动学、雅可比求解器以及真实机械臂 SDK 后端。
   KDL::Chain chain_; // 机械臂运动学链 从 base_link_ 到 control_link_ 的链
   std::unique_ptr<KDL::ChainFkSolverPos_recursive> fk_solver_;
@@ -150,16 +131,13 @@ private:
   ros::Time last_target_time_, last_joint_time_;
   bool have_target_{false}, have_joint_state_{false},
       integrator_initialized_{false};
-  bool have_ever_tracked_{false};
-  bool alignment_candidate_{false}, aligned_latched_{false};
-  ros::Time alignment_candidate_since_;
-  bool search_reacquire_pending_{false}, reacquire_candidate_{false};
-  ros::Time reacquire_candidate_since_;
+  visual_servo_internal::AlignmentTracker alignment_;
   std::atomic<bool> safety_stop_{false};
   ServoState state_{ServoState::DISABLED};
 
   // ROS 订阅、发布、服务和定时器句柄。
   ros::Subscriber target_sub_, joint_sub_;
+  ros::Publisher aligned_pub_, error_pub_, age_pub_, queue_pub_;
   ros::Publisher state_pub_, legacy_state_pub_, sdk_joint_pub_;
   ros::ServiceServer enable_service_, reset_service_;
   std::vector<ros::Publisher> gazebo_publishers_;

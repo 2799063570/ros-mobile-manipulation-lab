@@ -55,6 +55,11 @@ navigation_retries: 1
 server_timeout: 45.0
 sorting_initialization_timeout: 60.0
 sorting_operation_timeout: 300.0
+# 墙上时间超时；取消必须收到动作终态及本次动作后的底盘解锁消息。
+sorting_stop_timeout: 5.0
+sorting_base_lock_topic: /sorting/base_locked
+# 精停/转向只使用最近 0.5 秒内的 TF；失效后本次任务不再尝试底盘移动。
+base_pose_max_age: 0.5
 startup_delay: 3.0
 
 # 导航前收起机械臂；精停后复用 aubo_mobile_sorting 的观察与分拣服务。

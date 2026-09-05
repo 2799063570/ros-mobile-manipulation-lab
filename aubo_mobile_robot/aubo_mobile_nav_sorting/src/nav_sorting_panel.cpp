@@ -263,7 +263,8 @@ void NavSortingPanel::showMissionState(const QString& text)
   mission_busy_ = !(code == "IDLE" || code == "STOPPED" ||
                     code == "SUCCEEDED" || code == "FAILED");
   start_button_->setEnabled(!mission_busy_);
-  stop_button_->setEnabled(mission_busy_ && code != "INITIALIZING");
+  stop_button_->setEnabled(mission_busy_ && code != "INITIALIZING" &&
+                          code != "STOP_UNCONFIRMED");
   QString translated = code;
   if (code == "INITIALIZING") translated = tr("初始化中");
   else if (code == "IDLE") translated = tr("待命");
@@ -275,6 +276,7 @@ void NavSortingPanel::showMissionState(const QString& text)
   else if (code == "AT_WORKSTATION") translated = tr("已到达工位");
   else if (code == "SORTING") translated = tr("正在抓取分拣");
   else if (code == "STOPPING") translated = tr("正在停止");
+  else if (code == "STOP_UNCONFIRMED") translated = tr("停止未确认，已禁止新任务；请检查分拣服务");
   else if (code == "STOPPED") translated = tr("已停止");
   else if (code == "SUCCEEDED") translated = tr("任务成功");
   else if (code == "FAILED") translated = tr("任务失败");

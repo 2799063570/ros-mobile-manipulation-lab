@@ -103,10 +103,10 @@ rostopic echo /sorting/state
 `VALIDATING_DOCK`、`AT_WORKSTATION`、`SORTING`、`SUCCEEDED`；失败时为
 `FAILED`。
 
-到达预停靠点后，任务先调用 `/sorting/prepare_work`，刷新桌子碰撞物并将机械臂从
-`transport` 运输姿态切换到末端向下的 `work_ready` 工作准备姿态，再进行低速精停。
-每段底盘运动开始前机械臂均已停止，两者不会同时运动。精停完成后任务调用
-`/sorting/move_to_observation`，机械臂从 `work_ready` 移动到 `observe` 相机观察
+到达预停靠点后，机械臂保持 `transport` 运输姿态，底盘进行低速精停。
+精停完成后，任务调用 `/sorting/prepare_work`，刷新桌子碰撞物并将机械臂切换到
+末端向下的 `work_ready` 工作准备姿态。每段底盘运动开始前机械臂均已停止。
+随后任务调用 `/sorting/move_to_observation`，机械臂从 `work_ready` 移动到 `observe` 相机观察
 姿态，再开始检测。仿真手部相机使用 90° 水平视场，检测节点从
 `/hand_camera/camera_info` 实时读取相机内参。
 
@@ -207,3 +207,45 @@ roslaunch aubo_mobile_nav_sorting navigation_sorting.launch \
 
 实机入口会关闭 Gazebo 专用的临时吸附插件。真实场地必须使用现场生成的地图，并将
 工位位姿标定为机械臂能够覆盖工作台、底盘又不会碰撞工作台的位置。
+
+## 6. 异常退出与验证
+
+Python 和 C++ 任务节点采用相同的取消规则：
+
+- `/nav_sorting/stop` 快速返回“停止请求已接受”；任务线程负责后续取消和确认。
+  初始化等待和动作状态等待会响应停止，底盘控制等待不再依赖仿真时钟继续走动。
+- `sorting_operation_timeout` 包含分拣服务调用及动作执行等待。超时或停止时，
+  尚未确认结束的动作会调用 `/sorting/stop`；只有收到本次动作之后的终态
+  （`READY`、`ERROR` 或 `STOPPED`）以及底盘解锁消息，才认为分拣核心已退出动作。
+  这是软件接口的确认，不是机械臂硬件急停反馈。
+- `sorting_stop_timeout` 默认 5 秒，使用单调时钟计时，涵盖停止服务与退出确认。
+  未确认退出时发布 `STOP_UNCONFIRMED`，拒绝新任务，RViz 面板也禁止重新开始。
+- ROS 1 服务请求不能由调用方强制撤销。请求在超时后仍未返回时保留启动锁定；
+  涉及分拣的迟到请求返回后会再次请求停止。应先排除服务故障、处理悬而未决的
+  请求并确认设备停止，再重启任务节点；不要仅靠重启任务节点来清除异常。
+- `sorting_base_lock_topic` 默认 `/sorting/base_locked`，必须与分拣核心的
+  `base_lock_topic` 一致。终态与本次动作后的解锁消息也用于正常动作完成判断，
+  避免把核心尚在清理时发布的 `ERROR` 当作已经可以移动底盘。
+- `base_pose_max_age` 默认 0.5 秒。精停和小角度对正会拒绝过旧、未来超过
+  0.05 秒、零时间戳或无效坐标的 TF；查找失败也立即发布零速度。本次任务随后
+  退出，不再通过其他候选或后退动作继续移动。修复定位后可以重新发起任务。
+
+不依赖 ROS 的 Python 异常路径测试：
+
+```bash
+cd $(rospack find aubo_mobile_nav_sorting)
+python3 -m unittest discover -s test -v
+```
+
+该测试使用模拟的 ROS 服务、状态消息和 TF，不代表 C++ 编译或机器人运动验证。
+在 ROS 工作空间编译后，应分别使用 `mission_implementation:=python` 和 `cpp`
+运行以下 Gazebo 验收：
+
+1. 正常完成一个工位，确认动作成功路径仍可运行。
+2. 等待初始化、等待导航服务、导航途中及机械臂动作中分别请求停止。
+3. 缩短 `sorting_operation_timeout`，确认先请求取消，再发布 `FAILED`；
+   模拟停止服务无响应或不发布退出确认，确认状态为 `STOP_UNCONFIRMED` 且开始被拒绝。
+4. 在精停及航向对正时中断 TF 更新，确认输出零速度、任务失败，并且不尝试其他候选。
+5. 底盘运动中暂停 Gazebo，确认墙上时间超时仍能退出控制循环；恢复仿真前检查任务已退出。
+
+本轮没有更改恢复移动的开环距离策略、导航算法或 RViz 服务调用的线程模型。

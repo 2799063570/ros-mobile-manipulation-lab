@@ -14,7 +14,4 @@ minimum_safe_target_distance: 0.0
 desired_target_rpy: [3.141592653589793, 0.0, 0.0]
 use_orientation_control: true
 
-# A fixed camera does not need arm motion to acquire its first target. On loss,
-# decelerate briefly and hold instead of moving through the camera sight line.
-initial_search_enabled: false
-loss_strategy: stop
+# Target loss always decelerates to HOLD.

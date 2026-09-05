@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <functional>
 #include <iomanip>
 #include <limits>
 #include <set>
@@ -16,6 +17,62 @@ namespace aubo_mobile_nav_sorting
 {
 namespace
 {
+enum class RpcStatus { Completed, Failed, Abandoned };
+
+// ROS 1 service calls have no per-call cancellation. Detached workers own all
+// their data (never the mission object); an abandoned mutation locks out restart.
+template <typename Service>
+RpcStatus boundedRpc(ros::ServiceClient client, Service& service, double timeout,
+                     const std::function<bool()>& cancelled,
+                     const std::function<void()>& late_stop = {})
+{
+  struct Result
+  {
+    std::mutex mutex;
+    std::condition_variable condition;
+    bool done = false;
+    bool abandoned = false;
+    bool success = false;
+    Service service;
+  };
+  auto result = std::make_shared<Result>();
+  result->service = service;
+  std::thread([client, result, late_stop]() mutable {
+    bool success = false;
+    try { success = client.call(result->service); }
+    catch (const std::exception& error) { ROS_ERROR_STREAM(error.what()); }
+    bool abandoned;
+    {
+      std::lock_guard<std::mutex> lock(result->mutex);
+      result->success = success;
+      result->done = true;
+      abandoned = result->abandoned;
+      result->condition.notify_all();
+    }
+    // A delayed start can arrive after the initial stop. Cancel once more on
+    // its return, without clearing the restart interlock.
+    if (abandoned && late_stop)
+    {
+      try { late_stop(); }
+      catch (const std::exception& error) { ROS_ERROR_STREAM(error.what()); }
+    }
+  }).detach();
+  const auto deadline = std::chrono::steady_clock::now() +
+      std::chrono::duration<double>(timeout);
+  std::unique_lock<std::mutex> lock(result->mutex);
+  while (!result->done)
+  {
+    if (!ros::ok() || cancelled() || std::chrono::steady_clock::now() >= deadline)
+    {
+      result->abandoned = true;
+      return RpcStatus::Abandoned;
+    }
+    result->condition.wait_for(lock, std::chrono::milliseconds(50));
+  }
+  service = result->service;
+  return result->success ? RpcStatus::Completed : RpcStatus::Failed;
+}
+
 std::vector<double> vectorParam(const ros::NodeHandle& node,
                                 const std::string& name,
                                 const std::vector<double>& fallback)
@@ -103,6 +160,11 @@ NavigationSortingMission::NavigationSortingMission(
   sorting_failure_subscriber_ = node_handle_.subscribe(
       sorting_failure_topic_, 5,
       &NavigationSortingMission::sortingFailureCallback, this);
+  std::string base_lock_topic;
+  private_node_handle_.param("sorting_base_lock_topic", base_lock_topic,
+                             std::string("/sorting/base_locked"));
+  base_lock_subscriber_ = node_handle_.subscribe(
+      base_lock_topic, 5, &NavigationSortingMission::baseLockCallback, this);
 
   clear_costmaps_client_ = node_handle_.serviceClient<std_srvs::Empty>(
       "/move_base/clear_costmaps");
@@ -233,6 +295,11 @@ void NavigationSortingMission::loadParameters()
   private_node_handle_.param("sorting_initialization_timeout",
                              initialization_timeout_, 60.0);
   private_node_handle_.param("sorting_operation_timeout", operation_timeout_, 300.0);
+  private_node_handle_.param("sorting_stop_timeout", stop_timeout_, 5.0);
+  private_node_handle_.param("base_pose_max_age", tf_max_age_, 0.5);
+  if (!std::isfinite(stop_timeout_) || stop_timeout_ <= 0.0 ||
+      !std::isfinite(tf_max_age_) || tf_max_age_ <= 0.0)
+    throw std::runtime_error("sorting_stop_timeout and base_pose_max_age must be finite and positive");
   private_node_handle_.param("startup_delay", startup_delay_, 3.0);
   private_node_handle_.param("home_before_navigation",
                              home_before_navigation_, true);
@@ -323,6 +390,7 @@ void NavigationSortingMission::seedDynamicParameters()
 void NavigationSortingMission::reconfigureCallback(NavSortingConfig& config,
                                                     uint32_t)
 {
+  std::lock_guard<std::mutex> lock(mutex_);
   if (busy_)
   {
     config.goal_x = sorting_goal_.x;
@@ -366,20 +434,18 @@ bool NavigationSortingMission::startCallback(std_srvs::Trigger::Request&,
 bool NavigationSortingMission::stopCallback(std_srvs::Trigger::Request&,
                                             std_srvs::Trigger::Response& response)
 {
+  std::lock_guard<std::mutex> lock(mutex_);
   if (!busy_)
   {
-    response.success = true;
-    response.message = "no mission is running";
+    response.success = !stop_unconfirmed_;
+    response.message = stop_unconfirmed_ ? "stop remains unconfirmed; resolve the service fault" :
+        "no mission is running";
     return true;
   }
   stop_requested_ = true;
   navigation_client_->cancelAllGoals();
   stopBase();
-  std_srvs::Trigger service;
-  if (!sorting_stop_client_.call(service))
-    ROS_WARN("Could not call sorting stop service");
   condition_.notify_all();
-  publishState("STOPPING", "cancelling active operation");
   response.success = true;
   response.message = "stop requested";
   return true;
@@ -410,15 +476,24 @@ void NavigationSortingMission::autoStartCallback(const ros::TimerEvent&)
 
 bool NavigationSortingMission::submitMission(std::string& message)
 {
-  bool expected = false;
-  if (!busy_.compare_exchange_strong(expected, true))
   {
-    message = "a mission is already running";
-    return false;
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (stop_unconfirmed_)
+    {
+      message = "stop unconfirmed; resolve the sorting service fault before restarting this node";
+      return false;
+    }
+    if (busy_)
+    {
+      message = "a mission is already running";
+      return false;
+    }
+    busy_ = true;
+    stop_requested_ = false;
+    base_pose_failed_ = false;
   }
   if (mission_thread_.joinable())
     mission_thread_.join();
-  stop_requested_ = false;
   mission_thread_ = std::thread(&NavigationSortingMission::runMission, this);
   message = "mission accepted";
   return true;
@@ -431,6 +506,8 @@ bool NavigationSortingMission::waitForSortingReady()
   std::unique_lock<std::mutex> lock(mutex_);
   while (ros::ok() && std::chrono::steady_clock::now() < deadline)
   {
+    if (stop_requested_)
+      return false;
     const std::string state = stateName(sorting_state_);
     if (state == "IDLE" || state == "READY" || state == "STOPPED")
       return true;
@@ -442,39 +519,116 @@ bool NavigationSortingMission::waitForSortingReady()
   return false;
 }
 
+bool NavigationSortingMission::callTriggerBounded(
+    ros::ServiceClient client, std_srvs::Trigger& service, double timeout,
+    bool cancelable, bool late_stop)
+{
+  auto stop_client = sorting_stop_client_;
+  const auto status = boundedRpc(client, service, timeout,
+      [this, cancelable]() { return cancelable && stop_requested_; },
+      late_stop ? std::function<void()>([stop_client]() mutable {
+        std_srvs::Trigger stop;
+        if (!stop_client.call(stop) || !stop.response.success)
+          ROS_ERROR("Late sorting cancellation failed");
+      }) : std::function<void()>());
+  if (status == RpcStatus::Abandoned && late_stop)
+    stop_unconfirmed_ = true;
+  if (status != RpcStatus::Completed)
+    ROS_ERROR_STREAM("Service failed or interrupted: " << client.getService());
+  return status == RpcStatus::Completed;
+}
+
+void NavigationSortingMission::baseLockCallback(const std_msgs::Bool::ConstPtr& message)
+{
+  std::lock_guard<std::mutex> lock(mutex_);
+  base_locked_ = message->data;
+  ++base_lock_sequence_;
+  condition_.notify_all();
+}
+
+bool NavigationSortingMission::operationUnlocked() const
+{
+  // Caller holds mutex_. ERROR may precede the sorting worker's cleanup.
+  return !base_locked_ && base_lock_sequence_ > operation_lock_sequence_;
+}
+
+bool NavigationSortingMission::cancelSortingAndWait()
+{
+  publishState("STOPPING", "waiting for sorting cancellation");
+  stopBase();
+  const auto deadline = std::chrono::steady_clock::now() +
+      std::chrono::duration<double>(stop_timeout_);
+  std_srvs::Trigger stop;
+  if (!callTriggerBounded(sorting_stop_client_, stop, stop_timeout_, false, false) ||
+      !stop.response.success)
+  {
+    stop_unconfirmed_ = true;
+    return false;
+  }
+  std::unique_lock<std::mutex> lock(mutex_);
+  while (ros::ok() && std::chrono::steady_clock::now() < deadline)
+  {
+    const std::string state = stateName(sorting_state_);
+    if (sorting_sequence_ > operation_start_sequence_ &&
+        (state == "READY" || state == "ERROR" || state == "STOPPED") &&
+        operationUnlocked())
+    {
+      operation_active_ = false;
+      return !stop_unconfirmed_;
+    }
+    condition_.wait_for(lock, std::chrono::milliseconds(50));
+  }
+  stop_unconfirmed_ = true;
+  return false;
+}
+
 bool NavigationSortingMission::callSortingOperation(
     ros::ServiceClient& client, const std::vector<std::string>& running_states,
     const std::string& label)
 {
-  if (stop_requested_)
+  if (stop_requested_ || operation_active_ || stop_unconfirmed_)
     return false;
   unsigned long start_sequence;
   {
     std::lock_guard<std::mutex> lock(mutex_);
     start_sequence = sorting_sequence_;
+    operation_start_sequence_ = start_sequence;
+    operation_lock_sequence_ = base_lock_sequence_;
+    sorting_failure_.clear();
   }
+  operation_active_ = true;
+  const auto deadline = std::chrono::steady_clock::now() +
+      std::chrono::duration<double>(operation_timeout_);
   std_srvs::Trigger service;
-  if (!client.call(service) || !service.response.success)
+  if (!callTriggerBounded(client, service, operation_timeout_))
+    return false;
+  if (!service.response.success)
   {
+    operation_active_ = false;
     ROS_ERROR_STREAM(label << " command failed: " << service.response.message);
     return false;
   }
-  const auto deadline = std::chrono::steady_clock::now() +
-      std::chrono::duration<double>(operation_timeout_);
   bool saw_operation = false;
   std::unique_lock<std::mutex> lock(mutex_);
   while (ros::ok() && std::chrono::steady_clock::now() < deadline)
   {
+    if (stop_requested_)
+      return false;
     const std::string state = stateName(sorting_state_);
     if (sorting_sequence_ > start_sequence)
     {
       if (contains(running_states, state))
         saw_operation = true;
       else if (state == "READY" &&
-               (saw_operation || sorting_sequence_ > start_sequence + 1))
-        return true;
-      else if (state == "ERROR" || state == "STOPPED")
+               (saw_operation || sorting_sequence_ > start_sequence + 1) &&
+               operationUnlocked())
       {
+        operation_active_ = false;
+        return true;
+      }
+      else if ((state == "ERROR" || state == "STOPPED") && operationUnlocked())
+      {
+        operation_active_ = false;
         ROS_ERROR_STREAM(label << " failed: " << sorting_state_);
         return false;
       }
@@ -490,7 +644,8 @@ bool NavigationSortingMission::callSortingOperation(
 bool NavigationSortingMission::planningFailed() const
 {
   std::lock_guard<std::mutex> lock(mutex_);
-  return sorting_failure_.find("PLANNING_FAILED") == 0;
+  return !operation_active_ && !stop_unconfirmed_ && !stop_requested_ &&
+      sorting_failure_.find("PLANNING_FAILED") == 0;
 }
 
 bool NavigationSortingMission::configureWorkspace(
@@ -509,14 +664,11 @@ bool NavigationSortingMission::configureWorkspace(
   std_msgs::String message;
   message.data = toJson(workspace);
   workspace_publisher_.publish(message);
-  if (!ros::service::waitForService(configure_workspace_service_name_,
-                                    ros::Duration(server_timeout_)))
-  {
-    ROS_ERROR("Sorting workspace service is unavailable");
+  if (stop_requested_)
     return false;
-  }
   std_srvs::Trigger service;
-  if (!configure_workspace_client_.call(service) || !service.response.success)
+  if (!callTriggerBounded(configure_workspace_client_, service, server_timeout_) ||
+      !service.response.success)
   {
     ROS_ERROR_STREAM("Workstation configuration rejected: "
                      << service.response.message);
@@ -526,8 +678,10 @@ bool NavigationSortingMission::configureWorkspace(
 }
 
 bool NavigationSortingMission::navigateOnce(const Pose2D& target,
-                                             const std::string& goal_frame)
+                                              const std::string& goal_frame)
 {
+  if (stop_requested_ || base_pose_failed_)
+    return false;
   move_base_msgs::MoveBaseGoal goal;
   goal.target_pose.header.frame_id = goal_frame;
   goal.target_pose.header.stamp = ros::Time::now();
@@ -544,9 +698,10 @@ bool NavigationSortingMission::navigateOnce(const Pose2D& target,
       navigation_client_->cancelGoal();
       return false;
     }
-    if (navigation_client_->waitForResult(ros::Duration(0.2)))
+    if (navigation_client_->getState().isDone())
       return navigation_client_->getState() ==
           actionlib::SimpleClientGoalState::SUCCEEDED;
+    ros::WallDuration(0.05).sleep();
   }
   navigation_client_->cancelGoal();
   return false;
@@ -558,7 +713,12 @@ bool NavigationSortingMission::navigate(const Pose2D& target,
 {
   const std::string goal_frame = requested_frame.empty() ?
       navigation_frame_ : requested_frame;
-  if (!navigation_client_->waitForServer(ros::Duration(server_timeout_)))
+  const auto deadline = std::chrono::steady_clock::now() +
+      std::chrono::duration<double>(server_timeout_);
+  while (ros::ok() && !stop_requested_ && !navigation_client_->isServerConnected() &&
+         std::chrono::steady_clock::now() < deadline)
+    ros::WallDuration(0.05).sleep();
+  if (!ros::ok() || stop_requested_ || !navigation_client_->isServerConnected())
   {
     ROS_ERROR_STREAM("Navigation action unavailable: " << navigation_action_);
     return false;
@@ -575,31 +735,56 @@ bool NavigationSortingMission::navigate(const Pose2D& target,
       return true;
     if (stop_requested_)
       return false;
-    std_srvs::Empty clear;
-    if (!clear_costmaps_client_.call(clear))
-      ROS_WARN("Could not clear costmaps before navigation retry");
+    if (attempt < navigation_retries_)
+    {
+      std_srvs::Empty clear;
+      const auto result = boundedRpc(clear_costmaps_client_, clear, server_timeout_,
+          [this]() { return stop_requested_.load(); });
+      if (result != RpcStatus::Completed)
+      {
+        if (result == RpcStatus::Abandoned)
+          stop_unconfirmed_ = true;
+        ROS_WARN("Could not clear costmaps before navigation retry");
+        return false;
+      }
+    }
   }
   return false;
 }
 
 bool NavigationSortingMission::currentBasePose(
-    Pose2D& pose, const std::string& requested_frame) const
+    Pose2D& pose, const std::string& requested_frame)
 {
   const std::string pose_frame = requested_frame.empty() ?
       navigation_frame_ : requested_frame;
   try
   {
-    tf_listener_.waitForTransform(pose_frame, base_frame_, ros::Time(0),
-                                  ros::Duration(1.0));
     tf::StampedTransform transform;
     tf_listener_.lookupTransform(pose_frame, base_frame_, ros::Time(0),
-                                 transform);
+                                  transform);
+    const double age = (ros::Time::now() - transform.stamp_).toSec();
+    if (transform.stamp_.isZero() || age < -0.05 || age > tf_max_age_)
+    {
+      base_pose_failed_ = true;
+      ROS_ERROR_STREAM("Base pose is stale or future-dated (age " << age << " s)");
+      stopBase();
+      return false;
+    }
     pose = {transform.getOrigin().x(), transform.getOrigin().y(),
-            tf::getYaw(transform.getRotation())};
+             tf::getYaw(transform.getRotation())};
+    if (!std::isfinite(pose.x) || !std::isfinite(pose.y) || !std::isfinite(pose.yaw))
+    {
+      base_pose_failed_ = true;
+      stopBase();
+      ROS_ERROR("Base pose contains non-finite coordinates");
+      return false;
+    }
     return true;
   }
   catch (const tf::TransformException& error)
   {
+    base_pose_failed_ = true;
+    stopBase();
     ROS_WARN_STREAM("Cannot read base pose: " << error.what());
     return false;
   }
@@ -609,6 +794,11 @@ bool NavigationSortingMission::alignHeading(double target_yaw,
                                             const std::string& label,
                                             const std::string& pose_frame)
 {
+  if (stop_requested_ || base_pose_failed_)
+  {
+    stopBase();
+    return false;
+  }
   Pose2D actual;
   if (!currentBasePose(actual, pose_frame))
     return false;
@@ -630,7 +820,10 @@ bool NavigationSortingMission::alignHeading(double target_yaw,
   while (ros::ok() && std::chrono::steady_clock::now() < deadline)
   {
     if (stop_requested_ || !currentBasePose(actual, pose_frame))
+    {
+      stopBase();
       return false;
+    }
     const double error = angleError(target_yaw, actual.yaw);
     const double absolute_error = std::abs(error);
     if (absolute_error <= heading_goal_tolerance_)
@@ -677,6 +870,11 @@ bool NavigationSortingMission::driveStraightTo(const Pose2D& target,
                                                const std::string& state,
                                                const std::string& pose_frame)
 {
+  if (stop_requested_ || base_pose_failed_)
+  {
+    stopBase();
+    return false;
+  }
   Pose2D start;
   if (!currentBasePose(start, pose_frame) || !canDirectDock(start, target) ||
       !alignHeading(target.yaw, label, pose_frame) ||
@@ -748,6 +946,8 @@ bool NavigationSortingMission::driveStraightTo(const Pose2D& target,
 bool NavigationSortingMission::moveBaseDirect(double dx, double dy,
                                               int attempt, int total)
 {
+  if (stop_requested_ || base_pose_failed_)
+    return false;
   const double distance = std::max(std::abs(dx), std::abs(dy));
   if (distance <= 1e-6)
     return true;
@@ -944,6 +1144,8 @@ bool NavigationSortingMission::coordinateNearField()
     bool docked = direct_dock_enabled_ ?
         driveStraightTo(candidate, "fine-dock candidate") :
         navigate(candidate, "fine-dock");
+    if (!docked && (base_pose_failed_ || stop_requested_))
+      return false;
     if (!docked)
       continue;
     if (!arm_prepared)
@@ -1047,13 +1249,21 @@ void NavigationSortingMission::runMission()
     ROS_ERROR_STREAM("Navigation-sorting mission failed: " << error.what());
   }
   stopBase();
-  busy_ = false;
-  if (stop_requested_)
+  if (operation_active_)
+    cancelSortingAndWait();
+  if (stop_unconfirmed_)
+    publishState("STOP_UNCONFIRMED", "sorting stop not confirmed; new missions blocked");
+  else if (stop_requested_)
     publishState("STOPPED", "mission cancelled");
   else if (success)
     publishState("SUCCEEDED", "navigation and sorting complete");
   else
-    publishState("FAILED", "inspect move_base and /sorting/state");
+    publishState("FAILED", base_pose_failed_ ? "base pose unavailable or stale" :
+                 "inspect move_base and /sorting/state");
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    busy_ = false;
+  }
 }
 
 void NavigationSortingMission::publishState(const std::string& state,

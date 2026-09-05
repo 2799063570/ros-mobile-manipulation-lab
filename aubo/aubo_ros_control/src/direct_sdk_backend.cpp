@@ -242,7 +242,7 @@ void DirectSdkBackend::outputLoop()
         std::copy(safe.begin(), safe.end(), waypoint.jointpos);
         batch.push_back(waypoint);
       }
-      if (!batch.empty() &&
+      if (running_.load() && !batch.empty() &&
           mac_service_.robotServiceSetRobotPosData2Canbus(batch) !=
               aubo_robot_namespace::InterfaceCallSuccCode)
       {

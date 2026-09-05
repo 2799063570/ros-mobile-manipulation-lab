@@ -85,6 +85,9 @@ navigation_retries: 1
 server_timeout: 45.0
 sorting_initialization_timeout: 60.0
 sorting_operation_timeout: 300.0
+sorting_stop_timeout: 5.0
+sorting_base_lock_topic: /sorting/base_locked
+base_pose_max_age: 0.5
 home_before_navigation: true
 
 # Mandatory table exit: transport pose first, then reverse through cmd_vel.

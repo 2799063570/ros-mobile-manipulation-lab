@@ -15,6 +15,7 @@
 #include <move_base_msgs/MoveBaseAction.h>
 #include <ros/ros.h>
 #include <std_msgs/String.h>
+#include <std_msgs/Bool.h>
 #include <std_srvs/Empty.h>
 #include <std_srvs/Trigger.h>
 #include <tf/transform_listener.h>
@@ -63,12 +64,18 @@ private:
                     std_srvs::Trigger::Response& response);
   void sortingStateCallback(const std_msgs::String::ConstPtr& message);
   void sortingFailureCallback(const std_msgs::String::ConstPtr& message);
+  void baseLockCallback(const std_msgs::Bool::ConstPtr& message);
+  bool operationUnlocked() const;
   void autoStartCallback(const ros::TimerEvent& event);
   bool submitMission(std::string& message);
   void runMission();
   bool runWorkstationSequence();
 
   bool waitForSortingReady();
+  bool callTriggerBounded(ros::ServiceClient client, std_srvs::Trigger& service,
+                          double timeout, bool cancelable = true,
+                          bool late_stop = true);
+  bool cancelSortingAndWait();
   bool callSortingOperation(ros::ServiceClient& client,
                             const std::vector<std::string>& running_states,
                             const std::string& label);
@@ -79,7 +86,7 @@ private:
                 const std::string& goal_frame = std::string());
   bool navigateOnce(const Pose2D& target, const std::string& goal_frame);
   bool currentBasePose(Pose2D& pose,
-                       const std::string& pose_frame = std::string()) const;
+                       const std::string& pose_frame = std::string());
   bool alignHeading(double target_yaw, const std::string& label,
                     const std::string& pose_frame = std::string());
   bool driveStraightTo(const Pose2D& target, const std::string& label,
@@ -125,6 +132,7 @@ private:
   ros::Publisher velocity_publisher_;
   ros::Subscriber sorting_state_subscriber_;
   ros::Subscriber sorting_failure_subscriber_;
+  ros::Subscriber base_lock_subscriber_;
   ros::ServiceServer start_service_;
   ros::ServiceServer stop_service_;
   ros::ServiceClient clear_costmaps_client_;
@@ -141,6 +149,13 @@ private:
   std::thread mission_thread_;
   std::atomic<bool> busy_{false};
   std::atomic<bool> stop_requested_{false};
+  std::atomic<bool> stop_unconfirmed_{false};
+  bool operation_active_ = false;  // Accessed only by the mission worker.
+  bool base_pose_failed_ = false;
+  unsigned long operation_start_sequence_ = 0;
+  bool base_locked_ = true;
+  unsigned long base_lock_sequence_ = 0;
+  unsigned long operation_lock_sequence_ = 0;
   std::string sorting_state_;
   std::string sorting_failure_;
   unsigned long sorting_sequence_ = 0;
@@ -198,6 +213,8 @@ private:
   double server_timeout_ = 45.0;
   double initialization_timeout_ = 60.0;
   double operation_timeout_ = 300.0;
+  double stop_timeout_ = 5.0;
+  double tf_max_age_ = 0.5;
   double startup_delay_ = 3.0;
   double base_recovery_speed_ = 0.04;
   double base_recovery_rate_ = 20.0;
