@@ -721,7 +721,10 @@ void VisualServo::controlLoop(const ros::TimerEvent &event) {
     if (have_target_) {
       target = target_pose_;
       target_age = (ros::Time::now() - last_target_time_).toSec();// 距离上次获取到目标之间的时间间隔
-      fresh_target = target_age <= target_timeout_;// 如果目标年龄小于超时时间，认为目标新鲜
+      fresh_target = target_age >= 0.0 && target_age <= target_timeout_;
+      // Gazebo reset can rewind /clock: discard measurements from the old timeline.
+      if (target_age < 0.0)
+        have_target_ = false;
     }
   }
 

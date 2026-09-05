@@ -48,6 +48,10 @@ int main()
   require(!arrival.aligned(), "reset must clear arrival");
   require(!arrival.update(true, 1.0, 0.35), "loss breaks consecutive dwell");
   require(arrival.update(true, 1.4, 0.35), "new dwell can complete");
+  require(!arrival.update(true, 1.2, 0.35),
+          "rewind after candidate start must clear a latched arrival");
+  require(!arrival.update(true, 1.5, 0.35), "rewind must restart the full dwell");
+  require(arrival.update(true, 1.6, 0.35), "arrival can recover after rewind");
   require(!arrival.update(true, 0.2, 0.35), "clock rewind restarts dwell");
   require(!arrival.update(true, std::numeric_limits<double>::quiet_NaN(), 0.35),
           "invalid clock must not report arrival");

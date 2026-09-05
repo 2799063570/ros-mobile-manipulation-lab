@@ -42,11 +42,12 @@ bool AlignmentTracker::update(bool inside_window, double now, double hold_time)
     reset();
     return false;
   }
-  if (!candidate_ || now < since_) {
+  if (!candidate_ || now < last_update_) {
     candidate_ = true;
     aligned_ = false;
     since_ = now;
   }
+  last_update_ = now;
   if (now - since_ >= hold_time)
     aligned_ = true;
   return aligned_;
@@ -57,6 +58,7 @@ void AlignmentTracker::reset()
   candidate_ = false;
   aligned_ = false;
   since_ = 0.0;
+  last_update_ = 0.0;
 }
 
 CommandQueue::CommandQueue(std::size_t capacity)

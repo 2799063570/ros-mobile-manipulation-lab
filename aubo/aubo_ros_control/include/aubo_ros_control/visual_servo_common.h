@@ -33,7 +33,7 @@ public:
   bool aligned() const { return aligned_; }
 private:
   bool candidate_{false}, aligned_{false};
-  double since_{0.0};
+  double since_{0.0}, last_update_{0.0};
 };
 
 // 有界命令队列：生产速度过快时丢弃最旧指令，避免视觉伺服延迟累积。

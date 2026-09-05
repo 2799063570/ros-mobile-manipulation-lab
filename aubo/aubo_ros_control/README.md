@@ -231,7 +231,7 @@ rosrun rqt_reconfigure rqt_reconfigure
 - `PBVS_Control`：位置/姿态增益、笛卡尔速度上限、位置死区、阻尼系数和反馈融合；
 - `Target_and_Safety`：眼在手上的期望目标位置、眼在手外的 TCP 目标偏移、期望姿态、
   姿态控制开关和最小安全深度；
-- `Target_Loss`：目标超时、丢失策略、续行衰减和搜索恢复参数。
+- `Target_Loss`：目标超时时间；丢失目标后减速保持，搜索和恢复运动由上层任务负责。
 
 参数变化由 `VisualServo::reconfigureCallback()` 在 `control_mutex_` 保护下整体更新，
 并清空尚未执行的旧关节点，因此新值从下一控制周期开始参与计算。首次创建动态参数
