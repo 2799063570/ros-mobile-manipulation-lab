@@ -49,7 +49,7 @@ private:
   {
     double x{0.0};
     double y{0.0};
-    int count{0};
+    int count{0};// 被检测到的次数
     double m2{0.0};
     ros::WallTime last_seen;
     bool picked{false};
@@ -231,7 +231,7 @@ private:
   std::string attached_model_;
   ros::WallTime last_cloud_wall_time_;
   std::size_t cloud_points_{0};
-  std::uint64_t octomap_sequence_{0};
+  std::uint64_t octomap_sequence_{0};// Octomap更新计数器
   std::string last_failure_;
   std::string workspace_id_{"default"};
   WorkspaceConfig pending_workspace_;

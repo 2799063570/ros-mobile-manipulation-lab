@@ -35,6 +35,7 @@ bool wallSleep(double seconds, const std::atomic<bool>& stop_requested)
 
 std::string join(const std::vector<std::string>& values, const std::string& separator)
 {
+  // 该函数的作用吧字符串数组中各个字符串连接起来 中间用{separator}分隔  返回连接后的字符串
   std::ostringstream stream;
   for (std::size_t index = 0; index < values.size(); ++index)
   {
@@ -100,7 +101,7 @@ ColorSortingTask::ColorSortingTask(ros::NodeHandle nh, ros::NodeHandle private_n
   : nh_(std::move(nh)), private_nh_(std::move(private_nh)), tf_listener_(ros::Duration(30.0))
 {
   loadParameters();
-  robot_limits_valid_ = verifyLoadedUpperArmLimit();
+  robot_limits_valid_ = verifyLoadedUpperArmLimit();// 检证机械臂基座数第二个关节 
 
   arm_.reset(new moveit::planning_interface::MoveGroupInterface(group_name_));// 初始化MoveGroupInterface
   arm_->setEndEffectorLink(end_effector_link_);
@@ -149,7 +150,7 @@ ColorSortingTask::ColorSortingTask(ros::NodeHandle nh, ros::NodeHandle private_n
   base_lock_publisher_.publish(unlocked);
   std_msgs::String empty_failure;
   failure_publisher_.publish(empty_failure);
-  publishTargetCache();
+  publishTargetCache();// 发布目前检测到的结果
   publishState("INITIALIZING", "waiting for Gazebo controllers");
 }
 
@@ -195,7 +196,7 @@ void ColorSortingTask::loadParameters()
   private_nh_.param<std::string>("grasp_attach_topic", grasp_attach_topic_, "/sorting/grasp/attach");
   private_nh_.param<std::string>("grasp_detach_topic", grasp_detach_topic_, "/sorting/grasp/detach");
   private_nh_.param<std::string>("grasp_status_topic", grasp_status_topic_, "/sorting/grasp/status");
-  private_nh_.param("grasp_attachment_timeout", grasp_attachment_timeout_, 3.0);
+  private_nh_.param("grasp_attachment_timeout", grasp_attachment_timeout_, 3.0);// 抓取吸附插件加载超时时间
   private_nh_.param<std::string>("place_frame", place_frame_, target_frame_);
   private_nh_.param("detection_timeout", detection_timeout_, 15.0);
   private_nh_.param("detection_samples", detection_samples_, 8);
@@ -317,6 +318,7 @@ void ColorSortingTask::start()
 
 void ColorSortingTask::publishState(const std::string& state, const std::string& detail)
 {
+  // 负责更新状态机的状态为state并通过话题发布
   {
     std::lock_guard<std::mutex> lock(data_mutex_);
     state_ = state;
@@ -333,7 +335,7 @@ void ColorSortingTask::setFailure(const std::string& category, const std::string
   message.data = category + " | " + detail;
   {
     std::lock_guard<std::mutex> lock(data_mutex_);
-    last_failure_ = message.data;
+    last_failure_ = message.data;// 保存最近的失败信息  失败类型|失败详情
   }
   failure_publisher_.publish(message);
   ROS_ERROR_STREAM("Sorting failure: " << message.data);
@@ -344,7 +346,7 @@ void ColorSortingTask::detectionCallback(const aubo_perception::DetectedObjectAr
   std::string state;
   {
     std::lock_guard<std::mutex> lock(data_mutex_);
-    detections_ = message;
+    detections_ = message;// 保存检测到的对象 头+检测到的对象数组
     detections_wall_time_ = ros::WallTime::now();
     state = state_;
   }
@@ -352,12 +354,12 @@ void ColorSortingTask::detectionCallback(const aubo_perception::DetectedObjectAr
     updateTargetCache(*message);
 
   std::vector<std::string> counts;
-  for (const std::string& color : sort_colors_)
+  for (const std::string& color : sort_colors_)// 颜色统计
   {
     const int count = static_cast<int>(std::count_if(
         message->objects.begin(), message->objects.end(),
         [&color](const aubo_perception::DetectedObject& item) { return item.color == color; }));
-    counts.push_back(color + ":" + std::to_string(count));
+    counts.push_back(color + ":" + std::to_string(count));// 颜色:数量
   }
   std_msgs::String summary;
   summary.data = join(counts, "  ");
@@ -367,7 +369,7 @@ void ColorSortingTask::detectionCallback(const aubo_perception::DetectedObjectAr
 void ColorSortingTask::graspStatusCallback(const std_msgs::StringConstPtr& message)
 {
   std::lock_guard<std::mutex> lock(data_mutex_);
-  grasp_status_ = message->data;
+  grasp_status_ = message->data;// 抓取吸附的状态
   ++grasp_status_sequence_;
 }
 
@@ -393,8 +395,8 @@ bool ColorSortingTask::detectionInCacheFrame(
     const aubo_perception::DetectedObjectArray& message,
     const aubo_perception::DetectedObject& detected, double& x, double& y)
 {
-  geometry_msgs::PoseStamped pose;
-  pose.header = message.header;
+  geometry_msgs::PoseStamped pose;// 更新目标对象的位姿
+  pose.header = message.header;// 消息头
   if (pose.header.frame_id.empty())
     pose.header.frame_id = target_frame_;
   pose.pose = detected.pose;
@@ -431,11 +433,11 @@ bool ColorSortingTask::detectionInCacheFrame(
 
 void ColorSortingTask::updateTargetCache(const aubo_perception::DetectedObjectArray& message)
 {
-  std::map<std::string, const aubo_perception::DetectedObject*> selected;
-  for (const auto& detected : message.objects)
+  std::map<std::string, const aubo_perception::DetectedObject*> selected;// 颜色+目标对象
+  for (const auto& detected : message.objects) // 遍历检测到的对象数组 aubo_perception/DetectedObject[]
   {
     const auto found = selected.find(detected.color);
-    if (found == selected.end() || detected.contour_area > found->second->contour_area)
+    if (found == selected.end() || detected.contour_area > found->second->contour_area)// 如果没有找到|检测到的面积大于已选面积
       selected[detected.color] = &detected;
   }
   struct Update { std::string color; double x; double y; };
@@ -444,8 +446,8 @@ void ColorSortingTask::updateTargetCache(const aubo_perception::DetectedObjectAr
   {
     double x = 0.0;
     double y = 0.0;
-    if (detectionInCacheFrame(message, *item.second, x, y))
-      updates.push_back({item.first, x, y});
+    if (detectionInCacheFrame(message, *item.second, x, y))// 将检测到的目标对象转换到目标缓存坐标系下
+      updates.push_back({item.first, x, y});// 颜色:目标对象的x,y坐标
   }
   if (updates.empty())
     return;
@@ -456,8 +458,8 @@ void ColorSortingTask::updateTargetCache(const aubo_perception::DetectedObjectAr
     std::lock_guard<std::mutex> lock(data_mutex_);
     for (const Update& update : updates)
     {
-      auto found = target_tracks_.find(update.color);
-      if (found == target_tracks_.end())
+      auto found = target_tracks_.find(update.color);// 在目标跟踪中查找更新了颜色的目标对象
+      if (found == target_tracks_.end())// 没找到  首次观测到
       {
         TargetTrack track;
         track.x = update.x;
@@ -468,17 +470,17 @@ void ColorSortingTask::updateTargetCache(const aubo_perception::DetectedObjectAr
         changed = true;
         continue;
       }
-      TargetTrack& track = found->second;
+      TargetTrack& track = found->second;// 找到了 已经完成拾取
       if (track.picked)
         continue;
-      const double distance = std::hypot(update.x - track.x, update.y - track.y);
-      if (distance > target_cache_outlier_distance_)
+      const double distance = std::hypot(update.x - track.x, update.y - track.y);// 欧几里得距离
+      if (distance > target_cache_outlier_distance_)// 超出异常距离
       {
         ROS_WARN_THROTTLE(2.0, "Rejecting %s target-cache outlier %.3f m from track",
                           update.color.c_str(), distance);
         continue;
       }
-      ++track.count;
+      ++track.count;// 增加该目标被检测到的次数
       const double delta_x = update.x - track.x;
       const double delta_y = update.y - track.y;
       track.x += delta_x / track.count;
@@ -507,11 +509,11 @@ void ColorSortingTask::publishTargetCache()
   for (const auto& item : tracks)
   {
     const TargetTrack& track = item.second;
-    const double spread = std::sqrt(std::max(0.0, track.m2) / std::max(1, track.count));
+    const double spread = std::sqrt(std::max(0.0, track.m2) / std::max(1, track.count));// 面积的平方根/被检测到的次数  表示目标的大小
     const double observation_confidence =
-        std::min(1.0, static_cast<double>(track.count) / target_cache_min_observations_);
+        std::min(1.0, static_cast<double>(track.count) / target_cache_min_observations_);// 观测置信度  被检测到的次数/最小观测次数
     const double stability_confidence =
-        std::max(0.0, 1.0 - spread / target_cache_outlier_distance_);
+        std::max(0.0, 1.0 - spread / target_cache_outlier_distance_);// 稳定置信度  1-目标的大小/异常距离
     if (!first)
       stream << ',';
     first = false;
@@ -764,38 +766,38 @@ bool ColorSortingTask::configureWorkspaceService(std_srvs::Trigger::Request&,
 
 void ColorSortingTask::initialize()
 {
-  if (!robot_limits_valid_)
+  if (!robot_limits_valid_) // 检证机械臂基座数第二个关节 是否在范围[-60, 60]内
   {
     busy_.store(false);
     publishState("ERROR", "loaded upperArm_joint limit is not +/-60 deg");
     return;
   }
-  if (!waitForGraspPlugin())
+  if (!waitForGraspPlugin()) // 等待抓取吸附插件加载完成
   {
     busy_.store(false);
     publishState("ERROR", "Gazebo grasp plugin unavailable");
     return;
   }
   publishState("INITIALIZING", "waiting for gripper action");
-  if (!gripper_client_->waitForServer(ros::Duration(gripper_server_timeout_)))
+  if (!gripper_client_->waitForServer(ros::Duration(gripper_server_timeout_)))// 等待夹爪动作服务器启动
   {
     busy_.store(false);
     publishState("ERROR", "gripper action server unavailable");
     return;
   }
-  if (!addTableCollision())
+  if (!addTableCollision()) // 添加桌子到规划场景中
   {
     busy_.store(false);
     publishState("ERROR", "sorting table missing from planning scene");
     return;
   }
-  if (!refreshOctomap())
+  if (!refreshOctomap()) // 刷新octomap
   {
     busy_.store(false);
     publishState("ERROR", "RGB-D cloud or MoveIt OctoMap unavailable");
     return;
   }
-  initialized_.store(true);
+  initialized_.store(true);// 完成初始化
   busy_.store(false);
   publishState("IDLE", "controllers ready");
   if (auto_move_to_observation_)
@@ -825,8 +827,10 @@ std::pair<bool, std::string> ColorSortingTask::startOperation(
     locked.data = true;
     base_lock_publisher_.publish(locked);
   }
+  // 如果操作线程已经存在并且可连接，则等待其完成
   if (operation_thread_.joinable())
     operation_thread_.join();
+  // 启动一个新的线程来执行操作 捕获状态+操作函数
   operation_thread_ = std::thread([this, state, operation]() {
     bool success = false;
     publishState(state);
@@ -840,7 +844,7 @@ std::pair<bool, std::string> ColorSortingTask::startOperation(
       publishState("ERROR", exception.what());
     }
     if (!success)
-      releaseAttachedObjectNoWait();
+      releaseAttachedObjectNoWait();// 如果操作失败，释放吸附的对象
     {
       std::lock_guard<std::mutex> lock(operation_mutex_);
       busy_.store(false);
@@ -972,7 +976,7 @@ bool ColorSortingTask::prepareWorkOperation()
 bool ColorSortingTask::observation()
 {
   observation_ready_.store(false);
-  if (!refreshOctomap() || !addTableCollision())
+  if (!refreshOctomap() || !addTableCollision())  // 需要先更新octomap和场景碰撞模型
     return false;
   const bool success = observation_named_target_.empty() ?
       moveToPose(makePose(observation_pose_[0], observation_pose_[1], observation_pose_[2]),
@@ -1037,7 +1041,7 @@ bool ColorSortingTask::moveToPose(const geometry_msgs::PoseStamped& pose,
   if (stop_requested_.load())
     return false;
   ROS_INFO_STREAM("Planning arm to " << description);
-  arm_->setPoseTarget(pose, end_effector_link_);
+  arm_->setPoseTarget(pose, end_effector_link_);// 设置目标姿态(末端执行器的笛卡尔空间位姿)
   return planAndExecute(description) && !stop_requested_.load();
 }
 
@@ -1065,12 +1069,15 @@ bool ColorSortingTask::planAndExecute(const std::string& description)
 
 bool ColorSortingTask::moveNamed(const std::string& target)
 {
+  // 先判断这个目标是否已经在命名目标中
+  // 判断当前关节值是否已经满足阈值
+  // 设置目标为当前命名位置 
   if (target.empty())
     return true;
   if (stop_requested_.load())
     return false;
-  const std::vector<std::string> names = arm_->getNamedTargets();
-  if (std::find(names.begin(), names.end(), target) == names.end())
+  const std::vector<std::string> names = arm_->getNamedTargets();// 获取所有命名目标
+  if (std::find(names.begin(), names.end(), target) == names.end()) // 验证target是否在命名目标中
   {
     setFailure("CONFIGURATION_FAILED", "unknown named target '" + target + "'");
     return false;
@@ -1078,14 +1085,14 @@ bool ColorSortingTask::moveNamed(const std::string& target)
   const std::map<std::string, double> target_values = arm_->getNamedTargetValues(target);
   const std::vector<std::string> active_joints = arm_->getActiveJoints();
   const std::vector<double> current = arm_->getCurrentJointValues();
-  std::map<std::string, double> current_values;
+  std::map<std::string, double> current_values;// 当前关节值映射
   for (std::size_t index = 0; index < active_joints.size() && index < current.size(); ++index)
     current_values[active_joints[index]] = current[index];
   bool already_there = !target_values.empty();
   for (const auto& value : target_values)
   {
-    const auto found = current_values.find(value.first);
-    if (found == current_values.end() || std::abs(found->second - value.second) > 1.0e-3)
+    const auto found = current_values.find(value.first);// 在当前关节值中查找目标关节
+    if (found == current_values.end() || std::abs(found->second - value.second) > 1.0e-3) // 判断误差
     {
       already_there = false;
       break;
@@ -1212,7 +1219,7 @@ bool ColorSortingTask::addTableCollision()
     if (table_frame_ != planning_frame_)
     {
       tf_listener_.waitForTransform(planning_frame_, table_frame_, ros::Time(0),
-                                    ros::Duration(scene_update_timeout_));
+                                    ros::Duration(scene_update_timeout_));// 等待从table_frame_ map 到planning_frame_ base_link的变换
       geometry_msgs::PoseStamped transformed;
       tf_listener_.transformPose(planning_frame_, table_pose, transformed);
       table_pose = transformed;
@@ -1225,7 +1232,7 @@ bool ColorSortingTask::addTableCollision()
     return false;
   }
 
-  auto known = [this, &object_name]() {
+  auto known = [this, &object_name]() {// 检测当前场景中是否存在指定对象
     const auto names = scene_.getKnownObjectNames();
     return std::find(names.begin(), names.end(), object_name) != names.end();
   };
@@ -1255,7 +1262,7 @@ bool ColorSortingTask::addTableCollision()
   object.primitives.push_back(box);
   object.primitive_poses.push_back(table_pose.pose);
   object.operation = moveit_msgs::CollisionObject::ADD;
-  scene_.applyCollisionObject(object);
+  scene_.applyCollisionObject(object);// 应用碰撞对象到场景中
 
   const ros::WallTime deadline = ros::WallTime::now() + ros::WallDuration(scene_update_timeout_);
   ros::WallRate rate(10.0);
@@ -1263,7 +1270,7 @@ bool ColorSortingTask::addTableCollision()
   {
     if (known())
     {
-      arm_->setSupportSurfaceName(object_name);
+      arm_->setSupportSurfaceName(object_name);  // 告诉MoveIt规划器，这个障碍物（桌子）是支撑面
       ROS_INFO("Sorting table confirmed in MoveIt planning scene: frame=%s, position=[%.3f, %.3f, %.3f], size=[%.3f, %.3f, %.3f]",
                table_pose.header.frame_id.c_str(), table_pose.pose.position.x,
                table_pose.pose.position.y, table_pose.pose.position.z, box.dimensions[0],
@@ -1279,7 +1286,7 @@ bool ColorSortingTask::addTableCollision()
 
 bool ColorSortingTask::refreshOctomap()
 {
-  if (!require_octomap_)
+  if (!require_octomap_)// 是否要求八叉树地图
     return true;
   const ros::WallTime deadline = ros::WallTime::now() + ros::WallDuration(octomap_wait_timeout_);
   const ros::WallTime cloud_not_before = ros::WallTime::now();
@@ -1290,7 +1297,7 @@ bool ColorSortingTask::refreshOctomap()
   {
     {
       std::lock_guard<std::mutex> lock(data_mutex_);
-      cloud_ready = last_cloud_wall_time_ > cloud_not_before && cloud_points_ > 0;
+      cloud_ready = last_cloud_wall_time_ > cloud_not_before && cloud_points_ > 0;// 确保是新鲜的数据 且点云数据非空 
       cloud_points = cloud_points_;
     }
     if (cloud_ready)
@@ -1317,7 +1324,7 @@ bool ColorSortingTask::refreshOctomap()
     previous_sequence = octomap_sequence_;
   }
   std_srvs::Empty service;
-  if (!clear_octomap_client_.call(service))
+  if (!clear_octomap_client_.call(service))// 渰除八叉树地图
   {
     ROS_ERROR("Cannot clear MoveIt OctoMap");
     return false;
@@ -1343,7 +1350,7 @@ bool ColorSortingTask::refreshOctomap()
 
 bool ColorSortingTask::waitForGraspPlugin()
 {
-  if (!use_grasp_attachment_)
+  if (!use_grasp_attachment_) // 是否使用抓取吸附插件
     return true;
   const ros::WallTime deadline = ros::WallTime::now() + ros::WallDuration(grasp_attachment_timeout_);
   ros::WallRate rate(20.0);
@@ -1603,7 +1610,7 @@ bool ColorSortingTask::pickAndPlace(const aubo_perception::DetectedObject& detec
 
 bool ColorSortingTask::sortingOperation()
 {
-  bool all_complete = !sort_colors_.empty();
+  bool all_complete = !sort_colors_.empty();// 分拣的颜色列表不为空
   for (const auto& color : sort_colors_)
     all_complete = all_complete && completed_colors_.count(color) != 0;
   if (all_complete)
@@ -1612,7 +1619,7 @@ bool ColorSortingTask::sortingOperation()
     {
       std::lock_guard<std::mutex> lock(data_mutex_);
       for (auto& item : target_tracks_)
-        item.second.picked = false;
+        item.second.picked = false;// 重置所有目标为未拾取
     }
     publishTargetCache();
   }
