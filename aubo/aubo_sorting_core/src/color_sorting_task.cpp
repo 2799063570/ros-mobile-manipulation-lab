@@ -244,7 +244,7 @@ void ColorSortingTask::loadParameters()
   table_size_ = {0.80, 1.20, 0.40};
   grasp_rpy_ = {3.14159265358979323846, 0.0, 0.0};
   observation_pose_ = {0.58, 0.0, 0.62};
-  sort_colors_ = {"red", "green", "blue"};
+  sort_colors_ = {"red", "green", "blue"};// 要进行分拣的颜色列表
   private_nh_.getParam("table_center", table_center_);
   private_nh_.getParam("table_size", table_size_);
   private_nh_.getParam("grasp_rpy", grasp_rpy_);
@@ -351,7 +351,7 @@ void ColorSortingTask::detectionCallback(const aubo_perception::DetectedObjectAr
     state = state_;
   }
   if (state == "DETECTING" || (state == "OBSERVING" && observation_ready_.load()))
-    updateTargetCache(*message);
+    updateTargetCache(*message);// 特定阶段更新目标抓取信息
 
   std::vector<std::string> counts;
   for (const std::string& color : sort_colors_)// 颜色统计
@@ -363,7 +363,7 @@ void ColorSortingTask::detectionCallback(const aubo_perception::DetectedObjectAr
   }
   std_msgs::String summary;
   summary.data = join(counts, "  ");
-  detection_summary_publisher_.publish(summary);
+  detection_summary_publisher_.publish(summary);// 发布检测到的对象统计信息
 }
 
 void ColorSortingTask::graspStatusCallback(const std_msgs::StringConstPtr& message)
@@ -433,12 +433,17 @@ bool ColorSortingTask::detectionInCacheFrame(
 
 void ColorSortingTask::updateTargetCache(const aubo_perception::DetectedObjectArray& message)
 {
+  // 主要是为了更新target_tracks_下的目标对象信息
+  // 1、先对消息中的对象进行遍历取抓取颜色相同的目标对象中面积最大的一个
+  // 2、将面积最大的目标对象转换到目标缓存坐标系下
+  // 3、target_tracks_ 中若无 直接添加  
+  //    若有 则更新目标对象的平均位置、观测次数、离散程度、最后观测时间 （两次平滑过度）
   std::map<std::string, const aubo_perception::DetectedObject*> selected;// 颜色+目标对象
   for (const auto& detected : message.objects) // 遍历检测到的对象数组 aubo_perception/DetectedObject[]
   {
     const auto found = selected.find(detected.color);
     if (found == selected.end() || detected.contour_area > found->second->contour_area)// 如果没有找到|检测到的面积大于已选面积
-      selected[detected.color] = &detected;
+      selected[detected.color] = &detected;// 存储面积最大的目标对象 颜色:目标对象
   }
   struct Update { std::string color; double x; double y; };
   std::vector<Update> updates;
@@ -470,7 +475,7 @@ void ColorSortingTask::updateTargetCache(const aubo_perception::DetectedObjectAr
         changed = true;
         continue;
       }
-      TargetTrack& track = found->second;// 找到了 已经完成拾取
+      TargetTrack& track = found->second;// 找到了 取TargetTrack结构体
       if (track.picked)
         continue;
       const double distance = std::hypot(update.x - track.x, update.y - track.y);// 欧几里得距离
@@ -701,12 +706,12 @@ void ColorSortingTask::workspaceUpdateCallback(const std_msgs::StringConstPtr& m
 
 bool ColorSortingTask::applyWorkspace(const WorkspaceConfig& workspace, std::string& error)
 {
-  table_center_ = workspace.table_center;
-  table_size_ = workspace.table_size;
-  table_frame_ = workspace.table_frame;
-  table_z_ = workspace.table_z;
-  place_frame_ = workspace.place_frame;
-  place_targets_ = workspace.place_targets;
+  table_center_ = workspace.table_center;// 桌子的中心点坐标
+  table_size_ = workspace.table_size;// 桌子的尺寸
+  table_frame_ = workspace.table_frame;// 桌子的参考坐标系
+  table_z_ = workspace.table_z;// 桌子的z轴高度
+  place_frame_ = workspace.place_frame;// 放置物体的参考坐标系
+  place_targets_ = workspace.place_targets;// 放置目标位置
   grasp_model_names_ = workspace.grasp_model_names;
   workspace_id_ = workspace.id;
   completed_colors_.clear();
@@ -809,6 +814,7 @@ void ColorSortingTask::initialize()
 std::pair<bool, std::string> ColorSortingTask::startOperation(
     const std::string& state, const std::function<bool()>& operation)
 {
+  // 启动一个操作 在非busy_下 
   {
     std::lock_guard<std::mutex> lock(operation_mutex_);
     if (busy_.load())
@@ -816,16 +822,16 @@ std::pair<bool, std::string> ColorSortingTask::startOperation(
     if (!initialized_.load())
       return std::make_pair(false, "sorting node is not initialized");
     busy_.store(true);
-    stop_requested_.store(false);
+    stop_requested_.store(false);// 清除停止请求标志
     {
       std::lock_guard<std::mutex> data_lock(data_mutex_);
-      last_failure_.clear();
+      last_failure_.clear();// 清除故障信息
     }
     std_msgs::String empty;
-    failure_publisher_.publish(empty);
+    failure_publisher_.publish(empty);// 发布空字符串 清除故障信息
     std_msgs::Bool locked;
     locked.data = true;
-    base_lock_publisher_.publish(locked);
+    base_lock_publisher_.publish(locked);// 发布锁定信号 通知底盘锁定
   }
   // 如果操作线程已经存在并且可连接，则等待其完成
   if (operation_thread_.joinable())
@@ -847,11 +853,11 @@ std::pair<bool, std::string> ColorSortingTask::startOperation(
       releaseAttachedObjectNoWait();// 如果操作失败，释放吸附的对象
     {
       std::lock_guard<std::mutex> lock(operation_mutex_);
-      busy_.store(false);
+      busy_.store(false);// 操作完成，清除busy_标志
     }
     std_msgs::Bool unlocked;
     unlocked.data = false;
-    base_lock_publisher_.publish(unlocked);
+    base_lock_publisher_.publish(unlocked);// 发布解锁信号 通知底盘解锁
     if (stop_requested_.load())
     {
       observation_ready_.store(false);
@@ -1286,6 +1292,10 @@ bool ColorSortingTask::addTableCollision()
 
 bool ColorSortingTask::refreshOctomap()
 {
+  // 更新八叉树地图
+  // 首先等待点云数据 等待点云回调数据中的时间戳大于当前时间戳 且点云数据非空 说明有新的点云支持我们重新构建八叉树
+  // 然后调用清除八叉树地图的服务 清除八叉树地图
+  // 等待planning_sence的回调 看看八叉树的序列更新了吗
   if (!require_octomap_)// 是否要求八叉树地图
     return true;
   const ros::WallTime deadline = ros::WallTime::now() + ros::WallDuration(octomap_wait_timeout_);
@@ -1306,7 +1316,7 @@ bool ColorSortingTask::refreshOctomap()
       return false;
     rate.sleep();
   }
-  if (!cloud_ready)
+  if (!cloud_ready)// 没有收到新鲜的点云数据
   {
     ROS_ERROR_STREAM("No fresh RGB-D cloud received on " << point_cloud_topic_);
     return false;
@@ -1321,7 +1331,7 @@ bool ColorSortingTask::refreshOctomap()
   std::uint64_t previous_sequence = 0;
   {
     std::lock_guard<std::mutex> lock(data_mutex_);
-    previous_sequence = octomap_sequence_;
+    previous_sequence = octomap_sequence_;// 记录当前八叉树序列号
   }
   std_srvs::Empty service;
   if (!clear_octomap_client_.call(service))// 渰除八叉树地图
@@ -1333,7 +1343,7 @@ bool ColorSortingTask::refreshOctomap()
   {
     {
       std::lock_guard<std::mutex> lock(data_mutex_);
-      if (octomap_sequence_ > previous_sequence)
+      if (octomap_sequence_ > previous_sequence)  // 八叉树序列序列号大于之前的序列号 说明有新的八叉树地图
       {
         ROS_INFO("Fresh MoveIt OctoMap confirmed from %s (%zu points/cloud)",
                  point_cloud_topic_.c_str(), cloud_points);
@@ -1612,7 +1622,7 @@ bool ColorSortingTask::sortingOperation()
 {
   bool all_complete = !sort_colors_.empty();// 分拣的颜色列表不为空
   for (const auto& color : sort_colors_)
-    all_complete = all_complete && completed_colors_.count(color) != 0;
+    all_complete = all_complete && completed_colors_.count(color) != 0;// 检查所有颜色是否已经完成
   if (all_complete)
   {
     completed_colors_.clear();
