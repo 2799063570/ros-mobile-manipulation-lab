@@ -14,23 +14,23 @@ near_field_max_candidates: 6
 
 # move_base 只负责到 pre_dock；与 pre_dock 同轴的候选位姿使用低速直行精靠。
 # 直行命令仍经过 /cmd_vel_raw -> lidar safety -> /cmd_vel，不绕过急停保护。
-near_field_direct_dock_enabled: true
+near_field_direct_dock_enabled: true        # 近距离采用直行停靠 失败退回move_base
 near_field_direct_dock_max_distance: 0.50
-near_field_direct_dock_lateral_tolerance: 0.06
-near_field_direct_dock_yaw_tolerance: 0.06
-near_field_direct_dock_goal_tolerance: 0.06
+near_field_direct_dock_lateral_tolerance: 0.06  # 横向误差容限
+near_field_direct_dock_yaw_tolerance: 0.06      # 角度误差容限
+near_field_direct_dock_goal_tolerance: 0.06     # 纵向目标误差容限
 # move_base 到达预停靠点后，先在桌子安全距离外做一次小角度闭环对正，再直行。
 # 最大只修正约 6.9 度，禁止用这个控制器进行大角度掉头。
-near_field_heading_alignment_enabled: true
-near_field_heading_max_correction: 0.12
-near_field_heading_speed: 0.12
-near_field_heading_goal_tolerance: 0.015
-near_field_heading_final_tolerance: 0.025
-near_field_heading_timeout: 4.0
-near_field_heading_stall_timeout: 1.5
+near_field_heading_alignment_enabled: true        # 是否启用航向对正功能
+near_field_heading_max_correction: 0.12           # 最大航向修正量（弧度）
+near_field_heading_speed: 0.12                    # 航向修正速度（弧度/秒） 
+near_field_heading_goal_tolerance: 0.015          # 航向修正目标误差容限（弧度）
+near_field_heading_final_tolerance: 0.025         # 最终航向修正目标误差容限（弧度）
+near_field_heading_timeout: 4.0                   # 航向修正超时时间（秒）
+near_field_heading_stall_timeout: 1.5             # 航向修正无进展超时时间（秒）
 # 闭环精靠若被激光安全层持续拦停，会在超时/无进展后安全退出，不再交回 DWA 转圈。
-near_field_direct_dock_timeout: 15.0
-near_field_direct_dock_stall_timeout: 2.5
+near_field_direct_dock_timeout: 15.0              # 直行停靠超时时间（秒）
+near_field_direct_dock_stall_timeout: 2.5         # 直行停靠无进展超时时间（秒）
 near_field_direct_dock_progress_epsilon: 0.005
 # 近场直行复用恢复移动速度；低速可缩短激光安全层的动态停车距离。
 base_recovery_speed: 0.04

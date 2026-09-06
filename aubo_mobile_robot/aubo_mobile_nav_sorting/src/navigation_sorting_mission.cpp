@@ -145,42 +145,42 @@ NavigationSortingMission::NavigationSortingMission(
   : node_handle_(node_handle), private_node_handle_(private_node_handle)
 {
   loadParameters();
-  validateWorkstations();
+  validateWorkstations();// 检查工作台参数
   navigation_client_.reset(new MoveBaseClient(navigation_action_, true));
 
   state_publisher_ = node_handle_.advertise<std_msgs::String>(
-      "/nav_sorting/state", 1, true);
+      "/nav_sorting/state", 1, true);// 发布导航拣选状态
   workspace_publisher_ = node_handle_.advertise<std_msgs::String>(
-      "/nav_sorting/current_workstation", 1, true);
+      "/nav_sorting/current_workstation", 1, true);// 发布当前工作台
   velocity_publisher_ = node_handle_.advertise<geometry_msgs::Twist>(
-      velocity_topic_, 2);
+      velocity_topic_, 2);// 发布导航拣选速度 用于近场精靠
   sorting_state_subscriber_ = node_handle_.subscribe(
       sorting_state_topic_, 5,
-      &NavigationSortingMission::sortingStateCallback, this);
+      &NavigationSortingMission::sortingStateCallback, this);// 订阅分拣状态
   sorting_failure_subscriber_ = node_handle_.subscribe(
       sorting_failure_topic_, 5,
-      &NavigationSortingMission::sortingFailureCallback, this);
+      &NavigationSortingMission::sortingFailureCallback, this);// 订阅分拣失败状态
   std::string base_lock_topic;
   private_node_handle_.param("sorting_base_lock_topic", base_lock_topic,
                              std::string("/sorting/base_locked"));
   base_lock_subscriber_ = node_handle_.subscribe(
-      base_lock_topic, 5, &NavigationSortingMission::baseLockCallback, this);
+      base_lock_topic, 5, &NavigationSortingMission::baseLockCallback, this);// 订阅基础锁状态
 
   clear_costmaps_client_ = node_handle_.serviceClient<std_srvs::Empty>(
       "/move_base/clear_costmaps");
-  home_client_ = node_handle_.serviceClient<std_srvs::Trigger>(home_service_name_);
-  prepare_client_ = node_handle_.serviceClient<std_srvs::Trigger>(prepare_service_name_);
-  observe_client_ = node_handle_.serviceClient<std_srvs::Trigger>(observe_service_name_);
-  sort_client_ = node_handle_.serviceClient<std_srvs::Trigger>(sort_service_name_);
+  home_client_ = node_handle_.serviceClient<std_srvs::Trigger>(home_service_name_);// 请求机械臂移动到初始位姿
+  prepare_client_ = node_handle_.serviceClient<std_srvs::Trigger>(prepare_service_name_);// 请求机械臂移动到跑动模式位姿
+  observe_client_ = node_handle_.serviceClient<std_srvs::Trigger>(observe_service_name_);// 请求机械臂移动到观测位姿
+  sort_client_ = node_handle_.serviceClient<std_srvs::Trigger>(sort_service_name_);// 请求分拣
   sorting_stop_client_ = node_handle_.serviceClient<std_srvs::Trigger>(
-      sorting_stop_service_name_);
+      sorting_stop_service_name_);// 请求停止拣选
   configure_workspace_client_ = node_handle_.serviceClient<std_srvs::Trigger>(
-      configure_workspace_service_name_);
+      configure_workspace_service_name_);// 请求配置工作台
 
   start_service_ = node_handle_.advertiseService(
-      "/nav_sorting/start", &NavigationSortingMission::startCallback, this);
+      "/nav_sorting/start", &NavigationSortingMission::startCallback, this);// 请求启动导航拣选
   stop_service_ = node_handle_.advertiseService(
-      "/nav_sorting/stop", &NavigationSortingMission::stopCallback, this);
+      "/nav_sorting/stop", &NavigationSortingMission::stopCallback, this);// 请求停止导航拣选
 
   seedDynamicParameters();
   dynamic_server_.reset(new dynamic_reconfigure::Server<NavSortingConfig>(
@@ -351,21 +351,21 @@ void NavigationSortingMission::validateWorkstations() const
 {
   if (workstations_.getType() != XmlRpc::XmlRpcValue::TypeArray)
     throw std::runtime_error("workstations must be a list");
-  std::set<std::string> identifiers;
+  std::set<std::string> identifiers;// 工作台 id 集合
   for (int index = 0; index < workstations_.size(); ++index)
   {
     const auto& workspace = workstations_[index];
     if (workspace.getType() != XmlRpc::XmlRpcValue::TypeStruct)
       throw std::runtime_error("each workstation must be a mapping");
-    const std::string identifier = memberString(workspace, "id");
+    const std::string identifier = memberString(workspace, "id");// 工作台 id
     if (identifier.empty() || !identifiers.insert(identifier).second)
       throw std::runtime_error("each workstation needs a unique non-empty id");
     if (workspace.hasMember("navigation_goal_frame") &&
-        memberString(workspace, "navigation_goal_frame").empty())
+        memberString(workspace, "navigation_goal_frame").empty())// 导航目标参考坐标系判断
       throw std::runtime_error(identifier +
                                " has invalid navigation_goal_frame");
-    memberPose(workspace, "navigation_goal");
-    if (workspace.hasMember("pre_dock_goal"))
+    memberPose(workspace, "navigation_goal");// 导航目标的位置判断 类型+数目
+    if (workspace.hasMember("pre_dock_goal"))// 直行停靠目标判断
       memberPose(workspace, "pre_dock_goal");
     for (const std::string key : {"table_center", "table_size"})
     {
@@ -501,6 +501,7 @@ bool NavigationSortingMission::submitMission(std::string& message)
 
 bool NavigationSortingMission::waitForSortingReady()
 {
+  // 阻塞等待下游 ColorSortingTask 节点就绪
   const auto deadline = std::chrono::steady_clock::now() +
       std::chrono::duration<double>(initialization_timeout_);
   std::unique_lock<std::mutex> lock(mutex_);
