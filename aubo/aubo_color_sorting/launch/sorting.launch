@@ -28,9 +28,9 @@
   <node if="$(arg start_task)" pkg="aubo_sorting_core"
         type="$(arg task_executable)" name="color_sorting_task" output="screen">
     <rosparam file="$(find aubo_color_sorting)/config/sorting.yaml" command="load"/>
-    <param name="auto_move_to_observation" value="$(arg auto_move_to_observation)"/>
-    <param name="auto_start" value="$(arg auto_start)"/>
-    <param name="use_grasp_attachment" value="$(arg use_grasp_attachment)"/>
+    <param name="auto_move_to_observation" value="$(arg auto_move_to_observation)"/><!-- 自动移动到观察位姿 -->
+    <param name="auto_start" value="$(arg auto_start)"/><!-- 自动开始任务 -->
+    <param name="use_grasp_attachment" value="$(arg use_grasp_attachment)"/><!-- 是否使用抓取插件 -->
   </node>
 
   <node if="$(arg debug_view)" pkg="image_view" type="image_view"

@@ -202,7 +202,7 @@ void ColorSortingTask::loadParameters()
   private_nh_.param("detection_samples", detection_samples_, 8);
   detection_samples_ = std::max(1, detection_samples_);
   private_nh_.param("detection_settle_time", detection_settle_time_, 1.0);
-  private_nh_.param("verify_observation_detections", verify_observation_detections_, false);
+  private_nh_.param("verify_observation_detections", verify_observation_detections_, false);// 是否在每次移动到观察位置 后验证检测到的目标颜色是否与预期一致
   private_nh_.param("observation_verification_timeout", observation_verification_timeout_, 4.0);
   private_nh_.param("observation_verification_min_frames", observation_verification_min_frames_, 1);
   observation_verification_min_frames_ = std::max(1, observation_verification_min_frames_);
@@ -550,6 +550,7 @@ void ColorSortingTask::markTargetPicked(const std::string& color)
 bool ColorSortingTask::cachedObject(const std::string& color,
                                     aubo_perception::DetectedObject& detected)
 {
+  // 使用目标缓存中的目标对象 存在时间|未被抓取|观测次数
   if (!target_cache_fallback_enabled_)
     return false;
   TargetTrack track;
@@ -558,14 +559,15 @@ bool ColorSortingTask::cachedObject(const std::string& color,
     const auto found = target_tracks_.find(color);
     if (found == target_tracks_.end())
       return false;
-    track = found->second;
+    track = found->second;// 使用target_tracks_中保存的目标对象信息
   }
   const double age = (ros::WallTime::now() - track.last_seen).toSec();
+  // 目标已被抓取|观测次数小于最小观测次数|目标年龄大于最大年龄
   if (track.picked || track.count < target_cache_min_observations_ || age > target_cache_max_age_)
     return false;
   double x = 0.0;
   double y = 0.0;
-  if (!xyInTargetFrame(target_cache_frame_, {track.x, track.y}, x, y))
+  if (!xyInTargetFrame(target_cache_frame_, {track.x, track.y}, x, y))// 将目标对象的平均位置转换到目标缓存坐标系下
     return false;
   detected = aubo_perception::DetectedObject();
   detected.color = color;
@@ -940,7 +942,7 @@ bool ColorSortingTask::observationOperation()
 {
   if (!observation())
     return false;
-  if (verify_observation_detections_ && !verifyVisibleColors())
+  if (verify_observation_detections_ && !verifyVisibleColors()) // 验证检测到的目标颜色是否与预期一致
   {
     observation_ready_.store(false);
     return false;
@@ -1123,14 +1125,14 @@ bool ColorSortingTask::cartesianTo(const geometry_msgs::PoseStamped& target_pose
   moveit_msgs::RobotTrajectory trajectory;
   auto compute_path = [this, &waypoints, &trajectory]() {
     arm_->setStartStateToCurrentState();
-    return arm_->computeCartesianPath(waypoints, cartesian_step_, 0.0, trajectory, true);
+    return arm_->computeCartesianPath(waypoints, cartesian_step_, 0.0, trajectory, true);// 计算笛卡尔路径
   };
-  double fraction = compute_path();
+  double fraction = compute_path();// 返回计算的路径的比例
   ROS_INFO("Cartesian path to %s: %.1f%%", description.c_str(), 100.0 * fraction);
-  if (fraction < minimum_cartesian_fraction_ && require_octomap_)
+  if (fraction < minimum_cartesian_fraction_ && require_octomap_)// 如果路径比例小于最小值 且使用了八叉树地图
   {
     ROS_WARN("Cartesian fraction too low; refreshing OctoMap and retrying once");
-    if (refreshOctomap() && !stop_requested_.load())
+    if (refreshOctomap() && !stop_requested_.load())// 刷新八叉树 并重新规划
     {
       fraction = compute_path();
       ROS_INFO("Cartesian path retry to %s: %.1f%%", description.c_str(), 100.0 * fraction);
@@ -1139,9 +1141,9 @@ bool ColorSortingTask::cartesianTo(const geometry_msgs::PoseStamped& target_pose
   if (fraction < minimum_cartesian_fraction_)
   {
     ROS_WARN("Cartesian fraction too low; falling back to pose planning");
-    return moveToPose(target_pose, description);
+    return moveToPose(target_pose, description);// 回退到关节空间路径规划
   }
-
+  // 求解出了笛卡尔路径后，使用IterativeParabolicTimeParameterization对路径进行时间参数化
   robot_trajectory::RobotTrajectory robot_trajectory(arm_->getRobotModel(), group_name_);
   robot_trajectory.setRobotTrajectoryMsg(*arm_->getCurrentState(), trajectory);
   trajectory_processing::IterativeParabolicTimeParameterization parameterization;
@@ -1170,13 +1172,14 @@ bool ColorSortingTask::cartesianTo(const geometry_msgs::PoseStamped& target_pose
 
 bool ColorSortingTask::commandGripper(double position)
 {
+  // 通过action通信请求夹爪的控制器执行目标位置
   if (stop_requested_.load())
     return false;
   control_msgs::FollowJointTrajectoryGoal goal;
   goal.trajectory.joint_names = {"joint1", "joint2"};
-  trajectory_msgs::JointTrajectoryPoint point;
+  trajectory_msgs::JointTrajectoryPoint point;// 夹爪关节轨迹点 最后一个点
   point.positions = {position, position};
-  point.time_from_start = ros::Duration(gripper_motion_time_);
+  point.time_from_start = ros::Duration(gripper_motion_time_);// 夹爪执行时间
   goal.trajectory.points.push_back(point);
   goal.trajectory.header.stamp = ros::Time::now() + ros::Duration(0.1);
   for (const std::string& joint_name : goal.trajectory.joint_names)
@@ -1184,14 +1187,14 @@ bool ColorSortingTask::commandGripper(double position)
     control_msgs::JointTolerance path;
     path.name = joint_name;
     path.position = 0.10;
-    goal.path_tolerance.push_back(path);
+    goal.path_tolerance.push_back(path);// 夹爪关节轨迹容差
     control_msgs::JointTolerance target;
     target.name = joint_name;
     target.position = 0.03;
-    goal.goal_tolerance.push_back(target);
+    goal.goal_tolerance.push_back(target);// 夹爪关节目标容差
   }
   goal.goal_time_tolerance = ros::Duration(3.0);
-  gripper_client_->sendGoal(goal);
+  gripper_client_->sendGoal(goal);// 通过actionlib客户端发送夹爪目标轨迹
   if (!gripper_client_->waitForResult(ros::Duration(gripper_motion_time_ + 3.0)))
   {
     gripper_client_->cancelGoal();
@@ -1389,13 +1392,16 @@ bool ColorSortingTask::waitForGraspPlugin()
 
 bool ColorSortingTask::setGraspAttachment(const std::string& model_name, bool attach)
 {
+  // 通过话题通信请求抓取吸附插件进行吸附或释放物体
+  // 通过判断序列号和状态来判断是否执行成功
+  // 成功后注意修改attached_model_ 当前的吸附状态
   if (!use_grasp_attachment_)
     return true;
   const std::string expected = (attach ? "attached:" : "detached:") + model_name;
   std::uint64_t initial_sequence = 0;
   {
     std::lock_guard<std::mutex> lock(data_mutex_);
-    initial_sequence = grasp_status_sequence_;
+    initial_sequence = grasp_status_sequence_;// 记录当前抓取状态序列号
   }
   std_msgs::String command;
   command.data = model_name;
@@ -1408,14 +1414,14 @@ bool ColorSortingTask::setGraspAttachment(const std::string& model_name, bool at
     std::uint64_t sequence = 0;
     {
       std::lock_guard<std::mutex> lock(data_mutex_);
-      status = grasp_status_;
-      sequence = grasp_status_sequence_;
+      status = grasp_status_;// 获取当前抓取状态
+      sequence = grasp_status_sequence_;// 获取当前抓取状态序列号
     }
     if (sequence > initial_sequence && status == expected)
     {
       {
         std::lock_guard<std::mutex> lock(data_mutex_);
-        attached_model_ = attach ? model_name : std::string();
+        attached_model_ = attach ? model_name : std::string();// 记录当前吸附的物体|没有吸附
       }
       ROS_INFO_STREAM("Gazebo grasp status: " << status);
       return true;
@@ -1433,10 +1439,11 @@ bool ColorSortingTask::setGraspAttachment(const std::string& model_name, bool at
 
 void ColorSortingTask::releaseAttachedObjectNoWait()
 {
+  // 不用消息序列号和状态来判断是否执行成功 直接发送释放命令
   std::string model;
   {
     std::lock_guard<std::mutex> lock(data_mutex_);
-    model.swap(attached_model_);
+    model.swap(attached_model_);// 获取当前吸附的物体
   }
   if (use_grasp_attachment_ && !model.empty())
   {
@@ -1449,9 +1456,11 @@ void ColorSortingTask::releaseAttachedObjectNoWait()
 bool ColorSortingTask::waitForObject(const std::string& color, const ros::WallTime& not_before,
                                      aubo_perception::DetectedObject& detected)
 {
-  const ros::WallTime deadline = ros::WallTime::now() + ros::WallDuration(detection_timeout_);
+  // |←── 新鲜检测优先 ──→|target_cache_fallback_delay_|←── 缓存开始兜底 ──→|detection_timeout_|←── 硬超时 ──→
+  // 就是为了多帧图像来进行目标检测的平均位置计算
+  const ros::WallTime deadline = ros::WallTime::now() + ros::WallDuration(detection_timeout_);// 目标检测超时时间
   const ros::WallTime cache_deadline =
-      ros::WallTime::now() + ros::WallDuration(target_cache_fallback_delay_);
+      ros::WallTime::now() + ros::WallDuration(target_cache_fallback_delay_);// 目标回退时间
   ros::WallTime last_receipt = not_before;
   std::vector<aubo_perception::DetectedObject> samples;
   ros::WallRate rate(10.0);
@@ -1472,10 +1481,10 @@ bool ColorSortingTask::waitForObject(const std::string& color, const ros::WallTi
       const aubo_perception::DetectedObject* largest = nullptr;
       for (const auto& candidate : detections->objects)
         if (candidate.color == color && (!largest || candidate.contour_area > largest->contour_area))
-          largest = &candidate;
+          largest = &candidate;// 找到最大的目标且颜色对应的对象
       if (largest)
       {
-        samples.push_back(*largest);
+        samples.push_back(*largest);// 进行累计采样 当采样次数达到指定值时 计算平均位置
         if (static_cast<int>(samples.size()) >= detection_samples_)
         {
           detected = samples.back();
@@ -1488,7 +1497,7 @@ bool ColorSortingTask::waitForObject(const std::string& color, const ros::WallTi
             detected.pose.position.y += sample.pose.position.y;
             detected.pose.position.z += sample.pose.position.z;
           }
-          detected.pose.position.x /= samples.size();
+          detected.pose.position.x /= samples.size();// 计算平均位置
           detected.pose.position.y /= samples.size();
           detected.pose.position.z /= samples.size();
           ROS_INFO("Averaged %zu '%s' detections at [%.3f, %.3f]", samples.size(),
@@ -1497,7 +1506,7 @@ bool ColorSortingTask::waitForObject(const std::string& color, const ros::WallTi
         }
       }
     }
-    if (ros::WallTime::now() >= cache_deadline && cachedObject(color, detected))
+    if (ros::WallTime::now() >= cache_deadline && cachedObject(color, detected))// 目标回退时间到时 使用目标缓存中的目标对象
       return true;
     rate.sleep();
   }
@@ -1510,7 +1519,9 @@ bool ColorSortingTask::waitForObject(const std::string& color, const ros::WallTi
 
 bool ColorSortingTask::verifyVisibleColors()
 {
-  std::set<std::string> required;
+  // 光照可能变化、物体可能被遮挡、机械臂移动可能导致相机视角偏移，需要确认确实能看清所有颜色再开始抓取
+  // 就是检测当前得到的几帧图像中 是否包含了所有需要验证的颜色
+  std::set<std::string> required;// 需要验证的颜色集合
   for (const std::string& color : sort_colors_)
     if (completed_colors_.count(color) == 0)
       required.insert(color);
@@ -1542,7 +1553,7 @@ bool ColorSortingTask::verifyVisibleColors()
       last_receipt = receipt;
       std::set<std::string> visible;
       for (const auto& item : detections->objects)
-        visible.insert(item.color);
+        visible.insert(item.color);// 记录当前帧中可见的颜色
       for (const auto& color : required)
         if (visible.count(color))
           ++counts[color];
@@ -1577,28 +1588,28 @@ bool ColorSortingTask::verifyVisibleColors()
 bool ColorSortingTask::pickAndPlace(const aubo_perception::DetectedObject& detected)
 {
   const std::string color = detected.color;
-  const double object_x = detected.pose.position.x + grasp_offset_x_;
-  const double object_y = detected.pose.position.y + grasp_offset_y_;
-  const double grasp_z = table_z_ + 0.5 * object_height_ + grasp_height_offset_;
-  const double travel_z = table_z_ + lift_height_;
+  const double object_x = detected.pose.position.x + grasp_offset_x_;// 抓取偏移值
+  const double object_y = detected.pose.position.y + grasp_offset_y_;// 抓取偏移值
+  const double grasp_z = table_z_ + 0.5 * object_height_ + grasp_height_offset_;// 抓取高度偏移值
+  const double travel_z = table_z_ + lift_height_;// 抬升高度
   ROS_INFO("Picking %s at [%.3f, %.3f, %.3f]", color.c_str(), object_x, object_y, grasp_z);
 
   if (!commandGripper(gripper_open_) ||
       !moveToPose(makePose(object_x, object_y, table_z_ + pregrasp_height_), color + " pre-grasp") ||
-      !cartesianTo(makePose(object_x, object_y, grasp_z), color + " grasp"))
+      !cartesianTo(makePose(object_x, object_y, grasp_z), color + " grasp"))// 夹爪张开 移动到目标位置上方 移动到目标位置
     return false;
-  const auto model = grasp_model_names_.find(color);
+  const auto model = grasp_model_names_.find(color);// 根据颜色查找抓取碰撞体名称
   const std::string object_model_name =
       model == grasp_model_names_.end() ? color + "_block" : model->second;
-  if (!setGraspAttachment(object_model_name, true))
+  if (!setGraspAttachment(object_model_name, true))// 夹爪吸附目标物体
     return false;
-  if (!commandGripper(gripper_closed_))
+  if (!commandGripper(gripper_closed_))// 夹爪闭合
   {
-    setGraspAttachment(object_model_name, false);
+    setGraspAttachment(object_model_name, false);// 夹爪闭合失败 释放吸附
     return false;
   }
   if (!wallSleep(0.5, stop_requested_) ||
-      !cartesianTo(makePose(object_x, object_y, travel_z), color + " lift"))
+      !cartesianTo(makePose(object_x, object_y, travel_z), color + " lift"))// 抬升到指定高度
     return false;
 
   const auto place = place_targets_.find(color);
@@ -1609,13 +1620,13 @@ bool ColorSortingTask::pickAndPlace(const aubo_perception::DetectedObject& detec
   }
   double place_x = 0.0;
   double place_y = 0.0;
-  if (!xyInTargetFrame(place_frame_, place->second, place_x, place_y) ||
-      !moveToPose(makePose(place_x, place_y, travel_z), color + " pre-place") ||
-      !cartesianTo(makePose(place_x, place_y, grasp_z + place_clearance_), color + " place") ||
-      !commandGripper(gripper_open_) || !setGraspAttachment(object_model_name, false) ||
+  if (!xyInTargetFrame(place_frame_, place->second, place_x, place_y) ||      // 将目标放置位置转换到目标坐标系下
+      !moveToPose(makePose(place_x, place_y, travel_z), color + " pre-place") ||  // 移动到目标放置位置上方
+      !cartesianTo(makePose(place_x, place_y, grasp_z + place_clearance_), color + " place") || // 移动到目标放置位置
+      !commandGripper(gripper_open_) || !setGraspAttachment(object_model_name, false) || // 夹爪张开 释放吸附
       !wallSleep(0.5, stop_requested_))
     return false;
-  return cartesianTo(makePose(place_x, place_y, travel_z), color + " retreat");
+  return cartesianTo(makePose(place_x, place_y, travel_z), color + " retreat"); // 移动到目标放置位置上方
 }
 
 bool ColorSortingTask::sortingOperation()
@@ -1625,7 +1636,7 @@ bool ColorSortingTask::sortingOperation()
     all_complete = all_complete && completed_colors_.count(color) != 0;// 检查所有颜色是否已经完成
   if (all_complete)
   {
-    completed_colors_.clear();
+    completed_colors_.clear();// 若都完成分拣了  清空已完成颜色列表
     {
       std::lock_guard<std::mutex> lock(data_mutex_);
       for (auto& item : target_tracks_)
@@ -1644,19 +1655,19 @@ bool ColorSortingTask::sortingOperation()
       continue;
     }
     publishState("DETECTING", color);
-    aubo_perception::DetectedObject detected;
-    if (!waitForObject(color, ros::WallTime::now(), detected))
+    aubo_perception::DetectedObject detected;// 检测到的目标对象消息：颜色、面积、位置
+    if (!waitForObject(color, ros::WallTime::now(), detected))// 获取目标对象消息
       return false;
     observation_ready_.store(false);
     publishState("PICKING", color);
     if (!pickAndPlace(detected))
       return false;
-    completed_colors_.insert(color);
+    completed_colors_.insert(color);// 标记一下 该颜色物体已经完成抓取了
     markTargetPicked(color);
     if (index + 1 < sort_colors_.size())
     {
       publishState("OBSERVING", "next object");
-      if (!observation())
+      if (!observation())// 移动到观察位姿 并确认检测到的目标
         return false;
     }
   }

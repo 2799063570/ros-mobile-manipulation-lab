@@ -226,7 +226,7 @@ private:
   mutable std::mutex operation_mutex_;
   aubo_perception::DetectedObjectArrayConstPtr detections_;
   ros::WallTime detections_wall_time_;
-  std::string grasp_status_;
+  std::string grasp_status_;// attached:|detached: + model_name(碰撞体名称)
   std::uint64_t grasp_status_sequence_{0};
   std::string attached_model_;
   ros::WallTime last_cloud_wall_time_;
