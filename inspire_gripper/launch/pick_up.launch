@@ -1,0 +1,11 @@
+<?xml version="1.0" ?>
+<launch>
+
+  <include file="$(find inspire_gripper)/launch/gripper_controll.launch" />
+
+  <arg name="test_flag" default= "0" />
+  <node name="pick_sth_demo" pkg="inspire_gripper" type="pick_sth_demo" output="screen" >
+    <param name = "test_flags" value="$(arg test_flag)" />
+  </node>
+  
+</launch>

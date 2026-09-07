@@ -1,10 +1,22 @@
 <?xml version="1.0"?>
 <launch>
-  <!-- darknet_ros itself is intentionally not started here.  This adapter can
-       be reused with any network/configuration that publishes BoundingBoxes. -->
   <arg name="config" default="$(find aubo_mobile_perception)/config/yolo_rgbd.yaml"/>
+  <arg name="camera_name" default="workspace_camera"/>
+  <arg name="model_path" default="/home/zlab/deepL/code/ultralytics-main-modify/weights/GC-yolo.pt"/>
+  <arg name="depth_save_directory" default=""/>
+  <include file="$(find aubo_perception)/launch/ultralytics_yolo.launch">
+    <arg name="image_topic" value="/$(arg camera_name)/color/image_raw"/>
+    <arg name="model_path" value="$(arg model_path)"/>
+    <arg name="annotated_image_topic" value="/sorting/debug_image"/>
+  </include>
   <node pkg="aubo_perception" type="yolo_rgbd_target_node.py"
         name="yolo_rgbd_target" output="screen" required="true">
+    <env name="PYTHONNOUSERSITE" value="1"/>
     <rosparam file="$(arg config)" command="load"/>
+    <param name="backend" value="ultralytics"/>
+    <param name="boxes_topic" value="/yolo/detections"/>
+    <param name="aligned_depth_topic" value="/$(arg camera_name)/aligned_depth_to_color/image_raw"/>
+    <param name="camera_info_topic" value="/$(arg camera_name)/color/camera_info"/>
+    <param name="depth_save_directory" value="$(arg depth_save_directory)"/>
   </node>
 </launch>

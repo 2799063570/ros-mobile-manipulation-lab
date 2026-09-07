@@ -12,6 +12,7 @@ class QDoubleSpinBox;
 class QLabel;
 class QPushButton;
 class QSpinBox;
+class QTableWidget;
 
 namespace aubo_mobile_nav_sorting
 {
@@ -63,6 +64,8 @@ private:
   QDoubleSpinBox* navigation_timeout_;
   QSpinBox* navigation_retries_;
   bool mission_busy_;
+  QTableWidget* workstations_table_;
+  bool multi_workstation_{false};
 };
 
 }  // namespace aubo_mobile_nav_sorting

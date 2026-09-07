@@ -25,4 +25,5 @@
   <depend>urdf</depend>
   <exec_depend>moveit_commander</exec_depend>
   <export/>
+  <depend>inspire_gripper</depend>
 </package>

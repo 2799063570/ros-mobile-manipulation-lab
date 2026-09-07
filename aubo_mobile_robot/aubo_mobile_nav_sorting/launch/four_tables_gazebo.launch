@@ -1,8 +1,10 @@
 <?xml version="1.0"?>
 <launch>
+  <arg name="perception_mode" default="color"/>
+  <arg name="depth_save_directory" default=""/>
   <arg name="world" default="$(find aubo_mobile_nav_sorting)/worlds/four_tables.world"/>
   <arg name="map_file" default="$(find aubo_mobile_nav_sorting)/maps/four_tables.yaml"/>
-  <arg name="mission_config" default="$(find aubo_mobile_nav_sorting)/config/four_tables.yaml"/>
+  <arg name="mission_config" default="$(eval find('aubo_mobile_nav_sorting') + '/config/' + ('four_tables_yolo.yaml' if arg('perception_mode') == 'yolo' else 'four_tables.yaml'))"/>
   <arg name="gui" default="true"/>
   <arg name="rviz" default="true"/>
   <arg name="debug_view" default="false"/>
@@ -54,6 +56,8 @@
   </include>
 
   <include file="$(find aubo_mobile_sorting)/launch/sorting.launch">
+    <arg name="perception_mode" value="$(arg perception_mode)"/>
+    <arg name="depth_save_directory" value="$(arg depth_save_directory)"/>
     <arg name="task_executable" value="$(arg task_executable)"/>
     <arg name="config" value="$(find aubo_mobile_nav_sorting)/config/sorting.yaml"/>
     <arg name="debug_view" value="$(arg debug_view)"/>

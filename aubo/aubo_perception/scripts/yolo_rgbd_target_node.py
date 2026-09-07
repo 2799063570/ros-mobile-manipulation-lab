@@ -10,6 +10,9 @@ not import darknet_ros message types directly.
 from __future__ import print_function
 
 import threading
+import os
+from collections import deque
+from types import SimpleNamespace
 
 import numpy as np
 import rospy
@@ -23,13 +26,14 @@ from geometry_msgs.msg import PoseStamped
 from sensor_msgs.msg import CameraInfo, Image
 from std_msgs.msg import String
 
-from aubo_perception.msg import DetectedObject, DetectedObjectArray
+from aubo_perception.msg import DetectedObject, DetectedObjectArray, YoloDetectionArray
 
 
 class YoloRgbdTargetNode(object):
     def __init__(self):
+        self.backend = rospy.get_param("~backend", "ultralytics")
         self.boxes_topic = rospy.get_param(
-            "~boxes_topic", "/darknet_ros/bounding_boxes"
+            "~boxes_topic", "/yolo/detections"
         )
         self.depth_topic = rospy.get_param(
             "~aligned_depth_topic",
@@ -64,7 +68,10 @@ class YoloRgbdTargetNode(object):
         self.tf_listener = tf.TransformListener()
         self._camera_info = None
         self._info_lock = threading.Lock()
-        self._depth_message = None
+        self._depth_cache = deque(maxlen=max(1, int(rospy.get_param("~depth_cache_size", 90))))
+        self.depth_save_directory = os.path.expanduser(rospy.get_param("~depth_save_directory", ""))
+        if self.depth_save_directory:
+            os.makedirs(self.depth_save_directory, exist_ok=True)
         self._depth_lock = threading.Lock()
 
         self.detections_publisher = rospy.Publisher(
@@ -83,7 +90,8 @@ class YoloRgbdTargetNode(object):
             self.depth_topic, Image, self._depth_callback, queue_size=1
         )
         self.boxes_subscriber = rospy.Subscriber(
-            self.boxes_topic, BoundingBoxes, self._boxes_callback, queue_size=1
+            self.boxes_topic, YoloDetectionArray if self.backend == "ultralytics" else BoundingBoxes,
+            self._boxes_callback, queue_size=1
         )
         rospy.loginfo(
             "YOLO RGB-D bridge: %s + %s -> %s",
@@ -98,20 +106,31 @@ class YoloRgbdTargetNode(object):
 
     def _depth_callback(self, message):
         with self._depth_lock:
-            self._depth_message = message
+            if self._depth_cache and message.header.stamp < self._depth_cache[-1].header.stamp:
+                self._depth_cache.clear()  # Simulation clock reset.
+            self._depth_cache.append(message)
 
     def _boxes_callback(self, message):
-        with self._depth_lock:
-            depth_message = self._depth_message
-        if depth_message is None:
-            rospy.logwarn_throttle(2.0, "Waiting for aligned RGB-D depth")
-            return
         image_header = getattr(message, "image_header", message.header)
-        box_stamp = image_header.stamp if image_header.stamp != rospy.Time(0) else message.header.stamp
-        if (box_stamp != rospy.Time(0) and depth_message.header.stamp != rospy.Time(0) and
-                abs((box_stamp - depth_message.header.stamp).to_sec()) > self.maximum_depth_age):
-            rospy.logwarn_throttle(1.0, "YOLO boxes and aligned depth are too far apart")
+        box_stamp = image_header.stamp
+        if box_stamp == rospy.Time(0):
             return
+        with self._depth_lock:
+            if not self._depth_cache:
+                return
+            depth_message = min(self._depth_cache,
+                                key=lambda depth: abs((depth.header.stamp - box_stamp).to_sec()))
+        if abs((box_stamp - depth_message.header.stamp).to_sec()) > self.maximum_depth_age:
+            rospy.logwarn_throttle(1.0, "No cached depth matching the YOLO source image")
+            return
+        if self.backend == "ultralytics":
+            boxes = []
+            for item in message.detections:
+                boxes.append(SimpleNamespace(
+                    class_name=item.class_name, probability=item.confidence,
+                    xmin=item.center_x - item.width / 2, xmax=item.center_x + item.width / 2,
+                    ymin=item.center_y - item.height / 2, ymax=item.center_y + item.height / 2))
+            message = SimpleNamespace(header=image_header, bounding_boxes=boxes)
         self._callback(message, depth_message)
 
     def _depth_metres(self, message):
@@ -188,6 +207,22 @@ class YoloRgbdTargetNode(object):
             rospy.logwarn_throttle(2.0, "Cannot decode aligned depth: %s", str(error))
             return
 
+        if depth.shape[:2] != (info.height, info.width):
+            rospy.logwarn_throttle(2.0, "Aligned depth and color calibration dimensions differ")
+            return
+        if self.depth_save_directory:
+            # Preserve raw depth encoding/units, intrinsics and both timestamps for replay.
+            name = str(depth_message.header.stamp.to_nsec()) + ".npz"
+            try:
+                np.savez_compressed(
+                    os.path.join(self.depth_save_directory, name),
+                    depth=np.asarray(self.bridge.imgmsg_to_cv2(depth_message, "passthrough")),
+                    encoding=depth_message.encoding, K=np.asarray(info.K),
+                    frame_id=info.header.frame_id,
+                    depth_stamp_ns=depth_message.header.stamp.to_nsec(),
+                    image_stamp_ns=boxes_message.header.stamp.to_nsec())
+            except (OSError, CvBridgeError) as error:
+                rospy.logerr_throttle(2.0, "Cannot save depth: %s", str(error))
         output = DetectedObjectArray()
         output.header.stamp = depth_message.header.stamp
         output.header.frame_id = self.target_frame
@@ -235,7 +270,7 @@ class YoloRgbdTargetNode(object):
 
 def main():
     rospy.init_node("yolo_rgbd_target")
-    if BoundingBoxes is None:
+    if rospy.get_param("~backend", "ultralytics") == "darknet" and BoundingBoxes is None:
         rospy.logfatal(
             "yolo_rgbd_target requires the optional darknet_ros_msgs package; "
             "install a maintained detector backend or migrate this adapter to its messages."

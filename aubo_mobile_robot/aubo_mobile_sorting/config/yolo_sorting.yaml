@@ -1,0 +1,8 @@
+# Defaults in the robot base frame; adjust to the actual destination bins.
+sort_colors: [bottle, can, box]
+place_frame: base_link
+place_targets:
+  bottle: [0.45, -0.20]
+  can: [0.45, 0.0]
+  box: [0.45, 0.20]
+verify_observation_detections: false

@@ -1,0 +1,134 @@
+# YOLO labels mapped to default existing placement pads.
+# The world must contain visually recognizable bottle/can/box objects for this model.
+# Four-table Gazebo mission. Fixed-scene coordinates use odom, which coincides
+# with the Gazebo world. Each final dock uses the mission's low-speed cmd_vel.
+navigation_frame: map
+
+workstations:
+  - id: table_1
+    navigation_goal_frame: odom
+    pre_dock_goal: [1.50, 0.80, 1.5708]
+    navigation_goal: [1.50, 1.15, 1.5708]
+    table_frame: odom
+    table_center: [1.50, 2.00, 0.25]
+    table_size: [0.80, 0.80, 0.40]
+    table_z: 0.14
+    place_frame: odom
+    place_targets:
+      bottle: [1.74, 1.66]
+      can: [1.74, 1.80]
+      box: [1.26, 1.66]
+    grasp_model_names: {bottle: table_1_red_block, can: table_1_green_block, box: table_1_blue_block}
+    objects:
+      - {id: table_1_red_block, color: bottle, position: [1.62, 1.78, 0.47]}
+      - {id: table_1_green_block, color: can, position: [1.50, 1.86, 0.47]}
+      - {id: table_1_blue_block, color: box, position: [1.38, 1.78, 0.47]}
+
+  - id: table_2
+    navigation_goal_frame: odom
+    pre_dock_goal: [3.80, 2.00, 0.0]
+    navigation_goal: [4.15, 2.00, 0.0]
+    table_frame: odom
+    table_center: [5.00, 2.00, 0.25]
+    table_size: [0.80, 0.80, 0.40]
+    table_z: 0.14
+    place_frame: odom
+    place_targets:
+      bottle: [4.66, 1.76]
+      can: [4.80, 1.76]
+      box: [4.66, 2.24]
+    grasp_model_names: {bottle: table_2_red_block, can: table_2_green_block, box: table_2_blue_block}
+    objects:
+      - {id: table_2_red_block, color: bottle, position: [4.78, 1.88, 0.47]}
+      - {id: table_2_green_block, color: can, position: [4.86, 2.00, 0.47]}
+      - {id: table_2_blue_block, color: box, position: [4.78, 2.12, 0.47]}
+
+  - id: table_3
+    navigation_goal_frame: odom
+    pre_dock_goal: [5.00, -0.80, -1.5708]
+    navigation_goal: [5.00, -1.15, -1.5708]
+    table_frame: odom
+    table_center: [5.00, -2.00, 0.25]
+    table_size: [0.80, 0.80, 0.40]
+    table_z: 0.14
+    place_frame: odom
+    place_targets:
+      bottle: [4.76, -1.66]
+      can: [4.76, -1.80]
+      box: [5.24, -1.66]
+    grasp_model_names: {bottle: table_3_red_block, can: table_3_green_block, box: table_3_blue_block}
+    objects:
+      - {id: table_3_red_block, color: bottle, position: [4.88, -1.78, 0.47]}
+      - {id: table_3_green_block, color: can, position: [5.00, -1.86, 0.47]}
+      - {id: table_3_blue_block, color: box, position: [5.12, -1.78, 0.47]}
+
+  - id: table_4
+    navigation_goal_frame: odom
+    pre_dock_goal: [2.70, -2.00, 3.14159]
+    navigation_goal: [2.35, -2.00, 3.14159]
+    table_frame: odom
+    table_center: [1.50, -2.00, 0.25]
+    table_size: [0.80, 0.80, 0.40]
+    table_z: 0.14
+    place_frame: odom
+    place_targets:
+      bottle: [1.84, -1.76]
+      can: [1.70, -1.76]
+      box: [1.84, -2.24]
+    grasp_model_names: {bottle: table_4_red_block, can: table_4_green_block, box: table_4_blue_block}
+    objects:
+      - {id: table_4_red_block, color: bottle, position: [1.72, -1.88, 0.47]}
+      - {id: table_4_green_block, color: can, position: [1.64, -2.00, 0.47]}
+      - {id: table_4_blue_block, color: box, position: [1.72, -2.12, 0.47]}
+
+navigation_action: /move_base
+navigation_timeout: 180.0
+navigation_retries: 1
+server_timeout: 45.0
+sorting_initialization_timeout: 60.0
+sorting_operation_timeout: 300.0
+sorting_stop_timeout: 5.0
+sorting_base_lock_topic: /sorting/base_locked
+base_pose_max_age: 0.5
+home_before_navigation: true
+
+# Mandatory table exit: transport pose first, then reverse through cmd_vel.
+post_sort_retreat_enabled: true
+post_sort_retreat_distance: 0.30
+
+near_field_direct_dock_enabled: true
+near_field_direct_dock_max_distance: 0.50
+near_field_direct_dock_lateral_tolerance: 0.08
+near_field_direct_dock_yaw_tolerance: 0.06
+near_field_direct_dock_goal_tolerance: 0.08
+near_field_heading_alignment_enabled: true
+near_field_heading_max_correction: 0.12
+near_field_heading_speed: 0.12
+near_field_heading_goal_tolerance: 0.015
+near_field_heading_final_tolerance: 0.025
+near_field_heading_timeout: 4.0
+near_field_heading_stall_timeout: 1.5
+near_field_direct_dock_timeout: 15.0
+near_field_direct_dock_stall_timeout: 2.5
+near_field_direct_dock_progress_epsilon: 0.005
+
+base_recovery_enabled: true
+base_recovery_cmd_vel_topic: /cmd_vel_raw
+base_recovery_speed: 0.04
+base_recovery_rate: 20.0
+base_recovery_settle_time: 0.8
+base_recovery_steps:
+  - [0.05, 0.00]
+  - [-0.10, 0.00]
+
+sorting_state_topic: /sorting/state
+sorting_failure_topic: /sorting/failure
+sorting_home_service: /sorting/home
+sorting_prepare_service: /sorting/prepare_work
+sorting_observe_service: /sorting/move_to_observation
+sorting_start_service: /sorting/start
+sorting_stop_service: /sorting/stop
+sorting_configure_service: /sorting/configure_workspace
+sorting_workspace_param: /sorting/workspace_config
+
+auto_start: false

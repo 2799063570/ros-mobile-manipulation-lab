@@ -42,3 +42,23 @@
 固定平台加载 `aubo_color_sorting/config/sorting.yaml`，移动平台加载
 `aubo_mobile_sorting/config/sorting.yaml`；导航分拣场景可用
 `aubo_mobile_nav_sorting/config/sorting.yaml` 覆盖移动平台默认值。
+
+### 2026-09 分拣调整
+
+C++ 实现内部使用 `enum class State`；`/sorting/state` 仍保留原字符串协议，
+导航任务和 RViz 面板无需迁移消息类型。named pose 的关节值由 SRDF 定义，
+`observation_named_target` / `work_ready_named_target` / `finish_named_target`
+只选择 SRDF 名称。固定底座 SRDF 补齐了 `work_ready`。
+
+只有 pick/place 操作失败才清理它持有的 Gazebo 吸附；观察、检测、准备、回零
+失败不触发释放。真机不使用 Gazebo 吸附，规划失败不自动张开夹爪。
+工作台通过同一 `sorting_table` ID 同步 ADD 替换，不清空其他节点的障碍物；
+工作区配置参数存在时优先使用，只有参数不存在才使用话题缓存，参数非法直接报错。
+
+`gripper_backend=trajectory` 用于 Gazebo，轨迹包含当前关节位置和目标点，
+两端速度为零，默认运动时间 0.8 秒，可按仿真控制器响应调节。
+`gripper_backend=inspire` 仅支持 `color_sorting_task_cpp`，调用
+`/inspire_gripper/move_max`、`move_min`、`get_state`、`set_es`。
+参数 `inspire_speed=500`、`inspire_force=100`、`inspire_motion_timeout=5.0` 可调整。
+张开等待状态 1；闭合等待状态 2 或 6；超时/异常调用停止服务。
+`inspire_gripper/get_state.srv` 新增 `motion_state`，需要一起重新编译驱动和任务节点。

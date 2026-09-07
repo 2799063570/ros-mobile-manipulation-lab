@@ -43,6 +43,9 @@ public:
   void start();
 
 private:
+  enum class State { DETECTING, ERROR, HOMING, IDLE, INITIALIZING, OBSERVING, OPENING, PICKING, PREPARING, READY, SORTING, STOPPED };
+  static const char* stateName(State state);
+
   using GripperClient = actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction>;
 
   struct TargetTrack     // 目标跟踪结构体 
@@ -70,7 +73,7 @@ private:
   void loadParameters();
   bool verifyLoadedUpperArmLimit() const;
   void initialize();
-  void publishState(const std::string& state, const std::string& detail = std::string());
+  void publishState(State state, const std::string& detail = std::string());
   void setFailure(const std::string& category, const std::string& detail);
 
   void detectionCallback(const aubo_perception::DetectedObjectArrayConstPtr& message);
@@ -87,7 +90,7 @@ private:
   bool homeService(std_srvs::Trigger::Request&, std_srvs::Trigger::Response& response);
   bool configureWorkspaceService(std_srvs::Trigger::Request&, std_srvs::Trigger::Response& response);
 
-  std::pair<bool, std::string> startOperation(const std::string& state,
+  std::pair<bool, std::string> startOperation(State state,
                                               const std::function<bool()>& operation);
   bool observationOperation();
   bool initialObservationOperation();
@@ -151,6 +154,10 @@ private:
   ros::Subscriber planning_scene_subscriber_;
   ros::Subscriber workspace_subscriber_;
   ros::ServiceClient clear_octomap_client_;
+  ros::ServiceClient inspire_open_client_, inspire_close_client_, inspire_stop_client_, inspire_state_client_;
+  std::string gripper_backend_;
+  int inspire_speed_{500}, inspire_force_{100};
+  double inspire_motion_timeout_{5.0};
   std::vector<ros::ServiceServer> services_;
 
   std::string group_name_;
@@ -195,7 +202,7 @@ private:
   double minimum_cartesian_fraction_{0.90};
   double gripper_open_{0.0};
   double gripper_closed_{0.28};
-  double gripper_motion_time_{2.5};
+  double gripper_motion_time_{0.8};
   double gripper_contact_tolerance_{0.30};
   double grasp_attachment_timeout_{3.0};
   double detection_timeout_{15.0};
@@ -238,7 +245,7 @@ private:
   bool has_pending_workspace_{false};
   std::set<std::string> completed_colors_;
   std::map<std::string, TargetTrack> target_tracks_;
-  std::string state_{"INITIALIZING"};
+  State state_{State::INITIALIZING};
   std::atomic<bool> busy_{true};
   std::atomic<bool> initialized_{false};
   std::atomic<bool> observation_ready_{false};

@@ -1,6 +1,10 @@
 #include <aubo_sorting_core/color_sorting_task.hpp>
 
 #include <actionlib_msgs/GoalStatus.h>
+#include <inspire_gripper/move_max.h>
+#include <inspire_gripper/move_min.h>
+#include <inspire_gripper/set_es.h>
+#include <inspire_gripper/get_state.h>
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <control_msgs/JointTolerance.h>
@@ -111,7 +115,15 @@ ColorSortingTask::ColorSortingTask(ros::NodeHandle nh, ros::NodeHandle private_n
   arm_->setMaxVelocityScalingFactor(velocity_scaling_);
   arm_->setMaxAccelerationScalingFactor(acceleration_scaling_);
   planning_frame_ = arm_->getPlanningFrame();
-  gripper_client_.reset(new GripperClient(gripper_action_name_, true));// 初始化夹爪动作客户端
+  if (gripper_backend_ == "trajectory")
+    gripper_client_.reset(new GripperClient(gripper_action_name_, true));
+  else
+  {
+    inspire_open_client_ = nh_.serviceClient<inspire_gripper::move_max>("/inspire_gripper/move_max");
+    inspire_close_client_ = nh_.serviceClient<inspire_gripper::move_min>("/inspire_gripper/move_min");
+    inspire_state_client_ = nh_.serviceClient<inspire_gripper::get_state>("/inspire_gripper/get_state");
+    inspire_stop_client_ = nh_.serviceClient<inspire_gripper::set_es>("/inspire_gripper/set_es");
+  }
 
   state_publisher_ = nh_.advertise<std_msgs::String>("/sorting/state", 1, true);// 状态机
   detection_summary_publisher_ = nh_.advertise<std_msgs::String>("/sorting/detection_summary", 1, true);// 检测结果汇总 例如：红1,绿0,蓝1
@@ -151,7 +163,7 @@ ColorSortingTask::ColorSortingTask(ros::NodeHandle nh, ros::NodeHandle private_n
   std_msgs::String empty_failure;
   failure_publisher_.publish(empty_failure);
   publishTargetCache();// 发布目前检测到的结果
-  publishState("INITIALIZING", "waiting for Gazebo controllers");
+  publishState(State::INITIALIZING, "waiting for Gazebo controllers");
 }
 
 ColorSortingTask::~ColorSortingTask()
@@ -175,6 +187,14 @@ void ColorSortingTask::loadParameters()
   private_nh_.param<std::string>("detections_topic", detections_topic_, "/sorting/detections");
   private_nh_.param<std::string>("gripper_action", gripper_action_name_,
                                  "/gripper_controller/follow_joint_trajectory");
+  private_nh_.param<std::string>("gripper_backend", gripper_backend_, "trajectory");
+  private_nh_.param("inspire_speed", inspire_speed_, 500);
+  private_nh_.param("inspire_force", inspire_force_, 100);
+  private_nh_.param("inspire_motion_timeout", inspire_motion_timeout_, 5.0);
+  if ((gripper_backend_ != "trajectory" && gripper_backend_ != "inspire") ||
+      inspire_speed_ < 1 || inspire_speed_ > 1000 || inspire_force_ < 50 ||
+      inspire_force_ > 1000 || !std::isfinite(inspire_motion_timeout_) || inspire_motion_timeout_ <= 0.0)
+    throw std::runtime_error("invalid gripper backend/speed/force/settle time");
   private_nh_.param("table_z", table_z_, 0.14);
   private_nh_.param<std::string>("table_frame", table_frame_, target_frame_);
   private_nh_.param("table_collision_margin", table_collision_margin_, 0.0);
@@ -190,7 +210,9 @@ void ColorSortingTask::loadParameters()
   private_nh_.param("minimum_cartesian_fraction", minimum_cartesian_fraction_, 0.90);
   private_nh_.param("gripper_open", gripper_open_, 0.0);
   private_nh_.param("gripper_closed", gripper_closed_, 0.28);
-  private_nh_.param("gripper_motion_time", gripper_motion_time_, 2.5);
+  private_nh_.param("gripper_motion_time", gripper_motion_time_, 0.8);
+  if (!std::isfinite(gripper_motion_time_) || gripper_motion_time_ <= 0.0)
+    throw std::runtime_error("gripper_motion_time must be positive");
   private_nh_.param("gripper_contact_tolerance", gripper_contact_tolerance_, 0.30);
   private_nh_.param("use_grasp_attachment", use_grasp_attachment_, true);
   private_nh_.param<std::string>("grasp_attach_topic", grasp_attach_topic_, "/sorting/grasp/attach");
@@ -316,7 +338,27 @@ void ColorSortingTask::start()
   initialization_thread_ = std::thread(&ColorSortingTask::initialize, this);
 }
 
-void ColorSortingTask::publishState(const std::string& state, const std::string& detail)
+const char* ColorSortingTask::stateName(State state)
+{
+  switch (state)
+  {
+    case State::DETECTING: return "DETECTING";
+    case State::ERROR: return "ERROR";
+    case State::HOMING: return "HOMING";
+    case State::IDLE: return "IDLE";
+    case State::INITIALIZING: return "INITIALIZING";
+    case State::OBSERVING: return "OBSERVING";
+    case State::OPENING: return "OPENING";
+    case State::PICKING: return "PICKING";
+    case State::PREPARING: return "PREPARING";
+    case State::READY: return "READY";
+    case State::SORTING: return "SORTING";
+    case State::STOPPED: return "STOPPED";
+  }
+  return "ERROR";
+}
+
+void ColorSortingTask::publishState(State state, const std::string& detail)
 {
   // 负责更新状态机的状态为state并通过话题发布
   {
@@ -324,7 +366,9 @@ void ColorSortingTask::publishState(const std::string& state, const std::string&
     state_ = state;
   }
   std_msgs::String message;
-  message.data = detail.empty() ? state : state + " | " + detail;
+  message.data = stateName(state);
+  if (!detail.empty())
+    message.data += " | " + detail;
   state_publisher_.publish(message);
   ROS_INFO_STREAM("Sorting state: " << message.data);
 }
@@ -343,14 +387,14 @@ void ColorSortingTask::setFailure(const std::string& category, const std::string
 
 void ColorSortingTask::detectionCallback(const aubo_perception::DetectedObjectArrayConstPtr& message)
 {
-  std::string state;
+  State state;
   {
     std::lock_guard<std::mutex> lock(data_mutex_);
     detections_ = message;// 保存检测到的对象 头+检测到的对象数组
     detections_wall_time_ = ros::WallTime::now();
     state = state_;
   }
-  if (state == "DETECTING" || (state == "OBSERVING" && observation_ready_.load()))
+  if (state == State::DETECTING || (state == State::OBSERVING && observation_ready_.load()))
     updateTargetCache(*message);// 特定阶段更新目标抓取信息
 
   std::vector<std::string> counts;
@@ -708,26 +752,43 @@ void ColorSortingTask::workspaceUpdateCallback(const std_msgs::StringConstPtr& m
 
 bool ColorSortingTask::applyWorkspace(const WorkspaceConfig& workspace, std::string& error)
 {
-  table_center_ = workspace.table_center;// 桌子的中心点坐标
-  table_size_ = workspace.table_size;// 桌子的尺寸
-  table_frame_ = workspace.table_frame;// 桌子的参考坐标系
-  table_z_ = workspace.table_z;// 桌子的z轴高度
-  place_frame_ = workspace.place_frame;// 放置物体的参考坐标系
-  place_targets_ = workspace.place_targets;// 放置目标位置
+  if (workspace.table_center.size() != 3 || workspace.table_size.size() != 3 ||
+      !std::isfinite(workspace.table_z) ||
+      !std::all_of(workspace.table_center.begin(), workspace.table_center.end(),
+                   [](double v) { return std::isfinite(v); }) ||
+      !std::all_of(workspace.table_size.begin(), workspace.table_size.end(),
+                   [](double v) { return std::isfinite(v) && v > 0.0; }))
+  {
+    error = "workspace table must have finite coordinates and positive dimensions";
+    return false;
+  }
+  const auto old_center = table_center_;
+  const auto old_size = table_size_;
+  const auto old_frame = table_frame_;
+  table_center_ = workspace.table_center;
+  table_size_ = workspace.table_size;
+  table_frame_ = workspace.table_frame;
+  if (!addTableCollision())
+  {
+    table_center_ = old_center;
+    table_size_ = old_size;
+    table_frame_ = old_frame;
+    error = "MoveIt did not accept the workspace table";
+    return false;
+  }
+  table_z_ = workspace.table_z;
+  place_frame_ = workspace.place_frame;
+  place_targets_ = workspace.place_targets;
   grasp_model_names_ = workspace.grasp_model_names;
   workspace_id_ = workspace.id;
   completed_colors_.clear();
   {
     std::lock_guard<std::mutex> lock(data_mutex_);
     target_tracks_.clear();
+    detections_.reset();
   }
   publishTargetCache();
   observation_ready_.store(false);
-  if (!addTableCollision())
-  {
-    error = "MoveIt did not accept the workspace table";
-    return false;
-  }
   ROS_INFO_STREAM("Configured sorting workspace '" << workspace_id_ << "'");
   return true;
 }
@@ -744,6 +805,11 @@ bool ColorSortingTask::configureWorkspaceService(std_srvs::Trigger::Request&,
   }
   WorkspaceConfig workspace;
   bool has_workspace = false;
+  std::string error;
+  XmlRpc::XmlRpcValue value;
+  if (nh_.getParam(workspace_config_param_, value))
+    has_workspace = workspaceFromParam(value, workspace, error);
+  else
   {
     std::lock_guard<std::mutex> data_lock(data_mutex_);
     if (has_pending_workspace_)
@@ -752,10 +818,6 @@ bool ColorSortingTask::configureWorkspaceService(std_srvs::Trigger::Request&,
       has_workspace = true;
     }
   }
-  std::string error;
-  XmlRpc::XmlRpcValue value;
-  if (nh_.getParam(workspace_config_param_, value))
-    has_workspace = workspaceFromParam(value, workspace, error);
   if (!has_workspace)
   {
     response.success = false;
@@ -776,45 +838,49 @@ void ColorSortingTask::initialize()
   if (!robot_limits_valid_) // 检证机械臂基座数第二个关节 是否在范围[-60, 60]内
   {
     busy_.store(false);
-    publishState("ERROR", "loaded upperArm_joint limit is not +/-60 deg");
+    publishState(State::ERROR, "loaded upperArm_joint limit is not +/-60 deg");
     return;
   }
   if (!waitForGraspPlugin()) // 等待抓取吸附插件加载完成
   {
     busy_.store(false);
-    publishState("ERROR", "Gazebo grasp plugin unavailable");
+    publishState(State::ERROR, "Gazebo grasp plugin unavailable");
     return;
   }
-  publishState("INITIALIZING", "waiting for gripper action");
-  if (!gripper_client_->waitForServer(ros::Duration(gripper_server_timeout_)))// 等待夹爪动作服务器启动
+  publishState(State::INITIALIZING, "waiting for gripper action");
+  if (gripper_client_ ? !gripper_client_->waitForServer(ros::Duration(gripper_server_timeout_)) :
+      !(inspire_open_client_.waitForExistence(ros::Duration(gripper_server_timeout_)) &&
+        inspire_close_client_.waitForExistence(ros::Duration(gripper_server_timeout_)) &&
+        inspire_stop_client_.waitForExistence(ros::Duration(gripper_server_timeout_)) &&
+        inspire_state_client_.waitForExistence(ros::Duration(gripper_server_timeout_))))// 等待夹爪动作服务器启动
   {
     busy_.store(false);
-    publishState("ERROR", "gripper action server unavailable");
+    publishState(State::ERROR, "gripper action server unavailable");
     return;
   }
   if (!addTableCollision()) // 添加桌子到规划场景中
   {
     busy_.store(false);
-    publishState("ERROR", "sorting table missing from planning scene");
+    publishState(State::ERROR, "sorting table missing from planning scene");
     return;
   }
   if (!refreshOctomap()) // 刷新octomap
   {
     busy_.store(false);
-    publishState("ERROR", "RGB-D cloud or MoveIt OctoMap unavailable");
+    publishState(State::ERROR, "RGB-D cloud or MoveIt OctoMap unavailable");
     return;
   }
   initialized_.store(true);// 完成初始化
   busy_.store(false);
-  publishState("IDLE", "controllers ready");
+  publishState(State::IDLE, "controllers ready");
   if (auto_move_to_observation_)
-    startOperation("OBSERVING", std::bind(&ColorSortingTask::initialObservationOperation, this));
+    startOperation(State::OBSERVING, std::bind(&ColorSortingTask::initialObservationOperation, this));
   else if (auto_start_)
-    startOperation("SORTING", std::bind(&ColorSortingTask::sortingOperation, this));
+    startOperation(State::SORTING, std::bind(&ColorSortingTask::sortingOperation, this));
 }
 
 std::pair<bool, std::string> ColorSortingTask::startOperation(
-    const std::string& state, const std::function<bool()>& operation)
+    State state, const std::function<bool()>& operation)
 {
   // 启动一个操作 在非busy_下 
   {
@@ -849,10 +915,8 @@ std::pair<bool, std::string> ColorSortingTask::startOperation(
     catch (const std::exception& exception)
     {
       ROS_ERROR_STREAM("Sorting operation failed: " << exception.what());
-      publishState("ERROR", exception.what());
+      publishState(State::ERROR, exception.what());
     }
-    if (!success)
-      releaseAttachedObjectNoWait();// 如果操作失败，释放吸附的对象
     {
       std::lock_guard<std::mutex> lock(operation_mutex_);
       busy_.store(false);// 操作完成，清除busy_标志
@@ -863,12 +927,12 @@ std::pair<bool, std::string> ColorSortingTask::startOperation(
     if (stop_requested_.load())
     {
       observation_ready_.store(false);
-      publishState("STOPPED", "operation cancelled");
+      publishState(State::STOPPED, "operation cancelled");
     }
     else if (success)
-      publishState("READY", "waiting for panel command");
+      publishState(State::READY, "waiting for panel command");
     else
-      publishState("ERROR", "operation failed");
+      publishState(State::ERROR, "operation failed");
   });
   return std::make_pair(true, "command accepted");
 }
@@ -876,7 +940,7 @@ std::pair<bool, std::string> ColorSortingTask::startOperation(
 bool ColorSortingTask::observeService(std_srvs::Trigger::Request&,
                                       std_srvs::Trigger::Response& response)
 {
-  const auto result = startOperation("OBSERVING",
+  const auto result = startOperation(State::OBSERVING,
       std::bind(&ColorSortingTask::observationOperation, this));
   response.success = result.first;
   response.message = result.second;
@@ -892,7 +956,7 @@ bool ColorSortingTask::startService(std_srvs::Trigger::Request&,
     response.message = "move to observation pose and confirm detections first";
     return true;
   }
-  const auto result = startOperation("SORTING", std::bind(&ColorSortingTask::sortingOperation, this));
+  const auto result = startOperation(State::SORTING, std::bind(&ColorSortingTask::sortingOperation, this));
   response.success = result.first;
   response.message = result.second;
   return true;
@@ -902,9 +966,20 @@ bool ColorSortingTask::stopService(std_srvs::Trigger::Request&,
                                    std_srvs::Trigger::Response& response)
 {
   stop_requested_.store(true);
-  gripper_client_->cancelAllGoals();
+  if (gripper_client_)
+    gripper_client_->cancelAllGoals();
+  else
+  {
+    inspire_gripper::set_es stop;
+    if (!inspire_stop_client_.call(stop) || !stop.response.setes_accepted)
+    {
+      arm_->stop();
+      response.success = false;
+      response.message = "Inspire stop was not acknowledged";
+      return true;
+    }
+  }
   arm_->stop();
-  releaseAttachedObjectNoWait();
   response.success = true;
   response.message = "stop requested";
   return true;
@@ -913,7 +988,7 @@ bool ColorSortingTask::stopService(std_srvs::Trigger::Request&,
 bool ColorSortingTask::openService(std_srvs::Trigger::Request&,
                                    std_srvs::Trigger::Response& response)
 {
-  const auto result = startOperation("OPENING", std::bind(&ColorSortingTask::openOperation, this));
+  const auto result = startOperation(State::OPENING, std::bind(&ColorSortingTask::openOperation, this));
   response.success = result.first;
   response.message = result.second;
   return true;
@@ -922,7 +997,7 @@ bool ColorSortingTask::openService(std_srvs::Trigger::Request&,
 bool ColorSortingTask::prepareWorkService(std_srvs::Trigger::Request&,
                                           std_srvs::Trigger::Response& response)
 {
-  const auto result = startOperation("PREPARING",
+  const auto result = startOperation(State::PREPARING,
       std::bind(&ColorSortingTask::prepareWorkOperation, this));
   response.success = result.first;
   response.message = result.second;
@@ -932,7 +1007,7 @@ bool ColorSortingTask::prepareWorkService(std_srvs::Trigger::Request&,
 bool ColorSortingTask::homeService(std_srvs::Trigger::Request&,
                                    std_srvs::Trigger::Response& response)
 {
-  const auto result = startOperation("HOMING", std::bind(&ColorSortingTask::homeOperation, this));
+  const auto result = startOperation(State::HOMING, std::bind(&ColorSortingTask::homeOperation, this));
   response.success = result.first;
   response.message = result.second;
   return true;
@@ -1175,10 +1250,57 @@ bool ColorSortingTask::commandGripper(double position)
   // 通过action通信请求夹爪的控制器执行目标位置
   if (stop_requested_.load())
     return false;
+  if (gripper_backend_ == "inspire")
+  {
+    bool accepted = false;
+    if (std::abs(position - gripper_open_) < 1e-6)
+    {
+      inspire_gripper::move_max request;
+      request.request.speed = inspire_speed_;
+      accepted = inspire_open_client_.call(request) && request.response.movemax_accepted;
+    }
+    else
+    {
+      inspire_gripper::move_min request;
+      request.request.speed = inspire_speed_;
+      request.request.power = inspire_force_;
+      accepted = inspire_close_client_.call(request) && request.response.movemin_accepted;
+    }
+    if (!accepted)
+    {
+      setFailure("GRIPPER_FAILED", "Inspire command rejected");
+      return false;
+    }
+    const bool opening = std::abs(position - gripper_open_) < 1e-6;
+    const auto deadline = ros::WallTime::now() + ros::WallDuration(inspire_motion_timeout_);
+    while (wallSleep(0.1, stop_requested_) && ros::WallTime::now() < deadline)
+    {
+      inspire_gripper::get_state status;
+      if (!inspire_state_client_.call(status) || status.response.error_code != 0)
+        break;
+      const int motion = status.response.motion_state;
+      if (opening ? motion == 1 : (motion == 2 || motion == 6))
+        return !stop_requested_.load();
+    }
+    inspire_gripper::set_es stop;
+    inspire_stop_client_.call(stop);
+    setFailure("GRIPPER_FAILED", "Inspire motion failed or timed out");
+    return false;
+  }
   control_msgs::FollowJointTrajectoryGoal goal;
   goal.trajectory.joint_names = {"joint1", "joint2"};
+  const auto current = arm_->getCurrentState(2.0);
+  if (!current)
+    return false;
+  trajectory_msgs::JointTrajectoryPoint initial;
+  for (const auto& joint : goal.trajectory.joint_names)
+    initial.positions.push_back(current->getVariablePosition(joint));
+  initial.velocities = {0.0, 0.0};
+  initial.time_from_start = ros::Duration(0.0);
+  goal.trajectory.points.push_back(initial);
   trajectory_msgs::JointTrajectoryPoint point;// 夹爪关节轨迹点 最后一个点
   point.positions = {position, position};
+  point.velocities = {0.0, 0.0};
   point.time_from_start = ros::Duration(gripper_motion_time_);// 夹爪执行时间
   goal.trajectory.points.push_back(point);
   goal.trajectory.header.stamp = ros::Time::now() + ros::Duration(0.1);
@@ -1241,24 +1363,6 @@ bool ColorSortingTask::addTableCollision()
     return false;
   }
 
-  auto known = [this, &object_name]() {// 检测当前场景中是否存在指定对象
-    const auto names = scene_.getKnownObjectNames();
-    return std::find(names.begin(), names.end(), object_name) != names.end();
-  };
-  if (known())
-  {
-    scene_.removeCollisionObjects({object_name});
-    const ros::WallTime deadline = ros::WallTime::now() + ros::WallDuration(scene_update_timeout_);
-    ros::WallRate rate(20.0);
-    while (ros::ok() && known() && ros::WallTime::now() < deadline)
-      rate.sleep();
-    if (known())
-    {
-      ROS_ERROR("MoveIt did not remove stale sorting table");
-      return false;
-    }
-  }
-
   moveit_msgs::CollisionObject object;
   object.id = object_name;
   object.header.frame_id = table_pose.header.frame_id;
@@ -1271,26 +1375,13 @@ bool ColorSortingTask::addTableCollision()
   object.primitives.push_back(box);
   object.primitive_poses.push_back(table_pose.pose);
   object.operation = moveit_msgs::CollisionObject::ADD;
-  scene_.applyCollisionObject(object);// 应用碰撞对象到场景中
-
-  const ros::WallTime deadline = ros::WallTime::now() + ros::WallDuration(scene_update_timeout_);
-  ros::WallRate rate(10.0);
-  while (ros::ok() && ros::WallTime::now() < deadline)
+  if (!scene_.applyCollisionObject(object))
   {
-    if (known())
-    {
-      arm_->setSupportSurfaceName(object_name);  // 告诉MoveIt规划器，这个障碍物（桌子）是支撑面
-      ROS_INFO("Sorting table confirmed in MoveIt planning scene: frame=%s, position=[%.3f, %.3f, %.3f], size=[%.3f, %.3f, %.3f]",
-               table_pose.header.frame_id.c_str(), table_pose.pose.position.x,
-               table_pose.pose.position.y, table_pose.pose.position.z, box.dimensions[0],
-               box.dimensions[1], box.dimensions[2]);
-      return true;
-    }
-    rate.sleep();
+    ROS_ERROR("MoveIt rejected workspace table replacement");
+    return false;
   }
-  ROS_ERROR("MoveIt planning scene did not acknowledge '%s' within %.1f seconds",
-            object_name.c_str(), scene_update_timeout_);
-  return false;
+  arm_->setSupportSurfaceName(object_name);
+  return true;
 }
 
 bool ColorSortingTask::refreshOctomap()
@@ -1401,7 +1492,10 @@ bool ColorSortingTask::setGraspAttachment(const std::string& model_name, bool at
   std::uint64_t initial_sequence = 0;
   {
     std::lock_guard<std::mutex> lock(data_mutex_);
-    initial_sequence = grasp_status_sequence_;// 记录当前抓取状态序列号
+    initial_sequence = grasp_status_sequence_;
+    // A timed-out attach may still have reached Gazebo; keep ownership for cleanup.
+    if (attach)
+      attached_model_ = model_name;
   }
   std_msgs::String command;
   command.data = model_name;
@@ -1587,6 +1681,14 @@ bool ColorSortingTask::verifyVisibleColors()
 
 bool ColorSortingTask::pickAndPlace(const aubo_perception::DetectedObject& detected)
 {
+  // Only a failed pick/place owns attachment cleanup. Other operations cannot release it.
+  bool completed = false;
+  bool attachment_attempted = false;
+  const auto cleanup = [this, &completed, &attachment_attempted](void*) {
+    if (!completed && attachment_attempted)
+      releaseAttachedObjectNoWait();
+  };
+  std::unique_ptr<void, decltype(cleanup)> attachment_guard(this, cleanup);
   const std::string color = detected.color;
   const double object_x = detected.pose.position.x + grasp_offset_x_;// 抓取偏移值
   const double object_y = detected.pose.position.y + grasp_offset_y_;// 抓取偏移值
@@ -1601,6 +1703,7 @@ bool ColorSortingTask::pickAndPlace(const aubo_perception::DetectedObject& detec
   const auto model = grasp_model_names_.find(color);// 根据颜色查找抓取碰撞体名称
   const std::string object_model_name =
       model == grasp_model_names_.end() ? color + "_block" : model->second;
+  attachment_attempted = use_grasp_attachment_;
   if (!setGraspAttachment(object_model_name, true))// 夹爪吸附目标物体
     return false;
   if (!commandGripper(gripper_closed_))// 夹爪闭合
@@ -1626,7 +1729,8 @@ bool ColorSortingTask::pickAndPlace(const aubo_perception::DetectedObject& detec
       !commandGripper(gripper_open_) || !setGraspAttachment(object_model_name, false) || // 夹爪张开 释放吸附
       !wallSleep(0.5, stop_requested_))
     return false;
-  return cartesianTo(makePose(place_x, place_y, travel_z), color + " retreat"); // 移动到目标放置位置上方
+  completed = cartesianTo(makePose(place_x, place_y, travel_z), color + " retreat");
+  return completed; // 移动到目标放置位置上方
 }
 
 bool ColorSortingTask::sortingOperation()
@@ -1654,19 +1758,19 @@ bool ColorSortingTask::sortingOperation()
       ROS_INFO("Skipping completed color '%s' in workspace '%s'", color.c_str(), workspace_id_.c_str());
       continue;
     }
-    publishState("DETECTING", color);
+    publishState(State::DETECTING, color);
     aubo_perception::DetectedObject detected;// 检测到的目标对象消息：颜色、面积、位置
     if (!waitForObject(color, ros::WallTime::now(), detected))// 获取目标对象消息
       return false;
     observation_ready_.store(false);
-    publishState("PICKING", color);
+    publishState(State::PICKING, color);
     if (!pickAndPlace(detected))
       return false;
     completed_colors_.insert(color);// 标记一下 该颜色物体已经完成抓取了
     markTargetPicked(color);
     if (index + 1 < sort_colors_.size())
     {
-      publishState("OBSERVING", "next object");
+      publishState(State::OBSERVING, "next object");
       if (!observation())// 移动到观察位姿 并确认检测到的目标
         return false;
     }
@@ -1674,7 +1778,7 @@ bool ColorSortingTask::sortingOperation()
   observation_ready_.store(false);
   if (!finish_named_target_.empty())
   {
-    publishState("HOMING", finish_named_target_);
+    publishState(State::HOMING, finish_named_target_);
     return moveNamed(finish_named_target_);
   }
   return true;

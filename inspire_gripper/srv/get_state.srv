@@ -1,0 +1,4 @@
+---
+int32 error_code
+# 1=open, 2=closed, 3=stopped, 4=closing, 5=opening, 6=force reached; -1=invalid
+int32 motion_state

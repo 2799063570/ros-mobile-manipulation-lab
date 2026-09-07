@@ -1,4 +1,8 @@
-boxes_topic: /darknet_ros/bounding_boxes
+backend: ultralytics
+boxes_topic: /yolo/detections
+depth_cache_size: 90
+# Optional directory for matched raw depth + intrinsics (.npz).
+depth_save_directory: ""
 aligned_depth_topic: /workspace_camera/aligned_depth_to_color/image_raw
 camera_info_topic: /workspace_camera/color/camera_info
 detections_topic: /sorting/detections
@@ -16,7 +20,4 @@ object_center_z: 0.16
 selected_class: ""
 
 # Map network class names to the stable labels used by sorting.yaml.
-class_aliases:
-  red_block: red
-  green_block: green
-  blue_block: blue
+class_aliases: {bottle: bottle, can: can, box: box}

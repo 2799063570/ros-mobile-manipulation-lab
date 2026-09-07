@@ -87,7 +87,11 @@ public:
             ros::VoidPtr(), &ros_queue_);
     attach_subscriber_ = ros_node_->subscribe(attach_options);
     detach_subscriber_ = ros_node_->subscribe(detach_options);
-    base_lock_subscriber_ = ros_node_->subscribe(base_lock_options);
+    // Fixed-base robots have no mobile_base_link and need no physical base lock.
+    const bool enable_base_lock = !sdf->HasElement("enable_base_lock") ||
+        sdf->Get<bool>("enable_base_lock");
+    if (enable_base_lock)
+      base_lock_subscriber_ = ros_node_->subscribe(base_lock_options);
     status_publisher_ = ros_node_->advertise<std_msgs::String>(status_topic, 1, true);
 
     update_connection_ = event::Events::ConnectWorldUpdateBegin(

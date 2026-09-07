@@ -1,4 +1,5 @@
 <launch>
+  <arg name="controller_backend" default="aubo_mobile_robot"/>
 
   <!-- GDB Debug Option -->
   <arg name="debug" default="false" />
@@ -57,7 +58,7 @@
   <!-- Trajectory Execution Functionality -->
   <include ns="move_group" file="$(find aubo_mobile_moveit_config)/launch/trajectory_execution.launch.xml" if="$(arg allow_trajectory_execution)">
     <arg name="moveit_manage_controllers" value="true" />
-    <arg name="moveit_controller_manager" value="aubo_mobile_robot" unless="$(arg fake_execution)"/>
+    <arg name="moveit_controller_manager" value="$(arg controller_backend)" unless="$(arg fake_execution)"/>
     <arg name="moveit_controller_manager" value="fake" if="$(arg fake_execution)"/>
     <arg name="fake_execution_type" value="$(arg fake_execution_type)" />
   </include>

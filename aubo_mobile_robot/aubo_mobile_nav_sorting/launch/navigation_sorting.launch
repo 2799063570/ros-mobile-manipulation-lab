@@ -1,6 +1,11 @@
 <?xml version="1.0"?>
 <launch>
   <!-- Real robot description, base/arm drivers and controllers must already run. -->
+  <arg name="start_arm_driver" default="true"/>
+  <arg name="robot_ip" default="192.168.1.2"/>
+  <arg name="start_gripper" default="true"/>
+  <arg name="gripper_port" default="/dev/ttyUSB0"/>
+  <arg name="depth_save_directory" default="$(env HOME)/sorting_depth"/>
   <arg name="map_file" default="$(find aubo_mobile_nav_sorting)/maps/nav_sorting.yaml"/>
   <arg name="rviz" default="true"/>
   <arg name="debug_view" default="false"/>
@@ -15,6 +20,17 @@
   <arg name="mission_implementation" default="python"/>
   <arg name="task_executable" default="color_sorting_task_cpp"/>
 
+  <!-- The mobile robot description/base driver must already be loaded. -->
+  <include if="$(arg start_arm_driver)" file="$(find aubo_ros_control)/launch/aubo_control.launch">
+    <arg name="robot_ip" value="$(arg robot_ip)"/>
+    <arg name="load_robot_description" value="false"/>
+  </include>
+  <include if="$(arg start_gripper)" file="$(find inspire_gripper)/launch/gripper_control.launch">
+    <arg name="port" value="$(arg gripper_port)"/>
+  </include>
+  <node name="sorting_arm_joint_states" pkg="topic_tools" type="relay"
+        args="/aubo_i5/joint_states /joint_states"/>
+
   <include if="$(arg start_rgbd_camera)"
            file="$(find aubo_ros_control)/launch/eye_to_hand_camera_real.launch">
     <arg name="serial_no" value="$(arg camera_serial_no)"/>
@@ -27,6 +43,7 @@
   </include>
 
   <include file="$(find aubo_mobile_moveit_config)/launch/move_group.launch">
+    <arg name="controller_backend" value="sdk"/>
     <arg name="allow_trajectory_execution" value="true"/>
     <arg name="fake_execution" value="false"/>
     <arg name="load_robot_description" value="false"/>
@@ -40,6 +57,8 @@
     <arg name="debug_view" value="$(arg debug_view)"/>
     <arg name="auto_move_to_observation" value="false"/>
     <arg name="auto_start" value="false"/>
+    <arg name="gripper_backend" value="inspire"/>
+    <arg name="depth_save_directory" value="$(arg depth_save_directory)"/>
     <arg name="use_grasp_attachment" value="false"/>
     <arg name="perception_mode" value="$(arg perception_mode)"/>
   </include>

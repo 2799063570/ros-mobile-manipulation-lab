@@ -249,3 +249,48 @@ python3 -m unittest discover -s test -v
 5. 底盘运动中暂停 Gazebo，确认墙上时间超时仍能退出控制循环；恢复仿真前检查任务已退出。
 
 本轮没有更改恢复移动的开环距离策略、导航算法或 RViz 服务调用的线程模型。
+
+### YOLO、真机夹爪及四工位面板
+
+真机入口（移动底盘驱动、机器人模型及 TF 应先启动）：
+
+```bash
+roslaunch aubo_mobile_nav_sorting navigation_sorting.launch \
+  robot_ip:=192.168.1.2 gripper_port:=/dev/ttyUSB0 camera_serial_no:=""
+```
+
+入口默认启动 D435i 可用的 `realsense2_camera/rs_camera.launch`，开启彩色、
+深度和深度对齐；相机安装外参使用 `eye_to_hand_camera_real.launch` 中的标定文件。
+默认启动现有 `aubo_control.launch`（内部链接 aubo_sdk），MoveIt 执行地址为
+`/aubo_i5/aubo_i5_controller/follow_joint_trajectory`。只启动六轴和关节状态控制器，
+夹爪通过 Inspire 串口服务控制，不启动夹爪 ros_control 控制器。
+已有机械臂/夹爪驱动时分别设置 `start_arm_driver:=false`、`start_gripper:=false`。
+
+YOLO 使用 `/home/zlab/deepL/code/ultralytics-main-modify/weights/GC-yolo.pt`，
+启动 Ultralytics 推理和 RGB-D 桥。任务标签是 `bottle / can / box`；默认放置点在
+`aubo_mobile_sorting/config/yolo_sorting.yaml`，分别是 base_link 下
+`[0.45, -0.20]`、`[0.45, 0.0]`、`[0.45, 0.20]` 米，使用前按实际放置区调整。
+保持原来的桌面抓取流程和设定抓取高度，深度用于反投影获得目标位置。
+
+桥保存最近 90 张对齐深度，在 YOLO 推理结束后按原始 RGB 图像时间戳选最近深度，
+误差大于 `maximum_depth_age` 则拒绝该检测。真机默认把匹配的原始深度、编码、
+相机内参和 RGB/深度时间戳保存到 `~/sorting_depth/*.npz`；
+`depth_save_directory:=` 可关闭磁盘保存，内存缓存继续工作。
+这些文件用于深度回放；它们不是包含机器人 TF 的完整 rosbag。
+
+```bash
+roslaunch aubo_mobile_nav_sorting four_tables_gazebo.launch perception_mode:=color
+roslaunch aubo_mobile_nav_sorting four_tables_gazebo.launch perception_mode:=yolo
+```
+
+本仓库的 RealSense 包没有 Gazebo 插件。仿真使用现有
+`libgazebo_ros_openni_kinect.so` RGB-D 相机，发布同样的彩色、对齐深度和 CameraInfo。
+YOLO 模式使用 `four_tables_yolo.yaml` 的类别及默认放置区；现有 world 是彩色方块，
+验证 bottle/can/box 识别需要替换为对应外观模型，不能假定该权重能识别彩色方块。
+
+`NavSortingPanel` 显示各工位的目标坐标和待执行/执行中/已完成/失败状态。
+多工位模式禁用单工位坐标编辑，开始按钮按配置顺序执行工位列表。
+
+本次在 `/tmp/sorting_validation` 中编译核心、Inspire 驱动和面板，避免修改原工作空间
+的 build/devel。深度缓存/反投影单元测试和原任务安全测试通过；未执行真机运动或
+Gazebo 完整抓取验收。

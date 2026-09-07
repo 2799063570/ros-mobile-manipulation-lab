@@ -9,6 +9,7 @@ find_package(catkin REQUIRED COMPONENTS
   aubo_perception
   control_msgs
   geometry_msgs
+  inspire_gripper
   moveit_core
   moveit_msgs
   moveit_ros_planning_interface
@@ -32,6 +33,7 @@ catkin_package(
     aubo_perception
     control_msgs
     geometry_msgs
+  inspire_gripper
     moveit_core
     moveit_msgs
     moveit_ros_planning_interface

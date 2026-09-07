@@ -58,4 +58,6 @@
   <export>
     <rviz plugin="${prefix}/plugin_description.xml"/>
   </export>
+  <exec_depend>inspire_gripper</exec_depend>
+  <exec_depend>topic_tools</exec_depend>
 </package>

@@ -1,0 +1,5 @@
+int32 speed
+int32 power
+---
+bool  movemin_accepted
+

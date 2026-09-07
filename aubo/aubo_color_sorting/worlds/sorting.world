@@ -5,6 +5,7 @@
     <plugin name="aubo_grasp_attach"
             filename="libaubo_grasp_attach_plugin.so">
       <robot_model>aubo_i5</robot_model>
+      <enable_base_lock>false</enable_base_lock>
       <!-- wrist3_Link is guaranteed to survive URDF fixed-joint lumping; the
            fixed gripper base has the same pose in this model. -->
       <palm_link>wrist3_Link</palm_link>

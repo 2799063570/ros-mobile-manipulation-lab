@@ -1,0 +1,5 @@
+int32 openmax
+int32 openmin
+---
+bool openlimit_accepted
+

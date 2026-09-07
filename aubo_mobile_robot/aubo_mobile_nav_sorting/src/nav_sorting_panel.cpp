@@ -17,6 +17,8 @@
 #include <QPushButton>
 #include <QSpinBox>
 #include <QVBoxLayout>
+#include <QTableWidget>
+#include <QHeaderView>
 
 namespace
 {
@@ -125,6 +127,11 @@ NavSortingPanel::NavSortingPanel(QWidget* parent)
   parameters->addRow(parameter_buttons);
   parameters_group->setLayout(parameters);
 
+  workstations_table_ = new QTableWidget(0, 3);
+  workstations_table_->setHorizontalHeaderLabels({tr("工位"), tr("导航目标 (x, y, yaw)"), tr("进度")});
+  workstations_table_->setEditTriggers(QAbstractItemView::NoEditTriggers);
+  workstations_table_->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+  workstations_table_->setMaximumHeight(190);
   QVBoxLayout* layout = new QVBoxLayout();
   layout->addWidget(title);
   layout->addWidget(new QLabel(tr("总任务状态：")));
@@ -132,6 +139,7 @@ NavSortingPanel::NavSortingPanel(QWidget* parent)
   layout->addWidget(new QLabel(tr("抓取子任务状态：")));
   layout->addWidget(sorting_state_label_);
   layout->addLayout(command_buttons);
+  layout->addWidget(workstations_table_);
   layout->addWidget(parameters_group);
   layout->addWidget(command_label_);
   layout->addStretch();
@@ -180,6 +188,8 @@ void NavSortingPanel::callTrigger(ros::ServiceClient& client,
 
 void NavSortingPanel::startMission()
 {
+  for (int row = 0; row < workstations_table_->rowCount(); ++row)
+    workstations_table_->item(row, 2)->setText(tr("待执行"));
   callTrigger(start_client_, tr("开始任务"));
 }
 
@@ -196,6 +206,8 @@ void NavSortingPanel::applyParameters()
     return;
   }
   dynamic_reconfigure::Reconfigure service;
+  if (!multi_workstation_)
+  {
   addDouble(service.request.config, "goal_x", goal_x_->value());
   addDouble(service.request.config, "goal_y", goal_y_->value());
   addDouble(service.request.config, "goal_yaw", goal_yaw_->value());
@@ -203,6 +215,7 @@ void NavSortingPanel::applyParameters()
   addDouble(service.request.config, "pre_dock_x", pre_dock_x_->value());
   addDouble(service.request.config, "pre_dock_y", pre_dock_y_->value());
   addDouble(service.request.config, "pre_dock_yaw", pre_dock_yaw_->value());
+  }
   addDouble(service.request.config, "near_field_base_clearance", base_clearance_->value());
   addDouble(service.request.config, "navigation_timeout", navigation_timeout_->value());
   addInt(service.request.config, "navigation_retries", navigation_retries_->value());
@@ -218,6 +231,35 @@ void NavSortingPanel::applyParameters()
 void NavSortingPanel::refreshParameters()
 {
   const std::string prefix = "/nav_sorting_mission/";
+  XmlRpc::XmlRpcValue stations;
+  multi_workstation_ = node_handle_.getParam(prefix + "workstations", stations) &&
+      stations.getType() == XmlRpc::XmlRpcValue::TypeArray && stations.size() > 0;
+  workstations_table_->setVisible(multi_workstation_);
+  for (QWidget* widget : std::vector<QWidget*>{goal_x_, goal_y_, goal_yaw_,
+       pre_dock_x_, pre_dock_y_, pre_dock_yaw_, near_field_enabled_})
+    widget->setEnabled(!multi_workstation_);
+  if (multi_workstation_)
+  {
+    workstations_table_->setRowCount(stations.size());
+    for (int row = 0; row < stations.size(); ++row)
+    {
+      const auto& station = stations[row];
+      const QString id = QString::fromStdString(static_cast<std::string>(station["id"]));
+      const auto& goal = station["navigation_goal"];
+      QStringList coordinates;
+      for (int axis = 0; axis < goal.size(); ++axis)
+      {
+        const double value = goal[axis].getType() == XmlRpc::XmlRpcValue::TypeInt ?
+            static_cast<int>(goal[axis]) : static_cast<double>(goal[axis]);
+        coordinates << QString::number(value, 'f', 2);
+      }
+      workstations_table_->setItem(row, 0, new QTableWidgetItem(id));
+      workstations_table_->setItem(row, 1, new QTableWidgetItem(coordinates.join(", ")));
+      const bool enabled = !station.hasMember("enabled") || static_cast<bool>(station["enabled"]);
+      workstations_table_->setItem(row, 2, new QTableWidgetItem(enabled ? tr("待执行") : tr("已禁用")));
+    }
+    start_button_->setText(tr("按顺序执行多工位分拣"));
+  }
   double double_value;
   int int_value;
   bool bool_value;
@@ -260,6 +302,19 @@ void NavSortingPanel::showMissionState(const QString& text)
 {
   const QString code = text.section('|', 0, 0).trimmed();
   const QString detail = text.section('|', 1).trimmed();
+  if (code == "CONFIGURING_WORKSTATION" && workstations_table_->rowCount() == 0)
+    refreshParameters();
+  for (int row = 0; row < workstations_table_->rowCount(); ++row)
+  {
+    const QString id = workstations_table_->item(row, 0)->text();
+    if (code == "CONFIGURING_WORKSTATION" && detail == id)
+      workstations_table_->item(row, 2)->setText(tr("执行中"));
+    else if (code == "WORKSTATION_COMPLETE" && detail == id)
+      workstations_table_->item(row, 2)->setText(tr("已完成"));
+    else if ((code == "FAILED" || code == "STOPPED") &&
+             workstations_table_->item(row, 2)->text() == tr("执行中"))
+      workstations_table_->item(row, 2)->setText(code == "FAILED" ? tr("失败") : tr("已停止"));
+  }
   mission_busy_ = !(code == "IDLE" || code == "STOPPED" ||
                     code == "SUCCEEDED" || code == "FAILED");
   start_button_->setEnabled(!mission_busy_);
@@ -268,6 +323,9 @@ void NavSortingPanel::showMissionState(const QString& text)
   QString translated = code;
   if (code == "INITIALIZING") translated = tr("初始化中");
   else if (code == "IDLE") translated = tr("待命");
+  else if (code == "CONFIGURING_WORKSTATION") translated = tr("正在切换工位");
+  else if (code == "WORKSTATION_COMPLETE") translated = tr("工位已完成");
+  else if (code == "RETREATING_BASE") translated = tr("正在离开工作台");
   else if (code == "STOWING_ARM") translated = tr("正在收拢机械臂");
   else if (code == "NAVIGATING") translated = tr("正在导航");
   else if (code == "PREPARING_ARM") translated = tr("正在准备机械臂");
