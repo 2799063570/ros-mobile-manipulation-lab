@@ -83,3 +83,7 @@ install(FILES README.md
 if(CATKIN_ENABLE_TESTING)
   catkin_add_gtest(height_recovery_test test/height_recovery_test.cpp)
 endif()
+
+if(CATKIN_ENABLE_TESTING)
+  catkin_add_nosetests(test)
+endif()

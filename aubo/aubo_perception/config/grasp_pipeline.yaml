@@ -1,0 +1,18 @@
+# 感知与任务应使用相同的基座坐标系、桌高和物高。
+target_frame: base_link
+table_z: 0.10
+object_height: 0.04
+# 按类别覆盖已知物高，单位 m，例如 {bottle: 0.12}。
+class_heights: {}
+height_tolerance: 0.02
+minimum_probability: 0.50
+minimum_depth: 0.10
+maximum_depth: 2.50
+maximum_depth_age: 0.08
+# 缓存应覆盖推理延迟；90 帧深度在 30 Hz 下约覆盖 3 秒。
+depth_cache_size: 90
+depth_save_directory: ""
+roi_scale: 0.45
+class_aliases: {}
+# 仅固定机械臂分拣工作区；伺服输出不受此抓取工作区约束。
+workspace: {min_x: 0.38, max_x: 0.82, min_y: -0.20, max_y: 0.20}

@@ -24,6 +24,7 @@
   <depend>trajectory_msgs</depend>
   <depend>urdf</depend>
   <exec_depend>moveit_commander</exec_depend>
+  <test_depend>python3-nose</test_depend>
   <export/>
   <depend>inspire_gripper</depend>
 </package>

@@ -12,22 +12,40 @@
   <arg name="auto_start" default="false"/>
   <arg name="use_grasp_attachment" default="true"/>
 
-  <node if="$(arg start_perception)" pkg="aubo_perception"
-        type="color_object_detector.py" name="color_object_detector" output="screen">
-    <!-- ROS Noetic 的 cv_bridge 使用系统 OpenCV 4.2 编译。
-         禁止用户目录中的 OpenCV wheel 在运行时覆盖该 ABI。 -->
-    <env name="PYTHONNOUSERSITE" value="1"/>
-    <rosparam file="$(find aubo_color_sorting)/config/colors.yaml" command="load"/>
-    <param name="image_topic" value="/camera/color/image_raw"/>
-    <param name="camera_info_topic" value="/camera/color/camera_info"/>
-    <param name="depth_topic" value="/camera/aligned_depth_to_color/image_raw"/>
-    <param name="detections_topic" value="/sorting/detections"/>
-    <param name="debug_image_topic" value="/sorting/debug_image"/>
-  </node>
+  <!-- color/yolo 共用几何层，任务侧无需了解检测后端。 -->
+  <arg name="detector" default="color"/>
+  <arg name="camera_mount" default="eye_in_hand"/>
+  <arg name="camera_namespace" default="$(eval '/camera' if arg('camera_mount') == 'eye_in_hand' else '/workspace_camera')"/>
+  <arg name="height_mode" default="table"/>
+  <arg name="table_z" default="0.10"/>
+  <arg name="object_height" default="0.04"/>
+  <arg name="use_detected_angle" default="true"/>
+  <arg name="use_detected_width" default="false"/>
+  <arg name="task_config" default="$(find aubo_color_sorting)/config/sorting.yaml"/>
+  <arg name="perception_config" default="$(find aubo_perception)/config/grasp_pipeline.yaml"/>
+  <arg name="python" default="/home/zlab/anaconda3/envs/yolo/bin/python"/>
+  <arg name="model_path" default="/home/zlab/deepL/code/ultralytics-main-modify/weights/GC-yolo.pt"/>
+  <include if="$(arg start_perception)" file="$(find aubo_perception)/launch/grasp_perception.launch">
+    <arg name="colors_config" value="$(find aubo_color_sorting)/config/colors.yaml"/>
+    <arg name="detector" value="$(arg detector)"/>
+    <arg name="camera_mount" value="$(arg camera_mount)"/>
+    <arg name="camera_namespace" value="$(arg camera_namespace)"/>
+    <arg name="height_mode" value="$(arg height_mode)"/>
+    <arg name="table_z" value="$(arg table_z)"/>
+    <arg name="object_height" value="$(arg object_height)"/>
+    <arg name="config" value="$(arg perception_config)"/>
+    <arg name="python" value="$(arg python)"/>
+    <arg name="model_path" value="$(arg model_path)"/>
+  </include>
 
   <node if="$(arg start_task)" pkg="aubo_sorting_core"
         type="$(arg task_executable)" name="color_sorting_task" output="screen">
-    <rosparam file="$(find aubo_color_sorting)/config/sorting.yaml" command="load"/>
+    <rosparam file="$(arg task_config)" command="load"/>
+    <param name="height_mode" value="$(arg height_mode)"/>
+    <param name="table_z" value="$(arg table_z)"/>
+    <param name="object_height" value="$(arg object_height)"/>
+    <param name="use_detected_angle" value="$(arg use_detected_angle)"/>
+    <param name="use_detected_width" value="$(arg use_detected_width)"/>
     <param name="auto_move_to_observation" value="$(arg auto_move_to_observation)"/><!-- 自动移动到观察位姿 -->
     <param name="auto_start" value="$(arg auto_start)"/><!-- 自动开始任务 -->
     <param name="use_grasp_attachment" value="$(arg use_grasp_attachment)"/><!-- 是否使用抓取插件 -->

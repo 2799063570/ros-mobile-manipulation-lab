@@ -47,6 +47,21 @@ class ColorSortingTask(object):
             "~gripper_action", "/gripper_controller/follow_joint_trajectory"
         )
 
+        self.height_mode = rospy.get_param("~height_mode", "table")
+        self.use_detected_angle = bool(rospy.get_param("~use_detected_angle", False))
+        self.use_detected_width = bool(rospy.get_param("~use_detected_width", False))
+        self.height_tolerance = float(rospy.get_param("~height_tolerance", 0.02))
+        self.gripper_width_open = float(rospy.get_param("~gripper_width_open", -1.0))
+        self.gripper_width_closed = float(rospy.get_param("~gripper_width_closed", -1.0))
+        self.width_close_scale = float(rospy.get_param("~width_close_scale", 0.9))
+        self._active_grasp_angle = 0.0
+        if self.height_mode not in ("table", "depth") or not math.isfinite(self.height_tolerance) or self.height_tolerance < 0:
+            raise ValueError("invalid height mode/tolerance")
+        if self.use_detected_width and not (
+                math.isfinite(self.gripper_width_open) and math.isfinite(self.gripper_width_closed)
+                and 0 <= self.gripper_width_closed < self.gripper_width_open
+                and 0 < self.width_close_scale <= 1):
+            raise ValueError("detected width requires calibrated opening endpoints/scale")
         self.table_z = float(rospy.get_param("~table_z", 0.14))
         self.table_frame = rospy.get_param("~table_frame", self.target_frame)
         self.table_center = rospy.get_param("~table_center", [0.80, 0.0, -0.06])
@@ -538,7 +553,8 @@ class ColorSortingTask(object):
         self._publish_target_cache()
 
     def _cached_object(self, color):
-        if not self.target_cache_fallback_enabled:
+        if (not self.target_cache_fallback_enabled or self.height_mode == "depth"
+                or self.use_detected_angle or self.use_detected_width):
             return None
         now = time.time()
         with self._data_lock:
@@ -868,7 +884,7 @@ class ColorSortingTask(object):
         quaternion = quaternion_from_euler(
             float(self.grasp_rpy[0]),
             float(self.grasp_rpy[1]),
-            float(self.grasp_rpy[2]),
+            float(self.grasp_rpy[2]) + self._active_grasp_angle,
         )
         pose.pose.orientation.x = quaternion[0]
         pose.pose.orientation.y = quaternion[1]
@@ -1226,11 +1242,18 @@ class ColorSortingTask(object):
             with self._data_lock:
                 detections = self._detections
                 receipt_time = self._detections_wall_time
-            if detections is not None and receipt_time > last_receipt_time:
+            if (detections is not None and receipt_time > last_receipt_time
+                    and detections.header.frame_id == self.target_frame
+                    and detections.header.stamp != rospy.Time(0)
+                    and 0 <= (rospy.Time.now()-detections.header.stamp).to_sec() <= 1.0):
                 last_receipt_time = receipt_time
                 candidates = [item for item in detections.objects if item.color == color]
                 if candidates:
-                    samples.append(max(candidates, key=lambda item: item.contour_area))
+                    candidate = max(candidates, key=lambda item: item.contour_area)
+                    if samples and math.hypot(candidate.pose.position.x-samples[-1].pose.position.x,
+                                              candidate.pose.position.y-samples[-1].pose.position.y) > 0.03:
+                        samples.clear()
+                    samples.append(candidate)
                     if len(samples) >= self.detection_samples:
                         detected = copy.deepcopy(samples[-1])
                         detected.pose.position.x = sum(
@@ -1387,14 +1410,40 @@ class ColorSortingTask(object):
         return False
 
     def _pick_and_place(self, detected):
+        try:
+            return self._pick_and_place_impl(detected)
+        finally:
+            self._active_grasp_angle = 0.0
+
+    def _pick_and_place_impl(self, detected):
         color = detected.color
         object_x = detected.pose.position.x + self.grasp_offset_x
         object_y = detected.pose.position.y + self.grasp_offset_y
-        grasp_z = (
-            self.table_z
-            + 0.5 * self.object_height
-            + self.grasp_height_offset
-        )
+        height = detected.object_height if detected.object_height > 0 else self.object_height
+        expected_center = self.table_z + height/2
+        center_z = detected.pose.position.z if self.height_mode == "depth" else expected_center
+        if (not all(math.isfinite(v) for v in (object_x, object_y, center_z, height)) or height <= 0
+                or (self.height_mode == "depth" and
+                    (not detected.depth_valid or abs(center_z-expected_center) > self.height_tolerance))
+                or ((self.use_detected_angle or self.use_detected_width) and not detected.grasp_geometry_valid)
+                or (self.use_detected_angle and not math.isfinite(detected.grasp_angle))):
+            self._set_failure("DETECTION_FAILED", "invalid or unvalidated grasp geometry/height")
+            return False
+        close_command = self.gripper_closed
+        if self.use_detected_width:
+            opening = detected.grasp_width * self.width_close_scale
+            if (not math.isfinite(opening) or detected.grasp_width <= 0
+                    or detected.grasp_width > self.gripper_width_open
+                    or not self.gripper_width_closed <= opening <= self.gripper_width_open):
+                self._set_failure("DETECTION_FAILED", "width outside calibrated gripper range")
+                return False
+            close_command = self.gripper_open + ((self.gripper_width_open-opening) /
+                (self.gripper_width_open-self.gripper_width_closed)) * (self.gripper_closed-self.gripper_open)
+        grasp_z = center_z + self.grasp_height_offset
+        if not self.table_z < grasp_z < self.table_z + min(self.pregrasp_height, self.lift_min_height):
+            self._set_failure("DETECTION_FAILED", "grasp height outside approach/lift clearance")
+            return False
+        self._active_grasp_angle = detected.grasp_angle if self.use_detected_angle else 0.0
         preplace_z = self.table_z + self.preplace_height
 
         rospy.loginfo(
@@ -1420,7 +1469,7 @@ class ColorSortingTask(object):
         # motion and the fixed joint is released normally at placement.
         if not self._set_grasp_attachment(object_model_name, True):
             return False
-        if not self._command_gripper(self.gripper_closed):
+        if not self._command_gripper(close_command):
             self._set_grasp_attachment(object_model_name, False)
             return False
         rospy.sleep(0.5)
@@ -1441,7 +1490,7 @@ class ColorSortingTask(object):
         ):
             return False
         if not self._cartesian_to(
-            self._pose(place_x, place_y, grasp_z + self.place_clearance),
+            self._pose(place_x, place_y, expected_center + self.grasp_height_offset + self.place_clearance),
             color + " place",
         ):
             return False

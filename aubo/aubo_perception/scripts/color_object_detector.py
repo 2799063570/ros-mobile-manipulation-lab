@@ -13,7 +13,7 @@ from cv_bridge import CvBridge, CvBridgeError
 from sensor_msgs.msg import CameraInfo, Image
 from tf.transformations import quaternion_matrix
 
-from aubo_perception.msg import DetectedObject, DetectedObjectArray
+from aubo_perception.msg import DetectedObject, DetectedObjectArray, YoloDetection, YoloDetectionArray
 
 
 class ColorObjectDetector(object):
@@ -82,6 +82,19 @@ class ColorObjectDetector(object):
         self._lock = threading.Lock()
         self._kernel = np.ones((self.kernel_size, self.kernel_size), np.uint8)
 
+        # 新机械臂入口只提取 2D 旋转框，后续深度/TF/抓取几何与 YOLO 完全共用。
+        # legacy 保留旧入口，避免改动移动机器人现有任务。
+        self.output_mode = rospy.get_param("~output_mode", "legacy")
+        if self.output_mode == "boxes":
+            self._boxes_publisher = rospy.Publisher(
+                rospy.get_param("~boxes_topic", "/yolo/detections"), YoloDetectionArray, queue_size=1)
+            self._debug_publisher = rospy.Publisher(self.debug_image_topic, Image, queue_size=1)
+            self._image_subscriber = rospy.Subscriber(
+                self.image_topic, Image, self._boxes_image_callback, queue_size=1, buff_size=2**24)
+            return
+        if self.output_mode != "legacy":
+            raise ValueError("output_mode must be legacy or boxes")
+
         self._detections_publisher = rospy.Publisher(
             self.detections_topic, DetectedObjectArray, queue_size=2
         )
@@ -114,6 +127,42 @@ class ColorObjectDetector(object):
                 self.depth_topic,
                 self.top_surface_tolerance,
             )
+
+    def _boxes_image_callback(self, message):
+        try:
+            image = self._bridge.imgmsg_to_cv2(message, "bgr8")
+        except CvBridgeError as error:
+            rospy.logwarn_throttle(2.0, "Cannot decode color image: %s", str(error))
+            return
+        hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+        output = YoloDetectionArray()
+        output.header = message.header
+        for class_id, (name, config) in enumerate(sorted(self.colors.items())):
+            mask = self._mask_for_color(hsv, config)
+            for contour in self._find_contours(mask):
+                area = float(cv2.contourArea(contour))
+                if not self.min_area <= area <= self.max_area:
+                    continue
+                (u, v), (w, h), angle = cv2.minAreaRect(contour)
+                if min(w, h) <= 0 or max(w, h)/min(w, h) > self.max_aspect_ratio:
+                    continue
+                box = YoloDetection()
+                box.class_id, box.class_name = class_id, name
+                # HSV 没有神经网络置信度；使用轮廓/旋转框填充率作为质量分数。
+                box.confidence = min(1.0, area/(w*h))
+                box.center_x, box.center_y, box.width, box.height = u, v, w, h
+                box.angle = float(np.deg2rad(angle))
+                box.orientation_valid = True
+                output.detections.append(box)
+                corners = cv2.boxPoints(((u, v), (w, h), angle)).astype(np.int32)
+                cv2.drawContours(image, [corners], -1, tuple(config.get("draw_bgr", [255, 255, 255])), 2)
+        self._boxes_publisher.publish(output)
+        debug = Image()
+        debug.header = message.header
+        debug.height, debug.width = image.shape[:2]
+        debug.encoding, debug.step = "bgr8", image.shape[1]*3
+        debug.data = np.ascontiguousarray(image).tobytes()
+        self._debug_publisher.publish(debug)
 
     def _camera_info_callback(self, message):
         with self._lock:

@@ -196,6 +196,21 @@ void ColorSortingTask::loadParameters()
       inspire_speed_ < 1 || inspire_speed_ > 1000 || inspire_force_ < 50 ||
       inspire_force_ > 1000 || !std::isfinite(inspire_motion_timeout_) || inspire_motion_timeout_ <= 0.0)
     throw std::runtime_error("invalid gripper backend/speed/force/settle time");
+  private_nh_.param<std::string>("height_mode", height_mode_, "table");
+  private_nh_.param("use_detected_angle", use_detected_angle_, false);
+  private_nh_.param("use_detected_width", use_detected_width_, false);
+  private_nh_.param("height_tolerance", height_tolerance_, 0.02);
+  private_nh_.param("gripper_width_open", gripper_width_open_, -1.0);
+  private_nh_.param("gripper_width_closed", gripper_width_closed_, -1.0);
+  private_nh_.param("width_close_scale", width_close_scale_, 0.9);
+  if ((height_mode_ != "table" && height_mode_ != "depth") ||
+      !std::isfinite(height_tolerance_) || height_tolerance_ < 0.0)
+    throw std::runtime_error("invalid height_mode / height_tolerance");
+  if (use_detected_width_ && (gripper_backend_ != "trajectory" ||
+      !std::isfinite(gripper_width_open_) || !std::isfinite(gripper_width_closed_) ||
+      gripper_width_closed_ < 0.0 || gripper_width_open_ <= gripper_width_closed_ ||
+      !std::isfinite(width_close_scale_) || width_close_scale_ <= 0.0 || width_close_scale_ > 1.0))
+    throw std::runtime_error("detected width requires trajectory backend and calibrated opening endpoints/scale");
   private_nh_.param("table_z", table_z_, 0.14);
   private_nh_.param<std::string>("table_frame", table_frame_, target_frame_);
   private_nh_.param("table_collision_margin", table_collision_margin_, 0.0);
@@ -605,7 +620,7 @@ bool ColorSortingTask::cachedObject(const std::string& color,
                                     aubo_perception::DetectedObject& detected)
 {
   // 使用目标缓存中的目标对象 存在时间|未被抓取|观测次数
-  if (!target_cache_fallback_enabled_)
+  if (!target_cache_fallback_enabled_ || height_mode_ == "depth" || use_detected_angle_ || use_detected_width_)
     return false;
   TargetTrack track;
   {
@@ -1111,7 +1126,7 @@ geometry_msgs::PoseStamped ColorSortingTask::makePose(double x, double y, double
   pose.pose.position.y = y;
   pose.pose.position.z = z;
   tf::Quaternion quaternion;
-  quaternion.setRPY(grasp_rpy_[0], grasp_rpy_[1], grasp_rpy_[2]);
+  quaternion.setRPY(grasp_rpy_[0], grasp_rpy_[1], grasp_rpy_[2] + active_grasp_angle_);
   tf::quaternionTFToMsg(quaternion, pose.pose.orientation);
   return pose;
 }
@@ -1645,7 +1660,10 @@ bool ColorSortingTask::waitForObject(const std::string& color, const ros::WallTi
       detections = detections_;
       receipt = detections_wall_time_;
     }
-    if (detections && receipt > last_receipt)
+    if (detections && receipt > last_receipt && detections->header.frame_id == target_frame_ &&
+        !detections->header.stamp.isZero() &&
+        (ros::Time::now() - detections->header.stamp).toSec() >= 0.0 &&
+        (ros::Time::now() - detections->header.stamp).toSec() <= 1.0)
     {
       last_receipt = receipt;
       const aubo_perception::DetectedObject* largest = nullptr;
@@ -1654,6 +1672,10 @@ bool ColorSortingTask::waitForObject(const std::string& color, const ros::WallTi
           largest = &candidate;// 找到最大的目标且颜色对应的对象
       if (largest)
       {
+        // 同类多个目标时避免把相隔较远的目标平均到两者中间。
+        if (!samples.empty() && std::hypot(largest->pose.position.x - samples.back().pose.position.x,
+                                         largest->pose.position.y - samples.back().pose.position.y) > 0.03)
+          samples.clear();
         samples.push_back(*largest);// 进行累计采样 当采样次数达到指定值时 计算平均位置
         if (static_cast<int>(samples.size()) >= detection_samples_)
         {
@@ -1768,7 +1790,42 @@ bool ColorSortingTask::pickAndPlace(const aubo_perception::DetectedObject& detec
   const std::string color = detected.color;
   const double object_x = detected.pose.position.x + grasp_offset_x_;// 抓取偏移值
   const double object_y = detected.pose.position.y + grasp_offset_y_;// 抓取偏移值
-  const double grasp_z = table_z_ + 0.5 * object_height_ + grasp_height_offset_;// 抓取高度偏移值
+  const double height = detected.object_height > 0.0 ? detected.object_height : object_height_;
+  const double expected_center = table_z_ + 0.5 * height;
+  const double center_z = height_mode_ == "depth" ? detected.pose.position.z : expected_center;
+  double close_command = gripper_closed_;
+  if (!std::isfinite(object_x) || !std::isfinite(object_y) || !std::isfinite(center_z) ||
+      !std::isfinite(height) || height <= 0.0 ||
+      (height_mode_ == "depth" && (!detected.depth_valid || std::abs(center_z - expected_center) > height_tolerance_)) ||
+      ((use_detected_angle_ || use_detected_width_) && !detected.grasp_geometry_valid) ||
+      (use_detected_angle_ && !std::isfinite(detected.grasp_angle)))
+  {
+    setFailure("DETECTION_FAILED", "invalid or unvalidated grasp geometry/height");
+    return false;
+  }
+  if (use_detected_width_)
+  {
+    const double opening = detected.grasp_width * width_close_scale_;
+    if (!std::isfinite(opening) || detected.grasp_width <= 0.0 ||
+        detected.grasp_width > gripper_width_open_ || opening < gripper_width_closed_ || opening > gripper_width_open_)
+    {
+      setFailure("DETECTION_FAILED", "object width outside calibrated gripper range");
+      return false;
+    }
+    // 米制窄边乘闭合系数，再按实测两端开口换算为关节位置。
+    close_command = gripper_open_ + (gripper_width_open_ - opening) /
+        (gripper_width_open_ - gripper_width_closed_) * (gripper_closed_ - gripper_open_);
+  }
+  const double grasp_z = center_z + grasp_height_offset_;
+  if (grasp_z <= table_z_ || grasp_z >= table_z_ + std::min(pregrasp_height_, lift_min_height_))
+  {
+    setFailure("DETECTION_FAILED", "grasp height outside approach/lift clearance");
+    return false;
+  }
+  // 短边为夹爪闭合方向；grasp_rpy.yaw 用于补偿 TCP 与夹爪轴的标定偏差。
+  active_grasp_angle_ = use_detected_angle_ ? detected.grasp_angle : 0.0;
+  const auto reset_angle = [this](void*) { active_grasp_angle_ = 0.0; };
+  std::unique_ptr<void, decltype(reset_angle)> angle_guard(this, reset_angle);
   const double preplace_z = table_z_ + preplace_height_;// 放置前及放置后的退离高度
   ROS_INFO("Picking %s at [%.3f, %.3f, %.3f]", color.c_str(), object_x, object_y, grasp_z);
 
@@ -1782,7 +1839,7 @@ bool ColorSortingTask::pickAndPlace(const aubo_perception::DetectedObject& detec
   attachment_attempted = use_grasp_attachment_;
   if (!setGraspAttachment(object_model_name, true))// 夹爪吸附目标物体
     return false;
-  if (!commandGripper(gripper_closed_))// 夹爪闭合
+  if (!commandGripper(close_command))// 夹爪闭合
   {
     setGraspAttachment(object_model_name, false);// 夹爪闭合失败 释放吸附
     return false;
@@ -1801,7 +1858,7 @@ bool ColorSortingTask::pickAndPlace(const aubo_perception::DetectedObject& detec
   double place_y = 0.0;
   if (!xyInTargetFrame(place_frame_, place->second, place_x, place_y) ||      // 将目标放置位置转换到目标坐标系下
       !moveToPose(makePose(place_x, place_y, preplace_z), color + " pre-place") ||  // 移动到目标放置位置上方
-      !cartesianTo(makePose(place_x, place_y, grasp_z + place_clearance_), color + " place") || // 移动到目标放置位置
+      !cartesianTo(makePose(place_x, place_y, expected_center + grasp_height_offset_ + place_clearance_), color + " place") || // 移动到目标放置位置
       !commandGripper(gripper_open_) || !setGraspAttachment(object_model_name, false) || // 夹爪张开 释放吸附
       !wallSleep(0.5, stop_requested_))
     return false;

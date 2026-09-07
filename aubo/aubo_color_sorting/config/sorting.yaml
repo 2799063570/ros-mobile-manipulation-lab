@@ -58,3 +58,13 @@ planning_time: 12.0
 velocity_scaling: 0.15
 acceleration_scaling: 0.15
 finish_named_target: down
+
+# depth 模式在任务侧再次校验物体中心高度；与感知 height_tolerance 保持一致。
+height_tolerance: 0.02
+# 开启 use_detected_width 前必须实测以下开口（米），对应 gripper_open/closed。
+# -1 表示未标定，禁止带着占位值开启宽度控制。
+gripper_width_open: -1.0
+gripper_width_closed: -1.0
+width_close_scale: 0.90
+# 检测角度以基座 XY 平面内的短边为准；grasp_rpy 的 yaw 为夹爪轴偏置。
+# sort_colors/place_targets 的键也可填写任意 YOLO 类别，例如 bottle。

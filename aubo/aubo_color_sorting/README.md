@@ -1,5 +1,39 @@
 # AUBO 固定机械臂颜色抓取分拣
 
+## 通用颜色 / YOLO 抓取入口
+
+感知规则与消息定义见 [aubo_perception](../aubo_perception/README.md)。
+`sorting.launch` 现在通过共用几何层接收颜色旋转框或 YOLO OBB，任务默认为 C++，
+备用 `task_executable:=color_sorting_task.py` 使用相同参数。
+
+```bash
+# 机械臂控制器、MoveIt、相机和 TF 已运行；启动后仍等待 /sorting/start。
+roslaunch aubo_color_sorting sorting.launch detector:=color height_mode:=table
+
+# 深度高度 + 眼在手外 + YOLO；自定义配置须设置类别及放置位置。
+roslaunch aubo_color_sorting sorting.launch detector:=yolo height_mode:=depth \
+  camera_mount:=eye_to_hand model_path:=/absolute/path/obb.pt \
+  task_config:=/absolute/path/task.yaml
+
+# 仿真可以在原入口选择高度模式
+roslaunch aubo_color_sorting sorting_gazebo.launch height_mode:=depth
+```
+
+`table_z` 与 `object_height` 由 launch 同时传给感知和任务；`perception_config` 提供
+工作区、类别物高与深度误差容限，`task_config` 提供 `sort_colors/place_targets`、
+任务侧 `height_tolerance` 和夹爪配置。实机请设置 `use_grasp_attachment:=false`。
+眼在手外的真实相机话题与默认值不同可通过 `camera_namespace:=/实际相机` 覆盖。
+
+默认启用检测角度、保持夹爪向下。普通水平框模型须显式设置
+`use_detected_angle:=false` 使用固定角度；不能将水平框假装成可靠 OBB。
+自动宽度默认关闭；实测 `gripper_width_open/gripper_width_closed` 与
+`gripper_open/gripper_closed` 对应关系后，使用 `use_detected_width:=true`。
+`width_close_scale` 默认 0.90。当前宽度换算只用于 trajectory 夹爪后端。
+
+原颜色节点的 `use_depth` 不再控制新入口的抓取 Z；统一使用 `height_mode`。
+旧场景配置里 `projection_plane_z/object_center_z` 等仅属于旧节点的参数也不再决定新入口几何。
+
+
 `aubo_color_sorting` 是不带移动底盘的 AUBO i5 颜色分拣场景包。它保存固定平台的
 参数、world 和启动入口，并组合 `aubo_perception`、`aubo_sorting_core` 与
 `aubo_gazebo_plugins`。腕部 RGB-D 相机利用对齐深度图计算方块顶面的三维中心，

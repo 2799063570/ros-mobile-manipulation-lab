@@ -1,0 +1,22 @@
+# 通用 HSV 2D 前端；3D 工作区和高度规则见 grasp_pipeline.yaml。
+colors:
+  red:
+    ranges:
+      - {lower: [0, 110, 70], upper: [12, 255, 255]}
+      - {lower: [168, 110, 70], upper: [179, 255, 255]}
+    draw_bgr: [0, 0, 255]
+  green:
+    ranges:
+      - {lower: [38, 70, 55], upper: [88, 255, 255]}
+    draw_bgr: [0, 255, 0]
+  blue:
+    ranges:
+      - {lower: [95, 90, 55], upper: [132, 255, 255]}
+    draw_bgr: [255, 0, 0]
+
+min_contour_area: 180.0
+max_contour_area: 8000.0
+# 过滤画面边缘被截断的细长分类色块，只保留接近方形的抓取目标。
+max_aspect_ratio: 1.6
+morphology_kernel: 5
+

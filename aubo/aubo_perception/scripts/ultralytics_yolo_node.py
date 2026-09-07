@@ -73,6 +73,9 @@ class UltralyticsYoloNode:
         self.model_path = Path(
             rospy.get_param("~model_path", str(self.project_path / "weights/GC-yolo.pt"))
         ).expanduser().resolve()    
+        self.input_mode = rospy.get_param("~input_mode", "topic")
+        if self.input_mode not in ("topic", "image"):
+            raise ValueError("input_mode must be topic or image")
         self.confidence = float(rospy.get_param("~confidence", 0.25))
         self.iou = float(rospy.get_param("~iou", 0.70))
         self.image_size = int(rospy.get_param("~image_size", 640))
@@ -101,13 +104,23 @@ class UltralyticsYoloNode:
         annotated_topic = rospy.get_param("~annotated_image_topic", "/yolo/annotated_image")
         image_topic = rospy.get_param("~image_topic", "/camera/color/image_raw")
         self.detections_publisher = rospy.Publisher(
-            detections_topic, YoloDetectionArray, queue_size=1
+            detections_topic, YoloDetectionArray, queue_size=1, latch=self.input_mode == "image"
         )
-        self.annotated_publisher = rospy.Publisher(annotated_topic, Image, queue_size=1)
-        self.image_subscriber = rospy.Subscriber(
-            image_topic, Image, self.image_callback, queue_size=1, buff_size=2**24
-        )
-        rospy.loginfo("Ultralytics YOLO: %s -> %s", image_topic, detections_topic)
+        self.annotated_publisher = rospy.Publisher(annotated_topic, Image, queue_size=1, latch=self.input_mode == "image")
+        if self.input_mode == "topic":
+            self.image_subscriber = rospy.Subscriber(
+                image_topic, Image, self.image_callback, queue_size=1, buff_size=2**24)
+        else:
+            # 单张本地图片仅用于 2D 离线检测；零时间戳防止与实时深度错误配对。
+            import cv2
+            path = Path(rospy.get_param("~image_path", "")).expanduser()
+            image = cv2.imread(str(path)) if path.is_file() else None
+            if image is None:
+                raise ValueError("cannot read image_path: {}".format(path))
+            source = Image()
+            source.header.frame_id = rospy.get_param("~image_frame", "offline_image")
+            self.image_callback(bgr_to_image_message(image, source))
+        rospy.loginfo("Ultralytics YOLO input=%s -> %s", self.input_mode, detections_topic)
 
     @staticmethod
     def _name(result, class_id: int) -> str:
@@ -117,7 +130,7 @@ class UltralyticsYoloNode:
             return str(result.names[class_id])
         return str(class_id)
 
-    def _new_detection(self, result, row, class_id, confidence, angle=0.0):
+    def _new_detection(self, result, row, class_id, confidence, angle=0.0, oriented=False):
         detection = YoloDetection()
         detection.class_id = int(class_id)
         detection.class_name = self._name(result, detection.class_id)
@@ -125,6 +138,7 @@ class UltralyticsYoloNode:
         detection.center_x, detection.center_y = float(row[0]), float(row[1])
         detection.width, detection.height = float(row[2]), float(row[3])
         detection.angle = float(angle)
+        detection.orientation_valid = oriented
         return detection
 
     def _append_detections(self, output: YoloDetectionArray, result) -> None:
@@ -135,7 +149,7 @@ class UltralyticsYoloNode:
             confidences = obb.conf.detach().cpu().numpy()
             for row, class_id, confidence in zip(rows, classes, confidences):
                 output.detections.append(
-                    self._new_detection(result, row, class_id, confidence, row[4])
+                    self._new_detection(result, row, class_id, confidence, row[4], True)
                 )
             return
 
@@ -172,10 +186,12 @@ class UltralyticsYoloNode:
             output.header = message.header
             self._append_detections(output, result) # 获取检测结果
             self.detections_publisher.publish(output)
-            if self.publish_annotated and self.annotated_publisher.get_num_connections():
+            if self.publish_annotated and (self.input_mode == "image" or self.annotated_publisher.get_num_connections()):
                 self.annotated_publisher.publish(bgr_to_image_message(result.plot(), message))
         except Exception as error:
             rospy.logerr_throttle(2.0, "YOLO inference failed: %s", str(error))
+            if self.input_mode == "image":
+                raise
         finally:
             self.inference_lock.release()
 

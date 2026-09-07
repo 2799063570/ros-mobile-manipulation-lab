@@ -16,6 +16,8 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_sensor_msgs
 )
 
+catkin_python_setup()
+
 add_message_files(FILES
   DetectedObject.msg
   DetectedObjectArray.msg
@@ -54,3 +56,7 @@ install(TARGETS workspace_cloud_filter_node
 install(FILES README.md
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
+
+if(CATKIN_ENABLE_TESTING)
+  catkin_add_nosetests(test)
+endif()

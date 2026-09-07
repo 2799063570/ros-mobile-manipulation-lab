@@ -1,5 +1,7 @@
 <?xml version="1.0"?>
 <launch>
+  <arg name="height_mode" default="table"/>
+  <arg name="detector" default="color"/>
   <arg name="world" default="$(find aubo_color_sorting)/worlds/sorting.world"/>
   <arg name="gui" default="true"/>
   <arg name="rviz" default="true"/>
@@ -44,6 +46,8 @@
   </include>
 
   <include file="$(find aubo_color_sorting)/launch/sorting.launch">
+    <arg name="height_mode" value="$(arg height_mode)"/>
+    <arg name="detector" value="$(arg detector)"/>
     <arg name="task_executable" value="$(arg task_executable)"/>
     <arg name="debug_view" value="$(arg debug_view)"/>
     <arg name="auto_move_to_observation" value="$(arg auto_move_to_observation)"/>

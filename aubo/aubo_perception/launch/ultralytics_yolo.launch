@@ -2,17 +2,23 @@
   <arg name="config" default="$(find aubo_perception)/config/ultralytics_yolo.yaml"/>
   <arg name="python" default="/home/zlab/anaconda3/envs/yolo/bin/python"/>
 
+  <arg name="input_mode" default="topic"/>
+  <arg name="image_path" default=""/>
+  <arg name="detections_topic" default="/yolo/detections"/>
   <arg name="image_topic" default="/camera/color/image_raw"/>
   <arg name="model_path" default="/home/zlab/deepL/code/ultralytics-main-modify/weights/GC-yolo.pt"/>
   <arg name="annotated_image_topic" default="/yolo/annotated_image"/>
   <node pkg="aubo_perception"
-        type="ultralytics_yolo_node.sh"
+        type="ultralytics_yolo_node.py"
+        launch-prefix="$(arg python)"
         name="ultralytics_yolo"
         output="screen">
     <rosparam command="load" file="$(arg config)"/>
+    <param name="detections_topic" value="$(arg detections_topic)"/>
     <param name="image_topic" value="$(arg image_topic)"/>
     <param name="model_path" value="$(arg model_path)"/>
     <param name="annotated_image_topic" value="$(arg annotated_image_topic)"/>
-    <param name="python_executable" value="$(arg python)"/>
+    <param name="input_mode" value="$(arg input_mode)"/>
+    <param name="image_path" value="$(arg image_path)"/>
   </node>
 </launch>

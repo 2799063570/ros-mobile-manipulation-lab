@@ -27,6 +27,10 @@ class DepthCacheTest(unittest.TestCase):
         self.node._depth_lock = threading.Lock()
         self.node._depth_cache = deque(maxlen=3)
         self.node.backend = 'ultralytics'
+        self.node.height_mode = 'depth'
+        self.node.task_mode = 'sorting'
+        self.node.target_frame = 'base_link'
+        self.node.detections_publisher = Mock()
         self.node.maximum_depth_age = 0.05
         self.node._callback = Mock()
 
