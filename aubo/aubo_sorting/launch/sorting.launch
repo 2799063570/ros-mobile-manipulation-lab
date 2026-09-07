@@ -21,12 +21,16 @@
   <arg name="object_height" default="0.04"/>
   <arg name="use_detected_angle" default="true"/>
   <arg name="use_detected_width" default="false"/>
-  <arg name="task_config" default="$(find aubo_color_sorting)/config/sorting.yaml"/>
+  <arg name="task_config" default="$(find aubo_sorting)/config/sorting.yaml"/>
+  <arg name="colors_config" default="$(find aubo_sorting)/config/colors.yaml"/>
+  <arg name="yolo_config" default="$(find aubo_perception)/config/ultralytics_yolo.yaml"/>
+  <arg name="debug_image_topic" default="$(eval '/sorting/debug_image' if arg('detector') == 'color' else '/yolo/annotated_image')"/>
   <arg name="perception_config" default="$(find aubo_perception)/config/grasp_pipeline.yaml"/>
   <arg name="python" default="/home/zlab/anaconda3/envs/yolo/bin/python"/>
   <arg name="model_path" default="/home/zlab/deepL/code/ultralytics-main-modify/weights/GC-yolo.pt"/>
   <include if="$(arg start_perception)" file="$(find aubo_perception)/launch/grasp_perception.launch">
-    <arg name="colors_config" value="$(find aubo_color_sorting)/config/colors.yaml"/>
+    <arg name="colors_config" value="$(arg colors_config)"/>
+    <arg name="yolo_config" value="$(arg yolo_config)"/>
     <arg name="detector" value="$(arg detector)"/>
     <arg name="camera_mount" value="$(arg camera_mount)"/>
     <arg name="camera_namespace" value="$(arg camera_namespace)"/>
@@ -53,6 +57,6 @@
 
   <node if="$(arg debug_view)" pkg="image_view" type="image_view"
         name="sorting_debug_view" output="screen">
-    <remap from="image" to="/sorting/debug_image"/>
+    <remap from="image" to="$(arg debug_image_topic)"/>
   </node>
 </launch>

@@ -54,7 +54,7 @@ def finger_band(urdf, name, q, low, high):
 
 class ClearanceTest(unittest.TestCase):
     def test_cube_fits_calibrated_gripper(self):
-        config = yaml.safe_load((ROOT / 'aubo_mobile_robot/aubo_mobile_nav_sorting/config/sorting.yaml').read_text())
+        config = yaml.safe_load((ROOT / 'aubo/aubo_mobile_nav_sorting/config/sorting.yaml').read_text())
         urdf = ET.parse(str(DESCRIPTION / 'urdf/jiazhua.urdf'))
         tcp_z = float(urdf.find("joint[@name='gripper_joint']/origin").get('xyz').split()[2])
         cube_centre = tcp_z + config['grasp_height_offset']

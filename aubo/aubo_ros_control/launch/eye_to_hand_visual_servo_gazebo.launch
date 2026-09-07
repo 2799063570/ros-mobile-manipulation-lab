@@ -11,7 +11,7 @@
   <arg name="target_topic" default="/visual_servo/target_pose"/>
   <arg name="loss_strategy" default="stop"/>
   <arg name="start_perception" default="true"/>
-  <arg name="world" default="$(find aubo_color_sorting)/worlds/sorting.world"/>
+  <arg name="world" default="$(find aubo_sorting)/worlds/sorting.world"/>
 
   <!-- 固定相机由 world 提供；机械臂使用无腕部相机模型，避免产生重复图像话题。 -->
   <include file="$(find aubo_gazebo)/launch/aubo_world_gazebo.launch">

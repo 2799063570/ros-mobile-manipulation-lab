@@ -27,7 +27,7 @@
   <depend>rviz</depend>
   <build_depend>qtbase5-dev</build_depend>
   <exec_depend>joint_state_controller</exec_depend>
-  <exec_depend>aubo_color_sorting</exec_depend>
+  <exec_depend>aubo_sorting</exec_depend>
   <exec_depend>aubo_perception</exec_depend>
   <exec_depend>image_view</exec_depend>
   <exec_depend>joint_state_publisher</exec_depend>

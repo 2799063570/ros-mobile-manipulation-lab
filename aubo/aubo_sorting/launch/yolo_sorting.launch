@@ -1,0 +1,30 @@
+<?xml version="1.0"?>
+<launch>
+  <!--兼容/便捷入口；参数与执行逻辑统一由 aubo_sorting 维护。-->
+  <arg name="start_perception" default="true" />
+  <arg name="start_task" default="true" />
+  <arg name="task_executable" default="color_sorting_task_cpp" />
+
+  <arg name="debug_view" default="false" />
+  <arg name="auto_move_to_observation" default="true" />
+  <arg name="auto_start" default="false" />
+  <arg name="use_grasp_attachment" default="true" />
+
+
+  <arg name="detector" value="yolo" />
+  <arg name="camera_mount" default="eye_in_hand" />
+  <arg name="camera_namespace" default="$(eval '/camera' if arg('camera_mount') == 'eye_in_hand' else '/workspace_camera')" />
+  <arg name="height_mode" default="table" />
+  <arg name="table_z" default="0.10" />
+  <arg name="object_height" default="0.04" />
+  <arg name="use_detected_angle" default="true" />
+  <arg name="use_detected_width" default="false" />
+  <arg name="task_config" default="$(find aubo_sorting)/config/sorting.yaml" />
+  <arg name="colors_config" default="$(find aubo_sorting)/config/colors.yaml" />
+  <arg name="yolo_config" default="$(find aubo_perception)/config/ultralytics_yolo.yaml" />
+  <arg name="debug_image_topic" default="$(eval '/sorting/debug_image' if arg('detector') == 'color' else '/yolo/annotated_image')" />
+  <arg name="perception_config" default="$(find aubo_perception)/config/grasp_pipeline.yaml" />
+  <arg name="python" default="/home/zlab/anaconda3/envs/yolo/bin/python" />
+  <arg name="model_path" default="/home/zlab/deepL/code/ultralytics-main-modify/weights/GC-yolo.pt" />
+  <include file="$(find aubo_sorting)/launch/sorting.launch" pass_all_args="true" />
+  </launch>

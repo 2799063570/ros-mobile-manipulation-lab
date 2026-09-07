@@ -4,13 +4,14 @@ import math
 import unittest
 import xml.etree.ElementTree as ET
 import yaml
+from roslib.packages import get_pkg_dir
 
 
 class NamedTargetContractTest(unittest.TestCase):
     def test_navigation_sorting_targets_are_complete_srdf_arm_states(self):
         package = Path(__file__).resolve().parents[1]
         config = yaml.safe_load((package / 'config/sorting.yaml').read_text())
-        srdf = ET.parse(str(package.parent / 'aubo_mobile_moveit_config/config/aubo_mobile_robot.srdf'))
+        srdf = ET.parse(str(Path(get_pkg_dir('aubo_mobile_moveit_config')) / 'config/aubo_mobile_robot.srdf'))
         group = config['planning_group']
         states = {state.get('name'): state for state in srdf.findall('group_state')
                   if state.get('group') == group}

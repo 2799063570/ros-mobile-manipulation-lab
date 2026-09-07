@@ -105,7 +105,7 @@ aubo_mobile_robot
 - `aubo_gazebo`：Gazebo 仿真和 `ros_control` 控制器；
 - `aubo_moveit_config`：MoveIt 运动规划配置；
 - `aubo_planning`：夹爪控制、抓取和放置示例；
-- `aubo_color_sorting`：固定底座机械臂的腕部相机颜色识别、抓取和分类放置；
+- `aubo_sorting`：固定底座机械臂的颜色 / YOLO 感知、抓取和分类放置；
 - `aubo_perception`：固定和移动平台共用的视觉消息与颜色检测；
 - `aubo_sorting_core`：固定和移动平台共用的 MoveIt 分拣状态机；
 - `aubo_gazebo_plugins`：仿真场景共用的抓取辅助插件；
@@ -131,6 +131,9 @@ aubo_mobile_robot
 | `aubo_mobile_perception`    | 移动平台的视觉参数与启动入口（算法复用 `aubo_perception`） |
 | `aubo_mobile_sorting`       | 红、绿、蓝方块的视觉抓取与分类放置                         |
 | `aubo_mobile_nav_sorting`   | 导航到工位后执行自动分拣的完整任务编排                     |
+
+其中 `aubo_mobile_sorting`、`aubo_mobile_nav_sorting` 的源码已移到 `aubo/`，
+与 `aubo_sorting`（颜色 / YOLO）集中维护；ROS 包名保持不变。
 
 完整任务流程为：
 
@@ -449,13 +452,13 @@ roslaunch aubo_ros_control aubo_real_bringup.launch robot_ip:=192.168.1.2
 MoveIt 位置限制统一为 `-60°` 到 `60°`：
 
 ```bash
-roslaunch aubo_color_sorting sorting_gazebo.launch
+roslaunch aubo_sorting sorting_gazebo.launch
 rosservice call /sorting/start
 ```
 
 默认不会自动开始抓取；可先在 RViz 和 `/sorting/debug_image` 中检查轨迹与识别结果。
 完整参数和真实机械臂接入方式见
-[`aubo_color_sorting/README.md`](aubo/aubo_color_sorting/README.md)。
+[`aubo_sorting/README.md`](aubo/aubo_sorting/README.md)。
 
 ### 复合机器人：基础仿真
 
@@ -610,7 +613,7 @@ map → odom → base_footprint → base_link → AUBO links → tcp_link
 - [AUBO 通用视觉感知](aubo/aubo_perception/README.md)
 - [AUBO 通用分拣核心](aubo/aubo_sorting_core/README.md)
 - [AUBO Gazebo 通用插件](aubo/aubo_gazebo_plugins/README.md)
-- [AUBO 固定机械臂颜色抓取分拣](aubo/aubo_color_sorting/README.md)
+- [AUBO 固定机械臂颜色 / YOLO 抓取分拣](aubo/aubo_sorting/README.md)
 - [AUBO 复合移动机器人概览](aubo_mobile_robot/README.md)
 - [眼在手外 RGB-D、OctoMap、YOLO 与视觉伺服](aubo_mobile_robot/EYE_TO_HAND_RGBD.md)
 - [项目演示视频与图片](aubo/video_or_img/README.md)
@@ -619,8 +622,8 @@ map → odom → base_footprint → base_link → AUBO links → tcp_link
 - [建图、定位与导航](aubo_mobile_robot/aubo_mobile_navigation/README.md)
 - [底盘与机械臂协调控制](aubo_mobile_robot/aubo_mobile_control/README.md)
 - [手部相机视觉感知](aubo_mobile_robot/aubo_mobile_perception/README.md)
-- [视觉抓取与颜色分拣](aubo_mobile_robot/aubo_mobile_sorting/README.md)
-- [导航与分拣完整任务](aubo_mobile_robot/aubo_mobile_nav_sorting/README.md)
+- [视觉抓取与颜色分拣](aubo/aubo_mobile_sorting/README.md)
+- [导航与分拣完整任务](aubo/aubo_mobile_nav_sorting/README.md)
 
 ## 致谢
 

@@ -1,8 +1,17 @@
 <?xml version="1.0"?>
 <launch>
+  <arg name="task_config" default="$(find aubo_sorting)/config/sorting.yaml" />
+  <arg name="perception_config" default="$(find aubo_perception)/config/grasp_pipeline.yaml" />
+  <arg name="colors_config" default="$(find aubo_sorting)/config/colors.yaml" />
+  <arg name="yolo_config" default="$(find aubo_perception)/config/ultralytics_yolo.yaml" />
+  <arg name="python" default="/home/zlab/anaconda3/envs/yolo/bin/python" />
+  <arg name="model_path" default="/home/zlab/deepL/code/ultralytics-main-modify/weights/GC-yolo.pt" />
+  <arg name="use_detected_angle" default="true" />
+  <arg name="use_detected_width" default="false" />
+
   <arg name="height_mode" default="table"/>
   <arg name="detector" default="color"/>
-  <arg name="world" default="$(find aubo_color_sorting)/worlds/sorting.world"/>
+  <arg name="world" default="$(find aubo_sorting)/worlds/sorting.world"/>
   <arg name="gui" default="true"/>
   <arg name="rviz" default="true"/>
   <arg name="debug_view" default="false"/>
@@ -22,12 +31,12 @@
     <arg name="z_pos" value="0.0"/>
   </include>
 
-  <!-- 分拣目标引导垫是否加载到gazebo中  
+  <!-- 分拣目标引导垫是否加载到gazebo中
         如果把大块彩色垫子放进共享的 world 文件里，视觉伺服相关的 launch（比如单独测试夹爪视觉追踪）启动时，
         相机视野里也会有这些大色块，感知模块可能把它们误认为是待抓取的物理方块，导致检测混乱。-->
   <node if="$(arg show_sorting_pads)" name="spawn_sorting_pads"
         pkg="gazebo_ros" type="spawn_model" output="screen"
-        args="-sdf -file $(find aubo_color_sorting)/models/sorting_pads/model.sdf -model sorting_pads"/>
+        args="-sdf -file $(find aubo_sorting)/models/sorting_pads/model.sdf -model sorting_pads"/>
 
   <include file="$(find aubo_gazebo)/launch/aubo_controller_gazebo.launch"/>
 
@@ -45,7 +54,16 @@
     <arg name="robot_srdf" value="aubo_i5_with_camera.srdf"/>
   </include>
 
-  <include file="$(find aubo_color_sorting)/launch/sorting.launch">
+  <include file="$(find aubo_sorting)/launch/sorting.launch">
+    <arg name="task_config" value="$(arg task_config)"/>
+    <arg name="perception_config" value="$(arg perception_config)"/>
+    <arg name="colors_config" value="$(arg colors_config)"/>
+    <arg name="yolo_config" value="$(arg yolo_config)"/>
+    <arg name="python" value="$(arg python)"/>
+    <arg name="model_path" value="$(arg model_path)"/>
+    <arg name="use_detected_angle" value="$(arg use_detected_angle)"/>
+    <arg name="use_detected_width" value="$(arg use_detected_width)"/>
+
     <arg name="height_mode" value="$(arg height_mode)"/>
     <arg name="detector" value="$(arg detector)"/>
     <arg name="task_executable" value="$(arg task_executable)"/>

@@ -11,7 +11,7 @@
   <arg name="rviz" default="true"/>
   <arg name="debug_view" default="false"/>
   <arg name="paused" default="false"/>
-  <arg name="world" default="$(find aubo_color_sorting)/worlds/sorting.world"/>
+  <arg name="world" default="$(find aubo_sorting)/worlds/sorting.world"/>
 
   <!-- 加载带腕部相机的机械臂模型、Gazebo 场景和 robot_state_publisher。 -->
   <include file="$(find aubo_gazebo)/launch/aubo_world_gazebo.launch">

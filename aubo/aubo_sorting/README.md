@@ -1,4 +1,20 @@
-# AUBO 固定机械臂颜色抓取分拣
+# AUBO 固定机械臂颜色 / YOLO 抓取分拣
+
+正式包名为 `aubo_sorting`，同时支持颜色和 YOLO。旧 `aubo_color_sorting` 包已移除，
+自定义 launch 和脚本请改用 `aubo_sorting`。
+
+```bash
+# 两种入口共用 sorting.launch 和 aubo_sorting_core
+roslaunch aubo_sorting color_sorting.launch
+roslaunch aubo_sorting yolo_sorting.launch model_path:=/实际路径/obb.pt task_config:=/实际路径/task.yaml
+```
+
+也可继续使用 `sorting.launch detector:=color/yolo`。`config/sorting.yaml` 是共用的机械臂、
+桌面和夹爪任务配置，内含红绿蓝方块示例；YOLO 应通过 `task_config` 指定实际
+`sort_colors`（该旧参数名表示通用类别列表）和 `place_targets`，不要将示例颜色当成模型类别。
+`colors_config` 指定 HSV 阈值，`yolo_config` 指定模型推理配置，`perception_config` 指定共用 3D 规则。
+仿真入口同样支持这些配置以及 `model_path/python`；切换 detector 不会自动改变仿真物体或训练模型。
+
 
 ## 通用颜色 / YOLO 抓取入口
 
@@ -8,15 +24,15 @@
 
 ```bash
 # 机械臂控制器、MoveIt、相机和 TF 已运行；启动后仍等待 /sorting/start。
-roslaunch aubo_color_sorting sorting.launch detector:=color height_mode:=table
+roslaunch aubo_sorting sorting.launch detector:=color height_mode:=table
 
 # 深度高度 + 眼在手外 + YOLO；自定义配置须设置类别及放置位置。
-roslaunch aubo_color_sorting sorting.launch detector:=yolo height_mode:=depth \
+roslaunch aubo_sorting sorting.launch detector:=yolo height_mode:=depth \
   camera_mount:=eye_to_hand model_path:=/absolute/path/obb.pt \
   task_config:=/absolute/path/task.yaml
 
 # 仿真可以在原入口选择高度模式
-roslaunch aubo_color_sorting sorting_gazebo.launch height_mode:=depth
+roslaunch aubo_sorting sorting_gazebo.launch height_mode:=depth
 ```
 
 `table_z` 与 `object_height` 由 launch 同时传给感知和任务；`perception_config` 提供
@@ -34,7 +50,7 @@ roslaunch aubo_color_sorting sorting_gazebo.launch height_mode:=depth
 旧场景配置里 `projection_plane_z/object_center_z` 等仅属于旧节点的参数也不再决定新入口几何。
 
 
-`aubo_color_sorting` 是不带移动底盘的 AUBO i5 颜色分拣场景包。它保存固定平台的
+`aubo_sorting` 是不带移动底盘的 AUBO i5 颜色 / YOLO 分拣场景包。它保存固定平台的
 参数、world 和启动入口，并组合 `aubo_perception`、`aubo_sorting_core` 与
 `aubo_gazebo_plugins`。腕部 RGB-D 相机利用对齐深度图计算方块顶面的三维中心，
 MoveIt 负责抓取和放置，Gazebo 通用插件提高小物体夹持稳定性。
@@ -61,7 +77,7 @@ MoveIt 负责抓取和放置，Gazebo 通用插件提高小物体夹持稳定性
 ```bash
 catkin_make
 source devel/setup.bash
-roslaunch aubo_color_sorting sorting_gazebo.launch
+roslaunch aubo_sorting sorting_gazebo.launch
 ```
 
 启动完成后，机械臂先进入 `observe` 观察姿态。确认调试图像和目标位置正常，再开始：
@@ -73,19 +89,19 @@ rosservice call /sorting/start
 也可以启动后自动执行：
 
 ```bash
-roslaunch aubo_color_sorting sorting_gazebo.launch auto_start:=true
+roslaunch aubo_sorting sorting_gazebo.launch auto_start:=true
 ```
 
 如需在没有彩色放置区域干扰的情况下调试分拣识别：
 
 ```bash
-roslaunch aubo_color_sorting sorting_gazebo.launch show_sorting_pads:=false
+roslaunch aubo_sorting sorting_gazebo.launch show_sorting_pads:=false
 ```
 
 无界面运行时可关闭 Gazebo、RViz 和图像窗口：
 
 ```bash
-roslaunch aubo_color_sorting sorting_gazebo.launch \
+roslaunch aubo_sorting sorting_gazebo.launch \
   gui:=false rviz:=false debug_view:=false
 ```
 
@@ -165,7 +181,7 @@ roslaunch aubo_color_sorting sorting_gazebo.launch \
 只启动算法节点：
 
 ```bash
-roslaunch aubo_color_sorting sorting.launch use_grasp_attachment:=false
+roslaunch aubo_sorting sorting.launch use_grasp_attachment:=false
 ```
 
 首次在真实设备运行时应保持 `auto_start:=false`，降低速度比例，并先检查相机外参、

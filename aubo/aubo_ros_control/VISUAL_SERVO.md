@@ -58,7 +58,7 @@ roslaunch aubo_ros_control eye_to_hand_visual_servo_real.launch \
 /visual_servo/state                    std_msgs/String
 ```
 
-两种 Gazebo 模式默认共用 `aubo_color_sorting/worlds/sorting.world`。该场景同时包含
+两种 Gazebo 模式默认共用 `aubo_sorting/worlds/sorting.world`。该场景同时包含
 红、绿、蓝分拣块以及 `workspace_camera`：眼在手上使用腕部相机，眼在手外使用固定
 相机，并用共同的 `target_label:=red|green|blue` 参数选择跟踪颜色。分拣用的彩色
 放置区域不在该 world 内，只由 `sorting_gazebo.launch` 按需生成，因此不会参与伺服

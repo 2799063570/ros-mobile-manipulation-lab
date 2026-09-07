@@ -2,8 +2,8 @@
   <arg name="config" default="$(find aubo_perception)/config/ultralytics_yolo.yaml"/>
   <arg name="python" default="/home/zlab/anaconda3/envs/yolo/bin/python"/>
 
-  <arg name="input_mode" default="topic"/>
-  <arg name="image_path" default=""/>
+  <arg name="input_mode" default="image"/><!-- topic | image -->
+  <arg name="image_path" default="/home/zlab/deepL/code/ultralytics-main-modify/test.jpg"/>
   <arg name="detections_topic" default="/yolo/detections"/>
   <arg name="image_topic" default="/camera/color/image_raw"/>
   <arg name="model_path" default="/home/zlab/deepL/code/ultralytics-main-modify/weights/GC-yolo.pt"/>

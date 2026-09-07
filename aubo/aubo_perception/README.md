@@ -108,7 +108,7 @@ HSV 的置信度是轮廓对旋转框的填充率，不等同于神经网络概�
 
 ## 接入机械臂分拣
 
-见 [分拣运行说明](../aubo_color_sorting/README.md)。默认 C++ 和备选 Python 任务均支持：
+见 [分拣运行说明](../aubo_sorting/README.md)。默认 C++ 和备选 Python 任务均支持：
 
 - `height_mode=table/depth`；深度模式在动作前再校验中心高度，失败即拒绝目标。
 - `use_detected_angle=true`；保持 `grasp_rpy` 的竖直向下姿态，yaw 增加检测角度。

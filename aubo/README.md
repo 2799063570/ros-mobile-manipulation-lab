@@ -1,7 +1,8 @@
 # AUBO 功能包分层说明
 
 顶层 `aubo/` 保存 AUBO 机械臂本体能力，以及固定底座和移动底盘都可以复用的
-通用能力。`aubo_mobile_robot/` 只保存移动底盘带来的模型、导航、平台参数和场景编排。
+通用能力，并集中保存固定机械臂分拣、移动分拣与导航分拣应用。
+`aubo_mobile_robot/` 保存移动底盘模型、导航、平台感知配置及统一 bringup。
 
 ## 演示素材
 
@@ -29,10 +30,14 @@
 
 固定机械臂应用
 ├── aubo_planning            # 抓放、夹爪及深度相机 OctoMap 避障示例
-└── aubo_color_sorting       # 固定场景参数、world 和启动入口
+└── aubo_sorting             # 固定机械臂颜色 / YOLO 分拣场景
+
+移动机械臂分拣应用（也位于 aubo/ 下）
+├── aubo_mobile_sorting      # 移动分拣参数、场景、RViz 面板和启动入口
+└── aubo_mobile_nav_sorting  # 导航到工位后执行分拣的任务编排
 ```
 
-依赖只能由场景层指向通用层。例如 `aubo_color_sorting` 和
+依赖只能由场景层指向通用层。例如 `aubo_sorting` 和
 `aubo_mobile_sorting` 都依赖 `aubo_sorting_core`，通用核心不能反向依赖任一平台
 场景。两套 MoveIt 配置对应不同机器人模型，应继续独立维护。
 
@@ -62,16 +67,21 @@ MoveIt和独立启动入口复用这些能力。
                 └── 仅在 Gazebo 中辅助保持小物体接触
 ```
 
-固定平台参数位于 `aubo_color_sorting/config/`；移动平台参数位于
+固定平台参数位于 `aubo_sorting/config/`；移动平台参数位于
 `aubo_mobile_perception/config/` 和 `aubo_mobile_sorting/config/`。不要在三个通用
 包中写死桌面高度、控制器命名或具体 world。
 
 ## 兼容性说明
 
-原有场景启动命令继续有效：
+`aubo_color_sorting` 已正式更名为 `aubo_sorting`，旧包不再保留。
+两个移动分拣包从 `aubo_mobile_robot/` 迁入本目录，ROS 包名不变，
+通过 `$(find 包名)` 引用的资源和原移动分拣启动命令继续有效。
+迁移后请重新构建工作空间并加载 `devel/setup.bash`，刷新包路径与生成的启动脚本。
+
+当前场景启动命令：
 
 ```bash
-roslaunch aubo_color_sorting sorting_gazebo.launch
+roslaunch aubo_sorting sorting_gazebo.launch
 roslaunch aubo_mobile_sorting sorting_gazebo.launch
 ```
 

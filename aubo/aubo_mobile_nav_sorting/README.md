@@ -1,5 +1,8 @@
 # AUBO 复合机器人导航分拣任务
 
+本包源码现位于 `src/aubo/aubo_mobile_nav_sorting`，与固定机械臂分拣应用集中维护。
+ROS 包名仍为 `aubo_mobile_nav_sorting`，启动命令与 RViz 插件标识不变；移动平台资源通过包依赖引用。
+
 该功能包把已有模块组合成单工位或多工位完整场景：
 
 ```text
