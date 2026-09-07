@@ -8,7 +8,7 @@
   <arg name="goal_yaw" default="0.0"/>
   <arg name="direct_dock" default="true"/>
   <!-- python and cpp expose the same parameters, topics and services. -->
-  <arg name="implementation" default="python"/>
+  <arg name="implementation" default="cpp"/>
 
   <node if="$(eval arg('implementation') == 'python')"
         pkg="aubo_mobile_nav_sorting" type="nav_sorting_mission.py"

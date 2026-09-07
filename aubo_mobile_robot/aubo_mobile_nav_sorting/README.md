@@ -68,7 +68,7 @@ rosservice call /nav_sorting/start
 ```
 
 任务编排节点同时提供 Python 和 C++ 两种实现，对外话题、服务和 YAML 参数兼容。
-默认继续使用 Python；选择 C++ 实现时执行：
+默认使用 C++；显式选择时执行：
 
 ```bash
 roslaunch aubo_mobile_nav_sorting four_tables_gazebo.launch \
@@ -210,7 +210,8 @@ roslaunch aubo_mobile_nav_sorting navigation_sorting.launch \
 
 ## 6. 异常退出与验证
 
-Python 和 C++ 任务节点采用相同的取消规则：
+两种实现保留基础取消规则；本次执行对象拆分与在线停止恢复仅用于默认 C++ 实现，
+Python 保留为旧版对照实现：
 
 - `/nav_sorting/stop` 快速返回“停止请求已接受”；任务线程负责后续取消和确认。
   初始化等待和动作状态等待会响应停止，底盘控制等待不再依赖仿真时钟继续走动。
@@ -222,7 +223,8 @@ Python 和 C++ 任务节点采用相同的取消规则：
   未确认退出时发布 `STOP_UNCONFIRMED`，拒绝新任务，RViz 面板也禁止重新开始。
 - ROS 1 服务请求不能由调用方强制撤销。请求在超时后仍未返回时保留启动锁定；
   涉及分拣的迟到请求返回后会再次请求停止。应先排除服务故障、处理悬而未决的
-  请求并确认设备停止，再重启任务节点；不要仅靠重启任务节点来清除异常。
+  请求并确认设备停止。C++ 使用 `/nav_sorting/recover_stop` 重新验证；旧 Python 实现
+  仍需确认停止后重启任务节点，不能直接清除异常。
 - `sorting_base_lock_topic` 默认 `/sorting/base_locked`，必须与分拣核心的
   `base_lock_topic` 一致。终态与本次动作后的解锁消息也用于正常动作完成判断，
   避免把核心尚在清理时发布的 `ERROR` 当作已经可以移动底盘。
@@ -294,3 +296,79 @@ YOLO 模式使用 `four_tables_yolo.yaml` 的类别及默认放置区；现有 w
 本次在 `/tmp/sorting_validation` 中编译核心、Inspire 驱动和面板，避免修改原工作空间
 的 build/devel。深度缓存/反投影单元测试和原任务安全测试通过；未执行真机运动或
 Gazebo 完整抓取验收。
+
+## 7. C++ 执行对象与线程约定
+
+默认启动 C++ 实现。`aubo_mobile_nav_sorting_execution` 导出可复用执行库，
+节点入口独立为 `navigation_sorting_mission_node.cpp`：
+
+| 对象 | 负责内容 |
+| --- | --- |
+| `ArmExecutor` | `home / prepare / observe / sort`、工位配置、状态订阅、停止确认 |
+| `BaseExecutor` | move_base 目标、TF、航向校正、直线精靠／退让、零速度与取消 |
+| `NavigationSortingMission` | 工位顺序、近场候选选择、机械臂与底盘执行顺序、恢复策略 |
+| `MissionContext` | 参数加载与校验、共享状态、取消信号及状态输出 |
+
+其他 C++ 节点可以构造 `MissionContext(nh, private_nh)`，再组合所需执行器，链接
+`aubo_mobile_nav_sorting_execution`。调用执行方法的工作线程必须唯一；停止底盘
+和 ROS 回调可并发。Context 必须比执行器活得更久，销毁执行器前停止 spinner 并
+等待工作线程退出。组合两种执行器时应设置 `context.stop_base` 为底盘的 `stopBase()`；
+单独复用机械臂执行器时默认回调为空。可选设置 `context.state_publisher_` 接收任务状态。
+
+任务状态为 `enum class MissionState`，下游分拣状态为 `enum class SortingState`。
+字符串只在 ROS 消息边界解析／序列化，未知状态不能作为成功或停止确认。
+原有 `STATE | detail` 话题格式保持兼容。
+
+并发访问规则：
+
+- `lifecycle_mutex_` 串行化启动、停止恢复的受理和工作线程替换。
+- Context 的 `mutex_` 保护分拣状态、故障、底盘锁消息及序号；动态参数在同一把锁下
+  检查 `busy_`。任务／恢复执行期间拒绝修改，工作线程读取参数不必逐项加锁。
+- 停止请求、未确认标志和悬而未决 RPC 数量使用原子变量。RPC 线程持有自己的数据，
+  不捕获任务对象；迟到请求及其补发停止都结束后才允许恢复。
+- 底盘 `command_mutex_` 保护 action client 与速度发布；发送前检查停止和底盘锁。
+  与共享状态同时加锁时固定先 Context、再 command；不持锁进行 TF 查询或运动等待。
+- `operation_active_`、`base_pose_failed_` 为唯一执行线程的局部执行状态，
+  不供订阅回调读写，不需要再添加线程锁。
+
+### 停止未确认的恢复
+
+排除下游服务故障后，点击 RViz 的“重新确认停止”，或执行：
+
+```bash
+rosservice call /nav_sorting/recover_stop "{}"
+```
+
+服务返回“已接受”只表示开始验证。只有旧 RPC（包括迟到补发的停止）全部结束、
+重新调用 `/sorting/stop` 成功，并收到本次验证之后的新终态及新解锁消息，
+才清除 `stop_unconfirmed_` 并发布 `STOPPED`。失败仍保持 `STOP_UNCONFIRMED`；
+恢复操作不会自动启动任务。分拣核心在已初始化且空闲时也会响应停止并发布新确认，
+因此本包和 `aubo_sorting_core` 需要一起重新编译。
+
+### SRDF 与命名姿态
+
+导航分拣配置使用以下映射，关节值统一来自移动机器人 SRDF：
+
+| 调用 | 配置参数 | SRDF 名称 |
+| --- | --- | --- |
+| `/sorting/home` | `finish_named_target` | `transport`（导航时收拢） |
+| `/sorting/prepare_work` | `work_ready_named_target` | `work_ready`（到站后准备） |
+| `/sorting/move_to_observation` | `observation_named_target` | `observe` |
+
+`home` 是服务名称，不是要求 SRDF 存在名为 `home` 的姿态。当前 SRDF 的 `work_ready`
+与 `down` 关节值相同，是不同任务语义的别名。本次没有修改机器人姿态关节角度。
+分拣核心启动时核对实际加载的规划组命名目标；缺失时报告 `CONFIGURATION_FAILED`
+并拒绝就绪，执行时也检查 `setNamedTarget` 的返回值。
+
+### 自动验证
+
+```bash
+catkin_make --pkg aubo_mobile_nav_sorting aubo_sorting_core
+catkin_make run_tests_aubo_mobile_nav_sorting
+catkin_test_results
+```
+
+新增测试包括状态枚举边界、配置与 SRDF 的名称／关节覆盖，以及真实 C++ 节点配合
+模拟 ROS 服务／action 的任务、取消、恢复和并发路径。`rostest` 使用独立 master，
+不需要连接机器人；测试日志保存在 `/tmp/nav_mission_test_*.log`。这些测试不代替
+Gazebo 中的路径、碰撞和实际到位验证。

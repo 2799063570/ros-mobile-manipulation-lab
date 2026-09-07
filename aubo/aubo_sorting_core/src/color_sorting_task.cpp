@@ -835,6 +835,18 @@ bool ColorSortingTask::configureWorkspaceService(std_srvs::Trigger::Request&,
 
 void ColorSortingTask::initialize()
 {
+  // Resolve configured names against the actually loaded SRDF, before accepting work.
+  const auto names = arm_->getNamedTargets();
+  for (const auto& target : {work_ready_named_target_, observation_named_target_, finish_named_target_})
+  {
+    if (!target.empty() && std::find(names.begin(), names.end(), target) == names.end())
+    {
+      busy_.store(false);
+      setFailure("CONFIGURATION_FAILED", "SRDF group '" + group_name_ + "' has no named target '" + target + "'");
+      publishState(State::ERROR, "configured named target missing from loaded SRDF");
+      return;
+    }
+  }
   if (!robot_limits_valid_) // 检证机械臂基座数第二个关节 是否在范围[-60, 60]内
   {
     busy_.store(false);
@@ -965,6 +977,7 @@ bool ColorSortingTask::startService(std_srvs::Trigger::Request&,
 bool ColorSortingTask::stopService(std_srvs::Trigger::Request&,
                                    std_srvs::Trigger::Response& response)
 {
+  std::lock_guard<std::mutex> lock(operation_mutex_);
   stop_requested_.store(true);
   if (gripper_client_)
     gripper_client_->cancelAllGoals();
@@ -980,6 +993,14 @@ bool ColorSortingTask::stopService(std_srvs::Trigger::Request&,
     }
   }
   arm_->stop();
+  if (!busy_.load() && initialized_.load())
+  {
+    // Idle stop must also provide fresh acknowledgement for mission recovery.
+    std_msgs::Bool unlocked;
+    unlocked.data = false;
+    base_lock_publisher_.publish(unlocked);
+    publishState(State::STOPPED, "idle stop confirmed");
+  }
   response.success = true;
   response.message = "stop requested";
   return true;
@@ -1187,7 +1208,11 @@ bool ColorSortingTask::moveNamed(const std::string& target)
     return true;
   }
   ROS_INFO_STREAM("Moving arm to named target " << target);
-  arm_->setNamedTarget(target);
+  if (!arm_->setNamedTarget(target))
+  {
+    setFailure("CONFIGURATION_FAILED", "cannot select SRDF target '" + target + "'");
+    return false;
+  }
   return planAndExecute("named target '" + target + "'") && !stop_requested_.load();
 }
 

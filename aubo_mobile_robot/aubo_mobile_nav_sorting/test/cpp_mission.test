@@ -1,0 +1,4 @@
+<launch>
+  <test test-name="cpp_mission" pkg="aubo_mobile_nav_sorting"
+        type="cpp_mission_rostest.py" time-limit="120"/>
+</launch>

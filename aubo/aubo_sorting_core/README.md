@@ -62,3 +62,7 @@ C++ 实现内部使用 `enum class State`；`/sorting/state` 仍保留原字符�
 参数 `inspire_speed=500`、`inspire_force=100`、`inspire_motion_timeout=5.0` 可调整。
 张开等待状态 1；闭合等待状态 2 或 6；超时/异常调用停止服务。
 `inspire_gripper/get_state.srv` 新增 `motion_state`，需要一起重新编译驱动和任务节点。
+
+导航分拣停止恢复：已初始化且空闲时再次调用 `/sorting/stop`，会发布新的
+`STOPPED` 与 `base_locked=false`，供导航编排确认停止。C++ 初始化时检查配置的
+named target 是否存在于实际加载的 SRDF 规划组，配置不一致时不会进入就绪。

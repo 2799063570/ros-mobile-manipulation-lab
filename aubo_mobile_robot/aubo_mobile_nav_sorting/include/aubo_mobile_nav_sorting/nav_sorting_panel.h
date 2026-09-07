@@ -31,6 +31,7 @@ Q_SIGNALS:
 private Q_SLOTS:
   void startMission();
   void stopMission();
+  void recoverStop();
   void applyParameters();
   void refreshParameters();
   void showMissionState(const QString& text);
@@ -44,6 +45,7 @@ private:
   ros::NodeHandle node_handle_;
   ros::ServiceClient start_client_;
   ros::ServiceClient stop_client_;
+  ros::ServiceClient recover_client_;
   ros::ServiceClient reconfigure_client_;
   ros::Subscriber mission_state_subscriber_;
   ros::Subscriber sorting_state_subscriber_;
@@ -53,6 +55,7 @@ private:
   QLabel* command_label_;
   QPushButton* start_button_;
   QPushButton* stop_button_;
+  QPushButton* recover_button_;
   QDoubleSpinBox* goal_x_;
   QDoubleSpinBox* goal_y_;
   QDoubleSpinBox* goal_yaw_;

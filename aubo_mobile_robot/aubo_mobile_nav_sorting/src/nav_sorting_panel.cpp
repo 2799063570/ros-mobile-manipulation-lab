@@ -71,6 +71,7 @@ NavSortingPanel::NavSortingPanel(QWidget* parent)
   , command_label_(new QLabel(tr("任务空闲时可以应用新参数")))
   , start_button_(new QPushButton(tr("开始导航分拣")))
   , stop_button_(new QPushButton(tr("停止当前任务")))
+  , recover_button_(new QPushButton(tr("重新确认停止")))
   , goal_x_(poseSpinBox(-20.0, 20.0))
   , goal_y_(poseSpinBox(-20.0, 20.0))
   , goal_yaw_(poseSpinBox(-3.14159, 3.14159))
@@ -95,6 +96,7 @@ NavSortingPanel::NavSortingPanel(QWidget* parent)
       "font-weight: bold; color: #ffffff; background-color: #b33a3a;");
   navigation_retries_->setRange(0, 10);
   stop_button_->setEnabled(false);
+  recover_button_->setEnabled(false);
   navigation_timeout_->setSingleStep(10.0);
   navigation_timeout_->setSuffix(tr(" 秒"));
   base_clearance_->setSuffix(tr(" 米"));
@@ -105,6 +107,7 @@ NavSortingPanel::NavSortingPanel(QWidget* parent)
   QHBoxLayout* command_buttons = new QHBoxLayout();
   command_buttons->addWidget(start_button_);
   command_buttons->addWidget(stop_button_);
+  command_buttons->addWidget(recover_button_);
 
   QGroupBox* parameters_group = new QGroupBox(tr("在线任务参数（仅空闲时生效）"));
   QFormLayout* parameters = new QFormLayout();
@@ -147,6 +150,7 @@ NavSortingPanel::NavSortingPanel(QWidget* parent)
 
   start_client_ = node_handle_.serviceClient<std_srvs::Trigger>("/nav_sorting/start");
   stop_client_ = node_handle_.serviceClient<std_srvs::Trigger>("/nav_sorting/stop");
+  recover_client_ = node_handle_.serviceClient<std_srvs::Trigger>("/nav_sorting/recover_stop");
   reconfigure_client_ = node_handle_.serviceClient<dynamic_reconfigure::Reconfigure>(
       "/nav_sorting_mission/set_parameters");
   mission_state_subscriber_ = node_handle_.subscribe(
@@ -156,6 +160,7 @@ NavSortingPanel::NavSortingPanel(QWidget* parent)
 
   connect(start_button_, SIGNAL(clicked()), this, SLOT(startMission()));
   connect(stop_button_, SIGNAL(clicked()), this, SLOT(stopMission()));
+  connect(recover_button_, SIGNAL(clicked()), this, SLOT(recoverStop()));
   connect(apply_button, SIGNAL(clicked()), this, SLOT(applyParameters()));
   connect(refresh_button, SIGNAL(clicked()), this, SLOT(refreshParameters()));
   connect(this, SIGNAL(missionStateReceived(QString)), this,
@@ -191,6 +196,11 @@ void NavSortingPanel::startMission()
   for (int row = 0; row < workstations_table_->rowCount(); ++row)
     workstations_table_->item(row, 2)->setText(tr("待执行"));
   callTrigger(start_client_, tr("开始任务"));
+}
+
+void NavSortingPanel::recoverStop()
+{
+  callTrigger(recover_client_, tr("重新确认停止"));
 }
 
 void NavSortingPanel::stopMission()
@@ -318,6 +328,7 @@ void NavSortingPanel::showMissionState(const QString& text)
   mission_busy_ = !(code == "IDLE" || code == "STOPPED" ||
                     code == "SUCCEEDED" || code == "FAILED");
   start_button_->setEnabled(!mission_busy_);
+  recover_button_->setEnabled(code == "STOP_UNCONFIRMED");
   stop_button_->setEnabled(mission_busy_ && code != "INITIALIZING" &&
                           code != "STOP_UNCONFIRMED");
   QString translated = code;

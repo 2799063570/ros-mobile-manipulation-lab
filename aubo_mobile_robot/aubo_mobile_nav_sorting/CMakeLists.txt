@@ -22,7 +22,8 @@ generate_dynamic_reconfigure_options(
 )
 
 catkin_package(
-  LIBRARIES aubo_mobile_nav_sorting_panel
+  INCLUDE_DIRS include
+  LIBRARIES aubo_mobile_nav_sorting_panel aubo_mobile_nav_sorting_execution
   CATKIN_DEPENDS actionlib actionlib_msgs dynamic_reconfigure geometry_msgs
     move_base_msgs pluginlib roscpp rviz std_msgs std_srvs tf
 )
@@ -45,16 +46,23 @@ target_link_libraries(aubo_mobile_nav_sorting_panel
   Qt5::Widgets
 )
 
-add_executable(nav_sorting_mission_cpp
+add_library(aubo_mobile_nav_sorting_execution
   src/navigation_sorting_mission.cpp
+  src/mission_context.cpp
+  src/arm_executor.cpp
+  src/base_executor.cpp
 )
+add_dependencies(aubo_mobile_nav_sorting_execution ${PROJECT_NAME}_gencfg ${catkin_EXPORTED_TARGETS})
+target_compile_features(aubo_mobile_nav_sorting_execution PUBLIC cxx_std_14)
+target_link_libraries(aubo_mobile_nav_sorting_execution ${catkin_LIBRARIES})
+add_executable(nav_sorting_mission_cpp src/navigation_sorting_mission_node.cpp)
 add_dependencies(nav_sorting_mission_cpp
   ${PROJECT_NAME}_gencfg
   ${catkin_EXPORTED_TARGETS}
 )
 target_compile_features(nav_sorting_mission_cpp PRIVATE cxx_std_14)
 target_link_libraries(nav_sorting_mission_cpp
-  ${catkin_LIBRARIES}
+  aubo_mobile_nav_sorting_execution ${catkin_LIBRARIES}
 )
 
 catkin_install_python(PROGRAMS
@@ -67,7 +75,7 @@ install(DIRECTORY cfg config launch maps worlds
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
 
-install(TARGETS aubo_mobile_nav_sorting_panel nav_sorting_mission_cpp
+install(TARGETS aubo_mobile_nav_sorting_panel aubo_mobile_nav_sorting_execution nav_sorting_mission_cpp
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
@@ -80,3 +88,12 @@ install(DIRECTORY include/${PROJECT_NAME}/
 install(FILES README.md plugin_description.xml
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
+
+if(CATKIN_ENABLE_TESTING)
+  find_package(rostest REQUIRED)
+  catkin_add_gtest(mission_state_test test/mission_state_test.cpp)
+  catkin_add_nosetests(test/test_named_targets.py)
+  catkin_install_python(PROGRAMS test/cpp_mission_rostest.py
+    DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+  add_rostest(test/cpp_mission.test DEPENDENCIES nav_sorting_mission_cpp)
+endif()

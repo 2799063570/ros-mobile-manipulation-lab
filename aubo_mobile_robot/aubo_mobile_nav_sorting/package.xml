@@ -55,6 +55,11 @@
   <exec_depend>teb_local_planner</exec_depend>
   <exec_depend>tf</exec_depend>
 
+  <test_depend>rostest</test_depend>
+  <test_depend>python3-nose</test_depend>
+  <test_depend>python3-yaml</test_depend>
+  <test_depend>roslib</test_depend>
+
   <export>
     <rviz plugin="${prefix}/plugin_description.xml"/>
   </export>

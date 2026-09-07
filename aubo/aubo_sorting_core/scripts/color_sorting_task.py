@@ -822,11 +822,15 @@ class ColorSortingTask(object):
         return TriggerResponse(success=success, message=message)
 
     def _stop_service(self, _request):
-        self._stop_requested.set()
-        self.gripper_client.cancel_all_goals()
-        self.arm.stop()
-        self._release_attached_object_no_wait()
-        return TriggerResponse(success=True, message="stop requested")
+        with self._operation_lock:
+            self._stop_requested.set()
+            self.gripper_client.cancel_all_goals()
+            self.arm.stop()
+            self._release_attached_object_no_wait()
+            if not self._busy and self._initialized:
+                self._base_lock_publisher.publish(Bool(data=False))
+                self._publish_state("STOPPED", "idle stop confirmed")
+            return TriggerResponse(success=True, message="stop requested")
 
     def _open_service(self, _request):
         success, message = self._start_operation("OPENING", self._open_operation)
