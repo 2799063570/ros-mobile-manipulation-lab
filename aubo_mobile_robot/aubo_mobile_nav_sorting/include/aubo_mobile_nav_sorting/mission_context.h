@@ -43,15 +43,15 @@ struct MissionContext
     double clearance = 0.0;
   };
 
-  void publishState(MissionState state, const std::string &detail = std::string());
+  void publishState(MissionState state, const std::string &detail = std::string());// 发布 任务状态+detail(任务状态详情)
   static double angleError(double target, double actual);
-  static double number(const XmlRpc::XmlRpcValue &value);
-  static bool memberBool(const XmlRpc::XmlRpcValue &value, const std::string &key, bool fallback);
+  static double number(const XmlRpc::XmlRpcValue &value);// 将XmlRpcValue类型的数值转换为double类型
+  static bool memberBool(const XmlRpc::XmlRpcValue &value, const std::string &key, bool fallback);// 从XmlRpcValue类型的参数中提取指定键的bool类型数值
   static double memberDouble(const XmlRpc::XmlRpcValue &value, const std::string &key,
-                             double fallback);
-  static std::string memberString(const XmlRpc::XmlRpcValue &value, const std::string &key);
-  static Pose2D memberPose(const XmlRpc::XmlRpcValue &value, const std::string &key);
-  static std::string toJson(const XmlRpc::XmlRpcValue &value);
+                             double fallback);// 从XmlRpcValue类型的参数中提取指定键的double类型数值
+  static std::string memberString(const XmlRpc::XmlRpcValue &value, const std::string &key);// 从XmlRpcValue类型的参数中提取指定键的string类型数值
+  static Pose2D memberPose(const XmlRpc::XmlRpcValue &value, const std::string &key);// 从XmlRpcValue类型的参数中提取指定键的Pose2D类型数值
+  static std::string toJson(const XmlRpc::XmlRpcValue &value);// 将XmlRpcValue类型的数值转换为JSON字符串
   std::function<void()> stop_base = [] {};
   ros::NodeHandle node_handle_;
   ros::NodeHandle private_node_handle_;
@@ -90,8 +90,8 @@ struct MissionContext
   std::string configure_workspace_service_name_;
   std::string workspace_parameter_;
 
-  Pose2D sorting_goal_;
-  Pose2D pre_dock_goal_;
+  Pose2D sorting_goal_;// 导航的目标点位置和角度
+  Pose2D pre_dock_goal_;// 预停点位置和角度
   std::vector<double> candidate_x_;
   std::vector<double> candidate_y_;
   std::vector<double> candidate_yaw_;
@@ -99,11 +99,11 @@ struct MissionContext
   std::vector<std::vector<double>> workpiece_points_;
   std::vector<double> detector_workspace_;
   std::vector<double> camera_target_;
-  XmlRpc::XmlRpcValue workstations_;
+  XmlRpc::XmlRpcValue workstations_;// 工位配置
   std::vector<std::vector<double>> recovery_steps_;
 
-  bool near_field_enabled_ = false;
-  bool direct_dock_enabled_ = true;
+  bool near_field_enabled_ = false;// 是否启用近场直行
+  bool direct_dock_enabled_ = true;// 是否启用直接停靠
   bool heading_alignment_enabled_ = true;
   bool home_before_navigation_ = true;
   bool base_recovery_enabled_ = true;
@@ -113,7 +113,7 @@ struct MissionContext
   std::string return_frame_;
   int near_field_max_candidates_ = 6;
   int navigation_retries_ = 1;
-  double base_clearance_ = 0.40;
+  double base_clearance_ = 0.40;// 近场直行的最小基线距离
   double direct_dock_max_distance_ = 0.50;
   double direct_dock_lateral_tolerance_ = 0.04;
   double direct_dock_yaw_tolerance_ = 0.04;

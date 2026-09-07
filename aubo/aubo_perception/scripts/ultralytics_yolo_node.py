@@ -72,14 +72,14 @@ class UltralyticsYoloNode:
         ).expanduser().resolve()
         self.model_path = Path(
             rospy.get_param("~model_path", str(self.project_path / "weights/GC-yolo.pt"))
-        ).expanduser().resolve()
+        ).expanduser().resolve()    
         self.confidence = float(rospy.get_param("~confidence", 0.25))
         self.iou = float(rospy.get_param("~iou", 0.70))
         self.image_size = int(rospy.get_param("~image_size", 640))
         self.device = str(rospy.get_param("~device", "cpu"))
         self.max_detections = int(rospy.get_param("~max_detections", 100))
-        self.publish_annotated = bool(rospy.get_param("~publish_annotated_image", True))
-        inference_rate = float(rospy.get_param("~inference_rate", 10.0))
+        self.publish_annotated = bool(rospy.get_param("~publish_annotated_image", True)) # 是否发布标注后的图像
+        inference_rate = float(rospy.get_param("~inference_rate", 10.0))# 推理频率，单位为Hz
         self.minimum_interval = 0.0 if inference_rate <= 0 else 1.0 / inference_rate
         self.last_inference_time = 0.0
         self.inference_lock = threading.Lock()
@@ -91,7 +91,7 @@ class UltralyticsYoloNode:
         project_string = str(self.project_path)
         if project_string not in sys.path:
             sys.path.insert(0, project_string)
-        os.environ.setdefault("YOLO_CONFIG_DIR", "/tmp/ultralytics_ros")
+        os.environ.setdefault("YOLO_CONFIG_DIR", "/tmp/ultralytics_ros")    # 设置YOLO的环境
         from ultralytics import YOLO
 
         rospy.loginfo("Loading YOLO model %s on %s", self.model_path, self.device)
@@ -130,7 +130,7 @@ class UltralyticsYoloNode:
     def _append_detections(self, output: YoloDetectionArray, result) -> None:
         obb = getattr(result, "obb", None)
         if obb is not None and len(obb):
-            rows = obb.xywhr.detach().cpu().numpy()
+            rows = obb.xywhr.detach().cpu().numpy() # [x_center, y_center, width, height, angle_rad]
             classes = obb.cls.detach().cpu().numpy().astype(np.int32)
             confidences = obb.conf.detach().cpu().numpy()
             for row, class_id, confidence in zip(rows, classes, confidences):
@@ -170,7 +170,7 @@ class UltralyticsYoloNode:
             )[0]
             output = YoloDetectionArray()
             output.header = message.header
-            self._append_detections(output, result)
+            self._append_detections(output, result) # 获取检测结果
             self.detections_publisher.publish(output)
             if self.publish_annotated and self.annotated_publisher.get_num_connections():
                 self.annotated_publisher.publish(bgr_to_image_message(result.plot(), message))

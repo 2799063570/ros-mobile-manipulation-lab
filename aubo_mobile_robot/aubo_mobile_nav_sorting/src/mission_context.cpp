@@ -12,7 +12,7 @@ std::vector<double> vectorParam(const ros::NodeHandle &node, const std::string &
                                 const std::vector<double> &fallback)
 {
   std::vector<double> result;
-  if (!node.getParam(name, result))
+  if (!node.getParam(name, result))// 获取参数服务器中的一个vector<double>类型的参数
     result = fallback;
   if (result.empty())
     throw std::runtime_error(name + " must be a non-empty list");
@@ -23,7 +23,7 @@ std::vector<std::vector<double>> matrixParam(const ros::NodeHandle &node, const 
                                              const std::vector<std::vector<double>> &fallback)
 {
   XmlRpc::XmlRpcValue value;
-  if (!node.getParam(name, value))
+  if (!node.getParam(name, value))// 获取参数服务器中的一个XmlRpc::XmlRpcValue类型的参数
     return fallback;
   if (value.getType() != XmlRpc::XmlRpcValue::TypeArray)
     throw std::runtime_error(name + " must be a list");
@@ -50,6 +50,7 @@ std::vector<std::vector<double>> matrixParam(const ros::NodeHandle &node, const 
 
 std::string jsonEscape(const std::string &input)
 {
+  // JSON 字符串转义工具函数——把原始字符串中的特殊字符替换成 JSON 规范要求的转义序列
   std::ostringstream output;
   for (const char character : input)
   {
@@ -162,7 +163,7 @@ void MissionContext::loadParameters()
   if (return_frame_.empty())
     throw std::runtime_error("return_frame must not be empty");
   if (!private_node_handle_.getParam("workstations", workstations_))
-    workstations_.setSize(0);
+    workstations_.setSize(0);// 直接设置size=0，避免后续validateWorkstations()报错
 
   private_node_handle_.param("base_recovery_enabled", base_recovery_enabled_, true);
   private_node_handle_.param("base_recovery_cmd_vel_topic", velocity_topic_,

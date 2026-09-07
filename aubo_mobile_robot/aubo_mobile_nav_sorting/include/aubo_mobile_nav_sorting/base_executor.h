@@ -35,7 +35,7 @@ private:
   bool serverConnected();
   std::mutex command_mutex_;
   MissionContext &context_;
-  std::unique_ptr<MoveBaseClient> navigation_client_;
+  std::unique_ptr<MoveBaseClient> navigation_client_;// 导航客户端，用于发送导航目标
   mutable tf::TransformListener tf_listener_;
   ros::Publisher velocity_publisher_;
   ros::ServiceClient clear_costmaps_client_;

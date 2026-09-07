@@ -32,7 +32,7 @@ NavigationSortingMission::NavigationSortingMission(const ros::NodeHandle &node_h
   recover_service_ = node_handle_.advertiseService(
       "/nav_sorting/recover_stop", &NavigationSortingMission::recoverStopCallback, this);
 
-  seedDynamicParameters();
+  seedDynamicParameters();// 设置动态调参机制
   dynamic_server_.reset(new dynamic_reconfigure::Server<NavSortingConfig>(private_node_handle_));
   dynamic_reconfigure::Server<NavSortingConfig>::CallbackType callback =
       boost::bind(&NavigationSortingMission::reconfigureCallback, this, _1, _2);
@@ -63,21 +63,21 @@ NavigationSortingMission::~NavigationSortingMission()
 
 void NavigationSortingMission::seedDynamicParameters()
 {
-  private_node_handle_.setParam("goal_x", sorting_goal_.x);
+  private_node_handle_.setParam("goal_x", sorting_goal_.x);// 导航的目标点位置和角度
   private_node_handle_.setParam("goal_y", sorting_goal_.y);
   private_node_handle_.setParam("goal_yaw", sorting_goal_.yaw);
-  private_node_handle_.setParam("pre_dock_x", pre_dock_goal_.x);
+  private_node_handle_.setParam("pre_dock_x", pre_dock_goal_.x);// 预停点位置和角度
   private_node_handle_.setParam("pre_dock_y", pre_dock_goal_.y);
   private_node_handle_.setParam("pre_dock_yaw", pre_dock_goal_.yaw);
-  private_node_handle_.setParam("near_field_enabled", near_field_enabled_);
-  private_node_handle_.setParam("near_field_base_clearance", base_clearance_);
+  private_node_handle_.setParam("near_field_enabled", near_field_enabled_);// 是否启用近场直行
+  private_node_handle_.setParam("near_field_base_clearance", base_clearance_);// 近场直行的最小基线距离
   private_node_handle_.setParam("near_field_max_candidates", near_field_max_candidates_);
   private_node_handle_.setParam("navigation_timeout", navigation_timeout_);
   private_node_handle_.setParam("navigation_retries", navigation_retries_);
   private_node_handle_.setParam("server_timeout", server_timeout_);
   private_node_handle_.setParam("sorting_initialization_timeout", initialization_timeout_);
   private_node_handle_.setParam("sorting_operation_timeout", operation_timeout_);
-  private_node_handle_.setParam("home_before_navigation", home_before_navigation_);
+  private_node_handle_.setParam("home_before_navigation", home_before_navigation_);// 导航移动之前是否先移动到工作位置
 }
 
 void NavigationSortingMission::reconfigureCallback(NavSortingConfig &config, uint32_t)
