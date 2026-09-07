@@ -338,6 +338,7 @@ void NavSortingPanel::showMissionState(const QString& text)
   else if (code == "WORKSTATION_COMPLETE") translated = tr("工位已完成");
   else if (code == "RETREATING_BASE") translated = tr("正在离开工作台");
   else if (code == "STOWING_ARM") translated = tr("正在收拢机械臂");
+  else if (code == "RETURNING_TO_START") translated = tr("正在返回任务起点");
   else if (code == "NAVIGATING") translated = tr("正在导航");
   else if (code == "PREPARING_ARM") translated = tr("正在准备机械臂");
   else if (code == "COORDINATING") translated = tr("正在协同精停");

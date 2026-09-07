@@ -16,6 +16,7 @@ enum class MissionState
   NAVIGATING,
   PREPARING_ARM,
   RETREATING_BASE,
+  RETURNING_TO_START,
   SORTING,
   STOPPED,
   STOPPING,
@@ -64,6 +65,8 @@ inline const char *toString(MissionState state)
     return "NAVIGATING";
   case MissionState::PREPARING_ARM:
     return "PREPARING_ARM";
+  case MissionState::RETURNING_TO_START:
+    return "RETURNING_TO_START";
   case MissionState::RETREATING_BASE:
     return "RETREATING_BASE";
   case MissionState::SORTING:

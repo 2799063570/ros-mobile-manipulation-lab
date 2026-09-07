@@ -48,7 +48,7 @@ bool BaseExecutor::navigateOnce(const Pose2D &target, const std::string &goal_fr
 }
 
 bool BaseExecutor::navigate(const Pose2D &target, const std::string &stage,
-                            const std::string &requested_frame)
+                            const std::string &requested_frame, MissionState state)
 {
   const std::string goal_frame =
       requested_frame.empty() ? context_.navigation_frame_ : requested_frame;
@@ -68,7 +68,7 @@ bool BaseExecutor::navigate(const Pose2D &target, const std::string &stage,
     detail << stage << " attempt " << attempt + 1 << "/" << context_.navigation_retries_ + 1
            << " to [" << std::fixed << std::setprecision(2) << target.x << ", " << target.y << ", "
            << target.yaw << "] in " << goal_frame;
-    context_.publishState(MissionState::NAVIGATING, detail.str());
+    context_.publishState(state, detail.str());
     if (navigateOnce(target, goal_frame))
       return true;
     if (context_.stop_requested_)

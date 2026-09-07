@@ -152,6 +152,10 @@ class NavigationSortingMission(object):
         self.home_before_navigation = bool(
             rospy.get_param("~home_before_navigation", True)
         )
+        self.return_to_start = bool(rospy.get_param("~return_to_start", True))
+        self.return_frame = rospy.get_param("~return_frame", self.navigation_frame)
+        if not self.return_frame:
+            raise ValueError("~return_frame must not be empty")
         self.auto_start = bool(rospy.get_param("~auto_start", False))
         self.workstations = rospy.get_param("~workstations", [])
         if not isinstance(self.workstations, list):
@@ -1091,7 +1095,7 @@ class NavigationSortingMission(object):
         self.navigation_client.cancel_goal()
         return False
 
-    def _navigate(self, target, stage="navigation", goal_frame=None):
+    def _navigate(self, target, stage="navigation", goal_frame=None, state="NAVIGATING"):
         goal_frame = goal_frame or self.navigation_frame
         if not self._bounded_call(
                 lambda: self.navigation_client.wait_for_server(rospy.Duration(self.server_timeout)),
@@ -1100,7 +1104,7 @@ class NavigationSortingMission(object):
             return False
         for attempt in range(self.navigation_retries + 1):
             self._publish_state(
-                "NAVIGATING",
+                state,
                 "{} attempt {}/{} to [{:.2f}, {:.2f}, {:.2f}] in {}".format(
                     stage,
                     attempt + 1,
@@ -1336,35 +1340,54 @@ class NavigationSortingMission(object):
 
     def _run_mission(self):
         success = False
+        failure_detail = ""
+        starting_pose = None
         try:
             if not self._wait_for_sorting_ready():
                 return
+            if self.return_to_start:
+                starting_pose = self._current_base_pose(self.return_frame)
+                if starting_pose is None:
+                    raise RuntimeError("cannot record starting pose; mission not started")
             if self.workstations:
                 success = self._run_workstation_sequence()
-                return
-            if self.home_before_navigation:
-                self._publish_state("STOWING_ARM", "moving arm to navigation pose")
-                if not self._call_sorting_operation(
-                    self.home_client, ("HOMING",), "arm homing"
-                ):
-                    return
-            if self.near_field_enabled:
-                if not self._coordinate_near_field():
-                    return
             else:
-                if not self._navigate(
-                    [self.goal_x, self.goal_y, self.goal_yaw], "workstation"
-                ):
+                if self.home_before_navigation:
+                    self._publish_state("STOWING_ARM", "moving arm to navigation pose")
+                    if not self._call_sorting_operation(
+                        self.home_client, ("HOMING",), "arm homing"
+                    ):
+                        return
+                if self.near_field_enabled:
+                    if not self._coordinate_near_field():
+                        return
+                else:
+                    if not self._navigate(
+                        [self.goal_x, self.goal_y, self.goal_yaw], "workstation"
+                    ):
+                        return
+                    self._publish_state("AT_WORKSTATION", "starting camera observation")
+                    if not self._prepare_and_observe_with_recovery():
+                        return
+                self._publish_state("AT_WORKSTATION", "dock and camera view validated")
+                self._publish_state("SORTING", "sorting detected objects")
+                if not self._sort_with_recovery():
                     return
-                self._publish_state("AT_WORKSTATION", "starting camera observation")
-                if not self._prepare_and_observe_with_recovery():
+                success = True
+            if success and self.return_to_start:
+                success = False
+                if self._stop_requested.is_set() or self._stop_unconfirmed:
                     return
-            self._publish_state("AT_WORKSTATION", "dock and camera view validated")
-            self._publish_state("SORTING", "sorting detected objects")
-            if not self._sort_with_recovery():
-                return
-            success = True
+                self._publish_state("STOWING_ARM", "stowing arm before return to start")
+                if not self._call_sorting_operation(self.home_client, ("HOMING",),
+                                                   "arm stow before return to start"):
+                    raise RuntimeError("arm stow before return to start failed")
+                if not self._navigate(starting_pose, "return to mission starting pose",
+                                      self.return_frame, state="RETURNING_TO_START"):
+                    raise RuntimeError("sorting complete, but navigation to starting pose failed")
+                success = True
         except Exception as error:
+            failure_detail = str(error)
             rospy.logerr("Navigation-sorting mission failed: %s", str(error))
         finally:
             self._stop_base()
@@ -1375,10 +1398,11 @@ class NavigationSortingMission(object):
             elif self._stop_requested.is_set():
                 self._publish_state("STOPPED", "mission cancelled")
             elif success:
-                self._publish_state("SUCCEEDED", "navigation and sorting complete")
+                self._publish_state("SUCCEEDED", "sorting complete; returned to starting pose"
+                                    if self.return_to_start else "navigation and sorting complete")
             else:
                 self._publish_state("FAILED", "base pose unavailable or stale" if self._base_pose_failed
-                                    else "inspect move_base and /sorting/state")
+                                    else (failure_detail or "inspect move_base and /sorting/state"))
             with self._condition:
                 self._busy = False
 

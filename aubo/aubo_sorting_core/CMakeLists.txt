@@ -79,3 +79,7 @@ install(DIRECTORY include/${PROJECT_NAME}/
 install(FILES README.md
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
+
+if(CATKIN_ENABLE_TESTING)
+  catkin_add_gtest(height_recovery_test test/height_recovery_test.cpp)
+endif()

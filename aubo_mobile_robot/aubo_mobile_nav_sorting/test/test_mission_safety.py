@@ -71,6 +71,7 @@ class MissionSafetyTests(unittest.TestCase):
         self.m = m
         m._condition = threading.Condition()
         m._stop_requested = threading.Event()
+        m.return_to_start = False
         m._busy = True
         m._stop_unconfirmed = False
         m._operation_active = False

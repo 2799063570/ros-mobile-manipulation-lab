@@ -15,7 +15,8 @@ public:
   BaseExecutor &operator=(const BaseExecutor &) = delete;
   bool navigateOnce(const Pose2D &target, const std::string &goal_frame);
   bool navigate(const Pose2D &target, const std::string &stage,
-                const std::string &goal_frame = std::string());
+                const std::string &goal_frame = std::string(),
+                MissionState state = MissionState::NAVIGATING);
   bool currentBasePose(Pose2D &pose, const std::string &pose_frame = std::string());
   bool alignHeading(double target_yaw, const std::string &label,
                     const std::string &pose_frame = std::string());

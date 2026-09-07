@@ -7,7 +7,10 @@
       <finger_link_1>Link1</finger_link_1>
       <finger_link_2>Link2</finger_link_2>
       <object_link>block_link</object_link>
-      <max_attach_distance>0.18</max_attach_distance>
+      <!-- Finger-origin midpoint is about 4 cm above a correctly grasped cube centre. -->
+      <max_attach_distance>0.06</max_attach_distance>
+      <!-- Reject gross misalignment; this is not a contact/grip-force test. -->
+      <max_lateral_offset>0.008</max_lateral_offset>
       <attach_topic>/sorting/grasp/attach</attach_topic>
       <detach_topic>/sorting/grasp/detach</detach_topic>
       <status_topic>/sorting/grasp/status</status_topic>

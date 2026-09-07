@@ -459,10 +459,14 @@ void NavigationSortingMission::recoverStop()
 void NavigationSortingMission::runMission()
 {
   bool success = false;
+  Pose2D starting_pose;
+  std::string failure_detail;
   try
   {
     if (!arm_executor_->waitForSortingReady())
       throw std::runtime_error("sorting node is not ready");
+    if (return_to_start_ && !base_executor_->currentBasePose(starting_pose, return_frame_))
+      throw std::runtime_error("cannot record starting pose; mission not started");
     if (workstations_.size() > 0)
     {
       success = runWorkstationSequence();
@@ -486,9 +490,23 @@ void NavigationSortingMission::runMission()
       publishState(MissionState::SORTING, "sorting detected objects");
       success = sortWithRecovery();
     }
+    if (success && return_to_start_)
+    {
+      success = false;
+      if (stop_requested_ || stop_unconfirmed_)
+        throw std::runtime_error("return to start cancelled");
+      publishState(MissionState::STOWING_ARM, "stowing arm before return to start");
+      if (!arm_executor_->home("arm stow before return to start"))
+        throw std::runtime_error("arm stow before return to start failed");
+      if (!base_executor_->navigate(starting_pose, "return to mission starting pose", return_frame_,
+                                    MissionState::RETURNING_TO_START))
+        throw std::runtime_error("sorting complete, but navigation to starting pose failed");
+      success = true;
+    }
   }
   catch (const std::exception &error)
   {
+    failure_detail = error.what();
     ROS_ERROR_STREAM("Navigation-sorting mission failed: " << error.what());
   }
   base_executor_->stopBase();
@@ -500,10 +518,11 @@ void NavigationSortingMission::runMission()
   else if (stop_requested_)
     publishState(MissionState::STOPPED, "mission cancelled");
   else if (success)
-    publishState(MissionState::SUCCEEDED, "navigation and sorting complete");
+    publishState(MissionState::SUCCEEDED, return_to_start_ ? "sorting complete; returned to starting pose" :
+                 "navigation and sorting complete");
   else
     publishState(MissionState::FAILED, base_pose_failed_ ? "base pose unavailable or stale"
-                                                         : "inspect move_base and /sorting/state");
+                                                         : (failure_detail.empty() ? "inspect move_base and /sorting/state" : failure_detail));
   {
     std::lock_guard<std::mutex> lock(mutex_);
     busy_ = false;

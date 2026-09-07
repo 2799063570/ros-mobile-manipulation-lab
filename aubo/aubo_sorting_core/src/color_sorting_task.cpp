@@ -1,3 +1,4 @@
+#include <aubo_sorting_core/height_recovery.hpp>
 #include <aubo_sorting_core/color_sorting_task.hpp>
 
 #include <actionlib_msgs/GoalStatus.h>
@@ -205,6 +206,15 @@ void ColorSortingTask::loadParameters()
   private_nh_.param<std::string>("work_ready_named_target", work_ready_named_target_, "work_ready");
   private_nh_.param("pregrasp_height", pregrasp_height_, 0.25);
   private_nh_.param("lift_height", lift_height_, 0.30);
+  private_nh_.param("lift_min_height", lift_min_height_, lift_height_);
+  private_nh_.param("lift_height_step", lift_height_step_, 0.02);
+  private_nh_.param("lift_max_attempts", lift_max_attempts_, 5);
+  liftHeightCandidates(lift_height_, lift_min_height_, lift_height_step_, lift_max_attempts_);
+  if (lift_min_height_ <= 0.5 * object_height_ + grasp_height_offset_)
+    throw std::runtime_error("lift_min_height must exceed the grasp height above the table");
+  private_nh_.param("preplace_height", preplace_height_, lift_height_);
+  if (!std::isfinite(preplace_height_) || preplace_height_ <= 0.0)
+    throw std::runtime_error("preplace_height must be finite and positive");
   private_nh_.param("place_clearance", place_clearance_, 0.02);
   private_nh_.param("cartesian_step", cartesian_step_, 0.01);
   private_nh_.param("minimum_cartesian_fraction", minimum_cartesian_fraction_, 0.90);
@@ -1144,7 +1154,9 @@ bool ColorSortingTask::moveToPose(const geometry_msgs::PoseStamped& pose,
 {
   if (stop_requested_.load())
     return false;
-  ROS_INFO_STREAM("Planning arm to " << description);
+  ROS_INFO_STREAM("Planning arm to " << description << " in " << pose.header.frame_id
+                  << " at [" << pose.pose.position.x << ", " << pose.pose.position.y
+                  << ", " << pose.pose.position.z << "]");
   arm_->setPoseTarget(pose, end_effector_link_);// 设置目标姿态(末端执行器的笛卡尔空间位姿)
   return planAndExecute(description) && !stop_requested_.load();
 }
@@ -1217,10 +1229,11 @@ bool ColorSortingTask::moveNamed(const std::string& target)
 }
 
 bool ColorSortingTask::cartesianTo(const geometry_msgs::PoseStamped& target_pose,
-                                   const std::string& description)
+                                   const std::string& description, bool require_complete)
 {
   if (stop_requested_.load())
     return false;
+  const double required_fraction = require_complete ? 1.0 : minimum_cartesian_fraction_;
   std::vector<geometry_msgs::Pose> waypoints(1, target_pose.pose);
   moveit_msgs::RobotTrajectory trajectory;
   auto compute_path = [this, &waypoints, &trajectory]() {
@@ -1229,7 +1242,7 @@ bool ColorSortingTask::cartesianTo(const geometry_msgs::PoseStamped& target_pose
   };
   double fraction = compute_path();// 返回计算的路径的比例
   ROS_INFO("Cartesian path to %s: %.1f%%", description.c_str(), 100.0 * fraction);
-  if (fraction < minimum_cartesian_fraction_ && require_octomap_)// 如果路径比例小于最小值 且使用了八叉树地图
+  if (fraction < required_fraction && require_octomap_)// 如果路径比例小于最小值 且使用了八叉树地图
   {
     ROS_WARN("Cartesian fraction too low; refreshing OctoMap and retrying once");
     if (refreshOctomap() && !stop_requested_.load())// 刷新八叉树 并重新规划
@@ -1238,7 +1251,12 @@ bool ColorSortingTask::cartesianTo(const geometry_msgs::PoseStamped& target_pose
       ROS_INFO("Cartesian path retry to %s: %.1f%%", description.c_str(), 100.0 * fraction);
     }
   }
-  if (fraction < minimum_cartesian_fraction_)
+  if (!std::isfinite(fraction) || (require_complete && fraction < 1.0))
+  {
+    setFailure("PLANNING_FAILED", "incomplete Cartesian lift to " + description);
+    return false;  // Never execute a partial lift and mistake it for reaching the lower bound.
+  }
+  if (fraction < required_fraction)
   {
     ROS_WARN("Cartesian fraction too low; falling back to pose planning");
     return moveToPose(target_pose, description);// 回退到关节空间路径规划
@@ -1263,11 +1281,44 @@ bool ColorSortingTask::cartesianTo(const geometry_msgs::PoseStamped& target_pose
            velocity_scaling_);
   moveit::planning_interface::MoveGroupInterface::Plan plan;
   plan.trajectory_ = trajectory;
+  if (stop_requested_.load() || !ros::ok())
+    return false;
   const bool success = arm_->execute(plan) == moveit::planning_interface::MoveItErrorCode::SUCCESS;
   arm_->stop();
   if (!success)
     setFailure("EXECUTION_FAILED", "Cartesian path to " + description);
   return success && !stop_requested_.load();
+}
+
+bool ColorSortingTask::liftWithRecovery(double x, double y, const std::string& description)
+{
+  const auto heights = liftHeightCandidates(lift_height_, lift_min_height_,
+                                            lift_height_step_, lift_max_attempts_);
+  std::size_t attempt = 0;
+  const auto result = runHeightRecovery(heights, [&](double height) {
+    ++attempt;
+    ROS_INFO("Lift attempt %zu/%zu: height=%.3f m above table, target_z=%.3f m, minimum=%.3f m",
+             attempt, heights.size(), height, table_z_ + height, lift_min_height_);
+    // Clear the previous attempt's failure before classifying this result.
+    {
+      std::lock_guard<std::mutex> lock(data_mutex_);
+      last_failure_.clear();
+    }
+    if (cartesianTo(makePose(x, y, table_z_ + height), description, true))
+    {
+      std_msgs::String clear;
+      failure_publisher_.publish(clear);
+      return HeightAttemptResult::Succeeded;
+    }
+    if (stop_requested_.load())
+      return HeightAttemptResult::Cancelled;
+    std::lock_guard<std::mutex> lock(data_mutex_);
+    return last_failure_.find("PLANNING_FAILED |") == 0 ?
+        HeightAttemptResult::PlanningFailed : HeightAttemptResult::ExecutionFailed;
+  }, [this] { return stop_requested_.load() || !ros::ok(); });
+  if (result == HeightAttemptResult::PlanningFailed)
+    setFailure("PLANNING_FAILED", description + " exhausted bounded height attempts");
+  return result == HeightAttemptResult::Succeeded;
 }
 
 bool ColorSortingTask::commandGripper(double position)
@@ -1718,7 +1769,7 @@ bool ColorSortingTask::pickAndPlace(const aubo_perception::DetectedObject& detec
   const double object_x = detected.pose.position.x + grasp_offset_x_;// 抓取偏移值
   const double object_y = detected.pose.position.y + grasp_offset_y_;// 抓取偏移值
   const double grasp_z = table_z_ + 0.5 * object_height_ + grasp_height_offset_;// 抓取高度偏移值
-  const double travel_z = table_z_ + lift_height_;// 抬升高度
+  const double preplace_z = table_z_ + preplace_height_;// 放置前及放置后的退离高度
   ROS_INFO("Picking %s at [%.3f, %.3f, %.3f]", color.c_str(), object_x, object_y, grasp_z);
 
   if (!commandGripper(gripper_open_) ||
@@ -1737,7 +1788,7 @@ bool ColorSortingTask::pickAndPlace(const aubo_perception::DetectedObject& detec
     return false;
   }
   if (!wallSleep(0.5, stop_requested_) ||
-      !cartesianTo(makePose(object_x, object_y, travel_z), color + " lift"))// 抬升到指定高度
+      !liftWithRecovery(object_x, object_y, color + " lift"))// 抬升到指定高度
     return false;
 
   const auto place = place_targets_.find(color);
@@ -1749,12 +1800,12 @@ bool ColorSortingTask::pickAndPlace(const aubo_perception::DetectedObject& detec
   double place_x = 0.0;
   double place_y = 0.0;
   if (!xyInTargetFrame(place_frame_, place->second, place_x, place_y) ||      // 将目标放置位置转换到目标坐标系下
-      !moveToPose(makePose(place_x, place_y, travel_z), color + " pre-place") ||  // 移动到目标放置位置上方
+      !moveToPose(makePose(place_x, place_y, preplace_z), color + " pre-place") ||  // 移动到目标放置位置上方
       !cartesianTo(makePose(place_x, place_y, grasp_z + place_clearance_), color + " place") || // 移动到目标放置位置
       !commandGripper(gripper_open_) || !setGraspAttachment(object_model_name, false) || // 夹爪张开 释放吸附
       !wallSleep(0.5, stop_requested_))
     return false;
-  completed = cartesianTo(makePose(place_x, place_y, travel_z), color + " retreat");
+  completed = cartesianTo(makePose(place_x, place_y, preplace_z), color + " retreat");
   return completed; // 移动到目标放置位置上方
 }
 

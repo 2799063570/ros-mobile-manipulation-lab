@@ -1,4 +1,5 @@
 #include <atomic>
+#include <cmath>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -53,6 +54,14 @@ public:
     base_link_name_ = readSdf(sdf, "base_link", "mobile_base_link");
     max_attach_distance_ = sdf->HasElement("max_attach_distance") ?
         sdf->Get<double>("max_attach_distance") : 0.18;
+    max_lateral_offset_ = sdf->HasElement("max_lateral_offset") ?
+        sdf->Get<double>("max_lateral_offset") : 0.0;
+    if (!std::isfinite(max_attach_distance_) || max_attach_distance_ <= 0.0 ||
+        !std::isfinite(max_lateral_offset_) || max_lateral_offset_ < 0.0)
+    {
+      gzerr << "[aubo_grasp_attach] Invalid grasp distance/lateral bounds.\n";
+      return;
+    }
     const std::string attach_topic =
         readSdf(sdf, "attach_topic", "/sorting/grasp/attach");
     const std::string detach_topic =
@@ -273,7 +282,7 @@ private:
     }
     const double attach_distance =
         grasp_position.Distance(object_link->WorldPose().Pos());
-    if (attach_distance > max_attach_distance_)
+    if (!std::isfinite(attach_distance) || attach_distance > max_attach_distance_)
     {
       publishStatus("error:object_too_far:" + object_model_name);
       ROS_ERROR_STREAM("Refusing to attach " << object_model_name
@@ -281,6 +290,35 @@ private:
                        << attach_distance
                        << " m exceeds " << max_attach_distance_ << " m");
       return;
+    }
+
+    // Validate transverse alignment before disabling collisions or attaching.
+    // Finger joint origins define the closing axis even when fixed links are lumped.
+    if (max_lateral_offset_ > 0.0)
+    {
+      if (!finger_link_1 || !finger_link_2)
+      {
+        publishStatus("error:fingers_missing:" + object_model_name);
+        return;
+      }
+      auto closing_axis = finger_link_2->WorldPose().Pos() - finger_link_1->WorldPose().Pos();
+      if (closing_axis.Length() < 1e-6)
+      {
+        publishStatus("error:invalid_finger_axis:" + object_model_name);
+        return;
+      }
+      closing_axis.Normalize();
+      const double lateral_offset = std::abs(
+          (object_link->WorldPose().Pos() - grasp_position).Dot(closing_axis));
+      if (!std::isfinite(lateral_offset) || lateral_offset > max_lateral_offset_)
+      {
+        publishStatus("error:object_off_center:" + object_model_name);
+        ROS_ERROR_STREAM("Refusing to attach " << object_model_name << ": lateral offset "
+                         << lateral_offset << " m exceeds " << max_lateral_offset_ << " m");
+        return;
+      }
+      ROS_INFO_STREAM("Grasp alignment " << object_model_name << ": distance="
+                      << attach_distance << " m, lateral offset=" << lateral_offset << " m");
     }
 
     grasp_joint_ = world_->Physics()->CreateJoint("fixed", robot_model);
@@ -369,6 +407,7 @@ private:
   bool base_lock_dirty_;
   bool base_locked_;
   double max_attach_distance_;
+  double max_lateral_offset_;
 };
 
 GZ_REGISTER_WORLD_PLUGIN(SortingGraspAttachPlugin)

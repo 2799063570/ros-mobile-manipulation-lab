@@ -157,6 +157,10 @@ void MissionContext::loadParameters()
   private_node_handle_.param("startup_delay", startup_delay_, 3.0);
   private_node_handle_.param("home_before_navigation", home_before_navigation_, true);
   private_node_handle_.param("auto_start", auto_start_, false);
+  private_node_handle_.param("return_to_start", return_to_start_, true);
+  private_node_handle_.param("return_frame", return_frame_, navigation_frame_);
+  if (return_frame_.empty())
+    throw std::runtime_error("return_frame must not be empty");
   if (!private_node_handle_.getParam("workstations", workstations_))
     workstations_.setSize(0);
 

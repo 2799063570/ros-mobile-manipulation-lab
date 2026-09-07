@@ -109,7 +109,8 @@ private:
   bool moveNamed(const std::string& target);
   bool planAndExecute(const std::string& description);
   bool cartesianTo(const geometry_msgs::PoseStamped& target_pose,
-                   const std::string& description);
+                   const std::string& description, bool require_complete = false);
+  bool liftWithRecovery(double x, double y, const std::string& description);
   bool commandGripper(double position);
   bool addTableCollision();
   bool refreshOctomap();
@@ -197,6 +198,10 @@ private:
   double grasp_height_offset_{0.01};
   double pregrasp_height_{0.25};
   double lift_height_{0.30};
+  double lift_min_height_{0.30};
+  double lift_height_step_{0.02};
+  int lift_max_attempts_{5};
+  double preplace_height_{0.30};  // Height above the table for placement approach/retreat.
   double place_clearance_{0.02};
   double cartesian_step_{0.01};
   double minimum_cartesian_fraction_{0.90};

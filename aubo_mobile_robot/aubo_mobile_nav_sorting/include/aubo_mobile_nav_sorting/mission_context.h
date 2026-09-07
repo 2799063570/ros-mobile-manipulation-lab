@@ -109,6 +109,8 @@ struct MissionContext
   bool base_recovery_enabled_ = true;
   bool post_sort_retreat_enabled_ = false;
   bool auto_start_ = false;
+  bool return_to_start_ = true;
+  std::string return_frame_;
   int near_field_max_candidates_ = 6;
   int navigation_retries_ = 1;
   double base_clearance_ = 0.40;

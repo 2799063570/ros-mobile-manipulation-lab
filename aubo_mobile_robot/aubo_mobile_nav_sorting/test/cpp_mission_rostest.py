@@ -6,6 +6,7 @@ import threading
 import time
 import unittest
 
+import tf
 import actionlib
 import roslib.packages
 import rospy
@@ -37,6 +38,10 @@ class CppMissionTest(unittest.TestCase):
         self.block_stop = False
         self.ack_stop = True
         self.complete = True
+        self.goals = []
+        self.base_pose = [-1.2, .4, .6]
+        self.return_abort = False
+        self.return_hold = False
         self.navigation_goals = 0
         self.hold_navigation = False
         self.navigation_cancelled = threading.Event()
@@ -57,6 +62,8 @@ class CppMissionTest(unittest.TestCase):
         rospy.set_param('/nav_sorting_mission', {
             'navigation_action': '/test_move_base',
             'auto_start': False,
+            'return_to_start': self._testMethodName.startswith('test_return'),
+            'return_frame': 'map',
             'sorting_initialization_timeout': 2.0,
             'sorting_operation_timeout': 10.0,
             'sorting_stop_timeout': .25,
@@ -67,6 +74,14 @@ class CppMissionTest(unittest.TestCase):
             'near_field_enabled': False,
             'base_recovery_enabled': False,
         })
+        self.broadcaster = tf.TransformBroadcaster()
+        def publish_tf(_):
+            if self._testMethodName == 'test_return_missing_pose_blocks_mission':
+                return
+            x, y, yaw = self.base_pose
+            self.broadcaster.sendTransform((x, y, 0), tf.transformations.quaternion_from_euler(0, 0, yaw),
+                                           rospy.Time.now(), 'base_footprint', 'map')
+        self.tf_timer = rospy.Timer(rospy.Duration(.02), publish_tf)
         self.state_pub.publish(String(data='IDLE'))
         self.lock_pub.publish(Bool(data=False))
         executable = os.environ.get('NAV_MISSION_BINARY') or roslib.packages.find_node(
@@ -82,6 +97,7 @@ class CppMissionTest(unittest.TestCase):
 
     def tearDown(self):
         self.release.set()
+        self.tf_timer.shutdown()
         self.process.terminate()
         try:
             self.process.wait(timeout=4)
@@ -126,9 +142,14 @@ class CppMissionTest(unittest.TestCase):
             self.terminal('STOPPED')
         return TriggerResponse(success=True, message='accepted')
 
-    def navigate(self, _):
+    def navigate(self, goal):
+        self.goals.append(goal)
         self.navigation_goals += 1
-        if self.hold_navigation:
+        self.base_pose = [2.15, 0, 0]  # Subsequent TF must not overwrite the saved start.
+        if self.return_abort and self.navigation_goals == 2:
+            self.navigation.set_aborted(MoveBaseResult())
+            return
+        if self.hold_navigation or (self.return_hold and self.navigation_goals == 2):
             deadline = time.monotonic() + 4
             while not self.navigation.is_preempt_requested() and time.monotonic() < deadline:
                 time.sleep(.01)
@@ -150,6 +171,41 @@ class CppMissionTest(unittest.TestCase):
     def test_unknown_sorting_state_cannot_start_motion(self):
         self.state_pub.publish(String(data='UNRECOGNIZED | READY'))
         time.sleep(.1)
+        self.assertTrue(self.start().success)
+        self.wait(lambda: 'FAILED' in self.states)
+        self.assertEqual(self.homes, 0)
+        self.assertEqual(self.navigation_goals, 0)
+
+    def test_return_reaches_saved_start_after_stowing(self):
+        self.assertTrue(self.start().success)
+        self.wait(lambda: 'SUCCEEDED' in self.states)
+        self.assertEqual(self.navigation_goals, 2)
+        self.assertEqual(self.homes, 2)
+        target = self.goals[-1].target_pose
+        self.assertEqual(target.header.frame_id, 'map')
+        self.assertAlmostEqual(target.pose.position.x, -1.2)
+        self.assertAlmostEqual(target.pose.position.y, .4)
+        q = target.pose.orientation
+        self.assertAlmostEqual(tf.transformations.euler_from_quaternion([q.x,q.y,q.z,q.w])[2], .6)
+        self.assertLess(self.states.index('RETURNING_TO_START'), self.states.index('SUCCEEDED'))
+
+    def test_return_navigation_failure_is_not_success(self):
+        self.return_abort = True
+        self.assertTrue(self.start().success)
+        self.wait(lambda: 'FAILED' in self.states)
+        self.assertEqual(self.navigation_goals, 2)
+        self.assertNotIn('SUCCEEDED', self.states)
+
+    def test_return_can_be_stopped(self):
+        self.return_hold = True
+        self.assertTrue(self.start().success)
+        self.wait(lambda: self.navigation_goals == 2)
+        self.assertTrue(rospy.ServiceProxy('/nav_sorting/stop', Trigger)().success)
+        self.wait(lambda: 'STOPPED' in self.states)
+        self.assertTrue(self.navigation_cancelled.wait(1))
+        self.assertNotIn('SUCCEEDED', self.states)
+
+    def test_return_missing_pose_blocks_mission(self):
         self.assertTrue(self.start().success)
         self.wait(lambda: 'FAILED' in self.states)
         self.assertEqual(self.homes, 0)

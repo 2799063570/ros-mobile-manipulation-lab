@@ -4,11 +4,12 @@
 # with the Gazebo world. Each final dock uses the mission's low-speed cmd_vel.
 navigation_frame: map
 
+# Final docks include the previous +0.05 m forward recovery offset.
 workstations:
   - id: table_1
     navigation_goal_frame: odom
     pre_dock_goal: [1.50, 0.80, 1.5708]
-    navigation_goal: [1.50, 1.15, 1.5708]
+    navigation_goal: [1.50, 1.20, 1.5708]
     table_frame: odom
     table_center: [1.50, 2.00, 0.25]
     table_size: [0.80, 0.80, 0.40]
@@ -27,7 +28,7 @@ workstations:
   - id: table_2
     navigation_goal_frame: odom
     pre_dock_goal: [3.80, 2.00, 0.0]
-    navigation_goal: [4.15, 2.00, 0.0]
+    navigation_goal: [4.20, 2.00, 0.0]
     table_frame: odom
     table_center: [5.00, 2.00, 0.25]
     table_size: [0.80, 0.80, 0.40]
@@ -46,7 +47,7 @@ workstations:
   - id: table_3
     navigation_goal_frame: odom
     pre_dock_goal: [5.00, -0.80, -1.5708]
-    navigation_goal: [5.00, -1.15, -1.5708]
+    navigation_goal: [5.00, -1.20, -1.5708]
     table_frame: odom
     table_center: [5.00, -2.00, 0.25]
     table_size: [0.80, 0.80, 0.40]
@@ -65,7 +66,7 @@ workstations:
   - id: table_4
     navigation_goal_frame: odom
     pre_dock_goal: [2.70, -2.00, 3.14159]
-    navigation_goal: [2.35, -2.00, 3.14159]
+    navigation_goal: [2.30, -2.00, 3.14159]
     table_frame: odom
     table_center: [1.50, -2.00, 0.25]
     table_size: [0.80, 0.80, 0.40]
@@ -112,14 +113,13 @@ near_field_direct_dock_timeout: 15.0
 near_field_direct_dock_stall_timeout: 2.5
 near_field_direct_dock_progress_epsilon: 0.005
 
-base_recovery_enabled: true
+# Use the configured working dock; planning failure must not move the base.
+base_recovery_enabled: false
 base_recovery_cmd_vel_topic: /cmd_vel_raw
 base_recovery_speed: 0.04
 base_recovery_rate: 20.0
 base_recovery_settle_time: 0.8
-base_recovery_steps:
-  - [0.05, 0.00]
-  - [-0.10, 0.00]
+base_recovery_steps: []
 
 sorting_state_topic: /sorting/state
 sorting_failure_topic: /sorting/failure
@@ -132,3 +132,7 @@ sorting_configure_service: /sorting/configure_workspace
 sorting_workspace_param: /sorting/workspace_config
 
 auto_start: false
+
+# Record starting pose in the navigation frame; return after successful sorting.
+return_to_start: true
+return_frame: map

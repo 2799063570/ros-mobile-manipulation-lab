@@ -31,12 +31,22 @@ pregrasp_height: 0.25
 # outside the high, tool-down IK envelope; 0.26 m still provides ample table
 # clearance for a 0.04 m block while keeping the transfer pose reachable.
 lift_height: 0.26
+# Retry incomplete/failed lift planning at 2 cm lower targets, down to 18 cm
+# above the table. Execution failure or stop never retries; at most 5 attempts.
+lift_min_height: 0.18
+lift_height_step: 0.02
+lift_max_attempts: 5
+# Placement approach/retreat uses a lower independently reachable target.
+# Relative to table_z: 0.14 + 0.24 = 0.38 m in base_link.
+preplace_height: 0.24
 place_clearance: 0.02
 cartesian_step: 0.01
 minimum_cartesian_fraction: 0.90
 
 gripper_open: 0.0
-gripper_closed: 0.28
+# 40 mm cubes: mesh clearance at the grasp band is about 42 mm at 0.20 rad.
+# 0.28 rad leaves only about 37 mm and visibly penetrates attached cubes.
+gripper_closed: 0.20
 gripper_motion_time: 0.8
 gripper_contact_tolerance: 0.30
 

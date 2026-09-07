@@ -70,6 +70,18 @@ class ColorSortingTask(object):
         )
         self.pregrasp_height = float(rospy.get_param("~pregrasp_height", 0.25))
         self.lift_height = float(rospy.get_param("~lift_height", 0.30))
+        self.lift_min_height = float(rospy.get_param("~lift_min_height", self.lift_height))
+        self.lift_height_step = float(rospy.get_param("~lift_height_step", 0.02))
+        self.lift_max_attempts = int(rospy.get_param("~lift_max_attempts", 5))
+        if (not all(math.isfinite(v) for v in
+                    (self.lift_height, self.lift_min_height, self.lift_height_step))
+                or self.lift_min_height <= 0.5 * self.object_height + self.grasp_height_offset
+                or self.lift_height < self.lift_min_height or self.lift_height_step <= 0
+                or not 1 <= self.lift_max_attempts <= 100):
+            raise ValueError("invalid lift height bounds, step or attempt budget")
+        self.preplace_height = float(rospy.get_param("~preplace_height", self.lift_height))
+        if not math.isfinite(self.preplace_height) or self.preplace_height <= 0.0:
+            raise ValueError("preplace_height must be finite and positive")
         self.place_clearance = float(rospy.get_param("~place_clearance", 0.02))
         self.cartesian_step = float(rospy.get_param("~cartesian_step", 0.01))
         self.minimum_cartesian_fraction = float(
@@ -956,7 +968,8 @@ class ColorSortingTask(object):
         success = self._plan_and_execute("named target '{}'".format(target))
         return success and not self._stop_requested.is_set()
 
-    def _cartesian_to(self, target_pose, description):
+    def _cartesian_to(self, target_pose, description, require_complete=False):
+        required_fraction = 1.0 if require_complete else self.minimum_cartesian_fraction
         if self._stop_requested.is_set():
             return False
         waypoint = copy.deepcopy(target_pose.pose)
@@ -985,7 +998,7 @@ class ColorSortingTask(object):
         # stops part-way and pose planning reports zero valid goal states even
         # though the same target is normally reachable.  Rebuild the sensor
         # map once from the settled pose before treating the target as invalid.
-        if fraction < self.minimum_cartesian_fraction and self.require_octomap:
+        if fraction < required_fraction and self.require_octomap:
             rospy.logwarn(
                 "Cartesian fraction too low; refreshing OctoMap and retrying once"
             )
@@ -996,7 +1009,10 @@ class ColorSortingTask(object):
                     description,
                     100.0 * fraction,
                 )
-        if fraction < self.minimum_cartesian_fraction:
+        if not math.isfinite(fraction) or (require_complete and fraction < 1.0):
+            self._set_failure("PLANNING_FAILED", "incomplete Cartesian lift to " + description)
+            return False
+        if fraction < required_fraction:
             rospy.logwarn("Cartesian fraction too low; falling back to pose planning")
             return self._move_to_pose(target_pose, description)
         # Older MoveIt releases can return Cartesian trajectories whose timing
@@ -1040,11 +1056,39 @@ class ColorSortingTask(object):
             plan.joint_trajectory.points[-1].time_from_start.to_sec(),
             self.velocity_scaling,
         )
+        if self._stop_requested.is_set() or rospy.is_shutdown():
+            return False
         success = bool(self.arm.execute(plan, wait=True))
         self.arm.stop()
         if not success:
             self._set_failure("EXECUTION_FAILED", "Cartesian path to {}".format(description))
         return success and not self._stop_requested.is_set()
+
+    def _lift_with_recovery(self, x, y, description):
+        for index in range(self.lift_max_attempts):
+            if self._stop_requested.is_set() or rospy.is_shutdown():
+                return False
+            height = max(self.lift_min_height, self.lift_height - index * self.lift_height_step)
+            if height - self.lift_min_height < 1e-9:
+                height = self.lift_min_height
+            rospy.loginfo("Lift attempt %d/%d: height=%.3f, target_z=%.3f, minimum=%.3f",
+                          index + 1, self.lift_max_attempts, height,
+                          self.table_z + height, self.lift_min_height)
+            self._last_failure = ""
+            if self._cartesian_to(self._pose(x, y, self.table_z + height), description,
+                                  require_complete=True):
+                if self._stop_requested.is_set() or rospy.is_shutdown():
+                    return False
+                self._last_failure = ""
+                self._failure_publisher.publish(String(data=""))
+                return True
+            if (self._stop_requested.is_set() or rospy.is_shutdown()
+                    or not self._last_failure.startswith("PLANNING_FAILED |")):
+                return False
+            if height <= self.lift_min_height:
+                break
+        self._set_failure("PLANNING_FAILED", description + " exhausted bounded height attempts")
+        return False
 
     def _command_gripper(self, position):
         if self._stop_requested.is_set():
@@ -1351,7 +1395,7 @@ class ColorSortingTask(object):
             + 0.5 * self.object_height
             + self.grasp_height_offset
         )
-        travel_z = self.table_z + self.lift_height
+        preplace_z = self.table_z + self.preplace_height
 
         rospy.loginfo(
             "Picking %s at [%.3f, %.3f, %.3f]", color, object_x, object_y, grasp_z
@@ -1380,9 +1424,7 @@ class ColorSortingTask(object):
             self._set_grasp_attachment(object_model_name, False)
             return False
         rospy.sleep(0.5)
-        if not self._cartesian_to(
-            self._pose(object_x, object_y, travel_z), color + " lift"
-        ):
+        if not self._lift_with_recovery(object_x, object_y, color + " lift"):
             return False
 
         if color not in self.place_targets:
@@ -1395,7 +1437,7 @@ class ColorSortingTask(object):
             return False
         place_x, place_y = place_xy
         if not self._move_to_pose(
-            self._pose(place_x, place_y, travel_z), color + " pre-place"
+            self._pose(place_x, place_y, preplace_z), color + " pre-place"
         ):
             return False
         if not self._cartesian_to(
@@ -1409,7 +1451,7 @@ class ColorSortingTask(object):
             return False
         rospy.sleep(0.5)
         return self._cartesian_to(
-            self._pose(place_x, place_y, travel_z), color + " retreat"
+            self._pose(place_x, place_y, preplace_z), color + " retreat"
         )
 
     def _sorting_operation(self):

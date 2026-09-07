@@ -73,3 +73,7 @@ sorting_stop_service: /sorting/stop
 
 # true：系统就绪后自动执行一次；false：等待 /nav_sorting/start。
 auto_start: false
+
+# Record starting pose in the navigation frame; return after successful sorting.
+return_to_start: true
+return_frame: map
