@@ -13,7 +13,27 @@ roslaunch aubo_sorting yolo_sorting.launch model_path:=/实际路径/obb.pt task
 桌面和夹爪任务配置，内含红绿蓝方块示例；YOLO 应通过 `task_config` 指定实际
 `sort_colors`（该旧参数名表示通用类别列表）和 `place_targets`，不要将示例颜色当成模型类别。
 `colors_config` 指定 HSV 阈值，`yolo_config` 指定模型推理配置，`perception_config` 指定共用 3D 规则。
-仿真入口同样支持这些配置以及 `model_path/python`；切换 detector 不会自动改变仿真物体或训练模型。
+仿真入口按 `detector` 自动选择场景和任务配置：color 使用 `worlds/sorting.world`
+中的红绿蓝方块；yolo 使用独立的 `worlds/yolo_sorting.world` 和
+`config/yolo_sorting.yaml`，桌面放置带金属顶盖、拉环和标签带的易拉罐。
+
+```bash
+roslaunch aubo_sorting sorting_gazebo.launch detector:=color
+roslaunch aubo_sorting yolo_sorting_gazebo.launch
+# 等价入口，仍支持 world/task_config/model_path/python 等参数覆盖
+roslaunch aubo_sorting sorting_gazebo.launch detector:=yolo
+```
+
+YOLO 示例使用 `can` 类别，罐体直径 5 cm、轴向长度 10 cm，默认平躺在桌面，类别映射到 Gazebo
+模型 `beverage_can`。感知与任务同步使用竖直高度 `object_height=0.05`，中心 Z 为 0.125 m；
+默认使用 OBB 短边方向抓取，不加载彩色分拣垫。默认权重 GC-yolo.pt 的类别为 bottle/can/box，无需将颜色名当作类别。
+抓取感知入口显式指定 YOLO `input_mode=topic`，订阅 `/camera/color/image_raw`，
+检测框发布到 `/perception/boxes`，几何层结合相机信息与 TF 后发布 `/sorting/detections`。
+单独运行 `ultralytics_yolo.launch` 的离线图片模式不会影响分拣入口。
+当前任务每轮每个类别抓取一次，因此示例先放置一个罐子；多个同类罐子的连续分拣
+还需要扩展任务的实例选择及抓取模型映射。模型是本地 SDF 几何，无需下载外部资源；
+真实图像训练权重对仿真外观的识别效果需实测，必要时补充仿真训练数据。
+切换场景后须重启 Gazebo。算法入口 `yolo_sorting.launch` 本身不启动或替换仿真环境。
 
 
 ## 通用颜色 / YOLO 抓取入口

@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 <launch>
-  <arg name="task_config" default="$(find aubo_sorting)/config/sorting.yaml" />
+  <arg name="detector" default="color"/>
+  <arg name="task_config" default="$(eval find('aubo_sorting') + ('/config/yolo_sorting.yaml' if arg('detector') == 'yolo' else '/config/sorting.yaml'))" />
   <arg name="perception_config" default="$(find aubo_perception)/config/grasp_pipeline.yaml" />
   <arg name="colors_config" default="$(find aubo_sorting)/config/colors.yaml" />
   <arg name="yolo_config" default="$(find aubo_perception)/config/ultralytics_yolo.yaml" />
@@ -10,8 +11,10 @@
   <arg name="use_detected_width" default="false" />
 
   <arg name="height_mode" default="table"/>
-  <arg name="detector" default="color"/>
-  <arg name="world" default="$(find aubo_sorting)/worlds/sorting.world"/>
+  <arg name="table_z" default="0.10"/>
+  <!-- A lying can is 5 cm above the table; its axial length is 10 cm. -->
+  <arg name="object_height" default="$(eval 0.05 if arg('detector') == 'yolo' else 0.04)"/>
+  <arg name="world" default="$(eval find('aubo_sorting') + ('/worlds/yolo_sorting.world' if arg('detector') == 'yolo' else '/worlds/sorting.world'))"/>
   <arg name="gui" default="true"/>
   <arg name="rviz" default="true"/>
   <arg name="debug_view" default="false"/>
@@ -19,7 +22,7 @@
   <arg name="auto_move_to_observation" default="true"/>
   <arg name="auto_start" default="false"/>
   <arg name="task_executable" default="color_sorting_task_cpp"/>
-  <arg name="show_sorting_pads" default="true"/>
+  <arg name="show_sorting_pads" default="$(eval arg('detector') == 'color')"/>
 
   <!-- Fixed-base AUBO i5; no mobile-base model or odometry is loaded. -->
   <include file="$(find aubo_gazebo)/launch/aubo_world_gazebo.launch">
@@ -64,6 +67,8 @@
     <arg name="use_detected_angle" value="$(arg use_detected_angle)"/>
     <arg name="use_detected_width" value="$(arg use_detected_width)"/>
 
+    <arg name="table_z" value="$(arg table_z)"/>
+    <arg name="object_height" value="$(arg object_height)"/>
     <arg name="height_mode" value="$(arg height_mode)"/>
     <arg name="detector" value="$(arg detector)"/>
     <arg name="task_executable" value="$(arg task_executable)"/>

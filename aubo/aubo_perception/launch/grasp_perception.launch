@@ -22,6 +22,9 @@
 
   <group if="$(eval arg('detector') == 'yolo')">
     <include file="$(find aubo_perception)/launch/ultralytics_yolo.launch">
+      <!-- Grasp geometry needs live camera timestamps, never an offline image. -->
+      <arg name="input_mode" value="topic"/>
+      <arg name="image_path" value=""/>
       <arg name="config" value="$(arg yolo_config)"/>
       <arg name="python" value="$(arg python)"/>
       <arg name="model_path" value="$(arg model_path)"/>

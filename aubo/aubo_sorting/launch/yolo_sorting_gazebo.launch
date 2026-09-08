@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Forward caller overrides to the common simulation entry point. -->
+  <arg name="detector" value="yolo"/>
+  <include file="$(find aubo_sorting)/launch/sorting_gazebo.launch" pass_all_args="true"/>
+</launch>
