@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-"""Last-resort lidar stop layer for mobile-base velocity commands."""
+"""底盘速度输出前的激光停车层，组合运动互锁、数据超时和障碍距离检查。"""
 
 from __future__ import print_function
 
@@ -115,6 +115,7 @@ class LaserSafetyFilter(object):
         return command
 
     def _stopping_distance(self, speed, reverse=False):
+        # 总阈值 = 基础余量 + 反应期间位移 + 匀减速制动距离，单位均为米。
         base = self.reverse_stop_distance if reverse else self.stop_distance
         return base + self.reaction_time * speed + speed * speed / (
             2.0 * self.max_deceleration
@@ -129,6 +130,7 @@ class LaserSafetyFilter(object):
         rotating = abs(command.angular.z) > self.angular_deadband
 
         current_cluster = 0
+        # 使用连续角度上的障碍点簇抑制孤立噪点；紧急距离内的单点仍会停车。
         largest_cluster = 0
         emergency = False
         angle = scan.angle_min
@@ -184,6 +186,7 @@ class LaserSafetyFilter(object):
 
     def _publish_safe_command(self, _event):
         now = rospy.Time.now()
+        # 锁内只取快照；逐点扫描和发布放在锁外，减少对订阅回调的占用。
         with self._lock:
             scan = self._scan
             scan_received = self._scan_received

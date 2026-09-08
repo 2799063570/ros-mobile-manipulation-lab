@@ -24,6 +24,18 @@ class FilteredPidTest(unittest.TestCase):
         pid.update(0.0, 1.0, -10.0, 10.0)
         self.assertEqual(pid.update(4.0, 2.0, -10.0, 10.0), 1.0)
 
+    def test_old_measurements_obey_tighter_runtime_limits(self):
+        for timestamp in (2.0, 1.5):
+            for error in (-1.0, 1.0):
+                with self.subTest(timestamp=timestamp, error=error):
+                    pid = FilteredPid(kp=1.0, ki=0.1)
+                    pid.update(error, 1.0, -2.0, 2.0)
+                    pid.update(error, 2.0, -2.0, 2.0)
+                    integral = pid.integral
+                    self.assertEqual(pid.update(error, timestamp, -0.2, 0.2), error * 0.2)
+                    self.assertEqual(pid.integral, integral)
+                    self.assertEqual(pid._previous_time, 2.0)
+
     def test_integral_does_not_wind_up_into_saturation(self):
         pid = FilteredPid(ki=1.0, integral_limit=10.0)
         pid.update(2.0, 1.0, -1.0, 1.0)

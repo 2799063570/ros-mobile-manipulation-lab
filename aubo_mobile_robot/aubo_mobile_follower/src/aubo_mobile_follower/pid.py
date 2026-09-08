@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Small ROS-independent PID controller for follower nodes."""
+"""跟随节点共用的 PID：独立于 ROS，便于离线验证控制逻辑。"""
 
 from __future__ import division
 
@@ -9,11 +9,10 @@ def clamp(value, lower, upper):
 
 
 class FilteredPid(object):
-    """PID with derivative filtering, integral limiting and anti-windup.
+    """带微分低通滤波、积分限幅和抗饱和的 PID。
 
-    ``timestamp`` belongs to the measurement, not the control-loop timer.  A
-    repeated timestamp returns the previous output so one camera/lidar sample
-    cannot be integrated more than once.
+    timestamp 必须取自传感器测量时刻，而非控制定时器时刻。
+    重复或乱序帧不更新积分与微分，但输出仍须服从本次的速度上下限。
     """
 
     def __init__(
@@ -59,6 +58,8 @@ class FilteredPid(object):
             raise ValueError("PID lower output limit must not exceed upper limit")
 
         if self._previous_time is not None and timestamp <= self._previous_time:
+            # 动态调参或接近目标时可能收紧限速，旧测量不能绕过新的限制。
+            self._last_output = clamp(self._last_output, lower, upper)
             return self._last_output
 
         delta = None
@@ -82,7 +83,7 @@ class FilteredPid(object):
                 + self.ki * candidate_integral
                 + self.kd * self.derivative
             )
-            # Conditional integration: do not wind up farther into saturation.
+            # 输出饱和时，仅允许能使输出退出饱和区的误差继续积分。
             if (
                 lower <= candidate_output <= upper
                 or (candidate_output > upper and error < 0.0)

@@ -47,6 +47,21 @@ aubo_mobile_robot/
 [aubo_mobile_nav_sorting](aubo_mobile_nav_sorting/README.md)。只迁移源码目录，
 ROS 包名、RViz 插件名和 `roslaunch aubo_mobile_*` 命令不变。
 
+## 源码阅读入口
+
+| 关注的问题 | 主要入口 | 阅读要点 |
+| --- | --- | --- |
+| 多工位任务怎样串联 | `aubo_mobile_nav_sorting/src/navigation_sorting_mission.cpp` | 导航、观察、分拣、撤离和停止恢复 |
+| 底盘和机械臂怎样分工 | 同包 `src/base_executor.cpp`、`src/arm_executor.cpp` | 动作完成条件、重试和取消确认 |
+| 服务超时为什么不能直接重启 | 同包 `include/aubo_mobile_nav_sorting/bounded_rpc.h` | 结束本地等待不等于取消远端请求；延迟返回后还需补偿停止 |
+| 双雷达如何合并 | `aubo_mobile_navigation/scripts/dual_laser_merger.py` | 坐标变换、角度栅格取近点和时间戳去重 |
+| 底盘何时被禁止移动 | `aubo_mobile_navigation/scripts/laser_safety_filter.py` | 机械臂互锁、数据超时、制动距离与连续障碍点簇 |
+| 跟随速度怎样计算 | `aubo_mobile_follower/src/aubo_mobile_follower/pid.py` | 测量时间戳、抗积分饱和和动态输出限幅 |
+
+修改任务编排时要分别检查“请求已受理”“动作已完成”和“停止已确认”，三者不能互相替代。
+跟随 PID 的重复或乱序测量不会再次积分，但仍应用最新速度上下限；仿真重置或切换任务时，
+调用方应通过 `reset()` 清除旧的积分和测量时间。
+
 ## 分层结构
 
 ```text

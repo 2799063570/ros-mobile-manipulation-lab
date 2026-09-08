@@ -41,6 +41,23 @@
 `aubo_mobile_sorting` 都依赖 `aubo_sorting_core`，通用核心不能反向依赖任一平台
 场景。两套 MoveIt 配置对应不同机器人模型，应继续独立维护。
 
+## 源码阅读入口
+
+建议按“启动参数 → 感知消息 → 任务状态 → 执行动作”的顺序阅读：
+
+| 关注的问题 | 主要入口 | 阅读要点 |
+| --- | --- | --- |
+| YOLO 如何接收相机图像 | `aubo_perception/scripts/ultralytics_yolo_node.py` | 行步长、颜色通道、推理限频及原始图像时间戳 |
+| 检测框如何变成抓取坐标 | `aubo_perception/scripts/yolo_rgbd_target_node.py`、`src/aubo_perception/grasp_geometry.py` | 深度帧配对、TF、顶面高度与物体中心高度的区别 |
+| 分拣何时开始、停止 | `aubo_sorting_core/src/color_sorting_task.cpp` | 状态转换、初始化条件及停止请求 |
+| 目标位置如何稳定 | `aubo_sorting_core/src/target_tracking.cpp` | 每类一个候选、离群点过滤和位置离散程度；不是同类多目标跟踪 |
+| 抓取动作如何执行 | `aubo_sorting_core/src/pick_place.cpp`、`motion_executor.cpp` | 接近、夹取、抬升、放置及失败返回路径 |
+| 场景和抓取辅助如何配合 | `workspace_manager.cpp`、`grasp_attachment.cpp`（均在核心包 `src/` 下） | 规划场景与 Gazebo 附着状态是两套不同机制 |
+
+维护注释时优先解释坐标系、单位、线程所有权和失败原因。ROS 时间用于传感器配对，
+墙上时间用于部分可中断等待，单调时钟用于推理限频；修改超时时不要混用这些时间基准。
+修改运动参数后的离线测试只能验证程序逻辑，仍需在仿真中检查轨迹和抓取效果。
+
 ## SDK 与上游参考
 
 `aubo_sdk` 中的控制器头文件、运行库和配置来自

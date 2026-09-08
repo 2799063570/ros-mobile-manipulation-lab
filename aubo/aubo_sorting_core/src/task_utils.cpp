@@ -9,6 +9,7 @@ namespace detail
 {
 bool wallSleep(double seconds, const std::atomic<bool>& stop_requested)
 {
+  // 使用墙上时间，Gazebo 暂停 /clock 时仍能响应停止；每 20 ms 检查一次退出条件。
   const ros::WallTime deadline = ros::WallTime::now() + ros::WallDuration(seconds);
   ros::WallRate rate(50.0);
   while (ros::ok() && !stop_requested.load() && ros::WallTime::now() < deadline)
@@ -18,7 +19,7 @@ bool wallSleep(double seconds, const std::atomic<bool>& stop_requested)
 
 std::string join(const std::vector<std::string>& values, const std::string& separator)
 {
-  // 该函数的作用吧字符串数组中各个字符串连接起来 中间用{separator}分隔  返回连接后的字符串
+  // 分隔符仅插入元素之间，空数组返回空字符串。
   std::ostringstream stream;
   for (std::size_t index = 0; index < values.size(); ++index)
   {

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Ultralytics inference on ROS1 images without loading cv_bridge."""
+"""ROS 图像到 YOLO 检测框；避免在 Conda 推理进程中加载 cv_bridge。"""
 
 from __future__ import annotations
 
@@ -18,7 +18,9 @@ from aubo_perception.msg import YoloDetection, YoloDetectionArray
 
 
 def image_message_to_bgr(message: Image) -> np.ndarray:
-    """Decode common 8-bit ROS encodings without crossing OpenCV ABIs."""
+    """直接解码常见 8 位图像，避免 ROS 与 Conda 的 OpenCV ABI 冲突。"""
+    if message.width <= 0 or message.height <= 0:
+        raise ValueError("image width and height must be positive")
     encoding = message.encoding.lower()
     channel_counts = {
         "bgr8": 3,
@@ -41,6 +43,7 @@ def image_message_to_bgr(message: Image) -> np.ndarray:
     required = message.height * message.step
     if flat.size < required:
         raise ValueError("image data is shorter than height * step")
+    # step 包含每行的对齐填充；先按步长分行，再剔除填充字节。
     rows = flat[:required].reshape(message.height, message.step)
     image = rows[:, :packed_width].reshape(message.height, message.width, channels)
     if channels == 1:
@@ -72,7 +75,7 @@ class UltralyticsYoloNode:
         ).expanduser().resolve()
         self.model_path = Path(
             rospy.get_param("~model_path", str(self.project_path / "weights/GC-yolo.pt"))
-        ).expanduser().resolve()    
+        ).expanduser().resolve()
         self.input_mode = rospy.get_param("~input_mode", "topic")
         if self.input_mode not in ("topic", "image"):
             raise ValueError("input_mode must be topic or image")
@@ -165,6 +168,7 @@ class UltralyticsYoloNode:
             )
 
     def image_callback(self, message: Image) -> None:
+        # 用单调时钟限制推理频率；非阻塞锁避免多个相机回调并发使用同一模型。
         now = time.monotonic()
         if now - self.last_inference_time < self.minimum_interval:
             return
@@ -183,6 +187,7 @@ class UltralyticsYoloNode:
                 verbose=False,
             )[0]
             output = YoloDetectionArray()
+            # 保留采集时间，几何节点依此查找深度缓存，不能改成推理完成时间。
             output.header = message.header
             self._append_detections(output, result) # 获取检测结果
             self.detections_publisher.publish(output)

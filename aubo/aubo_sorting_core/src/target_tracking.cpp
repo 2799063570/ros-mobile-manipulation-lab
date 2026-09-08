@@ -77,11 +77,9 @@ bool ColorSortingTask::detectionInCacheFrame(
 
 void ColorSortingTask::updateTargetCache(const aubo_perception::DetectedObjectArray& message)
 {
-  // 主要是为了更新target_tracks_下的目标对象信息
-  // 1、先对消息中的对象进行遍历取抓取颜色相同的目标对象中面积最大的一个
-  // 2、将面积最大的目标对象转换到目标缓存坐标系下
-  // 3、target_tracks_ 中若无 直接添加  
-  //    若有 则更新目标对象的平均位置、观测次数、离散程度、最后观测时间 （两次平滑过度）
+  // 每个类别仅保留图像面积最大的候选，再转换到统一缓存坐标系。
+  // TF 查询放在 data_mutex_ 之外，避免等待变换时阻塞状态和检测回调。
+  // 当前是“每类一个目标”的缓存，不是同类多目标的身份跟踪器。
   std::map<std::string, const aubo_perception::DetectedObject*> selected;// 颜色+目标对象
   for (const auto& detected : message.objects) // 遍历检测到的对象数组 aubo_perception/DetectedObject[]
   {
@@ -130,6 +128,7 @@ void ColorSortingTask::updateTargetCache(const aubo_perception::DetectedObjectAr
         continue;
       }
       ++track.count;// 增加该目标被检测到的次数
+      // Welford 在线统计：m2 累积 XY 位置的平方偏差，无需保存全部历史帧。
       const double delta_x = update.x - track.x;
       const double delta_y = update.y - track.y;
       track.x += delta_x / track.count;
@@ -158,11 +157,12 @@ void ColorSortingTask::publishTargetCache()
   for (const auto& item : tracks)
   {
     const TargetTrack& track = item.second;
-    const double spread = std::sqrt(std::max(0.0, track.m2) / std::max(1, track.count));// 面积的平方根/被检测到的次数  表示目标的大小
+    // spread 是观测位置的均方根离散程度（米），不是轮廓面积或物体尺寸。
+    const double spread = std::sqrt(std::max(0.0, track.m2) / std::max(1, track.count));
     const double observation_confidence =
         std::min(1.0, static_cast<double>(track.count) / target_cache_min_observations_);// 观测置信度  被检测到的次数/最小观测次数
     const double stability_confidence =
-        std::max(0.0, 1.0 - spread / target_cache_outlier_distance_);// 稳定置信度  1-目标的大小/异常距离
+        std::max(0.0, 1.0 - spread / target_cache_outlier_distance_);// 位置越稳定，置信度越高
     if (!first)
       stream << ',';
     first = false;

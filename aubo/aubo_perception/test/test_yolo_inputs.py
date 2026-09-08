@@ -16,6 +16,25 @@ module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 
 class InputTest(unittest.TestCase):
+    def test_empty_image_dimensions_are_rejected(self):
+        for width, height in ((0, 8), (10, 0), (0, 0)):
+            with self.subTest(width=width, height=height):
+                message = module.Image()
+                message.encoding = 'bgr8'
+                message.width, message.height = width, height
+                message.step = width * 3
+                message.data = bytes(height * message.step)
+                with self.assertRaisesRegex(ValueError, 'width and height'):
+                    module.image_message_to_bgr(message)
+
+    def test_rgb_row_padding_is_not_decoded_as_pixels(self):
+        message = module.Image()
+        message.encoding = 'rgb8'
+        message.width, message.height, message.step = 1, 2, 4
+        message.data = bytes([1, 2, 3, 255, 4, 5, 6, 255])
+        np.testing.assert_array_equal(module.image_message_to_bgr(message),
+                                      [[[3, 2, 1]], [[6, 5, 4]]])
+
     def test_topic_waits_for_camera_and_preserves_timestamp(self):
         rospy.rostime.set_rostime_initialized(True)
         with tempfile.TemporaryDirectory() as directory:

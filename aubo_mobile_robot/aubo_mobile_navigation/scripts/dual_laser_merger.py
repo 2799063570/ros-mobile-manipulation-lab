@@ -12,7 +12,7 @@ from sensor_msgs.msg import LaserScan
 
 
 class DualLaserMerger(object):
-    """Merge two planar scans into one scan centred on a common target frame."""
+    """将前后平面激光转换到统一坐标系，再按方位角合并最近障碍距离。"""
 
     def __init__(self):
         self.front_topic = rospy.get_param("~front_topic", "/front/scan")
@@ -79,6 +79,7 @@ class DualLaserMerger(object):
         return (translation[0], translation[1], self._yaw_from_quaternion(quaternion))
 
     def _add_scan(self, scan, output_ranges, angle_min, angle_increment):
+        # 必须先平移、旋转激光点，再重新计算极坐标；不能直接拼接两个 ranges。
         tx, ty, yaw = self._transform_for_scan(scan)
         cos_yaw = math.cos(yaw)
         sin_yaw = math.sin(yaw)
@@ -98,6 +99,7 @@ class DualLaserMerger(object):
                         index = int(math.floor((target_angle - angle_min) / angle_increment))
                         if index == self.samples:
                             index = 0
+                        # 两个雷达落到同一个角度栅格时保留近点，避免远点遮掉障碍。
                         if 0 <= index < self.samples and target_range < output_ranges[index]:
                             output_ranges[index] = target_range
             angle += scan.angle_increment
@@ -118,11 +120,8 @@ class DualLaserMerger(object):
         if not valid_scans:
             return
 
-        # The timer and Gazebo lidar updates run independently.  A timer tick
-        # can therefore see the same pair of source scans more than once.  Do
-        # not republish that data: AMCL otherwise processes a duplicate scan
-        # and broadcasts map -> odom again with the same timestamp, which
-        # causes TF_REPEATED_DATA in every TF listener.
+        # 定时器可能反复读取同一组扫描；重复发布会使 AMCL 重复处理数据，
+        # 并以相同时间戳广播 map -> odom，导致 TF_REPEATED_DATA。
         output_stamp = max(scan.header.stamp for scan in valid_scans)
         with self._lock:
             if output_stamp == self._last_published_stamp:
