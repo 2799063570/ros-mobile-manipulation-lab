@@ -1,5 +1,14 @@
 <launch>
+  <!--
+    功能：HSV 颜色识别的 Gazebo 快捷入口。
+    眼在手上：相机安装在机械臂末端，随机械臂运动。
+    加载机械臂、RGB-D 相机、MoveIt 和目标场景，默认自动移动到 observe 观察位。
+    默认输出 /sorting/detections，不执行抓取或视觉伺服运动。
+    如需伺服目标，传入 task_mode:=both selected_class:=目标类别；颜色类别如 red。
+  -->
+  <!-- 固定检测方法与相机安装方式，具体启动流程由通用入口统一实现。 -->
   <arg name="detector" value="color"/>
   <arg name="camera_mount" value="eye_in_hand"/>
+  <!-- 转发命令行参数，例如 gui、paused、task_mode、selected_class 及模型路径。 -->
   <include file="$(find aubo_perception)/launch/perception_gazebo.launch" pass_all_args="true"/>
 </launch>

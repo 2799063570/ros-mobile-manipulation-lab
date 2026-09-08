@@ -1,13 +1,22 @@
 <launch>
+  <!--
+    功能：单独运行 Ultralytics YOLO 二维检测，支持普通检测框及模型提供的旋转框。
+    默认对本地图片进行检测；不计算三维坐标，也不启动相机、Gazebo 或机械臂。
+    输出检测框 /yolo/detections，启用标注图输出时发布 /yolo/annotated_image。
+  -->
+  <!-- YAML 配置推理选项；指定具备模型依赖的 Python 环境。 -->
   <arg name="config" default="$(find aubo_perception)/config/ultralytics_yolo.yaml"/>
   <arg name="python" default="/home/zlab/anaconda3/envs/yolo/bin/python"/>
 
-  <arg name="input_mode" default="image"/><!-- topic | image -->
+  <!-- image 读取 image_path；topic 订阅 image_topic。默认图片与权重路径需按本机文件调整。 -->
+  <arg name="input_mode" default="image"/><!-- topic：实时图像；image：离线图片 -->
   <arg name="image_path" default="/home/zlab/deepL/code/ultralytics-main-modify/test.jpg"/>
+  <!-- 可覆盖输入输出话题，便于接入相机或下游几何节点。 -->
   <arg name="detections_topic" default="/yolo/detections"/>
   <arg name="image_topic" default="/camera/color/image_raw"/>
   <arg name="model_path" default="/home/zlab/deepL/code/ultralytics-main-modify/weights/GC-yolo.pt"/>
   <arg name="annotated_image_topic" default="/yolo/annotated_image"/>
+  <!-- 通过指定解释器启动节点；先加载配置，再用显式参数覆盖同名设置。 -->
   <node pkg="aubo_perception"
         type="ultralytics_yolo_node.py"
         launch-prefix="$(arg python)"

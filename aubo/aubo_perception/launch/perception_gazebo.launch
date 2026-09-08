@@ -1,23 +1,38 @@
 <launch>
+  <!--
+    功能：统一搭建颜色/YOLO、眼在手上/眼在手外的独立感知仿真。
+    启动 Gazebo 场景、相机及检测与三维几何节点；眼在手上另启动机械臂和观察位运动。
+    默认发布分拣候选目标，不启动分拣任务或视觉伺服控制器。
+  -->
+  <!-- 检测方法和相机安装方式决定场景、机器人加载分支及默认坐标系。 -->
   <arg name="detector" default="color" doc="color | yolo"/>
   <arg name="camera_mount" default="eye_in_hand" doc="eye_in_hand | eye_to_hand"/>
-  <!-- Dictionary lookup rejects unsupported mode names during launch parsing. -->
+  <!-- 字典索引会在 launch 解析阶段拒绝不支持的检测方法或相机安装方式。 -->
   <arg name="world" default="$(eval find('aubo_perception') + '/worlds/' + {'color': 'color', 'yolo': 'yolo'}[arg('detector')] + '_perception.world')"/>
   <arg name="with_arm" value="$(eval {'eye_in_hand': True, 'eye_to_hand': False}[arg('camera_mount')])"/>
+  <!-- 仿真显示与时间：gui 控制 Gazebo 窗口；paused 为 true 时需恢复仿真；rviz 控制可视化。 -->
   <arg name="gui" default="true"/>
   <arg name="paused" default="false"/>
   <arg name="rviz" default="false"/>
+  <!-- 仅眼在手上生效：默认通过 MoveIt 移动到 SRDF 中的 observe 命名姿态。 -->
   <arg name="auto_move_to_observation" default="true"/>
   <arg name="observation_named_target" default="observe"/>
+  <!-- 三维高度来源：depth 使用对齐深度，table 使用已知桌面高度与物体高度投影。 -->
   <arg name="height_mode" default="depth"/>
+  <!-- sorting 仅输出分拣目标；servo 仅输出伺服目标；both 同时输出，后两者必须指定 selected_class。 -->
+  <arg name="task_mode" default="sorting" doc="sorting | servo | both"/>
+  <arg name="selected_class" default="" doc="Required for servo/both; e.g. red for color detection"/>
+  <!-- 几何参数单位为米；分拣输出坐标系默认是机械臂 base_link 或固定相机场景 world。 -->
   <arg name="table_z" default="0.10"/>
   <arg name="object_height" default="$(eval 0.05 if arg('detector') == 'yolo' else 0.04)"/>
   <arg name="target_frame" default="$(eval 'base_link' if arg('with_arm') else 'world')"/>
+  <!-- 分别加载抓取几何、HSV 阈值与 YOLO 配置；python 和 model_path 仅用于 YOLO 检测。 -->
   <arg name="config" default="$(find aubo_perception)/config/grasp_pipeline.yaml"/>
   <arg name="colors_config" default="$(find aubo_perception)/config/colors.yaml"/>
   <arg name="yolo_config" default="$(find aubo_perception)/config/ultralytics_yolo.yaml"/>
   <arg name="python" default="/home/zlab/anaconda3/envs/yolo/bin/python"/>
   <arg name="model_path" default="/home/zlab/deepL/code/ultralytics-main-modify/weights/GC-yolo.pt"/>
+  <!-- 仅眼在手外生效：固定相机在 world 中的位姿，位置单位米，欧拉角单位弧度。 -->
   <arg name="camera_x" default="0.55"/>
   <arg name="camera_y" default="0.0"/>
   <arg name="camera_z" default="1.60"/>
@@ -25,6 +40,7 @@
   <arg name="camera_pitch" default="1.57079632679"/>
   <arg name="camera_yaw" default="0.0"/>
 
+  <!-- 眼在手上分支：启动带相机机械臂、仿真关节控制器和 MoveIt。 -->
   <group if="$(arg with_arm)">
     <include file="$(find aubo_gazebo)/launch/aubo_world_gazebo.launch">
       <arg name="world_name" value="$(arg world)"/>
@@ -32,6 +48,7 @@
       <arg name="paused" value="$(arg paused)"/>
     </include>
     <include file="$(find aubo_gazebo)/launch/aubo_controller_gazebo.launch"/>
+    <!-- 将仿真控制器的关节状态汇总到标准 joint_states，供机器人状态与规划使用。 -->
     <node pkg="joint_state_publisher" type="joint_state_publisher" name="aubo_joint_state_relay">
       <rosparam param="source_list">[/aubo_i5/joint_states]</rosparam>
     </node>
@@ -42,6 +59,7 @@
       <arg name="robot_xacro" value="aubo_i5_with_camera.xacro"/>
       <arg name="robot_srdf" value="aubo_i5_with_camera.srdf"/>
     </include>
+    <!-- 到位后发布 /move_to_observation/ready；感知节点不等待该信号才启动。 -->
     <node if="$(arg auto_move_to_observation)" pkg="aubo_perception" type="move_to_observation.py"
           name="move_to_observation" output="screen">
       <param name="named_target" value="$(arg observation_named_target)"/>
@@ -50,6 +68,7 @@
     <include if="$(arg rviz)" file="$(find aubo_moveit_config)/launch/moveit_rviz.launch"/>
   </group>
 
+  <!-- 眼在手外分支：仅加载场景和固定相机，并使用 Gazebo 的仿真时钟。 -->
   <group unless="$(arg with_arm)">
     <include file="$(find gazebo_ros)/launch/empty_world.launch">
       <arg name="world_name" value="$(arg world)"/>
@@ -59,6 +78,7 @@
     </include>
     <node pkg="gazebo_ros" type="spawn_model" name="spawn_workspace_camera" output="screen"
           args="-sdf -file $(find aubo_perception)/models/workspace_camera/model.sdf -model workspace_camera -x $(arg camera_x) -y $(arg camera_y) -z $(arg camera_z) -R $(arg camera_roll) -P $(arg camera_pitch) -Y $(arg camera_yaw)"/>
+    <!-- TF 与 Gazebo 相机模型使用同一组位姿参数，保证三维坐标转换一致。 -->
     <include file="$(find aubo_description)/launch/eye_to_hand_camera_tf.launch">
       <arg name="parent_frame" value="world"/>
       <arg name="x" value="$(arg camera_x)"/>
@@ -71,8 +91,11 @@
     <node if="$(arg rviz)" pkg="rviz" type="rviz" name="perception_rviz" args="-f world"/>
   </group>
 
+  <!-- 共用感知流水线：RGB 检测框结合深度、内参与 TF，生成分拣或伺服目标。 -->
   <include file="$(find aubo_perception)/launch/grasp_perception.launch">
     <arg name="detector" value="$(arg detector)"/>
+    <arg name="task_mode" value="$(arg task_mode)"/>
+    <arg name="selected_class" value="$(arg selected_class)"/>
     <arg name="camera_mount" value="$(arg camera_mount)"/>
     <arg name="target_frame" value="$(arg target_frame)"/>
     <arg name="height_mode" value="$(arg height_mode)"/>

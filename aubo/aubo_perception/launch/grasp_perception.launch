@@ -1,28 +1,42 @@
 <launch>
-  <!-- 机械臂通用入口；两类相机都要求事先完成标定并发布正确 TF。 -->
+  <!--
+    功能：纯感知流水线，适用于已有相机/机器人环境，不启动 Gazebo、相机驱动或运动控制。
+    输入：RGB 图像、对齐深度、相机内参及所需 TF。
+    流程：颜色或 YOLO 检测生成二维框，共用几何节点计算三维目标。
+    两类相机都要求事先完成标定并发布正确 TF。
+  -->
+  <!-- 选择检测器与相机话题前缀；眼在手上默认 /camera，眼在手外默认 /workspace_camera。 -->
   <arg name="detector" default="color" doc="color | yolo"/>
   <arg name="camera_mount" default="eye_in_hand"/>
   <arg name="camera_namespace" default="$(eval '/camera' if arg('camera_mount') == 'eye_in_hand' else '/workspace_camera')"/>
+  <!-- sorting 发布 /sorting/detections；servo 发布 /visual_servo/target_pose、target_label、target_confidence；both 两者都发布。 -->
   <arg name="task_mode" default="sorting" doc="sorting | servo | both"/>
+  <!-- table 由桌高和物高确定投影平面；depth 从对齐深度估计高度。伺服目标始终需要有效深度。 -->
   <arg name="height_mode" default="table" doc="table | depth"/>
+  <!-- servo/both 必须指定目标类别，例如 red；sorting 不按此参数筛掉其他类别。 -->
   <arg name="selected_class" default=""/>
+  <!-- 配置文件提供几何阈值、颜色范围和模型选项；下面的显式 param 会覆盖 YAML 中同名设置。 -->
   <arg name="config" default="$(find aubo_perception)/config/grasp_pipeline.yaml"/>
   <arg name="colors_config" default="$(find aubo_perception)/config/colors.yaml"/>
   <arg name="yolo_config" default="$(find aubo_perception)/config/ultralytics_yolo.yaml"/>
+  <!-- YOLO 使用的 Python 解释器和权重路径，换机器时需按本地安装位置覆盖。 -->
   <arg name="python" default="/home/zlab/anaconda3/envs/yolo/bin/python"/>
   <arg name="model_path" default="/home/zlab/deepL/code/ultralytics-main-modify/weights/GC-yolo.pt"/>
+  <!-- 桌高与物高单位为米；target_frame 是分拣结果坐标系，应与桌高、工作区和 TF 保持一致。 -->
   <arg name="table_z" default="0.10"/>
   <arg name="object_height" default="0.04"/>
   <arg name="target_frame" default="base_link"/>
+  <!-- 话题接口：二维框是内部中间结果，detections_topic 为分拣三维目标数组。 -->
   <arg name="boxes_topic" default="/perception/boxes"/>
   <arg name="detections_topic" default="/sorting/detections"/>
   <arg name="image_topic" default="$(arg camera_namespace)/color/image_raw"/>
   <arg name="depth_topic" default="$(arg camera_namespace)/aligned_depth_to_color/image_raw"/>
   <arg name="camera_info_topic" default="$(arg camera_namespace)/color/camera_info"/>
 
+  <!-- YOLO 分支：订阅实时 RGB 图像，发布与颜色检测相同格式的二维框。 -->
   <group if="$(eval arg('detector') == 'yolo')">
     <include file="$(find aubo_perception)/launch/ultralytics_yolo.launch">
-      <!-- Grasp geometry needs live camera timestamps, never an offline image. -->
+      <!-- 几何计算必须匹配采集时刻的深度与 TF，因此强制使用话题输入并清空离线图片路径。 -->
       <arg name="input_mode" value="topic"/>
       <arg name="image_path" value=""/>
       <arg name="config" value="$(arg yolo_config)"/>
@@ -32,8 +46,10 @@
       <arg name="detections_topic" value="$(arg boxes_topic)"/>
     </include>
   </group>
+  <!-- 颜色分支：HSV 分割与轮廓筛选，boxes 模式只提取二维旋转框；调试图像为 /sorting/debug_image。 -->
   <node if="$(eval arg('detector') == 'color')" pkg="aubo_perception"
         type="color_object_detector.py" name="color_object_detector" output="screen">
+    <!-- 禁用用户级 Python 包，减少与 ROS 的 OpenCV/cv_bridge 依赖冲突。 -->
     <env name="PYTHONNOUSERSITE" value="1"/>
     <rosparam command="load" file="$(arg colors_config)"/>
     <param name="output_mode" value="boxes"/>
@@ -41,6 +57,11 @@
     <param name="boxes_topic" value="$(arg boxes_topic)"/>
     <param name="debug_image_topic" value="/sorting/debug_image"/>
   </node>
+  <!--
+    共用几何节点：名称虽含 yolo，也处理颜色检测框。
+    分拣结果包含目标中心、抓取宽度与角度；伺服位姿位于相机光学坐标系。
+    无有效伺服目标时发布空标签，不重复发布旧位姿。
+  -->
   <node pkg="aubo_perception" type="yolo_rgbd_target_node.py" name="grasp_geometry" output="screen">
     <env name="PYTHONNOUSERSITE" value="1"/>
     <rosparam command="load" file="$(arg config)"/>

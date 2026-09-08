@@ -24,6 +24,21 @@ roslaunch aubo_perception yolo_eye_to_hand_gazebo.launch
 默认使用 `height_mode:=depth`，可切换到 `table`；输出沿用 `/perception/boxes` 和
 `/sorting/detections`。Color 场景放置三色方块，YOLO 场景放置饮料罐，需要匹配的模型权重。
 YOLO 可传入 `python:=/path/to/python model_path:=/path/to/weights.pt`。
+
+默认 `task_mode:=sorting` 仅发布分拣结果。需要查看视觉伺服目标时，指定模式和类别后重启：
+
+```bash
+roslaunch aubo_perception color_eye_in_hand_gazebo.launch task_mode:=both selected_class:=red
+rostopic echo /visual_servo/target_pose
+rostopic echo /visual_servo/target_label
+```
+
+`both` 保留分拣输出并发布选定类别的伺服目标；`servo` 仅发布伺服输出。
+伺服位姿使用相机光学坐标系，只有检测到所选类别且深度有效时才发布；
+没有有效目标时标签为空，不重发旧位姿。`selected_class` 可选 `red`、`green`、`blue`。
+`rostopic echo` 的 simulated time 警告本身不能证明时钟故障，可用
+`rostopic echo -n 1 /clock` 单独检查时钟是否有消息。
+
 饮料罐使用包内自带的可乐罐网格与包装贴图（`models/beverage_can`），与 YOLO 分拣场景共用。
 外观适配为直径 50 mm、长 100 mm，保留原有横放姿态与碰撞体；更新后重启 Gazebo 生效。
 `gui:=false` 可关闭 Gazebo 窗口，`rviz:=true` 打开 RViz；眼在手外 RViz 使用 world 固定坐标系，显示项按需添加。
