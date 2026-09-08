@@ -1,6 +1,37 @@
 # AUBO 感知到分拣
 
-本次入口先面向固定机械臂。颜色识别和 YOLO 共用几何层，移动机器人场景暂不迁移。
+颜色识别和 YOLO 共用 RGB-D 几何层，支持眼在手上与眼在手外。包名沿用 `aubo_perception`。
+
+## 独立感知仿真
+
+```bash
+roslaunch aubo_perception color_eye_in_hand_gazebo.launch
+roslaunch aubo_perception color_eye_to_hand_gazebo.launch
+roslaunch aubo_perception yolo_eye_in_hand_gazebo.launch
+roslaunch aubo_perception yolo_eye_to_hand_gazebo.launch
+```
+
+眼在手上加载工作台、目标物、带 RGB-D 相机的机械臂及 MoveIt，自动移动到 SRDF 的
+`observe` 观察位，不启动分拣任务。`/move_to_observation/ready` 为 true 表示到位；
+检测节点启动后持续发布，运动期间的检测不代表已到观察位。可设置
+`auto_move_to_observation:=false` 关闭自动移动，或用 `observation_named_target:=...` 选择命名位姿。
+
+眼在手外仅加载工作台、目标物和一台固定 RGB-D 相机，不加载机械臂、控制器或 MoveIt。
+相机话题前缀为 `/workspace_camera`，输出坐标系默认为 `world`；眼在手上分别为
+`/camera` 和 `base_link`。两个模式的场景均只有一台相机，没有抓取插件。
+
+通用入口为 `perception_gazebo.launch detector:=color|yolo camera_mount:=eye_in_hand|eye_to_hand`。
+默认使用 `height_mode:=depth`，可切换到 `table`；输出沿用 `/perception/boxes` 和
+`/sorting/detections`。Color 场景放置三色方块，YOLO 场景放置饮料罐，需要匹配的模型权重。
+YOLO 可传入 `python:=/path/to/python model_path:=/path/to/weights.pt`。
+饮料罐使用包内自带的可乐罐网格与包装贴图（`models/beverage_can`），与 YOLO 分拣场景共用。
+外观适配为直径 50 mm、长 100 mm，保留原有横放姿态与碰撞体；更新后重启 Gazebo 生效。
+`gui:=false` 可关闭 Gazebo 窗口，`rviz:=true` 打开 RViz；眼在手外 RViz 使用 world 固定坐标系，显示项按需添加。
+`paused:=true` 时须恢复仿真后才能运动。
+固定相机的 `camera_x/y/z`、`camera_roll/pitch/yaw` 同时控制模型位姿和 TF。
+自定义 `world:=...` 时请保持桌面高度、工作区参数及相机数量一致；自定义输出坐标系需自行提供 TF。
+
+以下 `grasp_perception.launch` 是纯感知入口，供已有相机/机器人系统集成，不负责加载场景或移动机械臂。
 
 ```text
 ROS RGB ── HSV 旋转框 / Ultralytics YOLO、OBB ── YoloDetectionArray

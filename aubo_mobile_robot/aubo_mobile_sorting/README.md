@@ -1,6 +1,6 @@
 # AUBO 移动机器人 Gazebo 视觉抓取分拣
 
-本包源码现位于 `src/aubo/aubo_mobile_sorting`，与固定机械臂分拣应用集中维护。
+本包源码现位于 `src/aubo_mobile_robot/aubo_mobile_sorting`，与移动平台功能包一起维护。
 ROS 包名仍为 `aubo_mobile_sorting`，启动命令与 RViz 插件标识不变；移动平台资源通过包依赖引用。
 
 该功能包保存移动平台的分拣参数、Gazebo 场景、RViz 面板和启动入口，并组合

@@ -15,7 +15,8 @@ roslaunch aubo_sorting yolo_sorting.launch model_path:=/实际路径/obb.pt task
 `colors_config` 指定 HSV 阈值，`yolo_config` 指定模型推理配置，`perception_config` 指定共用 3D 规则。
 仿真入口按 `detector` 自动选择场景和任务配置：color 使用 `worlds/sorting.world`
 中的红绿蓝方块；yolo 使用独立的 `worlds/yolo_sorting.world` 和
-`config/yolo_sorting.yaml`，桌面放置带金属顶盖、拉环和标签带的易拉罐。
+`config/yolo_sorting.yaml`，桌面放置带真实可乐包装贴图的易拉罐，外观资源共用
+`aubo_perception/models/beverage_can`，尺寸为直径 50 mm、长 100 mm。
 
 ```bash
 roslaunch aubo_sorting sorting_gazebo.launch detector:=color
@@ -74,6 +75,22 @@ roslaunch aubo_sorting sorting_gazebo.launch height_mode:=depth
 参数、world 和启动入口，并组合 `aubo_perception`、`aubo_sorting_core` 与
 `aubo_gazebo_plugins`。腕部 RGB-D 相机利用对齐深度图计算方块顶面的三维中心，
 MoveIt 负责抓取和放置，Gazebo 通用插件提高小物体夹持稳定性。
+
+## 启动文件职责
+
+本包不编译任务节点；抓放算法修改见 [aubo_sorting_core](../aubo_sorting_core/README.md)。
+
+| 文件 | 职责 |
+| --- | --- |
+| `launch/sorting.launch` | 算法组合入口：加载检测器、几何计算和通用分拣任务 |
+| `launch/color_sorting.launch` | 颜色检测的便捷入口 |
+| `launch/yolo_sorting.launch` | YOLO 检测的便捷入口 |
+| `launch/sorting_gazebo.launch` | 固定机械臂仿真总入口：组合 Gazebo、MoveIt 和分拣算法 |
+| `launch/yolo_sorting_gazebo.launch` | YOLO 仿真便捷入口 |
+| `config/`、`worlds/`、`models/` | 固定平台参数、仿真世界和分拣标记模型 |
+
+移动单工位场景由 `aubo_mobile_sorting` 负责；工位导航与任务切换由
+`aubo_mobile_nav_sorting` 负责，两者位于 `aubo_mobile_robot/`。
 
 ## 场景约束
 

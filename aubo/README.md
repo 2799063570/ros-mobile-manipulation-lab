@@ -1,8 +1,8 @@
 # AUBO 功能包分层说明
 
 顶层 `aubo/` 保存 AUBO 机械臂本体能力，以及固定底座和移动底盘都可以复用的
-通用能力，并集中保存固定机械臂分拣、移动分拣与导航分拣应用。
-`aubo_mobile_robot/` 保存移动底盘模型、导航、平台感知配置及统一 bringup。
+通用能力，以及固定机械臂分拣应用。
+`aubo_mobile_robot/` 保存移动底盘模型、导航、平台感知配置、分拣应用及统一 bringup。
 
 ## 演示素材
 
@@ -32,7 +32,7 @@
 ├── aubo_planning            # 抓放、夹爪及深度相机 OctoMap 避障示例
 └── aubo_sorting             # 固定机械臂颜色 / YOLO 分拣场景
 
-移动机械臂分拣应用（也位于 aubo/ 下）
+移动机械臂分拣应用（位于 ../aubo_mobile_robot/ 下）
 ├── aubo_mobile_sorting      # 移动分拣参数、场景、RViz 面板和启动入口
 └── aubo_mobile_nav_sorting  # 导航到工位后执行分拣的任务编排
 ```
@@ -58,7 +58,7 @@ MoveIt和独立启动入口复用这些能力。
         ├── aubo_perception/color_object_detector.py
         │       └── aubo_perception/DetectedObjectArray
         │
-        ├── aubo_sorting_core/color_sorting_task.py
+        ├── aubo_sorting_core/color_sorting_task_cpp
         │       ├── MoveIt
         │       ├── 夹爪 FollowJointTrajectory
         │       └── /sorting/* 服务和状态话题
@@ -74,7 +74,7 @@ MoveIt和独立启动入口复用这些能力。
 ## 兼容性说明
 
 `aubo_color_sorting` 已正式更名为 `aubo_sorting`，旧包不再保留。
-两个移动分拣包从 `aubo_mobile_robot/` 迁入本目录，ROS 包名不变，
+两个移动分拣包位于 `aubo_mobile_robot/`，ROS 包名不变，
 通过 `$(find 包名)` 引用的资源和原移动分拣启动命令继续有效。
 迁移后请重新构建工作空间并加载 `devel/setup.bash`，刷新包路径与生成的启动脚本。
 

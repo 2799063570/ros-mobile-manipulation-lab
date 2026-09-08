@@ -87,34 +87,13 @@
             <contact><ode><kp>1000000</kp><kd>100</kd><max_vel>0.01</max_vel><min_depth>0.001</min_depth></ode></contact>
           </surface>
         </collision>
+        <!-- Textured can mesh, centered and fitted to the 50 x 100 mm collision. -->
         <visual name="printed_body">
-          <geometry><cylinder><radius>0.025</radius><length>0.094</length></cylinder></geometry>
-          <material><ambient>0.65 0.025 0.035 1</ambient><diffuse>0.85 0.035 0.045 1</diffuse><specular>0.4 0.4 0.4 1</specular></material>
-        </visual>
-        <visual name="silver_top">
-          <pose>0 0 0.0485 0 0 0</pose>
-          <geometry><cylinder><radius>0.025</radius><length>0.003</length></cylinder></geometry>
-          <material><ambient>0.65 0.65 0.68 1</ambient><diffuse>0.8 0.8 0.83 1</diffuse><specular>0.9 0.9 0.9 1</specular></material>
-        </visual>
-        <visual name="silver_bottom">
-          <pose>0 0 -0.0485 0 0 0</pose>
-          <geometry><cylinder><radius>0.025</radius><length>0.003</length></cylinder></geometry>
-          <material><ambient>0.65 0.65 0.68 1</ambient><diffuse>0.8 0.8 0.83 1</diffuse></material>
-        </visual>
-        <visual name="opening">
-          <pose>0 0.010 0.0501 0 0 0</pose>
-          <geometry><cylinder><radius>0.006</radius><length>0.0002</length></cylinder></geometry>
-          <material><ambient>0.04 0.04 0.04 1</ambient><diffuse>0.04 0.04 0.04 1</diffuse></material>
-        </visual>
-        <visual name="pull_tab">
-          <pose>0 -0.003 0.0505 0 0 0</pose>
-          <geometry><box><size>0.007 0.014 0.001</size></box></geometry>
-          <material><ambient>0.8 0.8 0.82 1</ambient><diffuse>0.9 0.9 0.92 1</diffuse></material>
-        </visual>
-        <visual name="label_band">
-          <pose>0 0 0.012 0 0 0</pose>
-          <geometry><cylinder><radius>0.025</radius><length>0.018</length></cylinder></geometry>
-          <material><ambient>0.92 0.92 0.88 1</ambient><diffuse>1 1 0.96 1</diffuse></material>
+          <geometry>
+            <mesh>
+              <uri>model://aubo_perception/models/beverage_can/meshes/coke_can.dae</uri>
+            </mesh>
+          </geometry>
         </visual>
       </link>
     </model>

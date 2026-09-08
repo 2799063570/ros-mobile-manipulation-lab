@@ -33,7 +33,7 @@ catkin_package(
     aubo_perception
     control_msgs
     geometry_msgs
-  inspire_gripper
+    inspire_gripper
     moveit_core
     moveit_msgs
     moveit_ros_planning_interface
@@ -53,7 +53,16 @@ include_directories(
   ${catkin_INCLUDE_DIRS}
 )
 
-add_library(color_sorting_task src/color_sorting_task.cpp)
+add_library(color_sorting_task
+  src/color_sorting_task.cpp
+  src/task_parameters.cpp
+  src/target_tracking.cpp
+  src/workspace_manager.cpp
+  src/motion_executor.cpp
+  src/grasp_attachment.cpp
+  src/pick_place.cpp
+  src/task_utils.cpp
+)
 add_dependencies(color_sorting_task ${catkin_EXPORTED_TARGETS})
 target_link_libraries(color_sorting_task ${catkin_LIBRARIES})
 
@@ -82,8 +91,5 @@ install(FILES README.md
 
 if(CATKIN_ENABLE_TESTING)
   catkin_add_gtest(height_recovery_test test/height_recovery_test.cpp)
-endif()
-
-if(CATKIN_ENABLE_TESTING)
   catkin_add_nosetests(test)
 endif()

@@ -25,7 +25,7 @@ GitHub 若未直接显示播放器，可点击链接打开或下载原视频。�
 通用机器人 URDF 不安装眼在手外相机或相机立柱，以免占用机械臂工作空间并增加
 碰撞风险。固定相机应按任务需要安装在对应场景中，其外参也由该场景负责定义。
 
-该目录存放 AUBO 移动平台基础功能；分拣与导航分拣应用已集中迁入 `../aubo/`。外层目录没有
+该目录存放 AUBO 移动平台基础功能，以及移动分拣与导航分拣应用。外层目录没有
 `package.xml`，它只是功能包集合，因此 catkin 会继续发现下面的各个功能包。
 
 ## 当前目录结构
@@ -38,11 +38,13 @@ aubo_mobile_robot/
 ├── aubo_mobile_bringup/        # 机器人、导航、分拣和任务的统一仿真入口
 ├── aubo_mobile_control/        # 键盘控制及导航/机械臂协同
 ├── aubo_mobile_follower/       # 激光跟随、颜色跟随与视觉循线
-└── aubo_mobile_perception/     # 移动平台视觉参数与检测启动入口
+├── aubo_mobile_perception/     # 移动平台视觉参数与检测启动入口
+├── aubo_mobile_sorting/        # 单工位分拣场景、参数和 RViz 面板
+└── aubo_mobile_nav_sorting/    # 多工位导航与分拣任务编排
 ```
 
-分拣应用见 [aubo_mobile_sorting](../aubo/aubo_mobile_sorting/README.md) 和
-[aubo_mobile_nav_sorting](../aubo/aubo_mobile_nav_sorting/README.md)。只迁移源码目录，
+分拣应用见 [aubo_mobile_sorting](aubo_mobile_sorting/README.md) 和
+[aubo_mobile_nav_sorting](aubo_mobile_nav_sorting/README.md)。只迁移源码目录，
 ROS 包名、RViz 插件名和 `roslaunch aubo_mobile_*` 命令不变。
 
 ## 分层结构
@@ -55,7 +57,9 @@ aubo_mobile_robot/
 ├── aubo_mobile_bringup/        # 统一仿真启动入口
 ├── aubo_mobile_control/        # 复合控制与指令分发
 ├── aubo_mobile_follower/       # 跟随/循迹与机械臂相机姿态准备
-└── aubo_mobile_perception/     # 移动平台视觉配置
+├── aubo_mobile_perception/     # 移动平台视觉配置
+├── aubo_mobile_sorting/        # 单工位分拣场景
+└── aubo_mobile_nav_sorting/    # 导航分拣任务编排
 ```
 
 AUBO 机械臂的通用网格模型和原有机械臂功能包继续保留在顶层 `aubo/` 目录中。

@@ -1,0 +1,5 @@
+<launch>
+  <arg name="detector" value="yolo"/>
+  <arg name="camera_mount" value="eye_to_hand"/>
+  <include file="$(find aubo_perception)/launch/perception_gazebo.launch" pass_all_args="true"/>
+</launch>

@@ -37,6 +37,7 @@ target_link_libraries(workspace_cloud_filter_node ${catkin_LIBRARIES})
 add_dependencies(workspace_cloud_filter_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 catkin_install_python(PROGRAMS
+  scripts/move_to_observation.py
   scripts/color_object_detector.py
   scripts/rgbd_visual_target_node.py
   scripts/ultralytics_yolo_node.py
@@ -48,7 +49,7 @@ install(PROGRAMS scripts/ultralytics_yolo_node.sh
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
-install(DIRECTORY config environment launch msg
+install(DIRECTORY config environment launch msg models worlds
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
 install(TARGETS workspace_cloud_filter_node

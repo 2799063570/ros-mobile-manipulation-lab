@@ -132,8 +132,8 @@ aubo_mobile_robot
 | `aubo_mobile_sorting`       | 红、绿、蓝方块的视觉抓取与分类放置                         |
 | `aubo_mobile_nav_sorting`   | 导航到工位后执行自动分拣的完整任务编排                     |
 
-其中 `aubo_mobile_sorting`、`aubo_mobile_nav_sorting` 的源码已移到 `aubo/`，
-与 `aubo_sorting`（颜色 / YOLO）集中维护；ROS 包名保持不变。
+其中 `aubo_mobile_sorting`、`aubo_mobile_nav_sorting` 位于 `aubo_mobile_robot/`，
+与移动平台功能包一起维护；固定平台场景和通用分拣核心位于 `aubo/`。ROS 包名保持不变。
 
 完整任务流程为：
 
@@ -622,8 +622,8 @@ map → odom → base_footprint → base_link → AUBO links → tcp_link
 - [建图、定位与导航](aubo_mobile_robot/aubo_mobile_navigation/README.md)
 - [底盘与机械臂协调控制](aubo_mobile_robot/aubo_mobile_control/README.md)
 - [手部相机视觉感知](aubo_mobile_robot/aubo_mobile_perception/README.md)
-- [视觉抓取与颜色分拣](aubo/aubo_mobile_sorting/README.md)
-- [导航与分拣完整任务](aubo/aubo_mobile_nav_sorting/README.md)
+- [视觉抓取与颜色分拣](aubo_mobile_robot/aubo_mobile_sorting/README.md)
+- [导航与分拣完整任务](aubo_mobile_robot/aubo_mobile_nav_sorting/README.md)
 
 ## 致谢
 

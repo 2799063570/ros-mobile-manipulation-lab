@@ -6,11 +6,37 @@
 请从 `aubo_sorting` 或 `aubo_mobile_sorting` 的 launch 文件启动，不要直接
 启动核心脚本。
 
-核心同时提供 Python 和 C++ 两个等价实现。固定平台和移动平台的分拣 launch 默认
+核心同时提供 Python 和 C++ 两个实现。固定平台和移动平台的分拣 launch 默认
 使用 `color_sorting_task_cpp`；如需回退 Python 版本，可在 launch 命令后增加
 `task_executable:=color_sorting_task.py`。C++ 类声明位于
-`include/aubo_sorting_core/color_sorting_task.hpp`，实现和节点入口分别位于
-`src/color_sorting_task.cpp` 与 `src/color_sorting_task_node.cpp`。
+`include/aubo_sorting_core/color_sorting_task.hpp`，节点入口位于 `src/color_sorting_task_node.cpp`，实现按职责拆分如下。
+
+## 程序职责与维护入口
+
+本包保留为固定和移动平台共用的执行层，`aubo_sorting` 保留为固定平台场景层。
+合并会让移动分拣依赖固定平台场景，因此当前不合并。
+
+| 文件 / 程序 | 职责 |
+| --- | --- |
+| `src/color_sorting_task_node.cpp` / `color_sorting_task_cpp` | 默认 ROS 节点入口，初始化并运行任务对象 |
+| `include/aubo_sorting_core/color_sorting_task.hpp` | 分拣任务类、状态及接口声明 |
+| `src/color_sorting_task.cpp` | 生命周期、ROS 服务、异步任务调度与状态发布 |
+| `src/task_parameters.cpp` | 参数读取、基本参数校验和机械臂关节限制检查 |
+| `src/target_tracking.cpp` | 检测订阅、坐标转换、目标缓存及多帧确认 |
+| `src/workspace_manager.cpp` | 工作区配置、桌面碰撞体及 OctoMap 更新 |
+| `src/motion_executor.cpp` | MoveIt 规划与执行、轨迹时间参数化、抬升重试和夹爪控制 |
+| `src/grasp_attachment.cpp` | Gazebo 抓取辅助插件的状态、吸附和释放 |
+| `src/pick_place.cpp` | 单目标抓放顺序及一轮分类分拣流程 |
+| `src/task_utils.hpp/.cpp` | 包内部共用的可中断等待、JSON 转义和参数转换 |
+| `include/aubo_sorting_core/height_recovery.hpp` | 抓取后抬升的有界高度重试规则 |
+| `scripts/color_sorting_task.py` | 可选 Python 实现，用于回退和对照；不与 C++ 节点同时启动 |
+
+`color_sorting_task` 是历史命名，当前任务通过检测消息和类别参数支持颜色及 YOLO
+分拣。选择检测器和加载场景由上层 launch 完成，核心不执行图像识别或底盘导航。
+这些 C++ 文件共同构建 `color_sorting_task` 库，由一个任务对象共享状态和锁；
+它们不是单独启动的节点。公共头文件、节点名及 `/sorting/*` 接口保持不变。
+
+Python 与 C++ 存在重复实现，修改共同抓放逻辑时需要同步检查；Inspire 夹爪仅支持 C++。
 
 ## 输入与输出
 
