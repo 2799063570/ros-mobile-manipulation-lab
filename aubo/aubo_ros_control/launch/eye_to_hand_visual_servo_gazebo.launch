@@ -7,6 +7,8 @@
   <arg name="debug_view" default="false"/>
   <arg name="paused" default="false"/>
   <arg name="auto_start" default="false"/>
+  <arg name="hybrid_enabled" default="false"/>
+  <arg name="hybrid_config" default="$(find aubo_ros_control)/config/hybrid_control.yaml"/>
   <arg name="target_label" default="red"/>
   <arg name="target_topic" default="/visual_servo/target_pose"/>
   <arg name="loss_strategy" default="stop"/>
@@ -48,6 +50,8 @@
     <arg name="joint_states_topic" value="/aubo_i5/joint_states"/>
     <arg name="loss_strategy" value="$(arg loss_strategy)"/>
     <arg name="start_enabled" value="$(arg auto_start)"/>
+    <arg name="hybrid_enabled" value="$(arg hybrid_enabled)"/>
+    <arg name="hybrid_config" value="$(arg hybrid_config)"/>
   </include>
 
   <!-- 固定相机 RGB-D 前端输出 base_link 可变换的目标位姿。 -->
@@ -66,4 +70,11 @@
         pkg="image_view" type="image_view" output="screen">
     <remap from="image" to="/visual_servo/debug_image"/>
   </node>
+  <!-- Hybrid mode uses MoveIt for planning only; the servo owns all output. -->
+  <include if="$(arg hybrid_enabled)" file="$(find aubo_moveit_config)/launch/move_group.launch">
+    <arg name="load_robot_description" value="false"/>
+    <arg name="robot_xacro" value="aubo_i5.xacro"/>
+    <arg name="robot_srdf" value="aubo_i5.srdf"/>
+    <arg name="allow_trajectory_execution" value="false"/>
+  </include>
 </launch>

@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Dedicated hybrid entry: MoveIt approach + local visual servo, shared output queue. -->
+  <!-- auto_start retains the existing false default. -->
+  <arg name="robot_ip" default="192.168.1.2"/>
+  <arg name="target_topic" default="/visual_servo/target_pose"/>
+  <arg name="load_robot_description" default="true"/>
+  <arg name="start_realsense" default="true"/>
+  <arg name="camera_serial_no" default=""/>
+  <arg name="start_perception" default="true"/>
+  <arg name="target_label" default="red"/>
+  <arg name="auto_start" default="false"/>
+  <arg name="hybrid_config" default="$(find aubo_ros_control)/config/hybrid_control.yaml"/>
+
+  <include file="$(find aubo_ros_control)/launch/eye_in_hand_visual_servo_real.launch">
+    <arg name="hybrid_enabled" value="true"/>
+    <arg name="loss_strategy" value="stop"/>
+    <arg name="robot_ip" value="$(arg robot_ip)"/>
+    <arg name="target_topic" value="$(arg target_topic)"/>
+    <arg name="load_robot_description" value="$(arg load_robot_description)"/>
+    <arg name="start_realsense" value="$(arg start_realsense)"/>
+    <arg name="camera_serial_no" value="$(arg camera_serial_no)"/>
+    <arg name="start_perception" value="$(arg start_perception)"/>
+    <arg name="target_label" value="$(arg target_label)"/>
+    <arg name="auto_start" value="$(arg auto_start)"/>
+    <arg name="hybrid_config" value="$(arg hybrid_config)"/>
+  </include>
+</launch>

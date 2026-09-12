@@ -1,0 +1,18 @@
+<launch>
+  <param name="robot_description" textfile="$(find aubo_ros_control)/test/hybrid_test.urdf"/>
+  <node pkg="aubo_ros_control" type="aubo_visual_servo_node" name="hybrid_test_controller" required="true">
+    <rosparam file="$(find aubo_ros_control)/config/visual_servo_common.yaml"/>
+    <rosparam file="$(find aubo_ros_control)/config/hybrid_control.yaml"/>
+    <param name="hybrid_enabled" value="true"/>
+    <param name="servo_mode" value="eye_to_hand"/>
+    <param name="backend" value="gazebo"/>
+    <param name="use_orientation_control" value="false"/>
+    <param name="hybrid_planning_time" value="0.5"/>
+    <param name="joint_limit_margin" value="0.0"/>
+    <rosparam param="desired_target_rpy">[0.0, 0.0, 0.0]</rosparam>
+    <rosparam param="target_offset">[0.0, 0.0, 0.0]</rosparam>
+    <rosparam param="desired_target_position">[0.0, 0.0, 0.0]</rosparam>
+    <rosparam param="gazebo_command_topics">[/hybrid_test/q0, /hybrid_test/q1, /hybrid_test/q2, /hybrid_test/q3, /hybrid_test/q4, /hybrid_test/q5]</rosparam>
+  </node>
+  <test test-name="hybrid_control" pkg="aubo_ros_control" type="hybrid_control_test.py" time-limit="100"/>
+</launch>

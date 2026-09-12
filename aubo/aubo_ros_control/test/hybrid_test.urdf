@@ -1,0 +1,46 @@
+<?xml version='1.0' encoding='utf-8'?>
+<robot name="hybrid_test">
+  <link name="base_link" />
+  <link name="link1" />
+  <joint name="shoulder_joint" type="prismatic">
+    <parent link="base_link" />
+    <child link="link1" />
+    <axis xyz="1 0 0" />
+    <limit lower="-3" upper="3" effort="10" velocity="0.5" />
+  </joint>
+  <link name="link2" />
+  <joint name="upperArm_joint" type="prismatic">
+    <parent link="link1" />
+    <child link="link2" />
+    <axis xyz="1 0 0" />
+    <limit lower="-3" upper="3" effort="10" velocity="0.5" />
+  </joint>
+  <link name="link3" />
+  <joint name="foreArm_joint" type="prismatic">
+    <parent link="link2" />
+    <child link="link3" />
+    <axis xyz="1 0 0" />
+    <limit lower="-3" upper="3" effort="10" velocity="0.5" />
+  </joint>
+  <link name="link4" />
+  <joint name="wrist1_joint" type="prismatic">
+    <parent link="link3" />
+    <child link="link4" />
+    <axis xyz="1 0 0" />
+    <limit lower="-3" upper="3" effort="10" velocity="0.5" />
+  </joint>
+  <link name="link5" />
+  <joint name="wrist2_joint" type="prismatic">
+    <parent link="link4" />
+    <child link="link5" />
+    <axis xyz="1 0 0" />
+    <limit lower="-3" upper="3" effort="10" velocity="0.5" />
+  </joint>
+  <link name="tcp_link" />
+  <joint name="wrist3_joint" type="prismatic">
+    <parent link="link5" />
+    <child link="tcp_link" />
+    <axis xyz="1 0 0" />
+    <limit lower="-3" upper="3" effort="10" velocity="0.5" />
+  </joint>
+</robot>

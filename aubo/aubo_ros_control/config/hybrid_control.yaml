@@ -1,0 +1,16 @@
+# Distances refer to TCP-to-desired-TCP error, not camera depth (m).
+planning_group: aubo_i5
+planning_service: /plan_kinematic_path
+hybrid_enter_distance: 0.10
+hybrid_exit_distance: 0.16
+hybrid_standoff: 0.06
+hybrid_target_drift: 0.04
+hybrid_joint_error: 0.08  # maximum per-joint following error (rad)
+hybrid_planning_time: 3.0
+hybrid_execution_timeout: 30.0
+# Hybrid mode waits for vision and holds on loss; no blind search/coast.
+initial_search_enabled: false
+loss_strategy: stop
+# Keep only a short horizon in the software queue and controller FIFO.
+command_queue_capacity: 8
+sdk_mac_buffer_target: 24

@@ -9,6 +9,8 @@
   <arg name="joint_states_topic" default="/joint_states"/>
   <arg name="loss_strategy" default=""/>
   <arg name="start_enabled" default="false"/>
+  <arg name="hybrid_enabled" default="false"/>
+  <arg name="hybrid_config" default="$(find aubo_ros_control)/config/hybrid_control.yaml"/>
 
   <!-- required=true：控制核心异常退出时终止所属 launch，避免其余节点继续误导操作者。 -->
   <node name="aubo_visual_servo" pkg="aubo_ros_control"
@@ -20,6 +22,8 @@
     <rosparam file="$(find aubo_ros_control)/config/visual_servo_common.yaml"
               command="load"/>
     <rosparam file="$(arg mode_config)" command="load"/>
+    <rosparam if="$(arg hybrid_enabled)" file="$(arg hybrid_config)" command="load"/>
+    <param name="hybrid_enabled" value="$(arg hybrid_enabled)"/>
     <param name="backend" value="$(arg backend)"/>
     <param name="robot_ip" value="$(arg robot_ip)"/>
     <param name="target_topic" value="$(arg target_topic)"/>

@@ -4,19 +4,22 @@
 
 ## 视觉伺服源码结构
 
-视觉伺服虽然分成三个 `.cpp`，但它们最终共同编译成一个可执行节点
-`aubo_visual_servo_node`，并不是三个 ROS 节点。拆分的目的是把“控制算法”、
+视觉伺服与混合控制分成四个 `.cpp`，最终共同编译成一个可执行节点
+`aubo_visual_servo_node`。拆分的目的是把“控制算法”、
 “线程安全队列”和“真机 SDK 通信”三类职责隔离，避免一个源文件同时处理所有细节。
 
 ### 文件与类的对应关系
 
 | 实现文件 | 对应头文件 | 主要内容 | 与节点的关系 |
 | --- | --- | --- | --- |
-| `src/visual_servo.cpp` | `include/aubo_ros_control/visual_servo.h` | `VisualServo` 主控制器、视觉伺服状态机和 `main()` | 包含唯一入口，另外两个文件链接到该节点 |
+| `src/visual_servo.cpp` | `include/aubo_ros_control/visual_servo.h` | `VisualServo` 主控制器、视觉伺服状态机和 `main()` | 包含唯一入口，其余文件链接到该节点 |
+| `src/hybrid_control.cpp` | `include/aubo_ros_control/visual_servo.h` | MoveIt 远距离规划、轨迹验证与回放、近距离伺服切换 | `hybrid_enabled:=true` 时启用 |
 | `src/visual_servo_common.cpp` | `include/aubo_ros_control/visual_servo_common.h` | `CommandQueue`、`JointPoint` 以及基础数值校验函数 | 节点内部公共工具，不会独立运行 |
 | `src/direct_sdk_backend.cpp` | `include/aubo_ros_control/direct_sdk_backend.h` | `DirectSdkBackend` 真机 SDK 执行后端 | `backend:=sdk` 时使用，不会独立运行 |
 
 类的静态关系如下：
+
+混合控制的启动方法、参数、控制公式与验证说明见 [HYBRID_CONTROL.md](HYBRID_CONTROL.md)。
 
 ```mermaid
 classDiagram

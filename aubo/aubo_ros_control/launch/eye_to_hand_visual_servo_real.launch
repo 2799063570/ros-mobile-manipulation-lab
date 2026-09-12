@@ -10,6 +10,8 @@
   <arg name="start_perception" default="true"/>
   <arg name="target_label" default="red"/>
   <arg name="auto_start" default="false"/>
+  <arg name="hybrid_enabled" default="false"/>
+  <arg name="hybrid_config" default="$(find aubo_ros_control)/config/hybrid_control.yaml"/>
 
   <!-- 使用无腕部相机的模型，防止外部相机模式下误启动手部传感器和重复话题。 -->
   <include file="$(find aubo_moveit_config)/launch/planning_context.launch">
@@ -41,5 +43,14 @@
     <arg name="backend" value="sdk"/>
     <arg name="robot_ip" value="$(arg robot_ip)"/>
     <arg name="start_enabled" value="$(arg auto_start)"/>
+    <arg name="hybrid_enabled" value="$(arg hybrid_enabled)"/>
+    <arg name="hybrid_config" value="$(arg hybrid_config)"/>
+  </include>
+  <!-- Hybrid mode uses MoveIt for planning only; the servo owns all output. -->
+  <include if="$(arg hybrid_enabled)" file="$(find aubo_moveit_config)/launch/move_group.launch">
+    <arg name="load_robot_description" value="false"/>
+    <arg name="robot_xacro" value="aubo_i5.xacro"/>
+    <arg name="robot_srdf" value="aubo_i5.srdf"/>
+    <arg name="allow_trajectory_execution" value="false"/>
   </include>
 </launch>

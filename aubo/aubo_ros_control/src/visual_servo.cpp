@@ -99,6 +99,10 @@ const char *VisualServo::stateName(ServoState state) {
     return "DISABLED";
   case ServoState::WAITING:
     return "WAITING";
+  case ServoState::PLANNING:
+    return "PLANNING";
+  case ServoState::APPROACH:
+    return "APPROACH";
   case ServoState::SEARCH_INITIAL:
     return "SEARCH_INITIAL";
   case ServoState::TRACKING:
@@ -118,7 +122,7 @@ const char *VisualServo::stateName(ServoState state) {
 VisualServo::VisualServo()
     : nh_(), private_nh_("~"), tf_listener_(tf_buffer_),
       queue_(readQueueCapacity()) {
-  valid_ = loadParameters() && initializeKinematics();
+  valid_ = loadParameters() && initializeKinematics() && loadHybridParameters();
   if (!valid_)
     return;
   state_ = enabled_ ? ServoState::WAITING : ServoState::DISABLED;
@@ -166,6 +170,11 @@ VisualServo::VisualServo()
   }
 
   setupDynamicReconfigure();
+  if (hybrid_enabled_) {
+    hybrid_plan_client_ = nh_.serviceClient<moveit_msgs::GetMotionPlan>(planning_service_);
+    hybrid_plan_timer_ = nh_.createTimer(ros::Duration(0.1),
+                                        &VisualServo::hybridPlanner, this);
+  }
   control_timer_ = nh_.createTimer(ros::Duration(1.0 / control_rate_),
                                    &VisualServo::controlLoop, this);
   publishState();
@@ -416,6 +425,7 @@ void VisualServo::reconfigureCallback(VisualServoConfig &config,
   initial_search_enabled_ = config.initial_search_enabled;
 
   // 丢弃按照旧参数计算、但还没有输出的关节点，让新参数从下一周期开始生效。
+  resetHybrid();
   queue_.clear();
   ROS_INFO_THROTTLE(1.0, "[visual_servo] rqt_reconfigure 参数已更新");
 }
@@ -538,6 +548,8 @@ bool VisualServo::setEnabled(std_srvs::SetBool::Request &request,
   // 接收rviz端发送的服务请求
   std::lock_guard<std::mutex> control_lock(control_mutex_);
   enabled_ = request.data;
+  resetHybrid();
+  integrator_initialized_ = false;
   safety_stop_.store(false);
   queue_.clear();
   last_tracking_velocity_.setZero();
@@ -564,6 +576,8 @@ bool VisualServo::setEnabled(std_srvs::SetBool::Request &request,
 bool VisualServo::reset(std_srvs::Trigger::Request &,
                         std_srvs::Trigger::Response &response) {
   std::lock_guard<std::mutex> control_lock(control_mutex_);
+  resetHybrid();
+  integrator_initialized_ = false;
   {
     std::lock_guard<std::mutex> target_lock(target_mutex_);
     have_target_ = false;
@@ -677,9 +691,11 @@ VisualServo::trackingVelocity(const JointPoint &position,
       *raw_position_error = position_error;
     // 三轴独立的软死区会屏蔽像素/深度小噪声，并让速度在
     // 死区边界连续衰减到零，避免夹爪在目标两侧来回切换。
+    // 混合模式将速度死区收窄到到达容差内，确保能进入 ALIGNED 窗口。
     for (int axis = 0; axis < 3; ++axis)
       position_error(axis) =
-          applyDeadband(position_error(axis), position_deadband_);
+          applyDeadband(position_error(axis), position_deadband_ *
+                        (hybrid_enabled_ ? 0.5 : 1.0));
     const Eigen::Vector3d control_linear =
         linear_gain_ * position_error;// 移动夹爪时，目标在夹爪系中反向移动
     base_linear = base_from_control * control_linear;// 转化为基坐标系下的速度
@@ -711,7 +727,8 @@ VisualServo::trackingVelocity(const JointPoint &position,
       *raw_position_error = position_error;
     for (int axis = 0; axis < 3; ++axis)
       position_error(axis) =
-          applyDeadband(position_error(axis), position_deadband_);
+          applyDeadband(position_error(axis), position_deadband_ *
+                        (hybrid_enabled_ ? 0.5 : 1.0));
     base_linear = linear_gain_ * position_error;
     if (use_orientation_control_) {
       const Eigen::Vector3d angular_error =
@@ -789,6 +806,12 @@ void VisualServo::controlLoop(const ros::TimerEvent &event) {
     if (!have_joint_state_ ||
         (ros::Time::now() - last_joint_time_).toSec() > 0.5) {
       ROS_WARN_THROTTLE(1.0, "[visual_servo] 等待有效关节状态");
+      if (hybrid_enabled_ && integrator_initialized_) {
+        resetHybrid();
+        hybrid_fault_ = true;
+        queue_.clear();
+        transitionTo(ServoState::HOLD);
+      }
       return;
     }
     feedback = feedback_position_;// 获取当前关节位置 
@@ -809,9 +832,14 @@ void VisualServo::controlLoop(const ros::TimerEvent &event) {
     if (have_target_) {
       target = target_pose_;
       target_age = (ros::Time::now() - last_target_time_).toSec();// 距离上次获取到目标之间的时间间隔
-      fresh_target = target_age <= target_timeout_;// 如果目标年龄小于超时时间，认为目标新鲜
+      fresh_target = target_age >= 0.0 && target_age <= target_timeout_;// 如果目标年龄小于超时时间，认为目标新鲜
     }
   }
+
+  if (hybrid_enabled_ && hybridControl(feedback, target, fresh_target,
+          clampValue((event.current_real - event.last_real).toSec(),
+                     0.5 / control_rate_, 2.0 / control_rate_)))
+    return;
 
   ServoState next = selectState(fresh_target, target_age);// 选择下一个状态
   bool entering_reacquire_hold = false;
@@ -945,6 +973,7 @@ void VisualServo::controlLoop(const ros::TimerEvent &event) {
 }
 
 void VisualServo::gazeboOutput(const ros::TimerEvent &) {
+  std::lock_guard<std::mutex> control_lock(control_mutex_);
   JointPoint requested{};
   if (queue_.pop(requested)) {
     // 在消费端再次限速限加速度，即使队列丢弃过期点也能保持指令连续。

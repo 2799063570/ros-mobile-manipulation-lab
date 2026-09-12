@@ -11,6 +11,8 @@
   <arg name="start_perception" default="true"/>
   <arg name="target_label" default="red"/>
   <arg name="auto_start" default="false"/>
+  <arg name="hybrid_enabled" default="false"/>
+  <arg name="hybrid_config" default="$(find aubo_ros_control)/config/hybrid_control.yaml"/>
 
   <!-- 启动腕部 RealSense；相机安装 TF 由机器人 URDF 唯一发布，避免重复 TF。 -->
   <include if="$(arg start_realsense)"
@@ -38,6 +40,8 @@
     <arg name="joint_states_topic" value="/joint_states"/>
     <arg name="loss_strategy" value="$(arg loss_strategy)"/>
     <arg name="start_enabled" value="$(arg auto_start)"/>
+    <arg name="hybrid_enabled" value="$(arg hybrid_enabled)"/>
+    <arg name="hybrid_config" value="$(arg hybrid_config)"/>
   </include>
 
   <!-- 感知与控制默认同步保持禁用，由 auto_start 或服务显式开启。 -->
@@ -49,4 +53,11 @@
     <param name="target_pose_topic" value="$(arg target_topic)"/>
     <param name="start_enabled" value="$(arg auto_start)"/>
   </node>
+  <!-- Hybrid mode uses MoveIt for planning only; the servo owns all output. -->
+  <include if="$(arg hybrid_enabled)" file="$(find aubo_moveit_config)/launch/move_group.launch">
+    <arg name="load_robot_description" value="false"/>
+    <arg name="robot_xacro" value="aubo_i5_with_camera.xacro"/>
+    <arg name="robot_srdf" value="aubo_i5_with_camera.srdf"/>
+    <arg name="allow_trajectory_execution" value="false"/>
+  </include>
 </launch>

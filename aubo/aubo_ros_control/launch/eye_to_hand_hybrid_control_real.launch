@@ -1,0 +1,25 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Dedicated hybrid entry: MoveIt approach + local visual servo, shared output queue. -->
+  <!-- auto_start retains the existing false default. -->
+  <arg name="robot_ip" default="192.168.1.2"/>
+  <arg name="camera_serial_no" default=""/>
+  <arg name="calibration_file" default="$(find aubo_ros_control)/config/aubo_realsense_handeye_eye_on_base.yaml"/>
+  <arg name="start_camera" default="true"/>
+  <arg name="start_perception" default="true"/>
+  <arg name="target_label" default="red"/>
+  <arg name="auto_start" default="false"/>
+  <arg name="hybrid_config" default="$(find aubo_ros_control)/config/hybrid_control.yaml"/>
+
+  <include file="$(find aubo_ros_control)/launch/eye_to_hand_visual_servo_real.launch">
+    <arg name="hybrid_enabled" value="true"/>
+    <arg name="robot_ip" value="$(arg robot_ip)"/>
+    <arg name="camera_serial_no" value="$(arg camera_serial_no)"/>
+    <arg name="calibration_file" value="$(arg calibration_file)"/>
+    <arg name="start_camera" value="$(arg start_camera)"/>
+    <arg name="start_perception" value="$(arg start_perception)"/>
+    <arg name="target_label" value="$(arg target_label)"/>
+    <arg name="auto_start" value="$(arg auto_start)"/>
+    <arg name="hybrid_config" value="$(arg hybrid_config)"/>
+  </include>
+</launch>

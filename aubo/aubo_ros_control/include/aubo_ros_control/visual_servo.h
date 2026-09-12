@@ -6,6 +6,7 @@
 
 #include <dynamic_reconfigure/server.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <moveit_msgs/GetMotionPlan.h>
 #include <ros/ros.h>
 #include <sensor_msgs/JointState.h>
 #include <std_srvs/SetBool.h>
@@ -56,6 +57,8 @@ private:
   enum class ServoState {
     DISABLED,
     WAITING,
+    PLANNING,
+    APPROACH,
     SEARCH_INITIAL,
     TRACKING,
     ALIGNED,
@@ -97,6 +100,31 @@ private:
   void publishState();
   void controlLoop(const ros::TimerEvent &event);
   void gazeboOutput(const ros::TimerEvent &event);
+  bool loadHybridParameters();
+  void resetHybrid();
+  void holdFeedback(const JointPoint &feedback);
+  void hybridPlanner(const ros::TimerEvent &event);
+  bool hybridControl(const JointPoint &feedback, const geometry_msgs::Pose &target,
+                     bool fresh_target, double dt);
+  bool hybridGoal(const JointPoint &feedback, const geometry_msgs::Pose &target,
+                  geometry_msgs::Pose &goal, double &distance);
+
+  bool hybrid_enabled_{false}, hybrid_pending_{false}, hybrid_fault_{false};
+  bool hybrid_near_{false};
+  std::string planning_group_, planning_service_;
+  double hybrid_enter_{0.10}, hybrid_exit_{0.16}, hybrid_standoff_{0.06};
+  double hybrid_target_drift_{0.04}, hybrid_joint_error_{0.08};
+  double hybrid_planning_time_{3.0}, hybrid_execution_timeout_{30.0};
+  double hybrid_elapsed_{0.0};
+  JointPoint hybrid_settle_position_{};
+  uint64_t hybrid_generation_{0};
+  ros::Time hybrid_settle_since_, hybrid_plan_started_, hybrid_execution_started_;
+  moveit_msgs::GetMotionPlan hybrid_request_;
+  geometry_msgs::Pose hybrid_goal_;
+  std::vector<JointPoint> hybrid_points_;
+  std::vector<double> hybrid_times_;
+  ros::ServiceClient hybrid_plan_client_;
+  ros::Timer hybrid_plan_timer_;
 
   // ROS 通信对象、坐标变换缓存和有界指令队列。
   ros::NodeHandle nh_, private_nh_;

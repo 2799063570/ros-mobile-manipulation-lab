@@ -13,6 +13,10 @@
   <depend>geometry_msgs</depend>
   <depend>hardware_interface</depend>
   <depend>kdl_parser</depend>
+  <depend>moveit_msgs</depend>
+  <depend>shape_msgs</depend>
+  <test_depend>rostest</test_depend>
+  <test_depend>trajectory_msgs</test_depend>
   <depend>pluginlib</depend>
   <build_depend>liborocos-kdl-dev</build_depend>
   <exec_depend>liborocos-kdl</exec_depend>
