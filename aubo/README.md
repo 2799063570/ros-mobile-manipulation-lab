@@ -106,10 +106,10 @@ roslaunch aubo_mobile_sorting sorting_gazebo.launch
 
 ```bash
 # 腕部相机（眼在手上）
-roslaunch aubo_ros_control eye_in_hand_visual_servo_gazebo.launch
+roslaunch aubo_sorting eye_in_hand_visual_servo_gazebo.launch
 
 # 场景固定 RGB-D 相机（眼在手外）
-roslaunch aubo_ros_control eye_to_hand_visual_servo_gazebo.launch
+roslaunch aubo_sorting eye_to_hand_visual_servo_gazebo.launch
 ```
 
 两种安装方式使用同一个 `aubo_visual_servo_node`；只在目标坐标变换和误差模型上分支，

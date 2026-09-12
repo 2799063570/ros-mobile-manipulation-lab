@@ -1,5 +1,7 @@
 # 长距离规划＋近距离视觉伺服
 
+分拣应用的 hybrid 和视觉伺服启动入口已迁移到 `aubo_sorting/launch`，启动命令请使用 `roslaunch aubo_sorting ...`（旧兼容文件名也在新包中）。底层 `visual_servo_core.launch`、控制节点、控制配置和相机入口仍由 `aubo_ros_control` 提供。
+
 `aubo_visual_servo_node` 增加可选混合模式。远距离使用分拣系统同一套
 MoveIt/OMPL 规划组 `aubo_i5`，近距离使用现有 PBVS；两个阶段统一通过
 `CommandQueue` 输出到 Gazebo 位置控制器或 SDK TCP2CANBUS。MoveIt 仅计算
@@ -10,13 +12,13 @@ MoveIt/OMPL 规划组 `aubo_i5`，近距离使用现有 PBVS；两个阶段统�
 眼在手外仿真：
 
 ```bash
-roslaunch aubo_ros_control eye_to_hand_hybrid_control_gazebo.launch auto_start:=true
+roslaunch aubo_sorting eye_to_hand_hybrid_control_gazebo.launch auto_start:=true
 ```
 
 眼在手上仿真：
 
 ```bash
-roslaunch aubo_ros_control eye_in_hand_hybrid_control_gazebo.launch auto_start:=true
+roslaunch aubo_sorting eye_in_hand_hybrid_control_gazebo.launch auto_start:=true
 ```
 
 专用入口默认开启混合控制，不需要再传 `hybrid_enabled`：

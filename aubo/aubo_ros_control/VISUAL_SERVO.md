@@ -1,5 +1,7 @@
 # AUBO 统一视觉位置伺服
 
+分拣应用的 hybrid 和视觉伺服启动入口已迁移到 `aubo_sorting/launch`，启动命令请使用 `roslaunch aubo_sorting ...`（旧兼容文件名也在新包中）。底层 `visual_servo_core.launch`、控制节点、控制配置和相机入口仍由 `aubo_ros_control` 提供。
+
 视觉伺服能力属于机械臂，因此实现位于 `aubo`。固定机械臂和移动机械臂都复用同一
 控制节点 `aubo_visual_servo_node`，移动端只负责把导航、底盘锁定和抓取任务组合起来。
 
@@ -31,10 +33,10 @@ aubo_ros_control: 坐标误差 -> 雅可比逆解 -> 限速/限加速度 -> 有�
 示例：
 
 ```bash
-roslaunch aubo_ros_control eye_in_hand_visual_servo_gazebo.launch
-roslaunch aubo_ros_control eye_to_hand_visual_servo_gazebo.launch
-roslaunch aubo_ros_control eye_to_hand_visual_servo_gazebo.launch target_label:=blue
-roslaunch aubo_ros_control eye_to_hand_visual_servo_real.launch \
+roslaunch aubo_sorting eye_in_hand_visual_servo_gazebo.launch
+roslaunch aubo_sorting eye_to_hand_visual_servo_gazebo.launch
+roslaunch aubo_sorting eye_to_hand_visual_servo_gazebo.launch target_label:=blue
+roslaunch aubo_sorting eye_to_hand_visual_servo_real.launch \
   robot_ip:=192.168.1.2 camera_serial_no:=<serial>
 ```
 

@@ -37,6 +37,29 @@ YOLO 示例使用 `can` 类别，罐体直径 5 cm、轴向长度 10 cm，默认
 切换场景后须重启 Gazebo。算法入口 `yolo_sorting.launch` 本身不启动或替换仿真环境。
 
 
+## Hybrid 与视觉伺服应用入口
+
+以下入口已从 `aubo_ros_control/launch` 迁移到本包，启动命令统一使用 `aubo_sorting`：
+
+| 模式 | Gazebo | 真机 |
+| --- | --- | --- |
+| 眼在手上 hybrid | `eye_in_hand_hybrid_control_gazebo.launch` | `eye_in_hand_hybrid_control_real.launch` |
+| 眼在手外 hybrid | `eye_to_hand_hybrid_control_gazebo.launch` | `eye_to_hand_hybrid_control_real.launch` |
+| 眼在手上视觉伺服 | `eye_in_hand_visual_servo_gazebo.launch` | `eye_in_hand_visual_servo_real.launch` |
+| 眼在手外视觉伺服 | `eye_to_hand_visual_servo_gazebo.launch` | `eye_to_hand_visual_servo_real.launch` |
+
+```bash
+roslaunch aubo_sorting eye_to_hand_hybrid_control_gazebo.launch
+roslaunch aubo_sorting eye_in_hand_hybrid_control_gazebo.launch
+roslaunch aubo_sorting eye_to_hand_hybrid_control_real.launch robot_ip:=192.168.1.2
+```
+
+默认 `auto_start:=false`，检查完成后再显式启用。旧文件名 `visual_servo_gazebo.launch`
+和 `visual_servo_real.launch` 也迁入本包，仅作为眼在手上视觉伺服的兼容包装。
+底层控制节点、配置、`visual_servo_core.launch` 与相机入口仍位于 `aubo_ros_control`。
+参数和控制原理见 [混合控制说明](../aubo_ros_control/HYBRID_CONTROL.md)
+与 [视觉伺服说明](../aubo_ros_control/VISUAL_SERVO.md)。
+
 ## 通用颜色 / YOLO 抓取入口
 
 感知规则与消息定义见 [aubo_perception](../aubo_perception/README.md)。

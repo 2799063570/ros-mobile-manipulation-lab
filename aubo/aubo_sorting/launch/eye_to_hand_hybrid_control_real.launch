@@ -11,7 +11,7 @@
   <arg name="auto_start" default="false"/>
   <arg name="hybrid_config" default="$(find aubo_ros_control)/config/hybrid_control.yaml"/>
 
-  <include file="$(find aubo_ros_control)/launch/eye_to_hand_visual_servo_real.launch">
+  <include file="$(find aubo_sorting)/launch/eye_to_hand_visual_servo_real.launch">
     <arg name="hybrid_enabled" value="true"/>
     <arg name="robot_ip" value="$(arg robot_ip)"/>
     <arg name="camera_serial_no" value="$(arg camera_serial_no)"/>

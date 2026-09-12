@@ -3,28 +3,28 @@
   <!-- Dedicated hybrid entry: MoveIt approach + local visual servo, shared output queue. -->
   <!-- auto_start retains the existing false default. -->
   <arg name="gui" default="true"/>
+  <arg name="target_topic" default="/visual_servo/target_pose"/>
+  <arg name="target_label" default="red"/>
+  <arg name="auto_start" default="false"/>
+  <arg name="hybrid_config" default="$(find aubo_ros_control)/config/hybrid_control.yaml"/>
+  <arg name="start_perception" default="true"/>
   <arg name="rviz" default="true"/>
   <arg name="debug_view" default="false"/>
   <arg name="paused" default="false"/>
-  <arg name="auto_start" default="false"/>
-  <arg name="hybrid_config" default="$(find aubo_ros_control)/config/hybrid_control.yaml"/>
-  <arg name="target_label" default="red"/>
-  <arg name="target_topic" default="/visual_servo/target_pose"/>
-  <arg name="start_perception" default="true"/>
   <arg name="world" default="$(find aubo_sorting)/worlds/sorting.world"/>
 
-  <include file="$(find aubo_ros_control)/launch/eye_to_hand_visual_servo_gazebo.launch">
+  <include file="$(find aubo_sorting)/launch/eye_in_hand_visual_servo_gazebo.launch">
     <arg name="hybrid_enabled" value="true"/>
     <arg name="loss_strategy" value="stop"/>
     <arg name="gui" value="$(arg gui)"/>
+    <arg name="target_topic" value="$(arg target_topic)"/>
+    <arg name="target_label" value="$(arg target_label)"/>
+    <arg name="auto_start" value="$(arg auto_start)"/>
+    <arg name="hybrid_config" value="$(arg hybrid_config)"/>
+    <arg name="start_perception" value="$(arg start_perception)"/>
     <arg name="rviz" value="$(arg rviz)"/>
     <arg name="debug_view" value="$(arg debug_view)"/>
     <arg name="paused" value="$(arg paused)"/>
-    <arg name="auto_start" value="$(arg auto_start)"/>
-    <arg name="hybrid_config" value="$(arg hybrid_config)"/>
-    <arg name="target_label" value="$(arg target_label)"/>
-    <arg name="target_topic" value="$(arg target_topic)"/>
-    <arg name="start_perception" value="$(arg start_perception)"/>
     <arg name="world" value="$(arg world)"/>
   </include>
 </launch>

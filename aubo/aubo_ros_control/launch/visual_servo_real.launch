@@ -12,7 +12,7 @@
   <arg name="target_label" default="red"/>
   <arg name="auto_start" default="false"/>
   <!-- 保留旧命令行调用方式，并统一转发到眼在手上真机入口。 -->
-  <include file="$(find aubo_ros_control)/launch/eye_in_hand_visual_servo_real.launch">
+  <include file="$(find aubo_sorting)/launch/eye_in_hand_visual_servo_real.launch">
     <arg name="robot_ip" value="$(arg robot_ip)"/>
     <arg name="target_topic" value="$(arg target_topic)"/>
     <arg name="loss_strategy" value="$(arg loss_strategy)"/>
