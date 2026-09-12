@@ -154,7 +154,7 @@ void ColorSortingTask::workspaceUpdateCallback(const std_msgs::StringConstPtr& m
     return;
   }
   std::lock_guard<std::mutex> lock(data_mutex_);
-  pending_workspace_ = workspace;
+  pending_workspace_ = workspace;// 将接收到的workspace配置存储到pending_workspace_中
   has_pending_workspace_ = true;
 }
 
@@ -216,7 +216,7 @@ bool ColorSortingTask::configureWorkspaceService(std_srvs::Trigger::Request&,
   std::string error;
   XmlRpc::XmlRpcValue value;
   if (nh_.getParam(workspace_config_param_, value))
-    has_workspace = workspaceFromParam(value, workspace, error);
+    has_workspace = workspaceFromParam(value, workspace, error);// 尝试从参数服务器加载workspace配置
   else
   {
     std::lock_guard<std::mutex> data_lock(data_mutex_);

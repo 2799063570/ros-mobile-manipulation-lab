@@ -8,6 +8,7 @@
 #include <vector>
 
 // Internal helpers shared by the task implementation; not part of the exported API.
+// JSON 字符串值转义、XML 数字解析、XML 向量解析等工具函数。
 namespace aubo_sorting_core
 {
 namespace detail

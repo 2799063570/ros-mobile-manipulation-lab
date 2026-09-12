@@ -184,8 +184,8 @@ private:
   std::string workspace_update_topic_;
   std::string planning_frame_;
 
-  std::vector<double> table_center_;
-  std::vector<double> table_size_;
+  std::vector<double> table_center_;// 桌面中心点坐标
+  std::vector<double> table_size_;// 桌面尺寸
   std::vector<double> grasp_rpy_;
   std::vector<double> observation_pose_;
   std::vector<std::string> sort_colors_;
