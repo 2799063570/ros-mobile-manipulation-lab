@@ -111,7 +111,10 @@ void MissionContext::loadParameters()
   table_geometry_ = vectorParam(private_node_handle_, "near_field_table", {3.0, 0.0, 0.80, 1.20});
   detector_workspace_ =
       vectorParam(private_node_handle_, "near_field_detector_workspace", {0.40, 0.82, -0.22, 0.22});
-  camera_target_ = vectorParam(private_node_handle_, "near_field_camera_target", {0.62, 0.0});
+  // observe 姿态下，相机中心射线与 z=0.18 m 方块顶面的交点（base_link 坐标系）。
+  // 数值对应相机相对夹爪 X=0.060 m、Y=0 的安装位姿。
+  camera_target_ =
+      vectorParam(private_node_handle_, "near_field_camera_target", {0.626, -0.077});
   workpiece_points_ = matrixParam(private_node_handle_, "near_field_workpieces",
                                   {{2.78, -0.12}, {2.86, 0.0}, {2.78, 0.12}});
   if (table_geometry_.size() != 4 || detector_workspace_.size() != 4 || camera_target_.size() != 2)

@@ -6,25 +6,37 @@
   <xacro:macro name="aubo_hand_camera" params="parent_link">
     <link name="hand_camera_mount_link">
       <visual>
-        <origin xyz="0 -0.035 0.055" rpy="0 0 0"/>
-        <geometry><box size="0.024 0.070 0.012"/></geometry>
+        <!-- 安装底板：固定在夹爪基座中心。 -->
+        <origin xyz="0 0 0.020" rpy="0 0 0"/>
+        <geometry><box size="0.050 0.050 0.012"/></geometry>
         <material name="hand_camera_black"><color rgba="0.025 0.03 0.04 1"/></material>
       </visual>
       <visual>
-        <origin xyz="0.020 -0.070 0.055" rpy="0 0 0"/>
-        <geometry><box size="0.040 0.024 0.012"/></geometry>
+        <!-- 竖向支柱：连接安装底板与相机横梁。 -->
+        <origin xyz="0 0 0.0375" rpy="0 0 0"/>
+        <geometry><box size="0.024 0.024 0.035"/></geometry>
+        <material name="hand_camera_black"/>
+      </visual>
+      <visual>
+        <!-- 相机横梁：沿 X 方向延伸 60 mm，Y 方向保持居中。 -->
+        <origin xyz="0.030 0 0.055" rpy="0 0 0"/>
+        <geometry><box size="0.060 0.024 0.012"/></geometry>
         <material name="hand_camera_black"/>
       </visual>
       <collision>
-        <origin xyz="0 -0.035 0.055" rpy="0 0 0"/>
-        <geometry><box size="0.024 0.070 0.012"/></geometry>
+        <origin xyz="0 0 0.020" rpy="0 0 0"/>
+        <geometry><box size="0.050 0.050 0.012"/></geometry>
       </collision>
       <collision>
-        <origin xyz="0.020 -0.070 0.055" rpy="0 0 0"/>
-        <geometry><box size="0.040 0.024 0.012"/></geometry>
+        <origin xyz="0 0 0.0375" rpy="0 0 0"/>
+        <geometry><box size="0.024 0.024 0.035"/></geometry>
+      </collision>
+      <collision>
+        <origin xyz="0.030 0 0.055" rpy="0 0 0"/>
+        <geometry><box size="0.060 0.024 0.012"/></geometry>
       </collision>
       <inertial>
-        <origin xyz="0.010 -0.050 0.055" rpy="0 0 0"/>
+        <origin xyz="0.025 0 0.045" rpy="0 0 0"/>
         <mass value="0.12"/>
         <inertia ixx="0.000066" ixy="0" ixz="0"
                  iyy="0.000018" iyz="0" izz="0.000080"/>
@@ -53,8 +65,9 @@
     <joint name="hand_camera_joint" type="fixed">
       <parent link="hand_camera_mount_link"/>
       <child link="hand_camera_link"/>
-      <!-- Gazebo camera looks along local +X; align it with the gripper approach axis. -->
-      <origin xyz="0.040 -0.070 0.055" rpy="0 -1.57079632679 0"/>
+      <!-- 相机相对夹爪沿 X 方向偏移 60 mm，Y 方向无侧向偏移。
+           相机局部 +X 方向旋转后指向夹爪的 +Z 工作方向。 -->
+      <origin xyz="0.060 0 0.055" rpy="0 -1.57079632679 0"/>
     </joint>
 
     <link name="hand_camera_optical_frame"/>

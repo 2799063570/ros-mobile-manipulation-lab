@@ -60,7 +60,7 @@ grasp_offset_y: 0.0
 moveit_server_timeout: 30.0
 gripper_server_timeout: 30.0
 planning_time: 12.0
-velocity_scaling: 0.15
+velocity_scaling: 0.6
 acceleration_scaling: 0.15
 finish_named_target: down
 

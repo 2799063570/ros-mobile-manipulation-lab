@@ -4,7 +4,10 @@
 
 ## AUBO i5 手眼相机
 
-`urdf/aubo_i5_with_camera.xacro` 在夹爪旁安装眼在手上的 RGB-D 相机，并使用与 RealSense 兼容的话题和坐标系名称。主要 TF 链如下：
+`urdf/aubo_i5_with_camera.xacro` 在夹爪上安装眼在手 RGB-D 相机，并使用与
+RealSense 兼容的话题和坐标系名称。相机在夹爪坐标系中沿 X 方向偏移
+`0.060 m`、Y 方向保持居中，通过安装底板、竖向支柱和横梁连接到夹爪基座。
+主要 TF 链如下：
 
 ```text
 gripper_base_link -> hand_camera_mount_link -> hand_camera_link -> camera_link

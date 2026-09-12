@@ -2,10 +2,10 @@ servo_mode: eye_in_hand
 camera_link: camera_color_optical_frame
 control_link: tcp_link
 
-# Desired object pose in the gripper TCP frame.  Keeping X/Y at zero aligns the
-# object with the gripper centreline instead of the laterally-offset camera
-# optical axis.  The camera is about 35 mm behind the TCP, so a 0.115 m TCP
-# standoff still produces approximately 0.15 m of camera depth.
+# 期望目标位姿在夹爪 TCP 坐标系中定义，X/Y 为零表示目标与夹爪中心线对齐，
+# 而不是与相机光轴对齐。相机光心相对夹爪沿 X 偏移 60 mm，沿接近方向比
+# TCP 后缩约 35 mm；因此 0.115 m 的 TCP 距离对应约 0.15 m 的相机深度。
+# 控制器通过 TF 自动考虑该 X 偏移，不需要在 desired_target_position 中重复补偿。
 desired_target_position: [0.0, 0.0, 0.115]
 # Independent controller-side guard. This remains below the desired distance
 # and matches the perception frontend's minimum valid depth.

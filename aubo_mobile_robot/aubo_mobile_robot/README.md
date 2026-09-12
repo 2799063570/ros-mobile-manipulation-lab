@@ -12,7 +12,8 @@ Classic 仿真。
 - 手部 RGB 相机：`hand_camera_optical_frame`
 - 相机话题：`/hand_camera/image_raw` 和 `/hand_camera/camera_info`
 - 两个雷达带有可见且参与碰撞计算的安装支柱
-- 手部相机通过 L 形支架连接在夹爪侧面
+- 手部相机沿夹爪 X 方向偏移 `0.060 m`、Y 方向保持居中
+- 相机通过安装底板、竖向支柱和横梁连接到夹爪基座
 - 相机光轴与夹爪接近方向一致，TCP 朝下时相机同时观察桌面
 - 底盘速度指令：`/cmd_vel`
 - 轮式里程计：`/odom`，并发布 TF `odom -> base_footprint`

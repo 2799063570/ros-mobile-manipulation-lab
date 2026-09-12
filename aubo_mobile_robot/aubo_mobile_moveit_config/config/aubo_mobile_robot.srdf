@@ -74,7 +74,7 @@
         <joint name="wrist2_joint" value="-1.5708" />
         <joint name="wrist3_joint" value="1.5708" />
     </group_state>
-    <!-- Hand camera is centred above the sorting blocks and points down. -->
+    <!-- 手部相机朝向桌面；近场停靠参数负责将其中心射线对准分拣区域。 -->
     <group_state name="observe" group="aubo_i5">
         <joint name="foreArm_joint" value="0.06780" />
         <joint name="shoulder_joint" value="0.08648" />

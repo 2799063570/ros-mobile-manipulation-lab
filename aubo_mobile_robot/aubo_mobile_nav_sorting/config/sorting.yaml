@@ -87,7 +87,7 @@ target_cache_fallback_delay: 2.0
 moveit_server_timeout: 30.0
 gripper_server_timeout: 30.0
 planning_time: 12.0
-velocity_scaling: 0.15
+velocity_scaling: 0.6
 acceleration_scaling: 0.15
 # Navigation mission calls /sorting/home before move_base starts. Keep the arm
 # in its compact A-shaped configuration while travelling.

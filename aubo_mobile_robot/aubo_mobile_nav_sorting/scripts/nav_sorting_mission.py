@@ -79,7 +79,7 @@ class NavigationSortingMission(object):
                 "~near_field_detector_workspace must be [min_x, max_x, min_y, max_y]"
             )
         self.camera_target = self._float_list(
-            "~near_field_camera_target", [0.62, 0.0]
+            "~near_field_camera_target", [0.626, -0.077]
         )
         if len(self.camera_target) != 2:
             raise ValueError("~near_field_camera_target must be [x, y]")
