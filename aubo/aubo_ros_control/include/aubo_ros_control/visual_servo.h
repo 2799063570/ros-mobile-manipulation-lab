@@ -9,6 +9,7 @@
 #include <moveit_msgs/GetMotionPlan.h>
 #include <ros/ros.h>
 #include <sensor_msgs/JointState.h>
+#include <std_msgs/Bool.h>
 #include <std_srvs/SetBool.h>
 #include <std_srvs/Trigger.h>
 #include <tf2_ros/buffer.h>
@@ -84,6 +85,7 @@ private:
   bool reset(std_srvs::Trigger::Request &request,
              std_srvs::Trigger::Response &response);
   void jointStateCallback(const sensor_msgs::JointState::ConstPtr &message);
+  void planningSceneReadyCallback(const std_msgs::Bool::ConstPtr &message);
   void setJointFeedback(const JointPoint &position);
   void sdkStateUpdate(const ros::TimerEvent &event);
 
@@ -110,17 +112,22 @@ private:
                   geometry_msgs::Pose &goal, double &distance);
 
   bool hybrid_enabled_{false}, hybrid_pending_{false}, hybrid_fault_{false};
-  bool hybrid_near_{false};
+  bool hybrid_near_{false}, hybrid_observation_complete_{false};
+  bool hybrid_orientation_control_{false};
+  bool hybrid_require_scene_ready_{false};
+  std::atomic<bool> hybrid_scene_ready_{false};
   std::string planning_group_, planning_service_;
   double hybrid_enter_{0.10}, hybrid_exit_{0.16}, hybrid_standoff_{0.06};
   double hybrid_target_drift_{0.04}, hybrid_joint_error_{0.08};
-  double hybrid_planning_time_{3.0}, hybrid_execution_timeout_{30.0};
+  double hybrid_planning_time_{3.0}, hybrid_execution_timeout_{60.0};
+  double hybrid_min_tcp_z_{-1e9};
   double hybrid_elapsed_{0.0};
   JointPoint hybrid_settle_position_{};
   uint64_t hybrid_generation_{0};
   ros::Time hybrid_settle_since_, hybrid_plan_started_, hybrid_execution_started_;
   moveit_msgs::GetMotionPlan hybrid_request_;
   geometry_msgs::Pose hybrid_goal_;
+  Eigen::Matrix3d hybrid_desired_rotation_{Eigen::Matrix3d::Identity()};
   std::vector<JointPoint> hybrid_points_;
   std::vector<double> hybrid_times_;
   ros::ServiceClient hybrid_plan_client_;
@@ -150,6 +157,7 @@ private:
   double search_timeout_{8.0}, open_posture_gain_{0.7},
       search_velocity_limit_{0.2};
   double feedback_blend_{0.02};
+  double tracking_velocity_filter_alpha_{0.18};
   bool use_orientation_control_{false}, initial_search_enabled_{false},
       enabled_{false};
 
@@ -188,6 +196,7 @@ private:
 
   // ROS 订阅、发布、服务和定时器句柄。
   ros::Subscriber target_sub_, joint_sub_;
+  ros::Subscriber hybrid_scene_ready_sub_;
   ros::Publisher state_pub_, legacy_state_pub_, sdk_joint_pub_;
   ros::ServiceServer enable_service_, reset_service_;
   std::vector<ros::Publisher> gazebo_publishers_;

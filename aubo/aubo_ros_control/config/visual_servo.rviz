@@ -6,7 +6,7 @@ Panels:
       Splitter Ratio: 0.5
     Tree Height: 430
   - Class: aubo_ros_control/VisualServoPanel
-    Name: 视觉伺服控制
+    Name: 两阶段流程控制
   - Class: rviz/Views
     Name: Views
 Visualization Manager:

@@ -34,6 +34,7 @@ generate_dynamic_reconfigure_options(
 
 catkin_install_python(PROGRAMS
   scripts/handeye_tf_publisher.py
+  scripts/hybrid_planning_scene.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

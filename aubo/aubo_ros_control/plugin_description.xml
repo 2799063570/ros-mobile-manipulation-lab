@@ -2,6 +2,6 @@
   <class name="aubo_ros_control/VisualServoPanel"
          type="aubo_ros_control::VisualServoPanel"
          base_class_type="rviz::Panel">
-    <description>AUBO 眼在手上视觉伺服流程控制面板。</description>
+    <description>AUBO MoveIt 路径规划与近距离视觉伺服两阶段流程面板。</description>
   </class>
 </library>

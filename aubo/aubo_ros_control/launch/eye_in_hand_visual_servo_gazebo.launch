@@ -74,4 +74,12 @@
     <arg name="robot_srdf" value="aubo_i5_with_camera.srdf"/>
     <arg name="allow_trajectory_execution" value="false"/>
   </include>
+  <!-- Gazebo collision geometry is not copied into MoveIt automatically.
+       Keep the sorting table registered and gate hybrid motion on readiness. -->
+  <node if="$(arg hybrid_enabled)" name="hybrid_planning_scene"
+        pkg="aubo_ros_control" type="hybrid_planning_scene.py" output="screen">
+    <rosparam file="$(find aubo_sorting)/config/sorting.yaml" command="load"/>
+    <param name="table_collision_margin" value="0.02"/>
+    <param name="table_top_margin" value="0.01"/>
+  </node>
 </launch>

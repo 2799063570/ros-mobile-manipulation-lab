@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cmath>
 #include <set>
+#include <string>
 
 namespace aubo_ros_control {
 namespace {
@@ -34,7 +35,26 @@ bool VisualServo::loadHybridParameters() {
   private_nh_.param("hybrid_target_drift", hybrid_target_drift_, 0.04);
   private_nh_.param("hybrid_joint_error", hybrid_joint_error_, 0.08);
   private_nh_.param("hybrid_planning_time", hybrid_planning_time_, 3.0);
-  private_nh_.param("hybrid_execution_timeout", hybrid_execution_timeout_, 30.0);
+  private_nh_.param("hybrid_execution_timeout", hybrid_execution_timeout_, 60.0);
+  private_nh_.param("hybrid_require_scene_ready",
+                    hybrid_require_scene_ready_, false);
+  private_nh_.param("hybrid_min_tcp_z", hybrid_min_tcp_z_, -1e9);
+  private_nh_.param("hybrid_use_orientation_control",
+                    hybrid_orientation_control_, false);
+  std::vector<double> hybrid_rpy;
+  if (!private_nh_.getParam("hybrid_desired_tcp_rpy", hybrid_rpy))
+    hybrid_rpy = {3.141592653589793, 0.0, 0.0};
+  if (hybrid_rpy.size() != 3 ||
+      !std::all_of(hybrid_rpy.begin(), hybrid_rpy.end(),
+                   [](double value) { return std::isfinite(value); })) {
+    ROS_ERROR("[hybrid] hybrid_desired_tcp_rpy must contain three finite values");
+    return false;
+  }
+  hybrid_desired_rotation_ =
+      (Eigen::AngleAxisd(hybrid_rpy[2], Eigen::Vector3d::UnitZ()) *
+       Eigen::AngleAxisd(hybrid_rpy[1], Eigen::Vector3d::UnitY()) *
+       Eigen::AngleAxisd(hybrid_rpy[0], Eigen::Vector3d::UnitX()))
+          .toRotationMatrix();
   for (double value : {hybrid_enter_, hybrid_exit_, hybrid_standoff_,
                        hybrid_target_drift_, hybrid_joint_error_,
                        hybrid_planning_time_, hybrid_execution_timeout_}) {
@@ -42,6 +62,10 @@ bool VisualServo::loadHybridParameters() {
       ROS_ERROR("[hybrid] All hybrid limits must be finite and positive");
       return false;
     }
+  }
+  if (!std::isfinite(hybrid_min_tcp_z_)) {
+    ROS_ERROR("[hybrid] hybrid_min_tcp_z must be finite");
+    return false;
   }
   if (hybrid_standoff_ >= hybrid_enter_ || hybrid_enter_ >= hybrid_exit_ ||
       planning_group_.empty() || planning_service_.empty()) {
@@ -87,10 +111,12 @@ bool VisualServo::hybridGoal(const JointPoint &feedback,
     for (int c = 0; c < 3; ++c)
       rotation(r, c) = frame.M(r, c);
   Eigen::Vector3d current(frame.p.x(), frame.p.y(), frame.p.z());
-  Eigen::Matrix3d goal_rotation = use_orientation_control_ ? desired_rotation_ : rotation;
+  Eigen::Matrix3d goal_rotation =
+      hybrid_orientation_control_ ? hybrid_desired_rotation_ :
+      (use_orientation_control_ ? desired_rotation_ : rotation);
   Eigen::Vector3d destination;
   if (servo_mode_ == "eye_in_hand") {
-    if (use_orientation_control_) {
+    if (use_orientation_control_ && !hybrid_orientation_control_) {
       Eigen::Quaterniond observed(target.orientation.w, target.orientation.x,
                                   target.orientation.y, target.orientation.z);
       if (!observed.coeffs().allFinite() || observed.norm() < 1e-6)
@@ -105,6 +131,12 @@ bool VisualServo::hybridGoal(const JointPoint &feedback,
   distance = (destination - current).norm();
   if (!destination.allFinite() || !goal_rotation.allFinite())
     return false;
+  if (destination.z() < hybrid_min_tcp_z_) {
+    ROS_ERROR_THROTTLE(1.0,
+        "[hybrid] Requested TCP height %.3f m is below safety floor %.3f m; "
+        "holding to protect the table", destination.z(), hybrid_min_tcp_z_);
+    return false;
+  }
   goal.position.x = destination.x();
   goal.position.y = destination.y();
   goal.position.z = destination.z();
@@ -137,62 +169,132 @@ void VisualServo::hybridPlanner(const ros::TimerEvent &) {
                         moveit_msgs::MoveItErrorCodes::SUCCESS &&
                trajectory.joint_names.size() == kDof && trajectory.points.size() >= 2 &&
                call.response.motion_plan_response.trajectory.multi_dof_joint_trajectory.points.empty();
+  std::string invalid_reason;
+  auto invalidate = [&](const std::string &reason) {
+    if (invalid_reason.empty()) invalid_reason = reason;
+    valid = false;
+  };
+  if (!ok) invalid_reason = "planning service call failed";
+  else if (call.response.motion_plan_response.error_code.val !=
+           moveit_msgs::MoveItErrorCodes::SUCCESS)
+    invalid_reason = "MoveIt returned error code " +
+        std::to_string(call.response.motion_plan_response.error_code.val);
+  else if (trajectory.joint_names.size() != kDof)
+    invalid_reason = "trajectory does not contain exactly six joints";
+  else if (trajectory.points.size() < 2)
+    invalid_reason = "trajectory contains fewer than two points";
+  else if (!call.response.motion_plan_response.trajectory.
+                multi_dof_joint_trajectory.points.empty())
+    invalid_reason = "multi-DOF trajectory is unsupported";
   std::array<std::size_t, kDof> order{};
   std::set<std::string> names(trajectory.joint_names.begin(), trajectory.joint_names.end());
-  valid = valid && names.size() == kDof;
+  if (valid && names.size() != kDof)
+    invalidate("trajectory contains duplicate joint names");
   for (std::size_t i = 0; valid && i < kDof; ++i) {
     auto it = std::find(trajectory.joint_names.begin(), trajectory.joint_names.end(), joint_names_[i]);
-    valid = it != trajectory.joint_names.end();
+    if (it == trajectory.joint_names.end()) {
+      invalidate("trajectory is missing joint " + joint_names_[i]);
+      break;
+    }
     order[i] = std::distance(trajectory.joint_names.begin(), it);
   }
   std::vector<JointPoint> points;
   std::vector<double> times;
+  double time_scale = 1.0;
+  const bool sparse_trajectory = trajectory.points.size() == 2;
   for (const auto &point : trajectory.points) {
     if (!valid) break;
     const double t = point.time_from_start.toSec();
-    valid = point.positions.size() == kDof && std::isfinite(t) &&
-            (times.empty() ? std::abs(t) < 1e-6 : t > times.back());
-    if (!valid) break;
+    if (point.positions.size() != kDof) {
+      invalidate("trajectory point does not contain six positions");
+      break;
+    }
+    if (!std::isfinite(t) ||
+        (times.empty() ? std::abs(t) >= 1e-6 : t <= times.back())) {
+      invalidate("trajectory timestamps are invalid or not strictly increasing");
+      break;
+    }
     JointPoint q{};
     for (std::size_t i = 0; i < kDof; ++i) {
       q[i] = point.positions[order[i]];
-      valid = valid && std::isfinite(q[i]) &&
-              q[i] >= lower_limits_[i] + joint_limit_margin_ &&
-              q[i] <= upper_limits_[i] - joint_limit_margin_;
-      if (!times.empty())
-        valid = valid && std::abs(q[i] - points.back()[i]) /
-                            (t - times.back()) <= velocity_limits_[i];
+      if (!std::isfinite(q[i])) {
+        invalidate("trajectory contains a non-finite joint position");
+        break;
+      }
+      if (q[i] < lower_limits_[i] + joint_limit_margin_ ||
+          q[i] > upper_limits_[i] - joint_limit_margin_) {
+        invalidate("trajectory violates the configured limit of joint " +
+                   joint_names_[i]);
+        break;
+      }
+      if (!times.empty()) {
+        const double duration = t - times.back();
+        const double displacement = std::abs(q[i] - points.back()[i]);
+        // A two-point path uses smoothstep, whose peak normalized speed is
+        // 1.5 and acceleration is 6. Dense MoveIt trajectories retain their
+        // time-parameterized linear segments; stopping at every generated
+        // sample would inflate a normal path to tens of seconds.
+        const double velocity_duration =
+            (sparse_trajectory ? 3.0 : 2.0) * displacement /
+            velocity_limits_[i];
+        const double acceleration_duration = sparse_trajectory
+            ? std::sqrt(12.0 * displacement / acceleration_limits_[i])
+            : 0.0;
+        time_scale = std::max(
+            time_scale, std::max(velocity_duration, acceleration_duration) /
+                            duration);
+      }
     }
+    if (!valid) break;
     points.push_back(q);
     times.push_back(t);
+  }
+  // MoveIt may be configured with permissive model dynamics (this project
+  // historically uses 100 rad/s). Preserve its collision-checked path but
+  // retime it to this controller's stricter velocity and acceleration limits.
+  if (valid && time_scale > 1.0) {
+    for (double &time : times) time *= time_scale;
+    ROS_WARN("[hybrid] Retimed MoveIt trajectory by %.2fx to %.2f s for safe "
+             "velocity and acceleration tracking", time_scale, times.back());
   }
   JointPoint feedback;
   {
     std::lock_guard<std::mutex> joint_lock(joint_mutex_);
     feedback = feedback_position_;
-    valid = valid && have_joint_state_ &&
-            (ros::Time::now() - last_joint_time_).toSec() <= 0.5;
+    if (valid && (!have_joint_state_ ||
+        (ros::Time::now() - last_joint_time_).toSec() > 0.5))
+      invalidate("joint feedback is missing or stale after planning");
   }
-  valid = valid && !points.empty() && times.back() < hybrid_execution_timeout_ &&
-          jointDistance(points.front(), feedback) <= 0.01;
+  if (valid && points.empty()) invalidate("trajectory contains no usable points");
+  if (valid && times.back() >= hybrid_execution_timeout_)
+    invalidate("safely retimed trajectory duration " +
+               std::to_string(times.back()) + " s exceeds execution timeout " +
+               std::to_string(hybrid_execution_timeout_) + " s");
+  if (valid && jointDistance(points.front(), feedback) > 0.01)
+    invalidate("trajectory start differs from current feedback by more than 0.01 rad");
   if (valid) {
     KDL::JntArray end(kDof);
     for (std::size_t i = 0; i < kDof; ++i) end(i) = points.back()[i];
     KDL::Frame frame;
-    valid = fk_solver_->JntToCart(end, frame) >= 0;
+    if (fk_solver_->JntToCart(end, frame) < 0)
+      invalidate("FK failed for trajectory endpoint");
     const auto &expected = call.request.motion_plan_request.goal_constraints.front();
     const auto &pose = expected.position_constraints.front().constraint_region.primitive_poses.front();
-    valid = valid && (Eigen::Vector3d(frame.p.x(), frame.p.y(), frame.p.z()) -
-                      translation(pose)).norm() <= 0.01;
+    if (valid && (Eigen::Vector3d(frame.p.x(), frame.p.y(), frame.p.z()) -
+                  translation(pose)).norm() > 0.01)
+      invalidate("trajectory endpoint position misses the requested approach pose");
     double x, y, z, w;
     frame.M.GetQuaternion(x, y, z, w);
-    valid = valid && Eigen::Quaterniond(w, x, y, z).angularDistance(
-        Eigen::Quaterniond(pose.orientation.w, pose.orientation.x,
-                           pose.orientation.y, pose.orientation.z)) <= 0.05;
+    if (valid && Eigen::Quaterniond(w, x, y, z).angularDistance(
+          Eigen::Quaterniond(pose.orientation.w, pose.orientation.x,
+                             pose.orientation.y, pose.orientation.z)) > 0.05)
+      invalidate("trajectory endpoint orientation misses the requested approach pose");
   }
   if (!valid) {
     hybrid_fault_ = true;
-    ROS_ERROR("[hybrid] Planning failed or returned an invalid/stale trajectory; reset required");
+    ROS_ERROR("[hybrid] Rejected MoveIt trajectory: %s; reset required",
+              invalid_reason.empty() ? "unknown validation failure" :
+                                       invalid_reason.c_str());
     return;
   }
   hybrid_points_ = std::move(points);
@@ -208,12 +310,44 @@ bool VisualServo::hybridControl(const JointPoint &feedback,
                               const geometry_msgs::Pose &target,
                               bool fresh_target, double dt) {
   const ros::Time now = ros::Time::now();
-  if (!enabled_ || safety_stop_.load() || hybrid_fault_ || !fresh_target) {
+  if (!enabled_ || safety_stop_.load() || hybrid_fault_) {
     const bool fault = hybrid_fault_;
     resetHybrid();
     hybrid_fault_ = fault;
     transitionTo(!enabled_ ? ServoState::DISABLED :
                  (fault || safety_stop_.load() ? ServoState::HOLD : ServoState::WAITING));
+    holdFeedback(feedback);
+    return true;
+  }
+  if (hybrid_require_scene_ready_ && !hybrid_scene_ready_.load()) {
+    if (hybrid_pending_ || !hybrid_plan_started_.isZero() ||
+        !hybrid_points_.empty())
+      resetHybrid();
+    ROS_WARN_THROTTLE(1.0,
+        "[hybrid] MoveIt table collision scene is not ready; motion inhibited");
+    transitionTo(ServoState::WAITING);
+    holdFeedback(feedback);
+    return true;
+  }
+  // Eye-in-hand has a mandatory preparation step: reach the configured wrist
+  // camera viewpoint before accepting even an already visible target.
+  if (!hybrid_observation_complete_) {
+    if (servo_mode_ != "eye_in_hand" || !initial_search_enabled_) {
+      hybrid_observation_complete_ = true;
+    } else if (jointDistance(feedback, initial_search_posture_) > 0.02) {
+      return false;  // controlLoop selects SEARCH_INITIAL and drives the posture.
+    } else {
+      hybrid_observation_complete_ = true;
+      holdFeedback(feedback);
+      transitionTo(ServoState::WAITING);
+      return true;
+    }
+  }
+  if (!fresh_target) {
+    // Once the mandatory observation posture has been reached, target loss
+    // always stops and holds instead of moving the arm blindly.
+    resetHybrid();
+    transitionTo(ServoState::WAITING);
     holdFeedback(feedback);
     return true;
   }
@@ -227,7 +361,7 @@ bool VisualServo::hybridControl(const JointPoint &feedback,
   }
   if ((!hybrid_plan_started_.isZero() || !hybrid_points_.empty()) &&
       ((translation(goal) - translation(hybrid_goal_)).norm() > hybrid_target_drift_ ||
-       (use_orientation_control_ &&
+       ((use_orientation_control_ || hybrid_orientation_control_) &&
         Eigen::Quaterniond(goal.orientation.w, goal.orientation.x, goal.orientation.y,
                            goal.orientation.z).angularDistance(
           Eigen::Quaterniond(hybrid_goal_.orientation.w, hybrid_goal_.orientation.x,
@@ -248,7 +382,14 @@ bool VisualServo::hybridControl(const JointPoint &feedback,
     auto upper = std::upper_bound(hybrid_times_.begin(), hybrid_times_.end(), t);
     const std::size_t b = std::min<std::size_t>(std::distance(hybrid_times_.begin(), upper), hybrid_times_.size() - 1);
     const std::size_t a = b ? b - 1 : 0;
-    const double fraction = a == b ? 1.0 : (t - hybrid_times_[a]) / (hybrid_times_[b] - hybrid_times_[a]);
+    const double linear_fraction = a == b ? 1.0 :
+        (t - hybrid_times_[a]) / (hybrid_times_[b] - hybrid_times_[a]);
+    // Smooth only a truly sparse start/goal trajectory. MoveIt-generated
+    // intermediate points already describe a time-parameterized path and
+    // must not be treated as mandatory full stops.
+    const double fraction = hybrid_points_.size() == 2
+        ? linear_fraction * linear_fraction * (3.0 - 2.0 * linear_fraction)
+        : linear_fraction;
     JointPoint command;
     for (std::size_t i = 0; i < kDof; ++i)
       command[i] = hybrid_points_[a][i] + fraction * (hybrid_points_[b][i] - hybrid_points_[a][i]);
@@ -330,8 +471,10 @@ bool VisualServo::hybridControl(const JointPoint &feedback,
   request.group_name = planning_group_;
   request.num_planning_attempts = 3;
   request.allowed_planning_time = hybrid_planning_time_;
-  request.max_velocity_scaling_factor = 0.1;
-  request.max_acceleration_scaling_factor = 0.1;
+  // MoveIt limits now match the output controller. A 0.5 scale leaves the
+  // same 50% tracking reserve enforced again by trajectory validation.
+  request.max_velocity_scaling_factor = 0.5;
+  request.max_acceleration_scaling_factor = 0.5;
   request.start_state.is_diff = true;
   request.start_state.joint_state.name = joint_names_;
   request.start_state.joint_state.position.assign(feedback.begin(), feedback.end());

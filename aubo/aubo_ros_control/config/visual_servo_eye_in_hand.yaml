@@ -17,12 +17,16 @@ use_orientation_control: false
 # Eye-in-hand measurements arrive more slowly than the 100 Hz control loop.
 # Conservative Cartesian gain/speed plus stronger DLS damping suppress delayed
 # corrections and joint amplification near singular configurations.
-linear_gain: 0.45
-max_linear_velocity: 0.04
+linear_gain: 0.30
+max_linear_velocity: 0.025
+angular_gain: 0.30
+max_angular_velocity: 0.12
 position_deadband: 0.006
 alignment_hold_time: 0.35
 alignment_release_multiplier: 2.0
 dls_lambda: 0.08
+tracking_velocity_filter_alpha: 0.15
+target_timeout: 0.40
 
 # The shared sorting scene puts all targets on the table. Use the same joint
 # posture as the sorting "observe" SRDF target so the wrist camera faces that

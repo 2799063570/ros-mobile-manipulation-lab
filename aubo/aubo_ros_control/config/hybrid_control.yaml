@@ -7,9 +7,18 @@ hybrid_standoff: 0.06
 hybrid_target_drift: 0.04
 hybrid_joint_error: 0.08  # maximum per-joint following error (rad)
 hybrid_planning_time: 3.0
-hybrid_execution_timeout: 30.0
-# Hybrid mode waits for vision and holds on loss; no blind search/coast.
-initial_search_enabled: false
+hybrid_execution_timeout: 60.0
+# Never request a path until the Gazebo table has been mirrored into MoveIt.
+hybrid_require_scene_ready: true
+# Sorting table top is z=0.10 m. The 0.10 m TCP clearance protects fingers and
+# camera during the collision-unchecked local PBVS segment.
+hybrid_min_tcp_z: 0.20
+# Keep the TCP/tool Z axis vertical downward in base_link throughout both
+# MoveIt approach and local PBVS. RPY is expressed in the base frame.
+hybrid_use_orientation_control: true
+hybrid_desired_tcp_rpy: [3.141592653589793, 0.0, 0.0]
+# Mount-specific configuration decides whether an initial observation posture
+# is required. Eye-in-hand enables it; fixed-camera eye-to-hand disables it.
 loss_strategy: stop
 # Keep only a short horizon in the software queue and controller FIFO.
 command_queue_capacity: 8

@@ -7,6 +7,11 @@
     <param name="servo_mode" value="eye_to_hand"/>
     <param name="backend" value="gazebo"/>
     <param name="use_orientation_control" value="false"/>
+    <param name="hybrid_use_orientation_control" value="false"/>
+    <param name="hybrid_require_scene_ready" value="true"/>
+    <!-- The synthetic chain moves only along X, so the table-Z guard is not
+         geometrically meaningful in this integration fixture. -->
+    <param name="hybrid_min_tcp_z" value="-100.0"/>
     <param name="hybrid_planning_time" value="0.5"/>
     <param name="joint_limit_margin" value="0.0"/>
     <rosparam param="desired_target_rpy">[0.0, 0.0, 0.0]</rosparam>

@@ -1,5 +1,6 @@
 #include <aubo_ros_control/visual_servo_panel.h>
 
+#include <moveit_msgs/GetMotionPlan.h>
 #include <pluginlib/class_list_macros.h>
 #include <std_srvs/SetBool.h>
 #include <std_srvs/Trigger.h>
@@ -9,6 +10,7 @@
 #include <QGridLayout>
 #include <QLabel>
 #include <QPushButton>
+#include <QTimer>
 #include <QVBoxLayout>
 
 namespace aubo_ros_control
@@ -20,9 +22,15 @@ VisualServoPanel::VisualServoPanel(QWidget* parent)
   , servo_state_label_(new QLabel(tr("等待控制器...")))
   , perception_state_label_(new QLabel(tr("等待视觉识别...")))
   , target_pose_label_(new QLabel(tr("尚无有效三维目标")))
-  , command_label_(new QLabel(tr("请选择目标，然后启动视觉伺服")))
+  , phase_label_(new QLabel(tr("未启动")))
+  , readiness_label_(new QLabel(tr("正在检查节点与服务...")))
+  , command_label_(new QLabel(tr("请选择目标，然后启动两阶段流程")))
+  , start_button_(new QPushButton(tr("启动两阶段流程")))
+  , stop_button_(new QPushButton(tr("停止并保持")))
+  , reset_button_(new QPushButton(tr("复位流程")))
+  , readiness_timer_(new QTimer(this))
 {
-  QLabel* title = new QLabel(tr("AUBO 统一视觉伺服"));
+  QLabel* title = new QLabel(tr("AUBO 路径规划 + 位置伺服"));
   QFont title_font = title->font();
   title_font.setBold(true);
   title_font.setPointSize(title_font.pointSize() + 2);
@@ -33,12 +41,19 @@ VisualServoPanel::VisualServoPanel(QWidget* parent)
   target_combo_->addItem(tr("蓝色目标"), "blue");
   target_combo_->addItem(tr("任意已配置目标"), "any");
 
-  QPushButton* start_button = new QPushButton(tr("启动闭环跟踪"));
-  QPushButton* stop_button = new QPushButton(tr("停止并保持"));
-  QPushButton* reset_button = new QPushButton(tr("清除目标 / 重新搜索"));
-  start_button->setStyleSheet(
+  QLabel* flow = new QLabel(tr("准备：眼在手上先移动到观察位\n"
+                               "阶段 1：MoveIt 路径规划与接近\n"
+                               "阶段 2：视觉位置伺服与对齐"));
+  flow->setStyleSheet("color: #666666;");
+  phase_label_->setAlignment(Qt::AlignCenter);
+  phase_label_->setStyleSheet(
+      "font-weight: bold; padding: 8px; border-radius: 3px; "
+      "background-color: #777777; color: white;");
+  readiness_label_->setWordWrap(true);
+
+  start_button_->setStyleSheet(
       "font-weight: bold; color: white; background-color: #2d8a45;");
-  stop_button->setStyleSheet(
+  stop_button_->setStyleSheet(
       "font-weight: bold; color: white; background-color: #b33a3a;");
 
   servo_state_label_->setWordWrap(true);
@@ -47,12 +62,16 @@ VisualServoPanel::VisualServoPanel(QWidget* parent)
   command_label_->setWordWrap(true);
 
   QGridLayout* buttons = new QGridLayout();
-  buttons->addWidget(start_button, 0, 0);
-  buttons->addWidget(stop_button, 0, 1);
-  buttons->addWidget(reset_button, 1, 0, 1, 2);
+  buttons->addWidget(start_button_, 0, 0);
+  buttons->addWidget(stop_button_, 0, 1);
+  buttons->addWidget(reset_button_, 1, 0, 1, 2);
 
   QVBoxLayout* layout = new QVBoxLayout();
   layout->addWidget(title);
+  layout->addWidget(flow);
+  layout->addWidget(phase_label_);
+  layout->addWidget(new QLabel(tr("系统就绪状态：")));
+  layout->addWidget(readiness_label_);
   layout->addWidget(new QLabel(tr("跟踪目标：")));
   layout->addWidget(target_combo_);
   layout->addWidget(new QLabel(tr("伺服状态：")));
@@ -74,6 +93,8 @@ VisualServoPanel::VisualServoPanel(QWidget* parent)
       "/visual_servo/reset");
   perception_reset_client_ = node_handle_.serviceClient<std_srvs::Trigger>(
       "/visual_servo/perception/reset");
+  planning_client_ = node_handle_.serviceClient<moveit_msgs::GetMotionPlan>(
+      "/plan_kinematic_path");
   target_selection_publisher_ = node_handle_.advertise<std_msgs::String>(
       "/visual_servo/target_selection", 1, true);
   servo_state_subscriber_ = node_handle_.subscribe(
@@ -83,10 +104,13 @@ VisualServoPanel::VisualServoPanel(QWidget* parent)
       &VisualServoPanel::perceptionStateCallback, this);
   target_pose_subscriber_ = node_handle_.subscribe(
       "/visual_servo/target_pose", 1, &VisualServoPanel::targetPoseCallback, this);
+  planning_scene_ready_subscriber_ = node_handle_.subscribe(
+      "/hybrid/planning_scene_ready", 1,
+      &VisualServoPanel::planningSceneReadyCallback, this);
 
-  connect(start_button, SIGNAL(clicked()), this, SLOT(startServo()));
-  connect(stop_button, SIGNAL(clicked()), this, SLOT(stopServo()));
-  connect(reset_button, SIGNAL(clicked()), this, SLOT(resetServo()));
+  connect(start_button_, SIGNAL(clicked()), this, SLOT(startServo()));
+  connect(stop_button_, SIGNAL(clicked()), this, SLOT(stopServo()));
+  connect(reset_button_, SIGNAL(clicked()), this, SLOT(resetServo()));
   connect(target_combo_, SIGNAL(currentIndexChanged(QString)),
           this, SLOT(selectTarget(QString)));
   connect(this, SIGNAL(servoStateReceived(QString)),
@@ -95,8 +119,11 @@ VisualServoPanel::VisualServoPanel(QWidget* parent)
           this, SLOT(showPerceptionState(QString)), Qt::QueuedConnection);
   connect(this, SIGNAL(targetPoseReceived(QString)),
           this, SLOT(showTargetPose(QString)), Qt::QueuedConnection);
+  connect(readiness_timer_, SIGNAL(timeout()), this, SLOT(updateReadiness()));
 
   selectTarget(target_combo_->currentText());
+  readiness_timer_->start(500);
+  updateReadiness();
 }
 
 bool VisualServoPanel::setEnabled(ros::ServiceClient& client, bool enabled,
@@ -142,7 +169,8 @@ void VisualServoPanel::startServo()
     command_label_->setText(tr("控制器启动失败：") + servo_response);
     return;
   }
-  command_label_->setText(tr("闭环已启动，等待所选目标进入相机视野"));
+  command_label_->setText(
+      tr("流程已启动：发现目标后先规划接近，再自动切换到位置伺服"));
 }
 
 void VisualServoPanel::stopServo()
@@ -153,7 +181,7 @@ void VisualServoPanel::stopServo()
   const bool perception_ok =
       setEnabled(perception_enable_client_, false, &perception_response);
   command_label_->setText(
-      (servo_ok && perception_ok) ? tr("已停止：机械臂减速保持，识别输出已关闭")
+      (servo_ok && perception_ok) ? tr("已停止：机械臂保持，识别输出已关闭")
                                   : tr("停止未完全执行：") + servo_response + " / " + perception_response);
 }
 
@@ -164,7 +192,7 @@ void VisualServoPanel::resetServo()
   const bool servo_ok = callReset(servo_reset_client_, &servo_response);
   const bool perception_ok = callReset(perception_reset_client_, &perception_response);
   command_label_->setText(
-      (servo_ok && perception_ok) ? tr("历史目标已清除，将等待新的图像观测")
+      (servo_ok && perception_ok) ? tr("流程已复位，将等待新的图像观测")
                                   : tr("复位未完全执行：") + servo_response + " / " + perception_response);
 }
 
@@ -196,18 +224,64 @@ void VisualServoPanel::targetPoseCallback(const geometry_msgs::PoseStamped::Cons
   Q_EMIT targetPoseReceived(text);
 }
 
+void VisualServoPanel::planningSceneReadyCallback(
+    const std_msgs::Bool::ConstPtr& message)
+{
+  planning_scene_ready_.store(message->data);
+}
+
 void VisualServoPanel::showServoState(const QString& text)
 {
   QString translated = text;
-  if (text == "DISABLED") translated = tr("已停用 / 保持当前位置");
-  else if (text == "WAITING") translated = tr("等待新目标");
-  else if (text == "SEARCH_INITIAL") translated = tr("初始化 / 移向可观测姿态");
-  else if (text == "TRACKING") translated = tr("正在闭环跟踪");
-  else if (text == "ALIGNED") translated = tr("已到达 / 稳定对齐");
-  else if (text == "COAST") translated = tr("目标短暂丢失 / 减速滑行");
-  else if (text == "SEARCH_RECOVERY") translated = tr("目标丢失 / 重新搜索");
-  else if (text == "HOLD") translated = tr("搜索超时 / 保持");
+  QString phase = tr("状态未知");
+  QString color = "#777777";
+  if (text == "DISABLED") {
+    translated = tr("已停用 / 保持当前位置");
+    phase = tr("未启动");
+  } else if (text == "WAITING") {
+    translated = tr("等待有效目标和稳定关节反馈");
+    phase = tr("准备阶段");
+    color = "#b07d18";
+  } else if (text == "PLANNING") {
+    translated = tr("正在请求 MoveIt 规划接近轨迹");
+    phase = tr("阶段 1 / 路径规划");
+    color = "#3569a8";
+  } else if (text == "APPROACH") {
+    translated = tr("正在执行规划轨迹，接近视觉伺服范围");
+    phase = tr("阶段 1 / 轨迹接近");
+    color = "#3569a8";
+  } else if (text == "SEARCH_INITIAL") {
+    translated = tr("正在移动到腕部相机观察位");
+    phase = tr("准备 / 移动到观察位");
+    color = "#00838f";
+  } else if (text == "TRACKING") {
+    translated = tr("正在进行近距离视觉位置伺服");
+    phase = tr("阶段 2 / 位置伺服");
+    color = "#7a4ca3";
+  } else if (text == "ALIGNED") {
+    translated = tr("目标已稳定对齐，可以执行后续抓取");
+    phase = tr("流程完成 / 已对齐");
+    color = "#2d8a45";
+  } else if (text == "COAST") {
+    translated = tr("目标短暂丢失 / 减速滑行");
+    phase = tr("安全过渡");
+    color = "#b07d18";
+  } else if (text == "SEARCH_RECOVERY") {
+    translated = tr("目标丢失 / 重新搜索");
+    phase = tr("恢复阶段");
+    color = "#b07d18";
+  } else if (text == "HOLD") {
+    translated = tr("故障或超时，机械臂保持；排查后点击复位");
+    phase = tr("安全保持 / 需要复位");
+    color = "#b33a3a";
+  }
   servo_state_label_->setText(translated);
+  phase_label_->setText(phase);
+  phase_label_->setStyleSheet(
+      QString("font-weight: bold; padding: 8px; border-radius: 3px; "
+              "background-color: %1; color: white;").arg(color));
+  flow_active_ = text != "DISABLED" && text != "HOLD";
+  start_button_->setEnabled(!flow_active_);
 }
 
 void VisualServoPanel::showPerceptionState(const QString& text)
@@ -227,6 +301,27 @@ void VisualServoPanel::showPerceptionState(const QString& text)
 void VisualServoPanel::showTargetPose(const QString& text)
 {
   target_pose_label_->setText(text);
+}
+
+void VisualServoPanel::updateReadiness()
+{
+  const bool planning_ready = planning_client_.exists();
+  const bool scene_ready = planning_scene_ready_.load();
+  const bool servo_ready = servo_enable_client_.exists();
+  const bool perception_ready = perception_enable_client_.exists();
+  readiness_label_->setText(
+      QString(tr("规划 %1  |  碰撞场景 %2  |  控制 %3  |  感知 %4"))
+          .arg(planning_ready ? tr("就绪") : tr("未就绪"))
+          .arg(scene_ready ? tr("就绪") : tr("未就绪"))
+          .arg(servo_ready ? tr("就绪") : tr("未就绪"))
+          .arg(perception_ready ? tr("就绪") : tr("未就绪")));
+  readiness_label_->setStyleSheet(
+      planning_ready && scene_ready && servo_ready && perception_ready
+          ? "color: #2d8a45; font-weight: bold;"
+          : "color: #b33a3a; font-weight: bold;");
+  start_button_->setEnabled(
+      planning_ready && scene_ready && servo_ready && perception_ready &&
+      !flow_active_);
 }
 
 }  // namespace aubo_ros_control

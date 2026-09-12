@@ -172,6 +172,9 @@ VisualServo::VisualServo()
   setupDynamicReconfigure();
   if (hybrid_enabled_) {
     hybrid_plan_client_ = nh_.serviceClient<moveit_msgs::GetMotionPlan>(planning_service_);
+    hybrid_scene_ready_sub_ = nh_.subscribe(
+        "/hybrid/planning_scene_ready", 1,
+        &VisualServo::planningSceneReadyCallback, this);
     hybrid_plan_timer_ = nh_.createTimer(ros::Duration(0.1),
                                         &VisualServo::hybridPlanner, this);
   }
@@ -181,6 +184,11 @@ VisualServo::VisualServo()
   ROS_INFO("[visual_servo] 初始化完成：mode=%s, backend=%s, chain=%s -> %s",
            servo_mode_.c_str(), backend_.c_str(), base_link_.c_str(),
            control_link_.c_str());
+}
+
+void VisualServo::planningSceneReadyCallback(
+    const std_msgs::Bool::ConstPtr &message) {
+  hybrid_scene_ready_.store(message->data);
 }
 
 bool VisualServo::valid() const { return valid_; }
@@ -241,6 +249,8 @@ bool VisualServo::loadParameters() {
   private_nh_.param<double>("search_velocity_limit", search_velocity_limit_,
                             0.2);
   private_nh_.param<double>("feedback_blend", feedback_blend_, 0.02);
+  private_nh_.param<double>("tracking_velocity_filter_alpha",
+                            tracking_velocity_filter_alpha_, 0.18);
   private_nh_.param<bool>("use_orientation_control", use_orientation_control_,
                           false);// 是否使用姿态控制(计算角度误差)
   private_nh_.param<bool>("initial_search_enabled", initial_search_enabled_,
@@ -270,6 +280,11 @@ bool VisualServo::loadParameters() {
   if (orientation_deadband_ < 0.0 || alignment_hold_time_ < 0.0 ||
       alignment_release_multiplier_ < 1.0) {
     ROS_ERROR("[visual_servo] 对齐死区/保持时间不能为负，退出倍数必须 >= 1");
+    return false;
+  }
+  if (tracking_velocity_filter_alpha_ <= 0.0 ||
+      tracking_velocity_filter_alpha_ > 1.0) {
+    ROS_ERROR("[visual_servo] tracking_velocity_filter_alpha 必须在 (0, 1] 内");
     return false;
   }
   if (recovery_delay_ < 0.0 || reacquire_hold_time_ < 0.0) {
@@ -344,6 +359,8 @@ void VisualServo::setupDynamicReconfigure() {
                        alignment_release_multiplier_);
   private_nh_.setParam("dls_lambda", dls_lambda_);
   private_nh_.setParam("feedback_blend", feedback_blend_);
+  private_nh_.setParam("tracking_velocity_filter_alpha",
+                       tracking_velocity_filter_alpha_);
   private_nh_.setParam("desired_target_x", desired_position_.x());
   private_nh_.setParam("desired_target_y", desired_position_.y());
   private_nh_.setParam("desired_target_z", desired_position_.z());
@@ -390,6 +407,7 @@ void VisualServo::reconfigureCallback(VisualServoConfig &config,
   alignment_release_multiplier_ = config.alignment_release_multiplier;
   dls_lambda_ = config.dls_lambda;
   feedback_blend_ = config.feedback_blend;
+  tracking_velocity_filter_alpha_ = config.tracking_velocity_filter_alpha;
 
   desired_position_ =
       Eigen::Vector3d(config.desired_target_x, config.desired_target_y,
@@ -427,6 +445,7 @@ void VisualServo::reconfigureCallback(VisualServoConfig &config,
   // 丢弃按照旧参数计算、但还没有输出的关节点，让新参数从下一周期开始生效。
   resetHybrid();
   queue_.clear();
+  last_tracking_velocity_.setZero();
   ROS_INFO_THROTTLE(1.0, "[visual_servo] rqt_reconfigure 参数已更新");
 }
 
@@ -549,6 +568,7 @@ bool VisualServo::setEnabled(std_srvs::SetBool::Request &request,
   std::lock_guard<std::mutex> control_lock(control_mutex_);
   enabled_ = request.data;
   resetHybrid();
+  hybrid_observation_complete_ = false;
   integrator_initialized_ = false;
   safety_stop_.store(false);
   queue_.clear();
@@ -577,6 +597,7 @@ bool VisualServo::reset(std_srvs::Trigger::Request &,
                         std_srvs::Trigger::Response &response) {
   std::lock_guard<std::mutex> control_lock(control_mutex_);
   resetHybrid();
+  hybrid_observation_complete_ = false;
   integrator_initialized_ = false;
   {
     std::lock_guard<std::mutex> target_lock(target_mutex_);
@@ -699,7 +720,13 @@ VisualServo::trackingVelocity(const JointPoint &position,
     const Eigen::Vector3d control_linear =
         linear_gain_ * position_error;// 移动夹爪时，目标在夹爪系中反向移动
     base_linear = base_from_control * control_linear;// 转化为基坐标系下的速度
-    if (use_orientation_control_) {
+    if (hybrid_enabled_ && hybrid_orientation_control_) {
+      const Eigen::Vector3d angular_error =
+          rotationLog(hybrid_desired_rotation_ * base_from_control.transpose());
+      if (raw_angular_error)
+        *raw_angular_error = angular_error;
+      base_angular = angular_gain_ * angular_error;
+    } else if (use_orientation_control_) {
       const Eigen::Quaterniond observed_q(
           target.orientation.w, target.orientation.x, target.orientation.y,
           target.orientation.z);
@@ -730,7 +757,13 @@ VisualServo::trackingVelocity(const JointPoint &position,
           applyDeadband(position_error(axis), position_deadband_ *
                         (hybrid_enabled_ ? 0.5 : 1.0));
     base_linear = linear_gain_ * position_error;
-    if (use_orientation_control_) {
+    if (hybrid_enabled_ && hybrid_orientation_control_) {
+      const Eigen::Vector3d angular_error =
+          rotationLog(hybrid_desired_rotation_ * base_from_control.transpose());
+      if (raw_angular_error)
+        *raw_angular_error = angular_error;
+      base_angular = angular_gain_ * angular_error;
+    } else if (use_orientation_control_) {
       const Eigen::Vector3d angular_error =
           rotationLog(desired_rotation_ * base_from_control.transpose());
       if (raw_angular_error)
@@ -836,10 +869,16 @@ void VisualServo::controlLoop(const ros::TimerEvent &event) {
     }
   }
 
-  if (hybrid_enabled_ && hybridControl(feedback, target, fresh_target,
-          clampValue((event.current_real - event.last_real).toSec(),
-                     0.5 / control_rate_, 2.0 / control_rate_)))
-    return;
+  if (hybrid_enabled_) {
+    if (hybridControl(feedback, target, fresh_target,
+            clampValue((event.current_real - event.last_real).toSec(),
+                       0.5 / control_rate_, 2.0 / control_rate_)))
+      return;
+    // While moving to the mandatory eye-in-hand viewpoint, suppress target
+    // tracking so the ordinary state machine selects SEARCH_INITIAL.
+    if (!hybrid_observation_complete_)
+      fresh_target = false;
+  }
 
   ServoState next = selectState(fresh_target, target_age);// 选择下一个状态
   bool entering_reacquire_hold = false;
@@ -885,8 +924,11 @@ void VisualServo::controlLoop(const ros::TimerEvent &event) {
         raw_position_error.allFinite() &&
         (raw_position_error.array().abs() <=
          position_deadband_ * release_scale).all(); // 判断位置误差是否在死区阈值内
+    const bool orientation_control_active =
+        use_orientation_control_ ||
+        (hybrid_enabled_ && hybrid_orientation_control_);
     const bool orientation_aligned =
-        !use_orientation_control_ ||
+        !orientation_control_active ||
         (raw_angular_error.allFinite() &&
          raw_angular_error.norm() <= orientation_deadband_ * release_scale); // 判断角度误差是否在死区阈值内
     const bool inside_alignment_window =
@@ -917,8 +959,14 @@ void VisualServo::controlLoop(const ros::TimerEvent &event) {
     // 上述程序 就是判断是否是在 TRACKING状态下对齐还是ALIGNED状态下对齐 设置不同的迟滞因子
     // 然后根据是否对齐 判断是否需要保持对齐状态 还是继续跟踪
 
-    if (next == ServoState::TRACKING)
-      requested = tracking_request;
+    if (next == ServoState::TRACKING) {
+      // The RGB-D pose changes only at camera rate and contains residual
+      // depth/centroid noise. Filtering joint velocity at the 100 Hz control
+      // rate prevents every image update from becoming a visible step while
+      // holdFeedback still bypasses it for immediate safety stops.
+      requested = tracking_velocity_filter_alpha_ * tracking_request +
+          (1.0 - tracking_velocity_filter_alpha_) * last_tracking_velocity_;
+    }
     last_tracking_velocity_ = requested;
     have_ever_tracked_ = true;
   } else {

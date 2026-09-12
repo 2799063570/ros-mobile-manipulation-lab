@@ -13,7 +13,7 @@ import rostest
 from geometry_msgs.msg import PoseStamped
 from moveit_msgs.srv import GetMotionPlan, GetMotionPlanResponse
 from sensor_msgs.msg import JointState
-from std_msgs.msg import Float64, String
+from std_msgs.msg import Bool, Float64, String
 from std_srvs.srv import SetBool
 from trajectory_msgs.msg import JointTrajectoryPoint
 
@@ -34,6 +34,9 @@ class HybridControlTest(unittest.TestCase):
                  "wrist1_joint", "wrist2_joint", "wrist3_joint"]
         self.joints = rospy.Publisher('/joint_states', JointState, queue_size=1)
         self.targets = rospy.Publisher('/visual_servo/target_pose', PoseStamped, queue_size=1)
+        self.scene_ready = rospy.Publisher(
+            '/hybrid/planning_scene_ready', Bool, queue_size=1, latch=True)
+        self.scene_ready.publish(False)
 
         def output(msg, index):
             with self.lock:
@@ -75,7 +78,8 @@ class HybridControlTest(unittest.TestCase):
             goal = req.motion_plan_request.goal_constraints[0].position_constraints[0]
             end = list(start)
             end[0] += goal.constraint_region.primitive_poses[0].position.x - sum(start)
-            for q, seconds in ((start, 0.0), (end, 2.0)):
+            duration = 0.05 if mode == 'fast' else 2.0
+            for q, seconds in ((start, 0.0), (end, duration)):
                 point = JointTrajectoryPoint()
                 point.positions = q[::-1]
                 point.time_from_start = rospy.Duration(seconds)
@@ -91,6 +95,13 @@ class HybridControlTest(unittest.TestCase):
         try:
             time.sleep(0.3)
             enable(True)
+            # No plan or motion is allowed until the collision scene confirms
+            # that the table has reached move_group.
+            self.wait_for(lambda: self.states[-1:] == ['WAITING'], 2)
+            time.sleep(0.3)
+            self.assertEqual(0, self.calls)
+            self.assertLess(max(abs(value) for value in self.q), 0.002)
+            self.scene_ready.publish(True)
             self.wait_for(lambda: 'ALIGNED' in self.states, 20)
             self.assertIn('PLANNING', self.states)
             self.assertIn('APPROACH', self.states)
@@ -112,6 +123,17 @@ class HybridControlTest(unittest.TestCase):
             time.sleep(0.4)
             self.assertLess(max(abs(a-b) for a, b in zip(held, self.q)), 0.002)
             self.visible = True
+
+            # A geometrically valid MoveIt path with permissive timestamps is
+            # retimed to the controller's safer velocity limits, not rejected.
+            enable(False)
+            self.mode = 'fast'
+            self.target = sum(self.q) + 0.25
+            self.states.clear()
+            enable(True)
+            self.wait_for(lambda: 'APPROACH' in self.states, 5)
+            self.wait_for(lambda: 'TRACKING' in self.states, 8)
+            self.assertNotIn('HOLD', self.states)
 
             for mode in ('failure', 'invalid'):
                 enable(False)

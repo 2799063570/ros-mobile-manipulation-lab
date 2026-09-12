@@ -32,8 +32,8 @@ depth_mask_erosion: 3
 minimum_depth: 0.10            # sensor validity; controller owns the independent safety stop
 maximum_depth: 2.50
 depth_scale_16u: 0.001         # RealSense 16UC1 millimetres -> metres
-position_filter_alpha: 0.35    # 1.0=no filtering; lower values reduce depth jitter
-filter_reset_timeout: 0.50
+position_filter_alpha: 0.20    # 1.0=no filtering; lower values reduce depth jitter
+filter_reset_timeout: 0.75
 sync_queue_size: 8
 sync_slop: 0.08
 

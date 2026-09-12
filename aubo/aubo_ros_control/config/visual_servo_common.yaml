@@ -40,6 +40,7 @@ open_posture_gain: 0.7
 search_velocity_limit: 0.20
 command_queue_capacity: 80
 feedback_blend: 0.02
+tracking_velocity_filter_alpha: 0.18
 
 # Direct SDK backend only.
 robot_ip: 192.168.1.2
