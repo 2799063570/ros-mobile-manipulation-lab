@@ -236,8 +236,32 @@ private:
     base_link_->SetAngularVel(ignition::math::Vector3d::Zero);
   }
 
-  void attachInPhysicsThread(const std::string& object_model_name)
+  void attachInPhysicsThread(const std::string& requested_model_name)
   {
+    std::string object_model_name = requested_model_name;
+    // Same-class instances are named <configured model> or <configured model>_<suffix>.
+    // Resolve locally in Gazebo, then apply the existing distance/lateral checks.
+    if (requested_model_name.compare(0, 8, "nearest:") == 0) {
+      const std::string prefix = requested_model_name.substr(8);
+      const auto robot = world_->ModelByName(robot_model_name_);
+      const auto palm = robot ? robot->GetLink(palm_link_name_) : physics::LinkPtr();
+      const auto finger1 = robot ? robot->GetLink(finger_link_1_name_) : physics::LinkPtr();
+      const auto finger2 = robot ? robot->GetLink(finger_link_2_name_) : physics::LinkPtr();
+      if (prefix.empty() || !palm) { publishStatus("error:invalid_nearest_request"); return; }
+      auto center = palm->WorldPose().Pos();
+      if (finger1 && finger2) center = 0.5 * (finger1->WorldPose().Pos() + finger2->WorldPose().Pos());
+      double nearest = max_attach_distance_;
+      object_model_name.clear();
+      for (const auto& model : world_->Models()) {
+        const auto name = model->GetName();
+        if (name != prefix && name.compare(0, prefix.size()+1, prefix + "_") != 0) continue;
+        const auto link = model->GetLink(object_link_name_);
+        if (!link) continue;
+        const double distance = center.Distance(link->WorldPose().Pos());
+        if (std::isfinite(distance) && distance < nearest) { nearest = distance; object_model_name = name; }
+      }
+      if (object_model_name.empty()) { publishStatus("error:no_nearby_instance:" + prefix); return; }
+    }
     if (object_model_name.empty())
     {
       publishStatus("error:empty_object_model");

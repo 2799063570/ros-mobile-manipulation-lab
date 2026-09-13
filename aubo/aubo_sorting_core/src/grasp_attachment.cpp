@@ -70,11 +70,15 @@ bool ColorSortingTask::setGraspAttachment(const std::string& model_name, bool at
       status = grasp_status_;// 获取当前抓取状态
       sequence = grasp_status_sequence_;// 获取当前抓取状态序列号
     }
-    if (sequence > initial_sequence && status == expected)
+    const bool nearest_ack = attach && model_name.compare(0, 8, "nearest:") == 0 &&
+        status.compare(0, 9, "attached:") == 0 &&
+        (status.substr(9) == model_name.substr(8) ||
+         status.substr(9).compare(0, model_name.size()-8+1, model_name.substr(8) + "_") == 0);
+    if (sequence > initial_sequence && (status == expected || nearest_ack))
     {
       {
         std::lock_guard<std::mutex> lock(data_mutex_);
-        attached_model_ = attach ? model_name : std::string();// 记录当前吸附的物体|没有吸附
+        attached_model_ = attach ? (nearest_ack ? status.substr(9) : model_name) : std::string();
       }
       ROS_INFO_STREAM("Gazebo grasp status: " << status);
       return true;

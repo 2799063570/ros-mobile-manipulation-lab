@@ -110,6 +110,33 @@ namespace aubo_sorting_core
     private_nh_.param("target_cache_fallback_enabled", target_cache_fallback_enabled_, true);
     private_nh_.param("target_cache_fallback_delay", target_cache_fallback_delay_, 2.0);
     target_cache_fallback_delay_ = std::max(0.2, target_cache_fallback_delay_);
+    private_nh_.param("continuous_sorting", continuous_sorting_, true);
+    private_nh_.param("queue_match_distance", instance_queue_.match_distance, 0.04);
+    private_nh_.param("queue_stable_distance", instance_queue_.stable_distance, 0.015);
+    private_nh_.param("queue_duplicate_distance", instance_queue_.duplicate_distance, 0.008);
+    private_nh_.param("queue_max_age", instance_queue_.max_age, 10.0);
+    private_nh_.param("queue_confirmation_gap", instance_queue_.confirmation_gap, 1.0);
+    private_nh_.param("queue_retention", instance_queue_.retention, 30.0);
+    private_nh_.param("queue_done_hold", instance_queue_.done_hold, 2.0);
+    instance_queue_.min_observations = target_cache_min_observations_;
+    private_nh_.param("queue_frame_max_age", queue_frame_max_age_, 1.0);
+    private_nh_.param("queue_empty_confirmation", queue_empty_confirmation_, 2.0);
+    private_nh_.param("queue_empty_min_frames", queue_empty_min_frames_, 5);
+    private_nh_.param("queue_place_exclusion_radius", queue_place_exclusion_radius_, 0.08);
+    private_nh_.param("queue_gripper_exclusion_radius", queue_gripper_exclusion_radius_, 0.10);
+    private_nh_.param("queue_height_tolerance", queue_height_tolerance_, 0.04);
+    for (double value : {instance_queue_.match_distance, instance_queue_.stable_distance,
+         instance_queue_.duplicate_distance, instance_queue_.max_age, instance_queue_.confirmation_gap,
+         instance_queue_.retention, instance_queue_.done_hold, queue_frame_max_age_,
+         queue_empty_confirmation_, queue_place_exclusion_radius_, queue_gripper_exclusion_radius_,
+         queue_height_tolerance_})
+      if (!std::isfinite(value) || value <= 0)
+        throw std::runtime_error("queue parameters must be finite and positive");
+    if (instance_queue_.duplicate_distance >= instance_queue_.stable_distance ||
+        instance_queue_.stable_distance >= instance_queue_.match_distance ||
+        instance_queue_.retention < instance_queue_.max_age || queue_empty_min_frames_ < 2 ||
+        queue_empty_confirmation_ >= detection_timeout_)
+      throw std::runtime_error("invalid queue distance/retention/empty-confirmation bounds");
     private_nh_.param<std::string>("failure_topic", failure_topic_, "/sorting/failure");
     private_nh_.param<std::string>("workspace_config_param", workspace_config_param_,
                                    "/sorting/workspace_config");

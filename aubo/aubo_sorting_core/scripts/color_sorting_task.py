@@ -7,6 +7,7 @@ import copy
 import inspect
 import json
 import math
+import os
 import sys
 import threading
 import time
@@ -1548,8 +1549,14 @@ class ColorSortingTask(object):
 
 
 def main():
-    moveit_commander.roscpp_initialize(sys.argv)
     rospy.init_node("color_sorting_task")
+    if rospy.get_param("~continuous_sorting", True):
+        # One implementation owns instance identity and concurrency. Preserve the
+        # legacy executable entry point and all roslaunch name/namespace remaps.
+        rospy.loginfo("Continuous sorting uses the C++ instance-queue executor")
+        rospy.signal_shutdown("handoff to continuous sorting executor")
+        os.execvp("rosrun", ["rosrun", "aubo_sorting_core", "color_sorting_task_cpp"] + sys.argv[1:])
+    moveit_commander.roscpp_initialize(sys.argv)
     try:
         task = ColorSortingTask()
         task.start()

@@ -1,4 +1,20 @@
 planning_group: aubo_i5
+# 实例队列由后台线程持续更新；有效目标连续抓取，缺少可靠目标才回观察位。
+continuous_sorting: true
+queue_match_distance: 0.04
+queue_stable_distance: 0.015
+queue_duplicate_distance: 0.008
+queue_max_age: 10.0
+queue_confirmation_gap: 1.0
+queue_retention: 30.0
+queue_done_hold: 2.0
+queue_frame_max_age: 1.0
+queue_empty_confirmation: 2.0
+queue_empty_min_frames: 5
+# 抓取区域为 table_frame 下的桌面 XY 范围，排除各放置点周围的区域。
+queue_place_exclusion_radius: 0.08
+queue_gripper_exclusion_radius: 0.10
+queue_height_tolerance: 0.04
 end_effector_link: tcp_link
 target_frame: base_link
 detections_topic: /sorting/detections       # 注意和检测节点的发布话题保持一致

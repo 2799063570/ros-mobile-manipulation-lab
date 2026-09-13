@@ -160,6 +160,8 @@ void ColorSortingTask::workspaceUpdateCallback(const std_msgs::StringConstPtr& m
 
 bool ColorSortingTask::applyWorkspace(const WorkspaceConfig& workspace, std::string& error)
 {
+  // Exclude the tracker while replacing coordinate frames, ROI and destinations.
+  std::unique_lock<std::mutex> queue_lock(queue_mutex_);
   if (workspace.table_center.size() != 3 || workspace.table_size.size() != 3 ||
       !std::isfinite(workspace.table_z) ||
       !std::all_of(workspace.table_center.begin(), workspace.table_center.end(),
@@ -195,6 +197,12 @@ bool ColorSortingTask::applyWorkspace(const WorkspaceConfig& workspace, std::str
     target_tracks_.clear();
     detections_.reset();
   }
+  instance_queue_.clear();
+  pending_detection_.reset();
+  queue_epoch_ = ros::Time::now();
+  queue_last_frame_ = queue_empty_since_ = ros::WallTime();
+  queue_empty_frames_ = 0;
+  queue_lock.unlock();
   publishTargetCache();
   observation_ready_.store(false);
   ROS_INFO_STREAM("Configured sorting workspace '" << workspace_id_ << "'");

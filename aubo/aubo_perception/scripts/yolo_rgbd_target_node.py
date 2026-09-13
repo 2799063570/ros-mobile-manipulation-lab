@@ -96,7 +96,7 @@ class YoloRgbdTargetNode(object):
         self._depth_lock = threading.Lock()
 
         self.detections_publisher = rospy.Publisher(
-            self.detections_topic, DetectedObjectArray, queue_size=2
+            self.detections_topic, DetectedObjectArray, queue_size=1
         )
         self.target_pose_publisher = rospy.Publisher(
             self.target_pose_topic, PoseStamped, queue_size=1
@@ -235,6 +235,7 @@ class YoloRgbdTargetNode(object):
 
     def _publish_empty(self, header):
         output = DetectedObjectArray()
+        output.observation_valid = False
         output.header.stamp = header.stamp
         output.header.frame_id = self.target_frame
         if self.task_mode in ("sorting", "both"):
@@ -277,6 +278,18 @@ class YoloRgbdTargetNode(object):
         output.header.frame_id = self.target_frame
         ranked = []
         transform = None
+        output.sensor_frame = info.header.frame_id
+        output.observation_valid = True
+        # Resolve the source-time transform even for an empty detector result.
+        # TF/depth failures must never be interpreted as an empty workspace.
+        if self.task_mode in ("sorting", "both"):
+            try:
+                self.tf_listener.waitForTransform(self.target_frame, info.header.frame_id, stamp, rospy.Duration(0.15))
+                transform = self.tf_listener.lookupTransform(self.target_frame, info.header.frame_id, stamp)
+            except tf.Exception as error:
+                rospy.logwarn_throttle(2.0, "Observation TF unavailable: %s", str(error))
+                self._publish_empty(boxes_message.header)
+                return
         for box in boxes_message.bounding_boxes:
             probability = float(getattr(box, "probability", 0.0))
             label = self._label(box)
@@ -287,19 +300,23 @@ class YoloRgbdTargetNode(object):
             u = float(getattr(box, "center_x", (box.xmin + box.xmax)/2))
             v = float(getattr(box, "center_y", (box.ymin + box.ymax)/2))
             if not (0 <= u < info.width and 0 <= v < info.height):
+                output.observation_valid = False
                 continue
             dimensions = (float(getattr(box, "width", box.xmax-box.xmin)),
                           float(getattr(box, "height", box.ymax-box.ymin)),
                           float(getattr(box, "angle", 0.0)))
             if not all(math.isfinite(value) for value in dimensions) or min(dimensions[:2]) <= 0:
+                output.observation_valid = False
                 continue
             camera_pose = None
             if depth is not None:
                 depth_result = self._depth_for_box(depth, box)
                 if depth_result is None:
+                    output.observation_valid = False
                     continue
                 camera_pose = self._camera_pose(info, stamp, depth_result[0], u, v)
                 if camera_pose is None:
+                    output.observation_valid = False
                     continue
                 if self.task_mode in ("servo", "both") and label == self.selected_class.lower():
                     ranked.append((probability, camera_pose, label))
@@ -344,6 +361,7 @@ class YoloRgbdTargetNode(object):
                 detected.pixel_x, detected.pixel_y = int(round(u)), int(round(v))
                 output.objects.append(detected)
             except (ValueError, tf.Exception) as error:
+                output.observation_valid = False
                 rospy.logwarn_throttle(2.0, "Rejecting grasp target: %s", str(error))
         if self.task_mode in ("sorting", "both"):
             self.detections_publisher.publish(output)

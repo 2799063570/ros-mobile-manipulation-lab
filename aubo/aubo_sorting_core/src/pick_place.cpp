@@ -59,16 +59,23 @@ bool ColorSortingTask::pickAndPlace(const aubo_perception::DetectedObject& detec
   const double preplace_z = table_z_ + preplace_height_;// 放置前及放置后的退离高度
   ROS_INFO("Picking %s at [%.3f, %.3f, %.3f]", color.c_str(), object_x, object_y, grasp_z);
 
-  if (!commandGripper(gripper_open_) ||
+  if (!validateReservedTarget() || !commandGripper(gripper_open_) ||
       !moveToPose(makePose(object_x, object_y, table_z_ + pregrasp_height_), color + " pre-grasp") ||
+      !validateReservedTarget() ||
       !cartesianTo(makePose(object_x, object_y, grasp_z), color + " grasp"))// 夹爪张开 移动到目标位置上方 移动到目标位置
     return false;
   const auto model = grasp_model_names_.find(color);// 根据颜色查找抓取碰撞体名称
-  const std::string object_model_name =
+  std::string object_model_name =
       model == grasp_model_names_.end() ? color + "_block" : model->second;
+  if (continuous_sorting_ && use_grasp_attachment_)
+    object_model_name = "nearest:" + object_model_name;
   attachment_attempted = use_grasp_attachment_;
   if (!setGraspAttachment(object_model_name, true))// 夹爪吸附目标物体
     return false;
+  if (continuous_sorting_ && use_grasp_attachment_) {
+    std::lock_guard<std::mutex> lock(data_mutex_);
+    object_model_name = attached_model_; // Plugin resolved the actual same-class model instance.
+  }
   if (!commandGripper(close_command))// 夹爪闭合
   {
     setGraspAttachment(object_model_name, false);// 夹爪闭合失败 释放吸附
@@ -98,6 +105,8 @@ bool ColorSortingTask::pickAndPlace(const aubo_perception::DetectedObject& detec
 
 bool ColorSortingTask::sortingOperation()
 {
+  if (continuous_sorting_)
+    return continuousSortingOperation();
   bool all_complete = !sort_colors_.empty();// 分拣的颜色列表不为空
   for (const auto& color : sort_colors_)
     all_complete = all_complete && completed_colors_.count(color) != 0;// 检查所有颜色是否已经完成

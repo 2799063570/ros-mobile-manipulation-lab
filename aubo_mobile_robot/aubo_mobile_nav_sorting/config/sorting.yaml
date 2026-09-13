@@ -2,6 +2,22 @@
 # 抓取位姿使用 base_link；桌体和放置点分别使用 table_frame、place_frame。
 # 四桌任务运行时按当前工位覆盖桌体和放置配置。
 planning_group: aubo_i5
+# 实例队列由后台线程持续更新；有效目标连续抓取，缺少可靠目标才回观察位。
+continuous_sorting: true
+queue_match_distance: 0.04
+queue_stable_distance: 0.015
+queue_duplicate_distance: 0.008
+queue_max_age: 10.0
+queue_confirmation_gap: 1.0
+queue_retention: 30.0
+queue_done_hold: 2.0
+queue_frame_max_age: 1.0
+queue_empty_confirmation: 2.0
+queue_empty_min_frames: 5
+# 抓取区域为 table_frame 下的桌面 XY 范围，排除各放置点周围的区域。
+queue_place_exclusion_radius: 0.08
+queue_gripper_exclusion_radius: 0.10
+queue_height_tolerance: 0.04
 end_effector_link: tcp_link
 target_frame: base_link
 detections_topic: /sorting/detections
@@ -73,8 +89,9 @@ observation_verification_min_frames: 3
 grasp_offset_x: 0.0
 grasp_offset_y: 0.0
 
-# 融合多次观测生成 map 坐标系下的目标轨迹，拒绝过大跳变。
-# 当前关闭缓存兜底，底盘调整后抓取必须等待新检测；其他缓存参数用于轨迹统计。
+# 以下 map 缓存及 fallback 开关仅控制 continuous_sorting=false 的旧流程。
+# 新流程使用 target_frame 下的实例队列，每次开始/切换工作区重新采样；
+# target_cache_min_observations 仍用于实例确认，fallback_delay 用于队列补充等待。
 target_cache_frame: map
 target_cache_min_observations: 5
 target_cache_max_age: 30.0

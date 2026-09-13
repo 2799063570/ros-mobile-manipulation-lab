@@ -103,7 +103,7 @@ class ColorObjectDetector(object):
             raise ValueError("output_mode must be legacy or boxes")
 
         self._detections_publisher = rospy.Publisher(
-            self.detections_topic, DetectedObjectArray, queue_size=2
+            self.detections_topic, DetectedObjectArray, queue_size=1
         )
         self._debug_publisher = rospy.Publisher(
             self.debug_image_topic, Image, queue_size=1
@@ -202,22 +202,15 @@ class ColorObjectDetector(object):
     def _camera_transform(self, camera_frame, stamp):
         # Images often arrive 1-15 ms before joint-state TF. Wait for the
         # original timestamp, with a wall-clock bound even if Gazebo pauses.
-        if self.require_depth:
-            deadline = time.monotonic() + self.tf_wait_timeout
-            while True:
-                try:
-                    return self._listener.lookupTransform(self.target_frame, camera_frame, stamp)
-                except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
-                    remaining = deadline - time.monotonic()
-                    if remaining <= 0.0 or rospy.is_shutdown():
-                        raise
-                    time.sleep(min(0.005, remaining))
-        try:
-            return self._listener.lookupTransform(self.target_frame, camera_frame, stamp)
-        except tf.ExtrapolationException:
-            return self._listener.lookupTransform(
-                self.target_frame, camera_frame, rospy.Time(0)
-            )
+        deadline = time.monotonic() + self.tf_wait_timeout
+        while True:
+            try:
+                return self._listener.lookupTransform(self.target_frame, camera_frame, stamp)
+            except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+                remaining = deadline - time.monotonic()
+                if remaining <= 0.0 or rospy.is_shutdown():
+                    raise
+                time.sleep(min(0.005, remaining))
 
     def _pixel_to_table(self, pixel_x, pixel_y, camera_info, transform):
         fx = camera_info.K[0]
@@ -358,6 +351,8 @@ class ColorObjectDetector(object):
         output = DetectedObjectArray()
         output.header.stamp = image_message.header.stamp
         output.header.frame_id = self.target_frame
+        output.sensor_frame = camera_frame
+        output.observation_valid = True
 
         for color_name, color_config in self.colors.items():
             mask = self._mask_for_color(hsv_image, color_config)
@@ -382,6 +377,7 @@ class ColorObjectDetector(object):
                 )
                 used_depth = point is not None
                 if point is None and self.require_depth:
+                    output.observation_valid = False
                     rospy.logwarn_throttle(
                         2.0, "Skipping color target: no fresh aligned depth/top surface; RGB fallback disabled"
                     )
@@ -391,10 +387,14 @@ class ColorObjectDetector(object):
                         pixel_x, pixel_y, camera_info, transform
                     )
                 if point is None:
+                    output.observation_valid = False
                     continue
 
                 detected = DetectedObject()
                 detected.color = color_name
+                detected.class_name = color_name
+                detected.confidence = 1.0
+                detected.object_height = self.object_height
                 detected.pose.position.x = point[0]
                 detected.pose.position.y = point[1]
                 detected.pose.position.z = point[2]

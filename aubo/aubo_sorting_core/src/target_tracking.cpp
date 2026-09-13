@@ -19,7 +19,15 @@ void ColorSortingTask::detectionCallback(const aubo_perception::DetectedObjectAr
     detections_wall_time_ = ros::WallTime::now();
     state = state_;
   }
-  if (state == State::DETECTING || (state == State::OBSERVING && observation_ready_.load()))
+  if (continuous_sorting_)
+  {
+    // Only the newest unprocessed source frame is retained. The worker never commands MoveIt.
+    std::lock_guard<std::mutex> lock(queue_mutex_);
+    if (!pending_detection_ || message->header.stamp > pending_detection_->header.stamp)
+      pending_detection_ = message;
+    queue_condition_.notify_one();
+  }
+  else if (state == State::DETECTING || (state == State::OBSERVING && observation_ready_.load()))
     updateTargetCache(*message);// 特定阶段更新目标抓取信息
 
   std::vector<std::string> counts;
@@ -144,6 +152,7 @@ void ColorSortingTask::updateTargetCache(const aubo_perception::DetectedObjectAr
 
 void ColorSortingTask::publishTargetCache()
 {
+  if (continuous_sorting_) { publishInstanceQueue(); return; }
   std::map<std::string, TargetTrack> tracks;
   {
     std::lock_guard<std::mutex> lock(data_mutex_);

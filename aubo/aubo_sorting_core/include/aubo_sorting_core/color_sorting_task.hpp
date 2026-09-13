@@ -15,9 +15,11 @@
 #include <std_srvs/Empty.h>
 #include <std_srvs/Trigger.h>
 #include <tf/transform_listener.h>
+#include <aubo_sorting_core/instance_queue.hpp>
 
 #include <atomic>
 #include <cstdint>
+#include <condition_variable>
 #include <functional>
 #include <map>
 #include <memory>
@@ -98,6 +100,12 @@ private:
   bool homeOperation();
   bool prepareWorkOperation();
   bool sortingOperation();
+  bool continuousSortingOperation();
+  void targetWorker();
+  void resetInstanceQueue();
+  void processInstanceFrame(const aubo_perception::DetectedObjectArray& message);
+  void publishInstanceQueue();
+  bool validateReservedTarget();
   bool observation();
   bool verifyVisibleColors();
   bool pickAndPlace(const aubo_perception::DetectedObject& detected);
@@ -263,6 +271,22 @@ private:
   bool robot_limits_valid_{false};
   std::thread initialization_thread_;
   std::thread operation_thread_;
+  using ObjectQueue = InstanceQueue<aubo_perception::DetectedObject>;
+  ObjectQueue instance_queue_;
+  bool continuous_sorting_{true};
+  double queue_frame_max_age_{1.0}, queue_empty_confirmation_{2.0};
+  double queue_place_exclusion_radius_{0.08}, queue_gripper_exclusion_radius_{0.10};
+  double queue_height_tolerance_{0.04};
+  int queue_empty_min_frames_{5};
+  std::mutex queue_mutex_;
+  std::condition_variable queue_condition_;
+  aubo_perception::DetectedObjectArrayConstPtr pending_detection_;
+  std::thread target_thread_;
+  std::atomic<bool> target_worker_shutdown_{false};
+  ros::Time queue_epoch_, queue_last_stamp_;
+  ros::WallTime queue_last_frame_, queue_empty_since_;
+  int queue_empty_frames_{0};
+  std::uint64_t active_instance_id_{0}; // Execution thread only.
 };
 
 }  // namespace aubo_sorting_core

@@ -46,7 +46,7 @@ ColorSortingTask::ColorSortingTask(ros::NodeHandle nh, ros::NodeHandle private_n
   grasp_attach_publisher_ = nh_.advertise<std_msgs::String>(grasp_attach_topic_, 1);// 将目标吸附到夹爪上
   grasp_detach_publisher_ = nh_.advertise<std_msgs::String>(grasp_detach_topic_, 1);// 从夹爪上分离目标
 
-  detection_subscriber_ = nh_.subscribe(detections_topic_, 2, &ColorSortingTask::detectionCallback, this);
+  detection_subscriber_ = nh_.subscribe(detections_topic_, 1, &ColorSortingTask::detectionCallback, this);
   grasp_status_subscriber_ = nh_.subscribe(grasp_status_topic_, 5,
                                            &ColorSortingTask::graspStatusCallback, this);// 抓取状态的反馈
   workspace_subscriber_ = nh_.subscribe(workspace_update_topic_, 1,
@@ -81,6 +81,9 @@ ColorSortingTask::ColorSortingTask(ros::NodeHandle nh, ros::NodeHandle private_n
 
 ColorSortingTask::~ColorSortingTask()
 {
+  detection_subscriber_.shutdown();
+  target_worker_shutdown_.store(true);
+  queue_condition_.notify_all();
   stop_requested_.store(true);
   if (arm_)
     arm_->stop();
@@ -90,10 +93,14 @@ ColorSortingTask::~ColorSortingTask()
     initialization_thread_.join();
   if (operation_thread_.joinable())
     operation_thread_.join();
+  if (target_thread_.joinable())
+    target_thread_.join();
 }
 
 void ColorSortingTask::start()
 {
+  if (continuous_sorting_)
+    target_thread_ = std::thread(&ColorSortingTask::targetWorker, this);
   initialization_thread_ = std::thread(&ColorSortingTask::initialize, this);
 }
 
@@ -347,9 +354,11 @@ bool ColorSortingTask::homeService(std_srvs::Trigger::Request&,
 
 bool ColorSortingTask::observationOperation()
 {
+  if (continuous_sorting_)
+    resetInstanceQueue();
   if (!observation())
     return false;
-  if (verify_observation_detections_ && !verifyVisibleColors()) // 验证检测到的目标颜色是否与预期一致
+  if (!continuous_sorting_ && verify_observation_detections_ && !verifyVisibleColors()) // Legacy per-class verification.
   {
     observation_ready_.store(false);
     return false;

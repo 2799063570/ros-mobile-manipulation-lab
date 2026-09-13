@@ -7,8 +7,9 @@
 启动核心脚本。
 
 核心同时提供 Python 和 C++ 两个实现。固定平台和移动平台的分拣 launch 默认
-使用 `color_sorting_task_cpp`；如需回退 Python 版本，可在 launch 命令后增加
-`task_executable:=color_sorting_task.py`。C++ 类声明位于
+使用 `color_sorting_task_cpp`。`continuous_sorting=true` 时，历史 Python 入口也转交给
+C++ 执行器并保留 ROS 名称/命名空间参数，避免维护两份并发实现。仅当场景 YAML 设置
+`continuous_sorting: false` 时，`task_executable:=color_sorting_task.py` 才运行旧 Python 流程。C++ 类声明位于
 `include/aubo_sorting_core/color_sorting_task.hpp`，节点入口位于 `src/color_sorting_task_node.cpp`，实现按职责拆分如下。
 
 ## 程序职责与维护入口
@@ -23,6 +24,8 @@
 | `src/color_sorting_task.cpp` | 生命周期、ROS 服务、异步任务调度与状态发布 |
 | `src/task_parameters.cpp` | 参数读取、基本参数校验和机械臂关节限制检查 |
 | `src/target_tracking.cpp` | 检测订阅、坐标转换、目标缓存及多帧确认 |
+| `src/instance_tracking.cpp` | 最新帧后台线程、实例过滤、连续抓取调度、空场景确认 |
+| `include/aubo_sorting_core/instance_queue.hpp` | 不依赖 ROS 的实例匹配、状态、预留和失效规则 |
 | `src/workspace_manager.cpp` | 工作区配置、桌面碰撞体及 OctoMap 更新 |
 | `src/motion_executor.cpp` | MoveIt 规划与执行、轨迹时间参数化、抬升重试和夹爪控制 |
 | `src/grasp_attachment.cpp` | Gazebo 抓取辅助插件的状态、吸附和释放 |
@@ -52,8 +55,80 @@ Python 与 C++ 存在重复实现，修改共同抓放逻辑时需要同步检�
 
 `prepare_work` 主要供移动机器人到达工位后的任务编排使用，固定平台通常不调用。
 `configure_workspace` 在节点空闲时从 `/sorting/workspace_config` 读取当前桌子的
-碰撞体、抓取高度和放置点。切换桌子会清空本桌完成颜色记录；同一桌规划失败后重试
-则跳过已经完成的颜色，避免重复抓取。
+碰撞体、抓取高度和放置点。切换桌子会清空目标。连续模式每次开始都建立新的采样周期，
+从桌面实际剩余物体恢复；旧模式同一桌重试才按完成颜色跳过。
+
+## 连续感知与实例队列
+
+默认 `continuous_sorting: true`。感知回调只投递最新一帧；独立线程维护实例，机械臂
+操作线程顺序抓放。队列不积压图像，也不在运动期间持有目标锁。同类多个物体按
+类别和 XY 距离一对一匹配，短距离重复检测去重，多帧稳定后可领取。队列最多保留
+200 个实例，过期记录在新有效帧到来时清理；ID 在节点生命周期内不复用。
+
+状态为 `candidate / ready / reserved / done / review`。领取时复制完整抓取信息，
+执行坐标冻结，其他物体继续更新。预抓取运动前和下降前复核新鲜度及已观测位移，
+不把后台坐标直接写入在途轨迹。遮挡短暂保留；明显跳变重新确认；同类新位置出现时，
+未匹配旧目标取消就绪以防旧坐标残留。匹配只能依据几何，不保证交叉/重叠物体的身份。
+
+抓放完成后等待一帧释放后的有效检测，再领取仍然有效的实例；不强制回观察位。
+队列不可用时短暂等待（`target_cache_fallback_delay`，默认 2 秒），随后回观察位并
+重新确认。只有在观察位收到至少 `queue_empty_min_frames` 帧有效空检测、持续
+`queue_empty_confirmation` 秒且检测仍新鲜，才结束。感知失联、无效深度、无效 TF、
+不满足抓取几何的物体均不能作为桌面清空证据；观察超时报告 `DETECTION_FAILED`。
+这里的“有效空检测”仍依赖相机覆盖抓取区，不能证明视野外或被其他物体完全遮挡的
+区域为空。观察姿态必须在部署时确认覆盖需要处理的桌面。
+
+目标在 `target_frame` 中保存，使用图像时间戳做严格 TF 转换。抓取区域为 `table_frame`
+下桌面 XY 边界，排除**所有类别**放置点周围 8 cm；因此源物体不能放在这些排除区中。
+抓取中还排除 TCP 邻域及 TCP 沿相机射线投影到桌面的邻域，降低手中物体重新入队的概率。
+桌高投影会受遮挡和深度误差影响，这不是物体分割或抓取成功传感器的替代品。
+
+每次抓取保留 OctoMap（如启用）和桌面碰撞体更新；底盘锁继续由现有操作接口维持。
+开始、人工重新观察、切换工作区均重建缓存，不沿用上次停靠的抓取坐标。执行失败或
+急停退出当前操作，待复核后重新观察和开始，不自动在夹持状态不明时抓下一个。
+`done` 表示抓放动作成功；无夹持反馈时不声称已经通过视觉确认抓取成功。
+
+主要参数（距离单位 m，时间单位 s）：
+
+| 参数 | 默认 | 作用 |
+| --- | --- | --- |
+| `target_cache_min_observations` | 5 | 多帧稳定确认 |
+| `queue_match_distance` | 0.04 | 同类实例关联上限 |
+| `queue_stable_distance` | 0.015 | 位置稳定阈值 |
+| `queue_duplicate_distance` | 0.008 | 同帧去重半径，应小于物体间距 |
+| `queue_max_age` | 10 | 目标最后可靠观测的有效期 |
+| `queue_frame_max_age` | 1 | 源图像及有效检测流的新鲜度上限 |
+| `queue_confirmation_gap` | 1 | 超过此间隔重新累计确认 |
+| `queue_retention` | 30 | 未预留实例的保留时间 |
+| `queue_done_hold` | 2 | 完成后原位置的短暂重入隔离 |
+| `queue_empty_confirmation` / `queue_empty_min_frames` | 2 / 5 | 观察位空场景确认条件 |
+| `queue_place_exclusion_radius` | 0.08 | 放置点排除半径 |
+| `queue_gripper_exclusion_radius` | 0.10 | 夹爪及其桌面投影排除半径 |
+| `queue_height_tolerance` | 0.04 | 桌面物体中心高度检查；depth 模式同时应用 `height_tolerance` |
+
+`target_cache_fallback_enabled / frame / max_age / outlier_distance` 仅用于旧模式，不影响
+新实例队列。降低 `queue_max_age` 会增加重新观察频率；如果 YOLO 推理超过 1 秒，需要
+根据实测延迟设置 `queue_frame_max_age`，不能通过重写图像时间戳规避过期检查。
+
+`/sorting/target_cache` 连续模式输出 `schema_version: 2`，`targets` 的键由类别改成
+实例 ID，每项包含 `id/color/status/position/observations/confidence/age/picked`。
+`confidence` 是稳定确认进度，不是检测模型概率；第三方按颜色解析的面板需适配 ID。
+
+### 重新编译和验证
+
+`DetectedObjectArray.msg` 新增 `observation_valid` 与 `sensor_frame`，ROS 消息 MD5 会改变。
+必须一起重编译并重启感知、分拣、Gazebo 插件及其他使用该消息的节点。自定义感知节点
+必须明确设置有效性和相机光学坐标系；默认 false 不会触发抓取或完成判定。
+
+Gazebo 连续模式发送 `nearest:<配置模型名>`，插件在该名称或 `<名称>_<后缀>` 的模型中
+选择夹爪附近实例，并保留原来的距离和横向对中检查。例：`red_block / red_block_1`。
+需要重编译并重启 Gazebo 加载新插件；实机不使用该协议。放置仍使用现有每类单一位置，
+多物体堆放容量和防碰撞摆放不属于此队列改造，需要按实际分拣容器配置。
+
+在 ROS 工作区执行 `catkin_make`，构建测试后运行 `instance_queue_test`（或 CTest），
+以及 `test_observation_contract.py` 和原有感知/抓取测试。硬件验证前在仿真中检查：
+同类多目标、抓取中加入新目标、遮挡、目标位移、感知断流、停止恢复和切换工作区。
+本机可独立编译 `test/instance_queue_test.cpp`，不需要 ROS；感知契约测试同样无需 ROS。
 
 ## 参数边界
 
