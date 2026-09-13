@@ -7,12 +7,15 @@
 #include <inspire_gripper/set_es.h>
 #include <inspire_gripper/get_state.h>
 #include <control_msgs/JointTolerance.h>
+#include <moveit_msgs/Constraints.h>
+#include <moveit_msgs/JointConstraint.h>
 #include <moveit/robot_trajectory/robot_trajectory.h>
 #include <moveit/trajectory_processing/iterative_time_parameterization.h>
 #include <tf/transform_datatypes.h>
 #include <trajectory_msgs/JointTrajectoryPoint.h>
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 
 namespace aubo_sorting_core
 {
@@ -66,18 +69,38 @@ bool ColorSortingTask::xyInTargetFrame(const std::string& source_frame,
 }
 
 bool ColorSortingTask::moveToPose(const geometry_msgs::PoseStamped& pose,
-                                  const std::string& description)
+                                  const std::string& description,
+                                  bool constrain_pregrasp_wrist1)
 {
   if (stop_requested_.load())
     return false;
+  const bool constrain_wrist1 = constrain_pregrasp_wrist1 && pregrasp_wrist1_limit_ > 0.0;
+  if (constrain_wrist1)
+  {
+    // 同一 TCP 位姿存在 wrist1≈0 和 wrist1≈±π 两组逆解；只在预抓取阶段排除翻腕分支。
+    // 观察位也必须位于这个范围内，否则 MoveIt 的路径约束会使规划失败。
+    moveit_msgs::Constraints constraints;
+    moveit_msgs::JointConstraint wrist;
+    wrist.joint_name = "wrist1_joint";
+    wrist.position = 0.0;
+    wrist.tolerance_above = pregrasp_wrist1_limit_;
+    wrist.tolerance_below = pregrasp_wrist1_limit_;
+    wrist.weight = 1.0;
+    constraints.joint_constraints.push_back(wrist);
+    arm_->setPathConstraints(constraints);
+  }
+  const auto clear_constraints = [this](void*) { arm_->clearPathConstraints(); };
+  std::unique_ptr<void, decltype(clear_constraints)> constraint_guard(
+      constrain_wrist1 ? this : nullptr, clear_constraints);
   ROS_INFO_STREAM("Planning arm to " << description << " in " << pose.header.frame_id
                   << " at [" << pose.pose.position.x << ", " << pose.pose.position.y
                   << ", " << pose.pose.position.z << "]");
   arm_->setPoseTarget(pose, end_effector_link_);// 设置目标姿态(末端执行器的笛卡尔空间位姿)
-  return planAndExecute(description) && !stop_requested_.load();
+  return planAndExecute(description, constrain_wrist1 ? pregrasp_wrist1_limit_ : 0.0) &&
+      !stop_requested_.load();
 }
 
-bool ColorSortingTask::planAndExecute(const std::string& description)
+bool ColorSortingTask::planAndExecute(const std::string& description, double wrist1_limit)
 {
   arm_->setStartStateToCurrentState();
   moveit::planning_interface::MoveGroupInterface::Plan plan;
@@ -89,6 +112,24 @@ bool ColorSortingTask::planAndExecute(const std::string& description)
     arm_->clearPoseTargets();
     setFailure("PLANNING_FAILED", description);
     return false;
+  }
+  if (wrist1_limit > 0.0)
+  {
+    // 路径约束交给 MoveIt 求解，执行前仍逐点检查，避免错误轨迹驱动翻腕。
+    const auto& trajectory = plan.trajectory_.joint_trajectory;
+    const auto found = std::find(trajectory.joint_names.begin(), trajectory.joint_names.end(), "wrist1_joint");
+    const std::size_t index = static_cast<std::size_t>(std::distance(trajectory.joint_names.begin(), found));
+    bool within_limit = found != trajectory.joint_names.end();
+    for (const auto& point : trajectory.points)
+      within_limit = within_limit && index < point.positions.size() &&
+          std::isfinite(point.positions[index]) && std::abs(point.positions[index]) <= wrist1_limit + 1e-3;
+    if (!within_limit)
+    {
+      arm_->stop();
+      arm_->clearPoseTargets();
+      setFailure("PLANNING_FAILED", description + " violates pre-grasp wrist1 limit");
+      return false;
+    }
   }
   const auto executed = arm_->execute(plan);
   arm_->stop();

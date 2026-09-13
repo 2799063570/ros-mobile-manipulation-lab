@@ -151,6 +151,12 @@ Gazebo 连续模式发送 `nearest:<配置模型名>`，插件在该名称或 `<
 `aubo_mobile_sorting/config/sorting.yaml`；导航分拣场景可用
 `aubo_mobile_nav_sorting/config/sorting.yaml` 覆盖移动平台默认值。
 
+固定平台的 `pregrasp_wrist1_limit=1.2`（rad）仅在预抓取姿态规划期间对
+`wrist1_joint` 施加相对零位的路径限制，避免相同末端位姿落到约 ±2.8 rad 的
+翻腕逆解；抓取下降、放置、观察和回收不沿用这项限制。设为 `0` 可禁用。
+限制必须包含当前起始姿态，默认 `observe` 的 wrist1 约为 -0.91 rad。
+目标在限制内仍不可达时应报告规划失败，不应放宽约束后自动执行。
+
 ### 2026-09 分拣调整
 
 C++ 实现内部使用 `enum class State`；`/sorting/state` 仍保留原字符串协议，

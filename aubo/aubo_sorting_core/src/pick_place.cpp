@@ -60,7 +60,8 @@ bool ColorSortingTask::pickAndPlace(const aubo_perception::DetectedObject& detec
   ROS_INFO("Picking %s at [%.3f, %.3f, %.3f]", color.c_str(), object_x, object_y, grasp_z);
 
   if (!validateReservedTarget() || !commandGripper(gripper_open_) ||
-      !moveToPose(makePose(object_x, object_y, table_z_ + pregrasp_height_), color + " pre-grasp") ||
+      !moveToPose(makePose(object_x, object_y, table_z_ + pregrasp_height_),
+                  color + " pre-grasp", true) ||
       !validateReservedTarget() ||
       !cartesianTo(makePose(object_x, object_y, grasp_z), color + " grasp"))// 夹爪张开 移动到目标位置上方 移动到目标位置
     return false;

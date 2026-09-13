@@ -113,9 +113,10 @@ private:
   geometry_msgs::PoseStamped makePose(double x, double y, double z) const;
   bool xyInTargetFrame(const std::string& source_frame, const std::vector<double>& xy,
                        double& x, double& y);
-  bool moveToPose(const geometry_msgs::PoseStamped& pose, const std::string& description);
+  bool moveToPose(const geometry_msgs::PoseStamped& pose, const std::string& description,
+                  bool constrain_pregrasp_wrist1 = false);
   bool moveNamed(const std::string& target);
-  bool planAndExecute(const std::string& description);
+  bool planAndExecute(const std::string& description, double wrist1_limit = 0.0);
   bool cartesianTo(const geometry_msgs::PoseStamped& target_pose,
                    const std::string& description, bool require_complete = false);
   bool liftWithRecovery(double x, double y, const std::string& description);
@@ -237,6 +238,7 @@ private:
   double target_cache_outlier_distance_{0.12};
   double target_cache_fallback_delay_{2.0};
   double planning_time_{12.0};
+  double pregrasp_wrist1_limit_{0.0};
   int detection_samples_{8};
   int observation_verification_min_frames_{1};
   int target_cache_min_observations_{5};

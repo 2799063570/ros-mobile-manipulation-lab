@@ -41,6 +41,9 @@ auto_move_to_observation: true
 # 默认等待 /sorting/start 服务命令，不在启动后立即抓取。
 auto_start: false
 pregrasp_height: 0.22
+# 预抓取路径限制 wrist1 在 ±1.2 rad 内，排除同位姿下约 ±2.8 rad 的翻腕逆解。
+# 0 表示禁用；观察位 wrist1=-0.91 rad，必须仍在限制范围内。
+pregrasp_wrist1_limit: 1.2
 lift_height: 0.28
 place_clearance: 0.02
 cartesian_step: 0.01

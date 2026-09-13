@@ -149,6 +149,10 @@ namespace aubo_sorting_core
     private_nh_.param<std::string>("workspace_update_topic", workspace_update_topic_,
                                    "/sorting/workspace_update");
     private_nh_.param("planning_time", planning_time_, 12.0);
+    private_nh_.param("pregrasp_wrist1_limit", pregrasp_wrist1_limit_, 0.0);
+    if (!std::isfinite(pregrasp_wrist1_limit_) || pregrasp_wrist1_limit_ < 0.0 ||
+        pregrasp_wrist1_limit_ > 3.04)
+      throw std::runtime_error("pregrasp_wrist1_limit must be in [0, 3.04] rad");
 
     table_center_ = {0.80, 0.0, -0.06};
     table_size_ = {0.80, 1.20, 0.40};
