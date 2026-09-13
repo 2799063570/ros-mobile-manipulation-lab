@@ -31,8 +31,10 @@ public:
     unsigned observations{0};
     double last_seen{0}, changed_at{0};
     bool disturbed{false};
+    double disturbance_distance{0};
+    std::string disturbance_color;
   };
-  double match_distance{0.04}, stable_distance{0.015}, duplicate_distance{0.008};
+  double match_distance{0.04}, stable_distance{0.015}, reserved_distance{0.035}, duplicate_distance{0.008};
   double max_age{3.0}, confirmation_gap{1.0}, retention{30.0}, done_hold{2.0};
   unsigned min_observations{5};
   std::size_t capacity{200};
@@ -98,9 +100,12 @@ public:
       used_tracks.insert(edge.id);
       auto& track = tracks_.at(edge.id);
       if (track.status == Status::RESERVED) {
-        if (edge.distance > stable_distance || samples[edge.sample].color != track.sample.color)
+        // 机械臂移动时手眼视角会让轮廓中心轻微偏移；预留目标采用独立的执行容差。
+        if (edge.distance > reserved_distance || samples[edge.sample].color != track.sample.color) {
           track.disturbed = true;
-        else track.last_seen = now;
+          track.disturbance_distance = edge.distance;
+          track.disturbance_color = samples[edge.sample].color;
+        } else track.last_seen = now;
         continue;
       }
       if (track.status == Status::DONE && now - track.changed_at < done_hold) continue;
@@ -118,6 +123,18 @@ public:
       track.sample = filtered;
       track.last_seen = now;
       track.status = sample.eligible && track.observations >= min_observations ? Status::READY : Status::CANDIDATE;
+    }
+    // 超出关联半径的同色新观测也可能是预留目标的大幅位移，不能让旧坐标继续有效。
+    for (auto& item : tracks_) {
+      auto& track = item.second;
+      if (track.status != Status::RESERVED || used_tracks.count(item.first)) continue;
+      for (std::size_t i = 0; i < samples.size(); ++i) {
+        if (used_samples.count(i) || samples[i].color != track.sample.color) continue;
+        track.disturbed = true;
+        track.disturbance_distance = distance(track.sample, samples[i]);
+        track.disturbance_color = samples[i].color;
+        break;
+      }
     }
     for (std::size_t i = 0; i < samples.size() && tracks_.size() < capacity; ++i) {
       if (used_samples.count(i)) continue;
@@ -145,6 +162,8 @@ public:
         if (track.sample.color != color || track.status != Status::READY || now - track.last_seen > max_age) continue;
         track.status = Status::RESERVED;
         track.disturbed = false;
+        track.disturbance_distance = 0;
+        track.disturbance_color.clear();
         track.changed_at = now;
         result = track; // Immutable execution snapshot, never a pointer into the cache.
         return true;
@@ -160,12 +179,13 @@ public:
     found->second.observations = 0;
     if (!success) invalidate(); // A failed motion may have disturbed neighbours.
   }
-  bool executionValid(std::uint64_t id, double now) const
+  bool executionValid(std::uint64_t id, double now, double reserved_max_age) const
   {
     const auto found = tracks_.find(id);
     return found != tracks_.end() && found->second.status == Status::RESERVED &&
-        !found->second.disturbed && now - found->second.last_seen <= max_age;
+        !found->second.disturbed && now - found->second.last_seen <= reserved_max_age;
   }
+  bool executionValid(std::uint64_t id, double now) const { return executionValid(id, now, max_age); }
 private:
   static double distance(const Sample& a, const Sample& b) { return std::hypot(a.x-b.x, a.y-b.y); }
   std::map<std::uint64_t, Track> tracks_;

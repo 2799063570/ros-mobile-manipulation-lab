@@ -1,6 +1,8 @@
 # 长距离规划＋近距离视觉伺服
 
-分拣应用的 hybrid 和视觉伺服启动入口已迁移到 `aubo_sorting/launch`，启动命令请使用 `roslaunch aubo_sorting ...`（旧兼容文件名也在新包中）。底层 `visual_servo_core.launch`、控制节点、控制配置和相机入口仍由 `aubo_ros_control` 提供。
+hybrid 组合入口位于 `aubo_sorting/launch`，使用 `roslaunch aubo_sorting ...`；
+它们包含 `aubo_ros_control/launch` 下对应的 `eye_...visual_servo...` 入口。
+底层 `visual_servo_core.launch`、控制节点、配置与相机入口仍由 `aubo_ros_control` 提供。
 
 `aubo_visual_servo_node` 增加可选混合模式。远距离使用分拣系统同一套
 MoveIt/OMPL 规划组 `aubo_i5`，近距离使用现有 PBVS；两个阶段统一通过

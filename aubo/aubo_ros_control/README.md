@@ -1,6 +1,8 @@
 # aubo_ros_control
 
-分拣应用的 hybrid 和视觉伺服启动入口已迁移到 `aubo_sorting/launch`，启动命令请使用 `roslaunch aubo_sorting ...`（旧兼容文件名也在新包中）。底层 `visual_servo_core.launch`、控制节点、控制配置和相机入口仍由 `aubo_ros_control` 提供。
+独立视觉伺服及兼容入口位于本包的 `launch` 目录；分拣应用的 hybrid 组合入口
+位于 `aubo_sorting/launch`。`visual_servo_core.launch` 是被各 `eye_...` 入口包含的
+共用底层入口，通常不单独启动。
 
 该功能包为真实 AUBO i5 提供 ROS 1 硬件接口。其实现参考了 [`aubo_ros_control`](https://github.com/2799063570/aubo_perception_planning/tree/main/aubo_ros_control) 的 AUBO SDK 驱动模式，并适配当前工作空间的关节名称和 MoveIt 控制器：`/aubo_i5/aubo_i5_controller/follow_joint_trajectory`。
 
@@ -324,4 +326,5 @@ roslaunch aubo_ros_control aubo_real_bringup.launch \
 
 `eye_in_hand_visual_servo_gazebo.launch` 会把 `/aubo_i5/joint_states` 转发到 `robot_state_publisher` 使用的全局 `/joint_states`。如果 RViz 报告机械臂和相机链路均无法变换到 `base_link`，应先确认这两个话题都在发布，再排查相机 TF。
 
-`visual_servo_gazebo.launch` 和 `visual_servo_real.launch` 是为已有部署保留的兼容入口，现已弃用。
+旧 `visual_servo_gazebo.launch` 和 `visual_servo_real.launch` 兼容包装已删除；
+请改用对应的 `eye_in_hand_visual_servo_*.launch` 入口。

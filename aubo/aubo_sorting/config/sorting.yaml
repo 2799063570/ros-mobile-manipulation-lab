@@ -3,8 +3,12 @@ planning_group: aubo_i5
 continuous_sorting: true
 queue_match_distance: 0.04
 queue_stable_distance: 0.015
+# 手眼相机随臂移动时轮廓中心有约 2 cm 视角偏差；预留目标复核采用独立阈值。
+queue_reserved_distance: 0.035
 queue_duplicate_distance: 0.008
 queue_max_age: 10.0
+# 预抓取规划和运动会遮挡手眼相机；仅对已预留目标放宽最后观测时长。
+queue_reserved_max_age: 30.0
 queue_confirmation_gap: 1.0
 queue_retention: 30.0
 queue_done_hold: 2.0
@@ -71,8 +75,8 @@ grasp_offset_y: 0.0
 moveit_server_timeout: 30.0
 gripper_server_timeout: 30.0
 planning_time: 12.0
-velocity_scaling: 0.6
-acceleration_scaling: 0.15
+velocity_scaling: 0.8           # 速度缩放因子
+acceleration_scaling: 0.4      # 加速度缩放因子
 finish_named_target: down
 
 # depth 模式在任务侧再次校验物体中心高度；与感知 height_tolerance 保持一致。

@@ -1,6 +1,8 @@
 # AUBO 统一视觉位置伺服
 
-分拣应用的 hybrid 和视觉伺服启动入口已迁移到 `aubo_sorting/launch`，启动命令请使用 `roslaunch aubo_sorting ...`（旧兼容文件名也在新包中）。底层 `visual_servo_core.launch`、控制节点、控制配置和相机入口仍由 `aubo_ros_control` 提供。
+独立视觉伺服与兼容入口位于 `aubo_ros_control/launch`；分拣应用的 hybrid 组合入口
+位于 `aubo_sorting/launch`。`visual_servo_core.launch` 由各 `eye_...` 入口包含，
+通常不单独启动。
 
 视觉伺服能力属于机械臂，因此实现位于 `aubo`。固定机械臂和移动机械臂都复用同一
 控制节点 `aubo_visual_servo_node`，移动端只负责把导航、底盘锁定和抓取任务组合起来。
@@ -33,15 +35,15 @@ aubo_ros_control: 坐标误差 -> 雅可比逆解 -> 限速/限加速度 -> 有�
 示例：
 
 ```bash
-roslaunch aubo_sorting eye_in_hand_visual_servo_gazebo.launch
-roslaunch aubo_sorting eye_to_hand_visual_servo_gazebo.launch
-roslaunch aubo_sorting eye_to_hand_visual_servo_gazebo.launch target_label:=blue
-roslaunch aubo_sorting eye_to_hand_visual_servo_real.launch \
+roslaunch aubo_ros_control eye_in_hand_visual_servo_gazebo.launch
+roslaunch aubo_ros_control eye_to_hand_visual_servo_gazebo.launch
+roslaunch aubo_ros_control eye_to_hand_visual_servo_gazebo.launch target_label:=blue
+roslaunch aubo_ros_control eye_to_hand_visual_servo_real.launch \
   robot_ip:=192.168.1.2 camera_serial_no:=<serial>
 ```
 
-旧名称 `visual_servo_gazebo.launch`、`visual_servo_real.launch` 仅作为兼容包装保留，
-新代码和文档应使用带 `eye_in_hand` 的完整名称。
+原 `visual_servo_gazebo.launch`、`visual_servo_real.launch` 兼容包装已删除；
+旧启动脚本请改用带 `eye_in_hand` 的完整名称。
 
 真机默认 `auto_start:=false`。先核对 TF、目标方向、工作空间和避碰，再调用
 `/visual_servo/set_enabled`。SDK 模式会独占机械臂，不能同时启动 `aubo_hw_node` 或

@@ -13,7 +13,7 @@
   <arg name="start_perception" default="true"/>
   <arg name="world" default="$(find aubo_sorting)/worlds/sorting.world"/>
 
-  <include file="$(find aubo_sorting)/launch/eye_to_hand_visual_servo_gazebo.launch">
+  <include file="$(find aubo_ros_control)/launch/eye_to_hand_visual_servo_gazebo.launch">
     <arg name="hybrid_enabled" value="true"/>
     <arg name="loss_strategy" value="stop"/>
     <arg name="gui" value="$(arg gui)"/>

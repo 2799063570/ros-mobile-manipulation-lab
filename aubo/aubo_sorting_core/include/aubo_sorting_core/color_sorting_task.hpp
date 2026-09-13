@@ -274,7 +274,7 @@ private:
   using ObjectQueue = InstanceQueue<aubo_perception::DetectedObject>;
   ObjectQueue instance_queue_;
   bool continuous_sorting_{true};
-  double queue_frame_max_age_{1.0}, queue_empty_confirmation_{2.0};
+  double queue_frame_max_age_{1.0}, queue_empty_confirmation_{2.0}, queue_reserved_max_age_{30.0};
   double queue_place_exclusion_radius_{0.08}, queue_gripper_exclusion_radius_{0.10};
   double queue_height_tolerance_{0.04};
   int queue_empty_min_frames_{5};
@@ -287,6 +287,7 @@ private:
   ros::WallTime queue_last_frame_, queue_empty_since_;
   int queue_empty_frames_{0};
   std::uint64_t active_instance_id_{0}; // Execution thread only.
+  std::atomic<bool> grasp_secured_{false}; // 夹紧前保留目标的视觉观测，夹紧后才屏蔽夹爪邻域。
 };
 
 }  // namespace aubo_sorting_core

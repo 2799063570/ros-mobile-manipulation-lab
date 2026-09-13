@@ -81,6 +81,8 @@ bool ColorSortingTask::pickAndPlace(const aubo_perception::DetectedObject& detec
     setGraspAttachment(object_model_name, false);// 夹爪闭合失败 释放吸附
     return false;
   }
+  // 夹爪夹紧后目标可能随手移动；此时才排除夹爪附近的检测，防止手中物体重新入队。
+  grasp_secured_.store(true);
   if (!wallSleep(0.5, stop_requested_) ||
       !liftWithRecovery(object_x, object_y, color + " lift"))// 抬升到指定高度
     return false;

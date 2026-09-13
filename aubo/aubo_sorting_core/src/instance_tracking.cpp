@@ -76,11 +76,12 @@ void ColorSortingTask::processInstanceFrame(const aubo_perception::DetectedObjec
   lookup(target_frame_, message.header.frame_id, source_to_target);
   lookup(table_frame_, target_frame_, target_to_table);
   lookup(target_frame_, place_frame_, place_to_target);
-  // Even a zero-object frame needs a valid camera transform in the perception node.
-  // During motion, discard the gripper neighbourhood rather than tracking carried objects.
+  // 抓取前必须继续跟踪预留目标；夹爪靠近时提前过滤会使它在下降前过期。
+  // 夹紧后才屏蔽夹爪邻域，避免手中物体再次入队。
   tf::Vector3 gripper_projection;
   bool has_projection = false;
-  if (state == State::PICKING) {
+  const bool exclude_gripper = state == State::PICKING && grasp_secured_.load();
+  if (exclude_gripper) {
     lookup(target_frame_, end_effector_link_, gripper);
     if (message.sensor_frame.empty()) {
       queue_last_frame_ = ros::WallTime();
@@ -111,7 +112,7 @@ void ColorSortingTask::processInstanceFrame(const aubo_perception::DetectedObjec
       if (std::hypot(point.x()-destination.x(), point.y()-destination.y()) < queue_place_exclusion_radius_)
         excluded = true;
     }
-    if (state == State::PICKING && (point - gripper.getOrigin()).length() < queue_gripper_exclusion_radius_)
+    if (exclude_gripper && (point - gripper.getOrigin()).length() < queue_gripper_exclusion_radius_)
       excluded = true;
     if (has_projection && std::hypot(point.x()-gripper_projection.x(), point.y()-gripper_projection.y()) <
         queue_gripper_exclusion_radius_) excluded = true;
@@ -165,15 +166,32 @@ void ColorSortingTask::processInstanceFrame(const aubo_perception::DetectedObjec
 bool ColorSortingTask::validateReservedTarget()
 {
   if (!continuous_sorting_ || active_instance_id_ == 0) return true;
-  bool valid;
+  std::string reason;
   {
     std::lock_guard<std::mutex> lock(queue_mutex_);
     const auto now = ros::WallTime::now();
-    valid = instance_queue_.executionValid(active_instance_id_, now.toSec()) &&
-        !queue_last_frame_.isZero() && (now-queue_last_frame_).toSec() <= queue_frame_max_age_;
+    // 已领走的目标允许在机械臂接近时短暂遮挡；仍要求检测流新鲜且不能出现位移证据。
+    const auto found = instance_queue_.tracks().find(active_instance_id_);
+    if (found == instance_queue_.tracks().end() || found->second.status != ObjectQueue::Status::RESERVED)
+      reason = "reservation no longer exists";
+    else if (found->second.disturbed) {
+      std::ostringstream detail;
+      detail << "reserved target association changed: distance="
+             << found->second.disturbance_distance << " m, observed color="
+             << found->second.disturbance_color;
+      reason = detail.str();
+    }
+    else if (now.toSec() - found->second.last_seen > queue_reserved_max_age_) {
+      std::ostringstream detail;
+      detail << "reserved target last seen " << now.toSec() - found->second.last_seen
+             << " s ago (limit " << queue_reserved_max_age_ << " s)";
+      reason = detail.str();
+    } else if (queue_last_frame_.isZero() ||
+               (now-queue_last_frame_).toSec() > queue_frame_max_age_)
+      reason = "valid observation stream unavailable before descent";
   }
-  if (!valid) setFailure("DETECTION_FAILED", "reserved target moved, expired, or observation unavailable before descent");
-  return valid && !stop_requested_.load();
+  if (!reason.empty()) setFailure("DETECTION_FAILED", reason);
+  return reason.empty() && !stop_requested_.load();
 }
 
 void ColorSortingTask::publishInstanceQueue()
@@ -236,6 +254,7 @@ bool ColorSortingTask::continuousSortingOperation()
       // Keep the scene refresh independent from a return to the observation pose.
       bool success = false;
       active_instance_id_ = target.id;
+      grasp_secured_.store(false);
       const auto clear_active = [this](void*) { active_instance_id_ = 0; };
       std::unique_ptr<void, decltype(clear_active)> active_guard(this, clear_active);
       try { success = refreshOctomap() && addTableCollision() && pickAndPlace(detected); }

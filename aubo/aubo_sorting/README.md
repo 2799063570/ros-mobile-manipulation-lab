@@ -31,31 +31,34 @@ YOLO 示例使用 `can` 类别，罐体直径 5 cm、轴向长度 10 cm，默认
 抓取感知入口显式指定 YOLO `input_mode=topic`，订阅 `/camera/color/image_raw`，
 检测框发布到 `/perception/boxes`，几何层结合相机信息与 TF 后发布 `/sorting/detections`。
 单独运行 `ultralytics_yolo.launch` 的离线图片模式不会影响分拣入口。
-当前任务每轮每个类别抓取一次，因此示例先放置一个罐子；多个同类罐子的连续分拣
-还需要扩展任务的实例选择及抓取模型映射。模型是本地 SDF 几何，无需下载外部资源；
+默认 C++ 任务使用实例队列，可连续抓取同一类别的多个物体；抓取插件按最近模型实例
+绑定。模型是本地 SDF 几何，无需下载外部资源；
 真实图像训练权重对仿真外观的识别效果需实测，必要时补充仿真训练数据。
 切换场景后须重启 Gazebo。算法入口 `yolo_sorting.launch` 本身不启动或替换仿真环境。
 
 
 ## Hybrid 与视觉伺服应用入口
 
-以下入口已从 `aubo_ros_control/launch` 迁移到本包，启动命令统一使用 `aubo_sorting`：
+hybrid 组合入口位于 `aubo_sorting`；独立视觉伺服入口和共用底层入口位于
+`aubo_ros_control`：
 
 | 模式 | Gazebo | 真机 |
 | --- | --- | --- |
 | 眼在手上 hybrid | `eye_in_hand_hybrid_control_gazebo.launch` | `eye_in_hand_hybrid_control_real.launch` |
 | 眼在手外 hybrid | `eye_to_hand_hybrid_control_gazebo.launch` | `eye_to_hand_hybrid_control_real.launch` |
-| 眼在手上视觉伺服 | `eye_in_hand_visual_servo_gazebo.launch` | `eye_in_hand_visual_servo_real.launch` |
-| 眼在手外视觉伺服 | `eye_to_hand_visual_servo_gazebo.launch` | `eye_to_hand_visual_servo_real.launch` |
+| 眼在手上视觉伺服（`aubo_ros_control`） | `eye_in_hand_visual_servo_gazebo.launch` | `eye_in_hand_visual_servo_real.launch` |
+| 眼在手外视觉伺服（`aubo_ros_control`） | `eye_to_hand_visual_servo_gazebo.launch` | `eye_to_hand_visual_servo_real.launch` |
 
 ```bash
 roslaunch aubo_sorting eye_to_hand_hybrid_control_gazebo.launch
 roslaunch aubo_sorting eye_in_hand_hybrid_control_gazebo.launch
 roslaunch aubo_sorting eye_to_hand_hybrid_control_real.launch robot_ip:=192.168.1.2
+roslaunch aubo_ros_control eye_in_hand_visual_servo_gazebo.launch
+roslaunch aubo_ros_control eye_to_hand_visual_servo_gazebo.launch
 ```
 
-默认 `auto_start:=false`，检查完成后再显式启用。旧文件名 `visual_servo_gazebo.launch`
-和 `visual_servo_real.launch` 也迁入本包，仅作为眼在手上视觉伺服的兼容包装。
+默认 `auto_start:=false`，检查完成后再显式启用。独立视觉伺服请使用
+`aubo_ros_control` 中明确区分相机安装位置的 `eye_...` 入口。
 底层控制节点、配置、`visual_servo_core.launch` 与相机入口仍位于 `aubo_ros_control`。
 参数和控制原理见 [混合控制说明](../aubo_ros_control/HYBRID_CONTROL.md)
 与 [视觉伺服说明](../aubo_ros_control/VISUAL_SERVO.md)。
@@ -145,6 +148,12 @@ roslaunch aubo_sorting sorting_gazebo.launch
 ```bash
 rosservice call /sorting/start
 ```
+
+若预抓取到位后报 `DETECTION_FAILED`（预留目标过期、位移或检测流失效），
+先检查 `/sorting/detections` 是否持续发布有效帧，并查看 `/sorting/target_cache` 中
+该实例的 `age` 和 `status`。手眼相机在预抓取时可能被夹爪遮挡；C++ 连续模式使用
+`queue_reserved_max_age`（默认 30 秒）限定预留目标的遮挡时间，超过后仍会拒绝下降。
+参数含义与安全条件见 [实例队列说明](../aubo_sorting_core/README.md#连续感知与实例队列)。
 
 也可以启动后自动执行：
 

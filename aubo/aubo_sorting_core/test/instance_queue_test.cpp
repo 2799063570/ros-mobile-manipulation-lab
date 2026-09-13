@@ -44,8 +44,29 @@ int main()
     }
     { // A nearby moved reserved target cancels descent, without changing its pose.
       Queue q; confirm(q,{object(.5)}); Queue::Track t;
-      CHECK(q.reserve({"red"},1.5,t)); q.update({object(.53)},1.6);
+      CHECK(q.reserve({"red"},1.5,t)); q.update({object(.538)},1.6);
       CHECK(!q.executionValid(t.id,1.6)); CHECK(q.tracks().at(t.id).sample.x==.5);
+    }
+    { // 手眼相机随臂移动引起的约 3 cm 轮廓中心偏差不应取消预留。
+      Queue q; confirm(q,{object(.5)}); Queue::Track t;
+      CHECK(q.reserve({"red"},1.5,t)); q.update({object(.53)},1.6);
+      CHECK(q.executionValid(t.id,1.6));
+      CHECK(q.tracks().at(t.id).sample.x==.5);
+    }
+    { // 目标跳出关联半径后，不能沿用旧预留坐标继续下降。
+      Queue q; confirm(q,{object(.5)}); Queue::Track t;
+      CHECK(q.reserve({"red"},1.5,t)); q.update({object(.56)},1.6);
+      CHECK(!q.executionValid(t.id,1.6));
+    }
+    { // 预抓取运动遮挡目标时可延长预留期；已观察到的位移仍立即否决。
+      Queue q; confirm(q,{object(.5)}); Queue::Track t;
+      CHECK(q.reserve({"red"},1.5,t));
+      q.update({},12);
+      CHECK(!q.executionValid(t.id,12));
+      CHECK(q.executionValid(t.id,12,30));
+      q.update({object(.538)},13);
+      CHECK(!q.executionValid(t.id,13,30));
+      CHECK(!q.executionValid(t.id,35,30));
     }
     { // A neighbouring same-class target inside the association radius is not consumed by the reservation.
       Queue q; confirm(q,{object(.5),object(.53)}); Queue::Track a,b;
@@ -93,7 +114,7 @@ int main()
       CHECK(q.tracks().size()==2); confirm(q,{object(.1)},2);
       q.update({object(.1)},4); Queue::Track t; CHECK(!q.reserve({"red"},4,t));
     }
-    std::cout << "12 instance queue scenarios passed\n";
+    std::cout << "15 instance queue scenarios passed\n";
     return 0;
   } catch(const std::exception& error) { std::cerr<<error.what()<<'\n'; return 1; }
 }
