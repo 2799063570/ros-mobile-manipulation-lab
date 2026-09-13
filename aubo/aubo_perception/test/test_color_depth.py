@@ -62,6 +62,7 @@ class ColorDepthTest(TestCase):
         msg.header.frame_id = 'camera'
         msg.header.stamp = rospy.Time(10)
         for depth, stamp in [(None, 10), (np.full((100, 100), .82), 9),
+                             (np.full((100, 100), .82), 0),
                              (np.full((100, 100), np.nan), 10)]:
             with self.subTest(stamp=stamp, missing=depth is None), patch.object(rospy, 'logwarn_throttle'):
                 self.node._depth_image = depth
@@ -69,6 +70,32 @@ class ColorDepthTest(TestCase):
                 self.node._image_callback(msg)
                 self.assertEqual(self.node._detections_publisher.publish.call_args[0][0].objects, [])
         self.node._pixel_to_table.assert_not_called()
+
+    def test_small_top_patch_cannot_validate_color_contour(self):
+        mask = np.zeros((100, 100), np.uint8)
+        mask[40:61, 40:61] = 255
+        contour = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[0][0]
+        depth = np.full(mask.shape, .84, np.float32)
+        depth[40:46, 40:46] = .82  # Enough points, but only 8% of the silhouette.
+        self.node._depth_image = depth
+        self.node._depth_stamp = rospy.Time(10)
+        self.assertIsNone(self.node._depth_top_center(
+            contour, mask, self.info, self.transform, rospy.Time(10)))
+
+    def test_depth_result_marks_detection_valid(self):
+        rgb = np.zeros((100, 100, 3), np.uint8)
+        rgb[40:61, 40:61, 2] = 255
+        self.node._bridge = Mock()
+        self.node._bridge.imgmsg_to_cv2.return_value = rgb
+        self.node._depth_image = np.full((100, 100), .82, np.float32)
+        self.node._depth_stamp = rospy.Time(10)
+        msg = Image()
+        msg.header.frame_id = 'camera'
+        msg.header.stamp = rospy.Time(10)
+        self.node._image_callback(msg)
+        objects = self.node._detections_publisher.publish.call_args[0][0].objects
+        self.assertEqual(len(objects), 1)
+        self.assertTrue(objects[0].depth_valid)
 
     def test_strict_depth_rejects_latest_tf_fallback(self):
         self.node.tf_wait_timeout = 0.0

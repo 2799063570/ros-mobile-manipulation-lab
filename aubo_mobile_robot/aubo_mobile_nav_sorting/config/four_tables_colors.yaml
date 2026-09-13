@@ -28,6 +28,7 @@ require_depth: true
 max_depth_age: 0.06
 top_surface_tolerance: 0.004
 min_top_surface_points: 30
+min_top_surface_fraction: 0.15
 top_surface_percentile: 5.0
 # 以下高度和工作区均在 target_frame 下表达，单位为米。
 target_frame: base_link

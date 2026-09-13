@@ -54,6 +54,11 @@ class ColorObjectDetector(object):
         self.min_top_surface_points = int(
             rospy.get_param("~min_top_surface_points", 30)
         )
+        self.min_top_surface_fraction = float(
+            rospy.get_param("~min_top_surface_fraction", 0.15)
+        )
+        if not 0.0 <= self.min_top_surface_fraction <= 1.0:
+            raise ValueError("min_top_surface_fraction must be between 0 and 1")
         self.top_surface_percentile = float(
             rospy.get_param("~top_surface_percentile", 5.0)
         )
@@ -265,9 +270,11 @@ class ColorObjectDetector(object):
             depth_stamp = self._depth_stamp
         if depth_image is None or depth_image.shape != color_mask.shape:
             return None
-        if stamp != rospy.Time(0) and depth_stamp != rospy.Time(0):
-            if abs((stamp - depth_stamp).to_sec()) > self.max_depth_age:
-                return None
+        # Unstamped depth cannot be paired safely with a color image.
+        if stamp == rospy.Time(0) or depth_stamp == rospy.Time(0):
+            return None
+        if abs((stamp - depth_stamp).to_sec()) > self.max_depth_age:
+            return None
 
         x, y, width, height = cv2.boundingRect(contour)
         local_contour = contour.copy()
@@ -309,6 +316,8 @@ class ColorObjectDetector(object):
         top = np.abs(target_points[2] - self.projection_plane_z)
         top_points = target_points[:, top <= self.top_surface_tolerance]
         if top_points.shape[1] < self.min_top_surface_points:
+            return None
+        if float(top_points.shape[1]) / depth.size < self.min_top_surface_fraction:
             return None
 
         # Midpoint of robust bounds is insensitive to perspective-dependent
@@ -395,6 +404,7 @@ class ColorObjectDetector(object):
                 detected.class_name = color_name
                 detected.confidence = 1.0
                 detected.object_height = self.object_height
+                detected.depth_valid = used_depth
                 detected.pose.position.x = point[0]
                 detected.pose.position.y = point[1]
                 detected.pose.position.z = point[2]

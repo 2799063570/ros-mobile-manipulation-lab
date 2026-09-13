@@ -25,6 +25,8 @@ require_depth: true
 max_depth_age: 0.06
 top_surface_tolerance: 0.004
 min_top_surface_points: 30
+# 顶面点至少占轮廓中有效深度点的 15%，避免少量噪点冒充方块顶面。
+min_top_surface_fraction: 0.15
 top_surface_percentile: 5.0
 
 # 所有高度均在 target_frame（base_link）下表达。
