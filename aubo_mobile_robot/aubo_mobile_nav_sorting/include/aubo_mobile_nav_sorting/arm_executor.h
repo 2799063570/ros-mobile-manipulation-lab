@@ -12,6 +12,7 @@ public:
   bool cancelSortingAndWait();
   bool recoverStop();
   bool planningFailed() const;
+  bool pregraspPlanningFailed() const;
   bool configureWorkspace(const XmlRpc::XmlRpcValue &workspace);
   bool home(const std::string &label)
   {

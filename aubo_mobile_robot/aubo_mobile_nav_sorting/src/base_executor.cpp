@@ -1,5 +1,6 @@
 #include <aubo_mobile_nav_sorting/base_executor.h>
 #include <aubo_mobile_nav_sorting/bounded_rpc.h>
+#include <aubo_mobile_nav_sorting/dock_control.h>
 #include <tf/transform_datatypes.h>
 #include <algorithm>
 #include <cmath>
@@ -201,8 +202,11 @@ bool BaseExecutor::canDirectDock(const Pose2D &start, const Pose2D &target) cons
 }
 
 bool BaseExecutor::driveStraightTo(const Pose2D &target, const std::string &label,
-                                   MissionState state, const std::string &pose_frame)
+                                   MissionState state, const std::string &pose_frame,
+                                   double position_tolerance)
 {
+  const double goal_tolerance = position_tolerance > 0.0 ? position_tolerance :
+                                context_.direct_dock_goal_tolerance_;
   if (context_.stop_requested_ || context_.base_pose_failed_)
   {
     stopBase();
@@ -238,19 +242,24 @@ bool BaseExecutor::driveStraightTo(const Pose2D &target, const std::string &labe
     const double dy = target.y - actual.y;
     const double lateral = -std::sin(actual.yaw) * dx + std::cos(actual.yaw) * dy;
     const double yaw_error = context_.angleError(target.yaw, actual.yaw);
-    if (std::hypot(dx, dy) <= context_.direct_dock_goal_tolerance_ &&
+    if (std::hypot(dx, dy) <= goal_tolerance &&
         std::abs(yaw_error) <= context_.heading_final_tolerance_)
     {
       stopBase();
+      ROS_INFO("%s reached: position error %.4f m, yaw error %.4f rad", label.c_str(),
+               std::hypot(dx, dy), yaw_error);
       return true;
     }
     if (std::abs(lateral) > context_.direct_dock_lateral_tolerance_ ||
         std::abs(yaw_error) > context_.direct_dock_yaw_tolerance_)
     {
       stopBase();
+      ROS_ERROR("%s corridor exceeded: lateral %.4f/%.4f m, yaw %.4f/%.4f rad",
+                label.c_str(), lateral, context_.direct_dock_lateral_tolerance_,
+                yaw_error, context_.direct_dock_yaw_tolerance_);
       return false;
     }
-    const double current_error = std::abs(longitudinal);
+    const double current_error = std::hypot(dx, dy);
     if (current_error <= best_error - context_.direct_dock_progress_epsilon_)
     {
       best_error = current_error;
@@ -260,16 +269,28 @@ bool BaseExecutor::driveStraightTo(const Pose2D &target, const std::string &labe
                  .count() > context_.direct_dock_stall_timeout_)
     {
       stopBase();
+      ROS_ERROR("%s stalled: position %.4f m, forward %.4f m, lateral %.4f m, yaw %.4f rad; inspect laser_safety_filter/blocked and cmd_vel",
+                label.c_str(), current_error, longitudinal, lateral, yaw_error);
       return false;
     }
     geometry_msgs::Twist command;
-    command.linear.x = std::copysign(
-        std::min(context_.base_recovery_speed_, std::max(0.02, current_error)), longitudinal);
+    if (current_error <= goal_tolerance)
+    {
+      stopBase();
+      return alignHeading(target.yaw, label + " final heading", pose_frame);
+    }
+    const double forward_target = std::cos(target.yaw) * dx + std::sin(target.yaw) * dy;
+    const double lateral_target = -std::sin(target.yaw) * dx + std::cos(target.yaw) * dy;
+    const auto correction = dockCommand(forward_target, lateral_target, yaw_error,
+        context_.base_recovery_speed_, context_.heading_speed_, context_.direct_dock_yaw_tolerance_);
+    command.linear.x = correction.linear;
+    command.angular.z = correction.angular;
     if (!publishVelocity(command))
       return false;
     rate.sleep();
   }
   stopBase();
+  ROS_ERROR("%s timed out after %.1f s", label.c_str(), context_.direct_dock_timeout_);
   return false;
 }
 

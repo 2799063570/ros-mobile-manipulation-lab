@@ -1,5 +1,33 @@
 # AUBO 移动机器人视觉感知
 
+## 移动颜色分拣 RGB-D 定位
+
+移动机器人腕部 Gazebo 相机现在发布同光心、同分辨率的 RGB 与对齐深度：
+`/hand_camera/image_raw`、`/hand_camera/camera_info` 和
+`/hand_camera/aligned_depth_to_color/image_raw`。默认颜色配置及四工作台配置
+开启 `use_depth: true`、`require_depth: true`。共享 `aubo_perception` 节点
+反投影轮廓内的深度像素到 `base_link`，保留距预期顶面 4 mm 以内的点，
+以 XY 稳健边界的中点估计中心。发布的 Z 仍为配置的方块中心高度。
+
+图像时刻 TF 尚未到达时，按原时间戳重试最多 `tf_wait_timeout` 秒（默认 0.2，
+使用墙钟计时，仿真暂停也会超时），不会使用最新 TF 代替历史 TF。
+深度与 RGB 时间差超过 0.06 s、顶面点不足或等待后图像时刻 TF 仍不可用时跳过目标，
+不会退回纯 RGB 质心定位。调试图像中的 `red-D/green-D/blue-D` 表示使用了深度。
+修改相机类型后必须完全重启 Gazebo、重新生成机器人，并重启感知节点；
+仅重启感知无法让已经加载的 RGB 相机产生深度。
+
+```bash
+rostopic hz /hand_camera/aligned_depth_to_color/image_raw
+rosparam get /color_object_detector/require_depth
+```
+
+参数可通过 `rosparam get /color_object_detector/use_depth` 与
+`rosparam get /color_object_detector/require_depth` 检查。保留抓取对中阈值 8 mm，
+需要在实际仿真中对照 Gazebo 方块实时位姿验证误差，深度开启并不保证零误差。
+
+下文纯 RGB 平面投影说明仅适用于显式设置 `use_depth: false`、
+`require_depth: false` 的旧相机配置。
+
 该功能包保存移动平台专用的视觉参数和启动入口。通用 OpenCV/YOLO RGB-D适配节点
 及消息定义由 `aubo_perception` 提供，识别结果统一转换为机器人坐标系下的目标位置。
 

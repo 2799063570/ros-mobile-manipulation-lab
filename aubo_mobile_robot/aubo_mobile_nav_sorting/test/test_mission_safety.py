@@ -30,6 +30,57 @@ with patch.dict(sys.modules, {name: MagicMock() for name in MODULES}):
     spec.loader.exec_module(module)
 
 
+class ForwardRecoveryTests(unittest.TestCase):
+    def setUp(self):
+        self.m = module.NavigationSortingMission.__new__(module.NavigationSortingMission)
+        m = self.m
+        m._condition = threading.Condition()
+        m._stop_requested = threading.Event()
+        m._operation_active = m._stop_unconfirmed = m._base_locked = False
+        m._sorting_failure = "PLANNING_FAILED | green pre-grasp"
+        m.sort_client = MagicMock()
+        m._call_sorting_operation = MagicMock(side_effect=[False, True])
+        m._stow_for_base_recovery = MagicMock(return_value=True)
+        m._current_base_pose = MagicMock(return_value=[0., 0., 0.])
+        m._drive_straight_to = MagicMock(return_value=True)
+        m._prepare_and_observe_once = MagicMock(return_value=True)
+        module.rospy.get_param.return_value = True
+        self.workspace = {'table_frame': 'odom', 'table_center': [.8, 0., .25],
+                          'table_size': [.8, .8, .4]}
+
+    def test_pregrasp_retries_after_stowing_and_fresh_observation(self):
+        self.assertTrue(self.m._sort_at_workspace_with_recovery(self.workspace))
+        self.m._stow_for_base_recovery.assert_called_once()
+        self.m._prepare_and_observe_once.assert_called_once()
+        self.assertEqual(self.m._drive_straight_to.call_args.args[0], [.03, 0., 0.])
+
+    def test_other_failures_do_not_move(self):
+        for failure in ('EXECUTION_FAILED | green pre-grasp', 'PLANNING_FAILED | green lift',
+                        'PLANNING_FAILED | green grasp', 'DETECTION_FAILED | green'):
+            self.m._sorting_failure = failure
+            self.m._call_sorting_operation = MagicMock(return_value=False)
+            self.assertFalse(self.m._sort_at_workspace_with_recovery(self.workspace))
+        self.m._stow_for_base_recovery.assert_not_called()
+        self.m._drive_straight_to.assert_not_called()
+
+    def test_too_close_or_facing_away_does_not_move(self):
+        for pose in ([.06, 0., 0.], [0., 0., math.pi]):
+            self.m._current_base_pose.return_value = pose
+            self.m._call_sorting_operation = MagicMock(return_value=False)
+            self.assertFalse(self.m._sort_at_workspace_with_recovery(self.workspace))
+        self.m._drive_straight_to.assert_not_called()
+
+    def test_two_attempt_limit(self):
+        self.m._call_sorting_operation = MagicMock(return_value=False)
+        self.assertFalse(self.m._sort_at_workspace_with_recovery(self.workspace))
+        self.assertEqual(self.m._drive_straight_to.call_count, 2)
+
+    def test_failed_stow_prevents_base_motion(self):
+        self.m._stow_for_base_recovery.return_value = False
+        self.assertFalse(self.m._sort_at_workspace_with_recovery(self.workspace))
+        self.m._drive_straight_to.assert_not_called()
+
+
 class Stamp:
     def __init__(self, value=0):
         self.value = value

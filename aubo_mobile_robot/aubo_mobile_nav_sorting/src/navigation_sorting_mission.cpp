@@ -247,6 +247,67 @@ bool NavigationSortingMission::sortWithRecovery()
   return false;
 }
 
+bool NavigationSortingMission::sortAtWorkspaceWithRecovery(const XmlRpc::XmlRpcValue &workspace)
+{
+  bool enabled = false;
+  private_node_handle_.param("pregrasp_forward_recovery_enabled", enabled, false);
+  if (!enabled)
+    return sortWithRecovery();
+  if (arm_executor_->sort("sorting"))
+    return true;
+
+  // Only pre-grasp failures: no object has been attached for this pick yet.
+  // Other motion/attachment failures must never trigger automatic base motion.
+  const std::string frame = memberString(workspace, "table_frame");
+  if (frame.empty())
+    return false;
+  const auto &center = workspace["table_center"];
+  const auto &size = workspace["table_size"];
+  const double cx = number(center[0]), cy = number(center[1]);
+  const double hx = 0.5 * number(size[0]), hy = 0.5 * number(size[1]);
+  const auto clearance = [&](const Pose2D &pose) {
+    return std::hypot(std::max(std::abs(pose.x - cx) - hx, 0.0),
+                      std::max(std::abs(pose.y - cy) - hy, 0.0));
+  };
+  // Bounded local recovery for the axis-aligned four-table mobile scene.
+  // Two 3 cm steps at most; retain >=35 cm from base origin to table edge.
+  for (int attempt = 1; attempt <= 2; ++attempt)
+  {
+    if (!arm_executor_->pregraspPlanningFailed())
+    {
+      ROS_WARN("Forward recovery skipped: failure is not an unlocked pre-grasp planning failure");
+      return false;
+    }
+    if (!stowForBaseRecovery())
+      return false;
+    Pose2D start;
+    if (!base_executor_->currentBasePose(start, frame))
+      return false;
+    const Pose2D target = {start.x + 0.03 * std::cos(start.yaw),
+                           start.y + 0.03 * std::sin(start.yaw), start.yaw};
+    const double before = clearance(start), after = clearance(target);
+    if (!std::isfinite(after) || after < 0.35 || after >= before)
+    {
+      ROS_ERROR("Forward recovery rejected: table clearance %.3f -> %.3f m (minimum 0.35 m)",
+                before, after);
+      return false;
+    }
+    ROS_WARN("Pre-grasp recovery %d/2: forward 0.03 m in %s; pose [%.3f, %.3f, %.3f], table clearance %.3f -> %.3f m",
+             attempt, frame.c_str(), start.x, start.y, start.yaw, before, after);
+    if (!base_executor_->driveStraightTo(target, "pre-grasp recovery " + std::to_string(attempt),
+                                         MissionState::ADJUSTING_BASE, frame, 0.01))
+      return false;
+    // Observation and fresh detections must be reacquired after moving the base.
+    // Do not configureWorkspace here: that would erase completed_colors_.
+    if (!prepareAndObserveOnce())
+      return false;
+    if (arm_executor_->sort("pre-grasp recovery retry"))
+      return true;
+  }
+  ROS_ERROR("Pre-grasp forward recovery exhausted (2 attempts); inspect IK and collisions");
+  return false;
+}
+
 bool NavigationSortingMission::retreatAfterSorting(const XmlRpc::XmlRpcValue &workspace)
 {
   publishState(MissionState::STOWING_ARM,
@@ -389,7 +450,7 @@ bool NavigationSortingMission::runWorkstationSequence()
     if (!prepareAndObserveWithRecovery())
       return false;
     publishState(MissionState::SORTING, "workstation '" + identifier + "'");
-    if (!sortWithRecovery() || !retreatAfterSorting(workspace))
+    if (!sortAtWorkspaceWithRecovery(workspace) || !retreatAfterSorting(workspace))
       return false;
     publishState(MissionState::WORKSTATION_COMPLETE, identifier);
   }

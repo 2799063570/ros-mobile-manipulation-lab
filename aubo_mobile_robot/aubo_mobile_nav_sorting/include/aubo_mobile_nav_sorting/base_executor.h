@@ -23,7 +23,8 @@ public:
   bool canDirectDock(const Pose2D &start, const Pose2D &target) const;
   bool driveStraightTo(const Pose2D &target, const std::string &label,
                        MissionState state = MissionState::DIRECT_DOCKING,
-                       const std::string &pose_frame = std::string());
+                       const std::string &pose_frame = std::string(),
+                       double position_tolerance = -1.0);
   bool moveBaseDirect(double dx, double dy, int attempt, int total);
   void stopBase();
   void cancelNavigation();

@@ -19,8 +19,13 @@ max_contour_area: 8000.0
 max_aspect_ratio: 1.6
 morphology_kernel: 5
 
-# 移动平台当前只有 RGB 图像；共用检测器将使用平面投影定位。
-use_depth: false
+# 腕部 RGB-D：反投影彩色轮廓内的深度点，仅使用方块顶面定位。
+use_depth: true
+require_depth: true
+max_depth_age: 0.06
+top_surface_tolerance: 0.004
+min_top_surface_points: 30
+top_surface_percentile: 5.0
 
 # 所有高度均在 target_frame（base_link）下表达。
 target_frame: base_link

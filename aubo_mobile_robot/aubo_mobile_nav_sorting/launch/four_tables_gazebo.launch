@@ -34,7 +34,8 @@
     <arg name="clearing_rotation_allowed" value="false"/>
     <arg name="max_vel_theta" value="0.35"/>
     <arg name="min_vel_theta" value="0.03"/>
-    <arg name="xy_goal_tolerance" value="0.08"/>
+    <!-- Fine docking cannot correct sideways error; acquire pre-dock accurately. -->
+    <arg name="xy_goal_tolerance" value="0.01"/>
     <arg name="yaw_goal_tolerance" value="0.08"/>
     <arg name="use_navigation_profile" value="true"/>
     <arg name="navigation_profile_file"

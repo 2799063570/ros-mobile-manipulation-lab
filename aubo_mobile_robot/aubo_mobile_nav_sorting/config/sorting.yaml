@@ -1,4 +1,6 @@
-# nav_sorting.world 在 x=2.15 m 停靠；以下均为停靠后的 base_link 坐标。
+# 导航分拣机械臂基础配置；单桌默认在 x=2.15 m 停靠。
+# 抓取位姿使用 base_link；桌体和放置点分别使用 table_frame、place_frame。
+# 四桌任务运行时按当前工位覆盖桌体和放置配置。
 planning_group: aubo_i5
 end_effector_link: tcp_link
 target_frame: base_link
@@ -6,16 +8,15 @@ detections_topic: /sorting/detections
 gripper_action: /gripper_controller/follow_joint_trajectory
 
 table_z: 0.14
-# Gazebo world coordinates coincide with odom. Keeping physical scene objects
-# in odom prevents AMCL map->odom corrections from shifting the virtual table.
+# Gazebo 世界坐标与 odom 重合；桌体固定在 odom 下，
+# 避免 AMCL 对 map→odom 的修正使规划场景中的桌子偏移。
 table_frame: odom
 table_center: [3.00, 0.0, 0.25]
 table_size: [0.80, 1.20, 0.40]
-# Extra clearance on each horizontal side; vertical size remains exact so the
-# gripper can still approach objects resting on the tabletop.
+# 桌体各水平侧面增加碰撞余量；高度保持原值，允许夹爪接近桌面物体。
 table_collision_margin: 0.03
 object_height: 0.04
-# Match the proven stationary sorting scene and keep fingertips off the table.
+# 抓取点相对物块中心抬高，保持与固定平台场景一致并避免指尖碰桌。
 grasp_height_offset: 0.01
 scene_update_timeout: 10.0
 
@@ -26,26 +27,24 @@ work_ready_named_target: work_ready
 auto_move_to_observation: false
 auto_start: false
 pregrasp_height: 0.25
-# The navigation dock leaves the farthest block about 5 cm farther from the
-# arm than in the stationary sorting scene.  A 0.30 m lift puts that block just
-# outside the high, tool-down IK envelope; 0.26 m still provides ample table
-# clearance for a 0.04 m block while keeping the transfer pose reachable.
+# 移动停靠场景中的远端方块比固定平台更远。
+# 过高的抬升点可能超出夹爪朝下的可达范围，采用距桌面 0.26 m 的抬升高度。
 lift_height: 0.26
-# Retry incomplete/failed lift planning at 2 cm lower targets, down to 18 cm
-# above the table. Execution failure or stop never retries; at most 5 attempts.
+# 抬升规划失败或路径不完整时，每次降低 2 cm，最低距桌面 18 cm，最多尝试 5 次。
+# 执行失败或收到停止请求时不重试。
 lift_min_height: 0.18
 lift_height_step: 0.02
 lift_max_attempts: 5
-# Placement approach/retreat uses a lower independently reachable target.
-# Relative to table_z: 0.14 + 0.24 = 0.38 m in base_link.
+# 放置前接近和放置后退离使用独立的较低高度。
+# 此值相对桌面：base_link 下为 0.14 + 0.24 = 0.38 m。
 preplace_height: 0.24
 place_clearance: 0.02
 cartesian_step: 0.01
 minimum_cartesian_fraction: 0.90
 
 gripper_open: 0.0
-# 40 mm cubes: mesh clearance at the grasp band is about 42 mm at 0.20 rad.
-# 0.28 rad leaves only about 37 mm and visibly penetrates attached cubes.
+# 对 40 mm 方块，关节为 0.20 rad 时抓取带开口约 42 mm。
+# 0.28 rad 时仅约 37 mm，会明显穿入已吸附方块。
 gripper_closed: 0.20
 gripper_motion_time: 0.8
 gripper_contact_tolerance: 0.30
@@ -57,7 +56,7 @@ grasp_status_topic: /sorting/grasp/status
 grasp_attachment_timeout: 3.0
 
 sort_colors: [red, green, blue]
-# The physical Gazebo pads are fixed in world/odom coordinates.
+# Gazebo 放置区固定在世界坐标及与之重合的 odom 坐标系下。
 place_frame: odom
 place_targets:
   red: [2.66, -0.24]
@@ -69,19 +68,18 @@ detection_samples: 8
 detection_settle_time: 1.0
 verify_observation_detections: true
 observation_verification_timeout: 4.0
-# Validate each color over several camera messages instead of requiring all
-# HSV contours to survive filtering in one identical frame.
+# 每种颜色分别累计多帧验证，不要求所有颜色同时在一帧通过轮廓过滤。
 observation_verification_min_frames: 3
 grasp_offset_x: 0.0
 grasp_offset_y: 0.0
 
-# Fuse repeated observations into stable map-frame target tracks. A short
-# camera occlusion can reuse a confident track, while large jumps are rejected.
+# 融合多次观测生成 map 坐标系下的目标轨迹，拒绝过大跳变。
+# 当前关闭缓存兜底，底盘调整后抓取必须等待新检测；其他缓存参数用于轨迹统计。
 target_cache_frame: map
 target_cache_min_observations: 5
 target_cache_max_age: 30.0
 target_cache_outlier_distance: 0.12
-target_cache_fallback_enabled: true
+target_cache_fallback_enabled: false
 target_cache_fallback_delay: 2.0
 
 moveit_server_timeout: 30.0
@@ -89,13 +87,11 @@ gripper_server_timeout: 30.0
 planning_time: 12.0
 velocity_scaling: 0.6
 acceleration_scaling: 0.15
-# Navigation mission calls /sorting/home before move_base starts. Keep the arm
-# in its compact A-shaped configuration while travelling.
+# 导航前调用 /sorting/home，将机械臂收至紧凑的 transport 姿态。
 finish_named_target: transport
 
-# Obstacles are supplied as parameterized collision objects in MoveIt's
-# PlanningScene.  RGB-D remains available for object detection, but is not an
-# OctoMap safety gate for motion planning.
+# 障碍物通过参数化碰撞体加入 MoveIt 规划场景。
+# RGB-D 用于物体定位，当前不将 OctoMap 就绪作为运动规划的前置条件。
 require_octomap: false
 point_cloud_topic: /workspace_camera/points_for_moveit
 planning_scene_topic: /move_group/monitored_planning_scene

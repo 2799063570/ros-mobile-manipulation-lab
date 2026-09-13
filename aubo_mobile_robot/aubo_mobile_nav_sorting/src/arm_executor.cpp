@@ -206,6 +206,17 @@ bool ArmExecutor::planningFailed() const
          context_.sorting_failure_.find("PLANNING_FAILED") == 0;
 }
 
+bool ArmExecutor::pregraspPlanningFailed() const
+{
+  std::lock_guard<std::mutex> lock(context_.mutex_);
+  const std::string suffix = " pre-grasp";
+  const auto &failure = context_.sorting_failure_;
+  return !context_.operation_active_ && !context_.stop_unconfirmed_ &&
+         !context_.stop_requested_ && !context_.base_locked_ &&
+         failure.find("PLANNING_FAILED | ") == 0 && failure.size() >= suffix.size() &&
+         failure.compare(failure.size() - suffix.size(), suffix.size(), suffix) == 0;
+}
+
 bool ArmExecutor::configureWorkspace(const XmlRpc::XmlRpcValue &workspace)
 {
   XmlRpc::XmlRpcValue payload;

@@ -34,6 +34,7 @@ class LaserSafetyFilter(object):
         )
         self.reaction_time = float(rospy.get_param("~reaction_time", 0.25))
         self.max_deceleration = float(rospy.get_param("~max_deceleration", 0.8))
+        self.max_angular_deceleration = float(rospy.get_param("~max_angular_deceleration", 0.7))
         self.rotation_clearance = float(rospy.get_param("~rotation_clearance", 0.48))
         self.min_cluster_points = int(rospy.get_param("~min_cluster_points", 3))
         self.emergency_distance = float(rospy.get_param("~emergency_distance", 0.18))
@@ -47,6 +48,8 @@ class LaserSafetyFilter(object):
             raise ValueError("robot dimensions must be positive")
         if self.max_deceleration <= 0.0:
             raise ValueError("max_deceleration must be positive")
+        if not math.isfinite(self.max_angular_deceleration) or self.max_angular_deceleration <= 0.0:
+            raise ValueError("max_angular_deceleration must be finite and positive")
         if self.min_cluster_points < 1:
             raise ValueError("min_cluster_points must be at least one")
         if self.scan_timeout <= 0.0 or self.command_timeout <= 0.0:
@@ -128,6 +131,18 @@ class LaserSafetyFilter(object):
         moving_forward = command.linear.x > self.linear_deadband
         moving_reverse = command.linear.x < -self.linear_deadband
         rotating = abs(command.angular.z) > self.angular_deadband
+        # For slow translating corrections, conservatively enclose the swept
+        # rectangle during reaction and braking. Pure rotation retains its
+        # full circular clearance. No obstacle checks are disabled.
+        steering = (rotating and (moving_forward or moving_reverse) and
+                    abs(command.linear.x) <= 0.04 and abs(command.angular.z) <= 0.12)
+        sweep = abs(command.angular.z) * (self.reaction_time + max(
+            abs(command.linear.x) / self.max_deceleration,
+            abs(command.angular.z) / self.max_angular_deceleration))
+        sweep = min(math.pi / 2.0, sweep)
+        swept_front = forward_limit + corridor_half_width * math.sin(sweep)
+        swept_back = reverse_limit + corridor_half_width * math.sin(sweep)
+        swept_half_width = corridor_half_width + max(forward_limit, reverse_limit) * math.sin(sweep)
 
         current_cluster = 0
         # 使用连续角度上的障碍点簇抑制孤立噪点；紧急距离内的单点仍会停车。
@@ -149,7 +164,10 @@ class LaserSafetyFilter(object):
                 elif moving_reverse:
                     in_motion_path = -reverse_limit <= x < 0.0 and abs(y) <= corridor_half_width
 
-                if rotating and measured_range <= self.rotation_clearance:
+                if steering:
+                    in_motion_path = in_motion_path or (
+                        -swept_back <= x <= swept_front and abs(y) <= swept_half_width)
+                elif rotating and measured_range <= self.rotation_clearance:
                     in_motion_path = True
 
                 if in_motion_path:

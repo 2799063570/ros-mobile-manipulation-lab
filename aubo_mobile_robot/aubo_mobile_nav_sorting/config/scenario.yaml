@@ -13,12 +13,12 @@ near_field_candidate_yaw: [0.0, -0.08, 0.08]
 near_field_max_candidates: 6
 
 # move_base 只负责到 pre_dock；与 pre_dock 同轴的候选位姿使用低速直行精靠。
-# 直行命令仍经过 /cmd_vel_raw -> lidar safety -> /cmd_vel，不绕过急停保护。
+# 直行命令仍经过 /cmd_vel_raw → 激光安全过滤 → /cmd_vel，不绕过急停保护。
 near_field_direct_dock_enabled: true        # 近距离采用直行停靠 失败退回move_base
 near_field_direct_dock_max_distance: 0.50
 near_field_direct_dock_lateral_tolerance: 0.06  # 横向误差容限
 near_field_direct_dock_yaw_tolerance: 0.06      # 角度误差容限
-near_field_direct_dock_goal_tolerance: 0.06     # 纵向目标误差容限
+near_field_direct_dock_goal_tolerance: 0.06     # 平面位置误差容限（米）
 # move_base 到达预停靠点后，先在桌子安全距离外做一次小角度闭环对正，再直行。
 # 最大只修正约 6.9 度，禁止用这个控制器进行大角度掉头。
 near_field_heading_alignment_enabled: true        # 是否启用航向对正功能
@@ -75,6 +75,6 @@ sorting_stop_service: /sorting/stop
 # true：系统就绪后自动执行一次；false：等待 /nav_sorting/start。
 auto_start: false
 
-# Record starting pose in the navigation frame; return after successful sorting.
+# 在 return_frame 坐标系记录出发位姿，分拣成功后返回。
 return_to_start: true
 return_frame: map

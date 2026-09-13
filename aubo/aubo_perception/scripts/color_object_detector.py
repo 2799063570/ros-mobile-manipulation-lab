@@ -4,6 +4,7 @@
 from __future__ import print_function
 
 import threading
+import time
 
 import cv2
 import numpy as np
@@ -40,6 +41,12 @@ class ColorObjectDetector(object):
         self.position_offset_x = float(rospy.get_param("~position_offset_x", 0.0))
         self.position_offset_y = float(rospy.get_param("~position_offset_y", 0.0))
         self.use_depth = bool(rospy.get_param("~use_depth", True))
+        self.require_depth = bool(rospy.get_param("~require_depth", False))
+        self.tf_wait_timeout = float(rospy.get_param("~tf_wait_timeout", 0.2))
+        if not np.isfinite(self.tf_wait_timeout) or self.tf_wait_timeout < 0.0:
+            raise ValueError("tf_wait_timeout must be finite and nonnegative")
+        if self.require_depth and not self.use_depth:
+            raise ValueError("require_depth requires use_depth=true")
         self.max_depth_age = float(rospy.get_param("~max_depth_age", 0.25))
         self.top_surface_tolerance = float(
             rospy.get_param("~top_surface_tolerance", 0.008)
@@ -193,6 +200,18 @@ class ColorObjectDetector(object):
         return result[0] if len(result) == 2 else result[1]
 
     def _camera_transform(self, camera_frame, stamp):
+        # Images often arrive 1-15 ms before joint-state TF. Wait for the
+        # original timestamp, with a wall-clock bound even if Gazebo pauses.
+        if self.require_depth:
+            deadline = time.monotonic() + self.tf_wait_timeout
+            while True:
+                try:
+                    return self._listener.lookupTransform(self.target_frame, camera_frame, stamp)
+                except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException):
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0.0 or rospy.is_shutdown():
+                        raise
+                    time.sleep(min(0.005, remaining))
         try:
             return self._listener.lookupTransform(self.target_frame, camera_frame, stamp)
         except tf.ExtrapolationException:
@@ -362,6 +381,11 @@ class ColorObjectDetector(object):
                     contour, mask, camera_info, transform, image_message.header.stamp
                 )
                 used_depth = point is not None
+                if point is None and self.require_depth:
+                    rospy.logwarn_throttle(
+                        2.0, "Skipping color target: no fresh aligned depth/top surface; RGB fallback disabled"
+                    )
+                    continue
                 if point is None:
                     point = self._pixel_to_table(
                         pixel_x, pixel_y, camera_info, transform

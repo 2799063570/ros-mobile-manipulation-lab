@@ -1,3 +1,4 @@
+# HSV 颜色阈值：H 范围为 0～179，S/V 范围为 0～255；draw_bgr 为调试绘图颜色。
 colors:
   red:
     ranges:
@@ -13,14 +14,22 @@ colors:
       - {lower: [95, 90, 55], upper: [132, 255, 255]}
     draw_bgr: [255, 0, 0]
 
-# A 40 mm cube is roughly 700-1800 px^2 from the observation pose. The
-# 100x140 mm placement pads are much larger, so reject them before publishing.
+# 观察姿态下 40 mm 方块约占 700～1800 平方像素。
+# 100×140 mm 放置色块更大，通过面积上限排除。
 min_contour_area: 180.0
 max_contour_area: 3000.0
 max_aspect_ratio: 1.6
 morphology_kernel: 5
 
-use_depth: false
+# 启用对齐深度反投影；require_depth 为真时，深度无效不会退回纯 RGB 定位。
+# max_depth_age 为彩色与深度最大时间差（秒）；顶面容差单位为米。
+use_depth: true
+require_depth: true
+max_depth_age: 0.06
+top_surface_tolerance: 0.004
+min_top_surface_points: 30
+top_surface_percentile: 5.0
+# 以下高度和工作区均在 target_frame 下表达，单位为米。
 target_frame: base_link
 table_z: 0.14
 object_height: 0.04
@@ -28,10 +37,10 @@ projection_plane_z: 0.18
 object_center_z: 0.16
 workspace_min_x: 0.40
 workspace_max_x: 0.82
-# The three source cubes span 0.24 m laterally. Keep another 0.06 m on each
-# side for the residual base-pose error accepted at the pre-dock goal. Large
-# placement pads remain rejected independently by max_contour_area above.
+# 三个待抓方块横向跨度为 0.24 m，工作区预留停靠残差余量。
+# 大尺寸放置色块另外通过 max_contour_area 排除。
 workspace_min_y: -0.30
 workspace_max_y: 0.30
+# 固定平面补偿量；只在测量确认存在固定偏差后调整。
 position_offset_x: 0.0
 position_offset_y: 0.0

@@ -1,23 +1,18 @@
-# Navigation tuning used only by four_tables_gazebo.launch.
-#
-# The mission has a separate low-speed controller for the final straight dock.
-# move_base therefore stops at a pre-dock pose and should not keep producing
-# new global paths while trying to remove centimetre-level pose errors.
+# 仅用于 four_tables_gazebo.launch 的导航参数。
+# move_base 负责预停点，任务节点随后通过独立低速控制器直线精靠。
+# 预停点需要足够精确，避免留下直线控制器无法修正的侧向误差。
 
-# Plan on receipt of a goal and again only when the current path becomes invalid.
-# This removes the 1 Hz global-plan churn visible as repeated "Got new plan".
+# 收到新目标或当前路径失效时规划，取消每秒一次的周期性全局重规划。
 planner_frequency: 0.0
 controller_frequency: 12.0
 controller_patience: 8.0
 
-# Detect a real lack of progress sooner, but do not trigger rotate recovery in
-# the narrow pre-dock region (rotation recovery is disabled by the launch file).
+# 提前检测无进展状态；狭窄预停区域不使用旋转恢复（启动文件已禁用）。
 oscillation_timeout: 7.0
 oscillation_distance: 0.10
 
 DWAPlannerROS:
-  # Slower motion near furniture. A small reverse range lets DWA undo an
-  # overshoot instead of turning the whole robot and oscillating left/right.
+  # 降低桌椅附近速度，允许小范围倒车修正越过目标的误差，减少转向振荡。
   max_vel_x: 0.22
   min_vel_x: -0.06
   max_vel_trans: 0.22
@@ -27,8 +22,7 @@ DWAPlannerROS:
   acc_lim_x: 0.35
   acc_lim_theta: 0.70
 
-  # A shorter horizon and denser velocity sampling behave more predictably
-  # close to table corners and the detour wall.
+  # 缩短轨迹预测时间并增加速度采样密度，改善桌角和绕行墙附近的控制。
   sim_time: 1.30
   vx_samples: 20
   vtheta_samples: 40
@@ -38,21 +32,20 @@ DWAPlannerROS:
   forward_point_distance: 0.15
   stop_time_buffer: 0.30
 
-  # The mission's heading-align/direct-dock stages perform the final precision
-  # correction, so move_base does not need to chase a 4 cm / 0.04 rad target.
-  xy_goal_tolerance: 0.08
+  # 预停点位置容差为 1 cm；剩余航向误差由任务节点闭环对正。
+  xy_goal_tolerance: 0.01
   yaw_goal_tolerance: 0.08
   latch_xy_goal_tolerance: true
   trans_stopped_vel: 0.02
   theta_stopped_vel: 0.03
 
-# Default local planner for the four-table scene. The same launch file can
-# still select DWA; keeping both namespaces here makes A/B testing repeatable.
+# 四桌场景默认使用 TEB，启动时也可选择 DWA。
+# 两个规划器参数分属独立命名空间，便于同场景对照调试。
 TebLocalPlannerROS:
   odom_topic: odom
   map_frame: map
 
-  # Trajectory timing and adherence to the global route around the wall.
+  # 轨迹时间离散化，以及跟随绕墙全局路径的约束。
   teb_autosize: true
   dt_ref: 0.25
   dt_hysteresis: 0.05
@@ -66,8 +59,7 @@ TebLocalPlannerROS:
   exact_arc_length: false
   publish_feedback: false
 
-  # Differential-drive limits. Reverse is available for small corrections but
-  # the optimizer is weighted to prefer forward driving on normal route legs.
+  # 差速底盘运动限制：允许小幅倒车修正，正常路径通过权重优先选择前进。
   max_vel_x: 0.22
   max_vel_x_backwards: 0.06
   max_vel_y: 0.0
@@ -78,15 +70,14 @@ TebLocalPlannerROS:
   min_turning_radius: 0.0
   cmd_angle_instead_rotvel: false
 
-  # Precision docking is handled by the mission node after move_base reaches
-  # the pre-dock pose, so TEB does not chase centimetre-level errors here.
-  xy_goal_tolerance: 0.08
+  # 预停点位置容差为 1 cm；到达后由任务节点执行航向对正和最终直线精靠。
+  xy_goal_tolerance: 0.01
   yaw_goal_tolerance: 0.08
   free_goal_vel: false
   complete_global_plan: true
 
-  # The costmap robot_radius is 0.35 m. This explicit optimization footprint
-  # prevents TEB's point-model fallback from cutting too close to a table.
+  # 代价地图机器人半径为 0.35 m；显式指定圆形优化轮廓，
+  # 避免 TEB 使用点模型而规划出过于贴近桌边的轨迹。
   footprint_model:
     type: circular
     radius: 0.35
@@ -120,8 +111,7 @@ TebLocalPlannerROS:
   weight_viapoint: 10.0
   weight_adapt_factor: 2.0
 
-  # The global planner already chooses which side of the wall to use. Keeping
-  # one TEB avoids left/right homotopy switching close to furniture.
+  # 绕墙方向已由全局规划器决定；保留单条 TEB 候选，避免桌椅附近左右切换。
   enable_homotopy_class_planning: false
   enable_multithreading: false
   max_number_classes: 1

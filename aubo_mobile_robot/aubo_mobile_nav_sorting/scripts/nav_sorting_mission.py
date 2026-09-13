@@ -845,11 +845,12 @@ class NavigationSortingMission(object):
         return False
 
     def _drive_straight_to(
-        self, target, label, state="DIRECT_DOCKING", pose_frame=None
+        self, target, label, state="DIRECT_DOCKING", pose_frame=None, position_tolerance=None
     ):
         if self._stop_requested.is_set() or self._base_pose_failed:
             self._stop_base()
             return False
+        goal_tolerance = self.direct_dock_goal_tolerance if position_tolerance is None else position_tolerance
         pose_frame = pose_frame or self.navigation_frame
         start = self._current_base_pose(pose_frame)
         if start is None:
@@ -911,7 +912,7 @@ class NavigationSortingMission(object):
                     actual[0] - target[0], actual[1] - target[1]
                 )
                 if (
-                    position_error <= self.direct_dock_goal_tolerance
+                    position_error <= goal_tolerance
                     and abs(yaw_error) <= self.heading_final_tolerance
                 ):
                     rospy.loginfo(
@@ -930,7 +931,7 @@ class NavigationSortingMission(object):
                     )
                     return False
 
-                current_error = abs(longitudinal)
+                current_error = position_error
                 if current_error <= best_error - self.direct_dock_progress_epsilon:
                     best_error = current_error
                     last_progress_time = time.monotonic()
@@ -943,10 +944,18 @@ class NavigationSortingMission(object):
                     return False
 
                 command = Twist()
-                command.linear.x = math.copysign(
-                    min(self.base_recovery_speed, max(0.02, current_error)),
-                    longitudinal,
-                )
+                if position_error <= goal_tolerance:
+                    self._stop_base()
+                    return self._align_heading_for_direct_dock(target[2], label + " final heading", pose_frame)
+                dx, dy = target[0] - actual[0], target[1] - actual[1]
+                forward = math.cos(target[2]) * dx + math.sin(target[2]) * dy
+                cross = -math.sin(target[2]) * dx + math.cos(target[2]) * dy
+                limit = min(.04, .5 * self.direct_dock_yaw_tolerance)
+                steering = max(-limit, min(limit, math.atan2(
+                    math.copysign(1., forward) * cross, max(.15, abs(forward)))))
+                command.linear.x = math.copysign(min(self.base_recovery_speed, .8 * abs(forward)), forward)
+                command.angular.z = max(-self.heading_speed, min(self.heading_speed,
+                    2. * (yaw_error + steering)))
                 self.base_recovery_publisher.publish(command)
                 self._stop_requested.wait(1.0 / self.base_recovery_rate)
         finally:
@@ -1063,6 +1072,49 @@ class NavigationSortingMission(object):
             if not self._planning_failed():
                 return False
         rospy.logerr("No direct base adjustment produced a valid sorting plan")
+        return False
+
+    def _sort_at_workspace_with_recovery(self, workspace):
+        if not rospy.get_param("~pregrasp_forward_recovery_enabled", False):
+            return self._sort_with_recovery()
+        states = ("SORTING", "DETECTING", "PICKING", "OBSERVING", "HOMING")
+        if self._call_sorting_operation(self.sort_client, states, "sorting"):
+            return True
+        frame = workspace.get("table_frame", "")
+        if not frame:
+            return False
+        cx, cy = workspace["table_center"][:2]
+        hx, hy = [v * 0.5 for v in workspace["table_size"][:2]]
+        def clearance(pose):
+            return math.hypot(max(abs(pose[0] - cx) - hx, 0.),
+                              max(abs(pose[1] - cy) - hy, 0.))
+        for attempt in range(1, 3):
+            with self._condition:
+                eligible = (not self._operation_active and not self._stop_unconfirmed and
+                            not self._stop_requested.is_set() and not self._base_locked and
+                            self._sorting_failure.startswith("PLANNING_FAILED | ") and
+                            self._sorting_failure.endswith(" pre-grasp"))
+            if not eligible or not self._stow_for_base_recovery():
+                return False
+            start = self._current_base_pose(frame)
+            if start is None:
+                return False
+            target = [start[0] + .03 * math.cos(start[2]),
+                      start[1] + .03 * math.sin(start[2]), start[2]]
+            before, after = clearance(start), clearance(target)
+            if not math.isfinite(after) or after < .35 or after >= before:
+                rospy.logerr("Forward recovery rejected: table clearance %.3f -> %.3f m", before, after)
+                return False
+            rospy.logwarn("Pre-grasp recovery %d/2: forward 0.03 m; clearance %.3f -> %.3f m",
+                          attempt, before, after)
+            if not self._drive_straight_to(target, "pre-grasp recovery %d" % attempt,
+                                           state="ADJUSTING_BASE", pose_frame=frame, position_tolerance=.01):
+                return False
+            if not self._prepare_and_observe_once():
+                return False
+            if self._call_sorting_operation(self.sort_client, states, "pre-grasp recovery retry"):
+                return True
+        rospy.logerr("Pre-grasp forward recovery exhausted (2 attempts); inspect IK and collisions")
         return False
 
     def _navigate_once(self, target, goal_frame=None):
@@ -1327,7 +1379,7 @@ class NavigationSortingMission(object):
             if not self._prepare_and_observe_with_recovery():
                 return False
             self._publish_state("SORTING", "workstation '{}'".format(identifier))
-            if not self._sort_with_recovery():
+            if not self._sort_at_workspace_with_recovery(workspace):
                 return False
             if not self._retreat_after_sorting(workspace):
                 return False

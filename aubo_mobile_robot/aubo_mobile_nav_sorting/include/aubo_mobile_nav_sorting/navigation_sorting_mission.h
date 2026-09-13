@@ -24,6 +24,7 @@ private:
   bool stowForBaseRecovery();
   bool prepareAndObserveWithRecovery();
   bool sortWithRecovery();
+  bool sortAtWorkspaceWithRecovery(const XmlRpc::XmlRpcValue &workspace);
   bool retreatAfterSorting(const XmlRpc::XmlRpcValue &workspace);
   double scoreCandidate(const Pose2D &pose, bool &valid, double &clearance) const;
   std::vector<Candidate> nearFieldCandidates() const;

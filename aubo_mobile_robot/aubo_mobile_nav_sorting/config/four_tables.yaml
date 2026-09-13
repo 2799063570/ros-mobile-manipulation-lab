@@ -1,8 +1,11 @@
-# Four-table Gazebo mission. Fixed-scene coordinates use odom, which coincides
-# with the Gazebo world. Each final dock uses the mission's low-speed cmd_vel.
+# 四工作台 Gazebo 任务：固定场景使用与世界重合的 odom 坐标系。
+# 导航到预停点后，任务节点通过低速速度命令完成最终直线精靠。
 navigation_frame: map
 
-# Final docks include the previous +0.05 m forward recovery offset.
+# 最终停靠点已包含此前沿机器人朝向前移 0.05 m 的修正。
+# 工位位姿为 [x, y, yaw]（米、米、弧度）；三维位置和尺寸单位为米。
+# table_z 使用 base_link；桌体、放置点等使用各自配置的坐标系。
+# place_targets 指定分类放置位置；grasp_model_names 指定 Gazebo 实体名称。
 workstations:
   - id: table_1
     navigation_goal_frame: odom
@@ -80,6 +83,7 @@ workstations:
       - {id: table_4_green_block, color: green, position: [1.64, -2.00, 0.47]}
       - {id: table_4_blue_block, color: blue, position: [1.72, -2.12, 0.47]}
 
+# 导航动作接口、重试次数及等待时间（秒）；navigation_retries 不含首次尝试。
 navigation_action: /move_base
 navigation_timeout: 180.0
 navigation_retries: 1
@@ -91,27 +95,31 @@ sorting_base_lock_topic: /sorting/base_locked
 base_pose_max_age: 0.5
 home_before_navigation: true
 
-# Mandatory table exit: transport pose first, then reverse through cmd_vel.
+# 每桌完成后先收臂至 transport，再通过速度命令后退离桌。
 post_sort_retreat_enabled: true
 post_sort_retreat_distance: 0.30
 
+# 精靠限制：距离单位为米，角度单位为弧度，时间单位为秒。
+# goal_tolerance 是平面距离容差；lateral_tolerance 是直线运行允许的侧向误差。
 near_field_direct_dock_enabled: true
 near_field_direct_dock_max_distance: 0.50
 near_field_direct_dock_lateral_tolerance: 0.08
 near_field_direct_dock_yaw_tolerance: 0.06
-near_field_direct_dock_goal_tolerance: 0.08
+near_field_direct_dock_goal_tolerance: 0.07
 near_field_heading_alignment_enabled: true
 near_field_heading_max_correction: 0.12
 near_field_heading_speed: 0.12
 near_field_heading_goal_tolerance: 0.015
-near_field_heading_final_tolerance: 0.025
+near_field_heading_final_tolerance: 0.04
 near_field_heading_timeout: 4.0
 near_field_heading_stall_timeout: 1.5
 near_field_direct_dock_timeout: 15.0
 near_field_direct_dock_stall_timeout: 2.5
 near_field_direct_dock_progress_epsilon: 0.005
 
-# Use the configured working dock; planning failure must not move the base.
+# 仅启用有边界的预抓取前移重试，旧版通用底盘搜索保持关闭。
+# 每次目标前移 3 cm、最多两次、底盘中心距桌边至少 35 cm，限值定义在任务代码中。
+pregrasp_forward_recovery_enabled: true
 base_recovery_enabled: false
 base_recovery_cmd_vel_topic: /cmd_vel_raw
 base_recovery_speed: 0.04
@@ -119,6 +127,7 @@ base_recovery_rate: 20.0
 base_recovery_settle_time: 0.8
 base_recovery_steps: []
 
+# 与分拣节点通信的话题、服务及当前工作区参数名称。
 sorting_state_topic: /sorting/state
 sorting_failure_topic: /sorting/failure
 sorting_home_service: /sorting/home
@@ -129,8 +138,9 @@ sorting_stop_service: /sorting/stop
 sorting_configure_service: /sorting/configure_workspace
 sorting_workspace_param: /sorting/workspace_config
 
+# 是否在节点就绪后自动启动；启动文件的同名参数会覆盖此值。
 auto_start: false
 
-# Record starting pose in the navigation frame; return after successful sorting.
+# 在 return_frame 坐标系记录出发位姿，全部分拣成功后返回。
 return_to_start: true
 return_frame: map
