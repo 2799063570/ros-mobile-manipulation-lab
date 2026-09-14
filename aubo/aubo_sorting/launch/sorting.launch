@@ -4,6 +4,7 @@
   <arg name="start_perception" default="true"/>
   <arg name="start_task" default="true"/>
   <arg name="task_executable" default="color_sorting_task_cpp"/>
+  <arg name="gripper_backend" default="trajectory"/>
   <!-- image_view/OpenCV 4.2 can abort while closing an unregistered GTK
        window.  Keep publishing /sorting/debug_image, but make the optional
        desktop viewer opt-in so shutdown remains clean and headless-safe. -->
@@ -53,6 +54,7 @@
     <param name="auto_move_to_observation" value="$(arg auto_move_to_observation)"/><!-- 自动移动到观察位姿 -->
     <param name="auto_start" value="$(arg auto_start)"/><!-- 自动开始任务 -->
     <param name="use_grasp_attachment" value="$(arg use_grasp_attachment)"/><!-- 是否使用抓取插件 -->
+    <param name="gripper_backend" value="$(arg gripper_backend)"/>
   </node>
 
   <node if="$(arg debug_view)" pkg="image_view" type="image_view"

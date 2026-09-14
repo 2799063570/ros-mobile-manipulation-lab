@@ -110,6 +110,9 @@ private:
                      bool fresh_target, double dt);
   bool hybridGoal(const JointPoint &feedback, const geometry_msgs::Pose &target,
                   geometry_msgs::Pose &goal, double &distance);
+  Eigen::Vector3d hybridGraspPosition(const Eigen::Vector3d &current,
+                                     const Eigen::Matrix3d &base_from_control,
+                                     const geometry_msgs::Pose &surface) const;
 
   bool hybrid_enabled_{false}, hybrid_pending_{false}, hybrid_fault_{false};
   bool hybrid_near_{false}, hybrid_observation_complete_{false};
@@ -121,6 +124,7 @@ private:
   double hybrid_target_drift_{0.04}, hybrid_joint_error_{0.08};
   double hybrid_planning_time_{3.0}, hybrid_execution_timeout_{60.0};
   double hybrid_min_tcp_z_{-1e9};
+  double hybrid_surface_to_grasp_z_{0.0};
   double hybrid_elapsed_{0.0};
   JointPoint hybrid_settle_position_{};
   uint64_t hybrid_generation_{0};

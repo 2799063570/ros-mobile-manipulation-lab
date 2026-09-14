@@ -58,6 +58,7 @@
               command="load"/>
     <param name="target_label" value="$(arg target_label)"/>
     <param name="target_pose_topic" value="$(arg target_topic)"/>
+    <param if="$(arg hybrid_enabled)" name="minimum_depth" value="0.03"/>
     <param name="start_enabled" value="$(arg auto_start)"/>
   </node>
   <!-- RViz 和调试图像窗口均为可选项，关闭后可用于无桌面环境。 -->

@@ -113,6 +113,8 @@ MoveIt 负责抓取和放置，Gazebo 通用插件提高小物体夹持稳定性
 | `launch/yolo_sorting.launch` | YOLO 检测的便捷入口 |
 | `launch/sorting_gazebo.launch` | 固定机械臂仿真总入口：组合 Gazebo、MoveIt 和分拣算法 |
 | `launch/yolo_sorting_gazebo.launch` | YOLO 仿真便捷入口 |
+| `launch/sorting_real.launch` | 实机共用总入口：组合硬件、MoveIt、D435i、Inspire 夹爪和分拣算法 |
+| `launch/eye_*_*_sorting_real.launch` | 眼在手上/眼在手外 × 颜色/YOLO 四种实机便捷入口 |
 | `config/`、`worlds/`、`models/` | 固定平台参数、仿真世界和分拣标记模型 |
 
 移动单工位场景由 `aubo_mobile_sorting` 负责；工位导航与任务切换由
@@ -246,14 +248,53 @@ roslaunch aubo_sorting sorting_gazebo.launch \
 
 ## 接入真实机械臂
 
-真实机械臂由 `aubo_ros_control` 和真实相机驱动提供控制器、关节状态及相机话题后，
-只启动算法节点：
+固定 AUBO i5、RealSense D435i 和 Inspire 夹爪有四种实机入口：
 
 ```bash
-roslaunch aubo_sorting sorting.launch use_grasp_attachment:=false
+# 眼在手上 + 颜色
+roslaunch aubo_sorting eye_in_hand_color_sorting_real.launch \
+  camera_serial_no:=实际D435i序列号 task_config:=/实际路径/颜色分拣参数.yaml
+# 眼在手上 + YOLO
+roslaunch aubo_sorting eye_in_hand_yolo_sorting_real.launch \
+  camera_serial_no:=实际D435i序列号 model_path:=/实际路径/obb.pt \
+  task_config:=/实际路径/YOLO分拣参数.yaml
+# 眼在手外 + 颜色
+roslaunch aubo_sorting eye_to_hand_color_sorting_real.launch \
+  camera_serial_no:=实际D435i序列号 calibration_file:=/实际路径/眼在手外标定.yaml \
+  task_config:=/实际路径/颜色分拣参数.yaml
+# 眼在手外 + YOLO
+roslaunch aubo_sorting eye_to_hand_yolo_sorting_real.launch \
+  camera_serial_no:=实际D435i序列号 calibration_file:=/实际路径/眼在手外标定.yaml \
+  model_path:=/实际路径/obb.pt task_config:=/实际路径/YOLO分拣参数.yaml
 ```
 
-首次在真实设备运行时应保持 `auto_start:=false`，降低速度比例，并先检查相机外参、
-桌面高度、抓取偏移和所有规划轨迹。真实相机必须发布已经对齐到彩色图的深度图；
-如果话题名称不同，应修改 `launch/sorting.launch` 中的 `depth_topic`。Gazebo 的吸附
-插件不能用于真实机械臂。
+四个入口共用 `sorting_real.launch`，也可直接通过 `camera_mount:=eye_in_hand|eye_to_hand`
+和 `detector:=color|yolo` 选择模式。D435i 驱动启用彩色图、深度图及彩色对齐深度；
+眼在手上默认话题前缀 `/camera`，相机安装 TF 由腕部 URDF 发布；眼在手外默认
+`/workspace_camera`，基座到彩色光学坐标系的 TF 由 `calibration_file` 发布。
+两种安装方式使用不同的 URDF/SRDF，眼在手外的标定文件必须与当前安装位置相符。
+按序列号指定 D435i，避免多台 RealSense 时连接到错误设备。
+
+总入口默认启动真实控制器、MoveIt、D435i 和 Inspire 驱动，不启动 Gazebo；
+如果相机或夹爪驱动已单独运行，分别设置
+`start_camera:=false` 或 `start_gripper:=false`，确保话题和服务名称仍与分拣配置一致。
+默认不自动移动到观察位，也不自动开始分拣；验证现场后可显式调用
+`/sorting/move_to_observation` 和 `/sorting/start`。默认速度与加速度比例均为 0.1，
+可通过 `velocity_scaling`、`acceleration_scaling` 覆盖。
+
+YOLO 须提供对应类别及放置点的 `task_config`。仓库中的 `config/sorting.yaml`
+和 `config/yolo_sorting.yaml` 是仿真尺寸与放置点示例。
+实机运动前必须用实际桌高、工作区、物体尺寸、放置点和相机外参校准
+`task_config`、`perception_config`，并检查规划轨迹。总入口固定使用 Inspire 夹爪
+后端并关闭 Gazebo 抓取吸附。
+
+如果控制器、MoveIt、相机和 TF 已由其他入口启动，只启动算法节点：
+
+```bash
+roslaunch aubo_sorting sorting.launch gripper_backend:=inspire \
+  use_grasp_attachment:=false auto_move_to_observation:=false
+```
+
+真实相机必须发布已经对齐到彩色图的深度图；可用 `camera_namespace` 指定相机话题前缀。
+眼在手外若只启动算法节点，需先自行启动标定 TF 和相机驱动，再使用
+`sorting.launch camera_mount:=eye_to_hand camera_namespace:=/workspace_camera`。

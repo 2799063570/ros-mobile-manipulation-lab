@@ -1,0 +1,92 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- 固定 AUBO i5 + RealSense D435i 实机分拣总入口；不会启动 Gazebo。 -->
+  <arg name="robot_ip" default="192.168.1.2"/>
+  <arg name="camera_serial_no" default=""/>
+  <arg name="start_camera" default="true"/>
+  <arg name="calibration_file" default="$(find aubo_ros_control)/config/aubo_realsense_handeye_eye_on_base.yaml"/>
+  <arg name="start_gripper" default="true"/>
+  <arg name="gripper_port" default="/dev/ttyUSB0"/>
+  <arg name="rviz" default="true"/>
+
+  <arg name="detector" default="color" doc="color | yolo"/>
+  <arg name="camera_mount" default="eye_in_hand" doc="eye_in_hand | eye_to_hand"/>
+  <arg name="task_config" default="$(eval find('aubo_sorting') + ('/config/yolo_sorting.yaml' if arg('detector') == 'yolo' else '/config/sorting.yaml'))"/>
+  <arg name="perception_config" default="$(find aubo_perception)/config/grasp_pipeline.yaml"/>
+  <arg name="colors_config" default="$(find aubo_sorting)/config/colors.yaml"/>
+  <arg name="yolo_config" default="$(find aubo_perception)/config/ultralytics_yolo.yaml"/>
+  <arg name="python" default="/home/zlab/anaconda3/envs/yolo/bin/python"/>
+  <arg name="model_path" default="/home/zlab/deepL/code/ultralytics-main-modify/weights/GC-yolo.pt"/>
+  <arg name="camera_namespace" default="$(eval '/camera' if arg('camera_mount') == 'eye_in_hand' else '/workspace_camera')"/>
+  <arg name="robot_xacro" value="$(eval {'eye_in_hand': 'aubo_i5_with_camera.xacro', 'eye_to_hand': 'aubo_i5.xacro'}[arg('camera_mount')])"/>
+  <arg name="robot_srdf" value="$(eval {'eye_in_hand': 'aubo_i5_with_camera.srdf', 'eye_to_hand': 'aubo_i5.srdf'}[arg('camera_mount')])"/>
+  <arg name="height_mode" default="table"/>
+  <arg name="table_z" default="0.10"/>
+  <arg name="object_height" default="$(eval 0.05 if arg('detector') == 'yolo' else 0.04)"/>
+  <arg name="use_detected_angle" default="true"/>
+  <arg name="use_detected_width" default="false"/>
+  <arg name="start_perception" default="true"/>
+  <arg name="start_task" default="true"/>
+  <arg name="debug_view" default="false"/>
+  <!-- 首次运行只启动节点；运动必须由服务显式触发。 -->
+  <arg name="auto_move_to_observation" default="false"/>
+  <arg name="auto_start" default="false"/>
+  <arg name="velocity_scaling" default="0.10"/>
+  <arg name="acceleration_scaling" default="0.10"/>
+
+  <include file="$(find aubo_ros_control)/launch/aubo_real_bringup.launch">
+    <arg name="robot_ip" value="$(arg robot_ip)"/>
+    <arg name="use_rviz" value="$(arg rviz)"/>
+    <arg name="robot_xacro" value="$(arg robot_xacro)"/>
+    <arg name="robot_srdf" value="$(arg robot_srdf)"/>
+  </include>
+
+  <!-- D435i 的 RGB + 对齐深度话题供两种检测器共用；IMU 不参与分拣。 -->
+  <group if="$(arg start_camera)">
+    <include if="$(eval arg('camera_mount') == 'eye_in_hand')"
+             file="$(find aubo_ros_control)/launch/eye_in_hand_camera_real.launch">
+      <arg name="serial_no" value="$(arg camera_serial_no)"/>
+      <arg name="camera_name" value="$(eval arg('camera_namespace').strip('/'))"/>
+    </include>
+    <include if="$(eval arg('camera_mount') == 'eye_to_hand')"
+             file="$(find aubo_ros_control)/launch/eye_to_hand_camera_real.launch">
+      <arg name="serial_no" value="$(arg camera_serial_no)"/>
+      <arg name="camera_name" value="$(eval arg('camera_namespace').strip('/'))"/>
+      <arg name="calibration_file" value="$(arg calibration_file)"/>
+    </include>
+  </group>
+
+  <include if="$(arg start_gripper)" file="$(find inspire_gripper)/launch/gripper_control.launch">
+    <arg name="port" value="$(arg gripper_port)"/>
+  </include>
+
+  <include file="$(find aubo_sorting)/launch/sorting.launch">
+    <arg name="detector" value="$(arg detector)"/>
+    <arg name="camera_mount" value="$(arg camera_mount)"/>
+    <arg name="camera_namespace" value="$(arg camera_namespace)"/>
+    <arg name="task_config" value="$(arg task_config)"/>
+    <arg name="perception_config" value="$(arg perception_config)"/>
+    <arg name="colors_config" value="$(arg colors_config)"/>
+    <arg name="yolo_config" value="$(arg yolo_config)"/>
+    <arg name="python" value="$(arg python)"/>
+    <arg name="model_path" value="$(arg model_path)"/>
+    <arg name="height_mode" value="$(arg height_mode)"/>
+    <arg name="table_z" value="$(arg table_z)"/>
+    <arg name="object_height" value="$(arg object_height)"/>
+    <arg name="use_detected_angle" value="$(arg use_detected_angle)"/>
+    <arg name="use_detected_width" value="$(arg use_detected_width)"/>
+    <!-- Inspire 后端仅由 C++ 分拣节点实现。 -->
+    <arg name="task_executable" value="color_sorting_task_cpp"/>
+    <arg name="gripper_backend" value="inspire"/>
+    <arg name="start_perception" value="$(arg start_perception)"/>
+    <arg name="start_task" value="$(arg start_task)"/>
+    <arg name="debug_view" value="$(arg debug_view)"/>
+    <arg name="auto_move_to_observation" value="$(arg auto_move_to_observation)"/>
+    <arg name="auto_start" value="$(arg auto_start)"/>
+    <arg name="use_grasp_attachment" value="false"/>
+  </include>
+
+  <!-- 覆盖仿真任务 YAML 的较快速度；参数在节点启动前统一装载。 -->
+  <param name="/color_sorting_task/velocity_scaling" value="$(arg velocity_scaling)"/>
+  <param name="/color_sorting_task/acceleration_scaling" value="$(arg acceleration_scaling)"/>
+</launch>

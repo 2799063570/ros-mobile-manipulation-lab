@@ -39,6 +39,7 @@ bool VisualServo::loadHybridParameters() {
   private_nh_.param("hybrid_require_scene_ready",
                     hybrid_require_scene_ready_, false);
   private_nh_.param("hybrid_min_tcp_z", hybrid_min_tcp_z_, -1e9);
+  private_nh_.param("hybrid_surface_to_grasp_z", hybrid_surface_to_grasp_z_, 0.0);
   private_nh_.param("hybrid_use_orientation_control",
                     hybrid_orientation_control_, false);
   std::vector<double> hybrid_rpy;
@@ -63,8 +64,9 @@ bool VisualServo::loadHybridParameters() {
       return false;
     }
   }
-  if (!std::isfinite(hybrid_min_tcp_z_)) {
-    ROS_ERROR("[hybrid] hybrid_min_tcp_z must be finite");
+  if (!std::isfinite(hybrid_min_tcp_z_) ||
+      !std::isfinite(hybrid_surface_to_grasp_z_)) {
+    ROS_ERROR("[hybrid] TCP height and surface-to-grasp offset must be finite");
     return false;
   }
   if (hybrid_standoff_ >= hybrid_enter_ || hybrid_enter_ >= hybrid_exit_ ||
@@ -97,6 +99,19 @@ void VisualServo::holdFeedback(const JointPoint &feedback) {
   queue_.push(feedback);
 }
 
+Eigen::Vector3d VisualServo::hybridGraspPosition(
+    const Eigen::Vector3d &current,
+    const Eigen::Matrix3d &base_from_control,
+    const geometry_msgs::Pose &surface) const {
+  // The perception pose is the visible top surface. Sorting grasps at the
+  // object centre plus grasp_height_offset, expressed here as a base-Z shift.
+  const Eigen::Vector3d surface_in_base = servo_mode_ == "eye_in_hand"
+      ? current + base_from_control * translation(surface)
+      : translation(surface);
+  return surface_in_base +
+         Eigen::Vector3d(0.0, 0.0, hybrid_surface_to_grasp_z_);
+}
+
 bool VisualServo::hybridGoal(const JointPoint &feedback,
                             const geometry_msgs::Pose &target,
                             geometry_msgs::Pose &goal, double &distance) {
@@ -114,20 +129,16 @@ bool VisualServo::hybridGoal(const JointPoint &feedback,
   Eigen::Matrix3d goal_rotation =
       hybrid_orientation_control_ ? hybrid_desired_rotation_ :
       (use_orientation_control_ ? desired_rotation_ : rotation);
-  Eigen::Vector3d destination;
-  if (servo_mode_ == "eye_in_hand") {
-    if (use_orientation_control_ && !hybrid_orientation_control_) {
-      Eigen::Quaterniond observed(target.orientation.w, target.orientation.x,
-                                  target.orientation.y, target.orientation.z);
-      if (!observed.coeffs().allFinite() || observed.norm() < 1e-6)
-        return false;
-      goal_rotation = rotation * observed.normalized().toRotationMatrix() *
-                      desired_rotation_.transpose();
-    }
-    destination = current + rotation * translation(target) - goal_rotation * desired_position_;
-  } else {
-    destination = translation(target) + target_offset_;
+  if (servo_mode_ == "eye_in_hand" && use_orientation_control_ &&
+      !hybrid_orientation_control_) {
+    Eigen::Quaterniond observed(target.orientation.w, target.orientation.x,
+                                target.orientation.y, target.orientation.z);
+    if (!observed.coeffs().allFinite() || observed.norm() < 1e-6)
+      return false;
+    goal_rotation = rotation * observed.normalized().toRotationMatrix() *
+                    desired_rotation_.transpose();
   }
+  const Eigen::Vector3d destination = hybridGraspPosition(current, rotation, target);
   distance = (destination - current).norm();
   if (!destination.allFinite() || !goal_rotation.allFinite())
     return false;

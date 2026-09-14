@@ -70,8 +70,13 @@ stateDiagram-v2
     HOLD --> WAITING: reset后等待新测量
 ```
 
-控制器先从关节反馈计算 TCP 正运动学。眼在手外的期望 TCP 位置为目标基坐标
-位置加 `target_offset`。眼在手上则从当前 TCP 位姿和观测目标相对位置恢复目标。
+控制器先从关节反馈计算 TCP 正运动学。感知目标是物体**可见顶面**；混合分拣
+的期望 TCP 必须是抓取位，而不是普通视觉伺服的观察距离或避让偏置。
+两种相机安装方式均先把顶面点换算到基坐标系，再沿基坐标 Z 加
+`hybrid_surface_to_grasp_z = -object_height/2 + grasp_height_offset`。
+当前 4 cm 方块和 1 cm 抓取补偿对应 `-0.01 m`。MoveIt 规划、远近切换、
+目标漂移判断和近距离 PBVS 共用此抓取位；普通模式仍使用原来的
+`desired_target_position` 或 `target_offset`。更换物体高度时须同步标定该偏移。
 混合模式可通过 `hybrid_use_orientation_control` 和基坐标系下的
 `hybrid_desired_tcp_rpy` 固定 TCP 姿态；默认 `[pi, 0, 0]` 使工具 Z 轴竖直向下。
 该姿态在 MoveIt 接近和近距离 PBVS 两阶段共用。未启用时，规划保持当前 TCP 朝向。
@@ -113,7 +118,8 @@ CommandQueue.push(q_cmd[k+1])
 | hybrid_planning_time | 3 s | MoveIt 允许规划时间，额外 2 s 后看门狗锁存 HOLD |
 | hybrid_execution_timeout | 60 s | 轨迹执行与到位等待的总超时；应大于安全重定时后的轨迹时长 |
 | hybrid_require_scene_ready | true | 未确认工作台碰撞场景时禁止混合运动 |
-| hybrid_min_tcp_z | 0.20 m | 局部 PBVS 的 TCP 最低安全高度 |
+| hybrid_surface_to_grasp_z | -0.01 m | 顶面点到抓取 TCP 的基座 Z 偏移 |
+| hybrid_min_tcp_z | 0.12 m | 局部 PBVS 的 TCP 最低安全高度 |
 | hybrid_use_orientation_control | true | 规划和 PBVS 均启用世界系 TCP 姿态控制 |
 | hybrid_desired_tcp_rpy | [pi,0,0] | 基坐标系下竖直向下的 TCP 姿态 |
 | command_queue_capacity | 8 点 | 软件队列上限 |
@@ -126,6 +132,8 @@ CommandQueue.push(q_cmd[k+1])
 关节反馈超时、规划失败、非法轨迹和跟踪偏差锁存 HOLD，需调用
 `/visual_servo/reset` 或重新启用。停用/复位会递增规划版本号，异步旧回包不能恢复运动。
 
+眼在手上混合入口把感知最小有效深度和控制器相机距离保护设为 0.03 m，
+以允许连续观测到抓取位；实机使用前须按相机近距能力和夹爪几何重新校验。
 接口继续使用 `/visual_servo/target_pose` (`PoseStamped`)、
 `/visual_servo/state`、`/visual_servo/set_enabled` 和 `/visual_servo/reset`。
 分拣任务若使用此控制流程，应将选定的同一物体持续转换为目标位姿消息，等待

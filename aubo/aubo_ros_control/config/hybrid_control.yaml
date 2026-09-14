@@ -10,9 +10,15 @@ hybrid_planning_time: 3.0
 hybrid_execution_timeout: 60.0
 # Never request a path until the Gazebo table has been mirrored into MoveIt.
 hybrid_require_scene_ready: true
-# Sorting table top is z=0.10 m. The 0.10 m TCP clearance protects fingers and
-# camera during the collision-unchecked local PBVS segment.
-hybrid_min_tcp_z: 0.20
+# The RGB-D target is the visible top surface. The sorting grasp TCP is at
+# surface_z - object_height / 2 + grasp_height_offset: 0.04 m blocks and
+# 0.01 m grasp compensation give -0.01 m. Recalibrate for other objects.
+hybrid_surface_to_grasp_z: -0.01
+# Table top is z=0.10 m; the configured grasp TCP is z=0.13 m.
+hybrid_min_tcp_z: 0.12
+# Eye-in-hand must continue measuring through the final approach. The normal
+# tracking stop at 0.10 m camera depth would prevent reaching this grasp.
+minimum_safe_target_distance: 0.03
 # Keep the TCP/tool Z axis vertical downward in base_link throughout both
 # MoveIt approach and local PBVS. RPY is expressed in the base frame.
 hybrid_use_orientation_control: true

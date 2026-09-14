@@ -28,6 +28,7 @@ class HybridControlTest(unittest.TestCase):
         self.feedback_enabled = True
         self.mode = "success"
         self.calls = 0
+        self.planned_heights = []
         self.plan_entered = threading.Event()
         self.plan_release = threading.Event()
         names = ["shoulder_joint", "upperArm_joint", "foreArm_joint",
@@ -60,6 +61,7 @@ class HybridControlTest(unittest.TestCase):
                 target.header.stamp = rospy.Time.now()
                 target.header.frame_id = 'base_link'
                 target.pose.position.x = self.target
+                target.pose.position.z = 0.01  # surface; grasp TCP is at z=0
                 target.pose.orientation.w = 1.0
                 self.targets.publish(target)
 
@@ -76,6 +78,7 @@ class HybridControlTest(unittest.TestCase):
             trajectory.joint_names = names[::-1]
             start = list(req.motion_plan_request.start_state.joint_state.position)
             goal = req.motion_plan_request.goal_constraints[0].position_constraints[0]
+            self.planned_heights.append(goal.constraint_region.primitive_poses[0].position.z)
             end = list(start)
             end[0] += goal.constraint_region.primitive_poses[0].position.x - sum(start)
             duration = 0.05 if mode == 'fast' else 2.0
@@ -106,6 +109,8 @@ class HybridControlTest(unittest.TestCase):
             self.assertIn('PLANNING', self.states)
             self.assertIn('APPROACH', self.states)
             self.assertIn('TRACKING', self.states)
+            self.assertTrue(self.planned_heights)
+            self.assertAlmostEqual(0.0, self.planned_heights[0], places=5)
             self.assertLess(abs(sum(self.q) - self.target), 0.012)
             # Small online displacement must converge without another plan.
             calls = self.calls

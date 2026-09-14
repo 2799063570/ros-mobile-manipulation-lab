@@ -707,7 +707,12 @@ VisualServo::trackingVelocity(const JointPoint &position,
   if (servo_mode_ == "eye_in_hand") {
     const Eigen::Vector3d observed(target.position.x, target.position.y,
                                    target.position.z);// 眼在手上：目标在夹爪/TCP 坐标系下的位置
+    const Eigen::Vector3d current_tcp(base_control.p.x(), base_control.p.y(),
+                                      base_control.p.z());
     Eigen::Vector3d position_error = observed - desired_position_;
+    if (hybrid_enabled_)
+      position_error = base_from_control.transpose() *
+          (hybridGraspPosition(current_tcp, base_from_control, target) - current_tcp);
     if (raw_position_error)
       *raw_position_error = position_error;
     // 三轴独立的软死区会屏蔽像素/深度小噪声，并让速度在
@@ -748,8 +753,9 @@ VisualServo::trackingVelocity(const JointPoint &position,
                                          target.position.z);// 眼在手外：目标位置的基坐标系下的位置
     const Eigen::Vector3d current_tcp(base_control.p.x(), base_control.p.y(),
                                       base_control.p.z());
-    Eigen::Vector3d position_error =
-        target_in_base + target_offset_ - current_tcp;
+    Eigen::Vector3d position_error = target_in_base + target_offset_ - current_tcp;
+    if (hybrid_enabled_)
+      position_error = hybridGraspPosition(current_tcp, base_from_control, target) - current_tcp;
     if (raw_position_error)
       *raw_position_error = position_error;
     for (int axis = 0; axis < 3; ++axis)
