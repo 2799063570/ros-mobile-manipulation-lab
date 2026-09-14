@@ -218,7 +218,7 @@
            laser perfectly aligned (no encoder drift). NOTE: do NOT combine this with
            high wheel friction: with mu 2.0 the robot physically wedges against
            obstacles and, because world odom no longer masks the stall with drift,
-           DWA reports "failed to produce path" and recovery cannot free it.
+           the local planner can report "failed to produce path" and recovery cannot free it.
            For learning SLAM on realistic odometry, switch back to:
            <odometrySource>encoder</odometrySource> -->
       <odometrySource>world</odometrySource>

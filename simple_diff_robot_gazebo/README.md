@@ -178,6 +178,9 @@ roslaunch simple_diff_robot_gazebo navigation.launch map_file:=$HOME/maps/my_map
 
 在 RViz 中先用 **2D Pose Estimate** 指定初始位姿，再用 **2D Nav Goal** 指定目标。其他地图可通过 `map_file:=/绝对路径/map.yaml` 指定。
 
+导航、边建图边导航和 RRT 探索均使用 TEB 局部规划器，参数见 `config/teb_local_planner.yaml`。
+运行前可用 `rospack find teb_local_planner` 检查插件是否已安装；在 ROS Noetic 下缺少时安装 `ros-noetic-teb-local-planner`。
+
 ## RRT 自主探索建图
 
 联合启动 Gazebo、Gmapping、Navigation Stack 和 `rrt_exploration`：
@@ -206,7 +209,7 @@ rqt_image_view /camera/image_raw
 2. 阅读 `simple_diff_robot.xacro` 中底盘、车轮、万向轮、雷达和相机的 link/joint。
 3. 阅读末尾 `libgazebo_ros_diff_drive.so` 的参数。
 4. 在 Gazebo 中观察 `/cmd_vel`、`/odom` 和 TF。
-5. 依次实验激光雷达、相机、Gmapping、AMCL、代价地图和 DWA。
+5. 依次实验激光雷达、相机、Gmapping、AMCL、代价地图和 TEB。
 6. 掌握现有链路后，可继续增加 IMU、传感器融合或视觉算法。
 
 ## 运行前检查

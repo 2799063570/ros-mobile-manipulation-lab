@@ -106,7 +106,7 @@ rosrun tf tf_echo odom base_footprint
 1. 是否用 **2D Pose Estimate** 设置了正确初始位姿；
 2. 激光是否与地图重合；
 3. 局部代价地图是否把机器人自身标成障碍；
-4. `/move_base/DWAPlannerROS/local_plan` 是否存在；
+4. `/move_base/TebLocalPlannerROS/local_plan` 是否存在；
 5. `/cmd_vel` 是否由 `move_base` 发布。
 
 ```bash
@@ -124,17 +124,17 @@ rosservice call /move_base/clear_costmaps
 演示模式的处理（`urdf/simple_diff_robot.xacro`）：
 
 - `<odometrySource>world</odometrySource>`：里程计改用 Gazebo 真值，消除编码器漂移（根治）。
-- 驱动轮摩擦保持 `mu1/mu2 = 1.0`：**不要**提高到 2.0。摩擦过高会让机器人顶到障碍时无法打滑脱身而物理卡死；配合 world 真值里程计（不再用漂移掩盖卡死），会表现为 DWA 反复 `failed to produce path`、rotate recovery 也救不回来。
+- 驱动轮摩擦保持 `mu1/mu2 = 1.0`：**不要**提高到 2.0。摩擦过高会让机器人顶到障碍时无法打滑脱身而物理卡死；配合 world 真值里程计（不再用漂移掩盖卡死），会表现为局部规划器反复 `failed to produce path`、rotate recovery 也救不回来。
 
 若改回"更贴近真实机器人的编码器里程计"（用于学习 SLAM）：把 xacro 中 `odometrySource` 改回 `encoder` 即可；届时轻微的局部地图/雷达角度错位属正常现象。
 
-### DWA 反复 failed to produce path（改配置后导航突然卡死）排查阶梯
+### TEB 反复 failed to produce path（改配置后导航突然卡死）排查阶梯
 
 按以下顺序逐级回退，每步重启导航验证：
 
-1. 先把轮子摩擦恢复 `1.0`、DWA 加速度恢复 `acc_lim_x: 1.0 / acc_lim_theta: 2.0 / max_vel_theta: 1.2`（已恢复到默认）。
-2. 仍失败 → 把 `odometrySource` 改回 `encoder`（此时即原始配置，此前验证可导航）。若恢复，说明问题出在 world 里程计与该版本 gazebo_ros_diff_drive 的兼容性，保留 encoder 即可。
-3. 连原始配置都失败 → 与环境无关、是定位/地图问题：RViz 用 **2D Pose Estimate** 重新给初始位姿，检查 `/map` 与激光是否重合、目标点是否可到达：
+1. 先把轮子摩擦恢复 `1.0`，并核对 `config/teb_local_planner.yaml` 的 `acc_lim_x: 1.0 / acc_lim_theta: 2.0 / max_vel_theta: 1.2` 与底盘一致。
+2. 仍失败 → 检查 `/move_base/local_costmap/costmap` 中是否有贴着机器人的障碍，以及 TEB 圆形模型半径是否与 `costmap_common.yaml` 一致。
+3. 继续失败 → 在 RViz 用 **2D Pose Estimate** 重新给初始位姿，检查 `/map` 与激光是否重合、目标点是否可到达：
 
 ```bash
 rosrun tf tf_echo map base_footprint
@@ -145,4 +145,4 @@ rosservice call /move_base/clear_costmaps
 
 ## 10. 当前验证边界
 
-仓库中的 XML、Xacro、YAML 和 RViz 配置可进行静态语法检查；完整物理效果和插件兼容性仍需在 Ubuntu 18.04、ROS Melodic 与对应 Gazebo 版本中启动验证。
+仓库中的 XML、Xacro、YAML 和 RViz 配置可进行静态语法检查；完整物理效果仍需在 Gazebo 中启动导航并发送目标进行验证。

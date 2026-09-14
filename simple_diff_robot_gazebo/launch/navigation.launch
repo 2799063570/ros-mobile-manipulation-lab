@@ -15,9 +15,9 @@
     <rosparam file="$(find simple_diff_robot_gazebo)/config/costmap_common.yaml" command="load" ns="local_costmap"/>
     <rosparam file="$(find simple_diff_robot_gazebo)/config/global_costmap.yaml" command="load"/>
     <rosparam file="$(find simple_diff_robot_gazebo)/config/local_costmap.yaml" command="load"/>
-    <rosparam file="$(find simple_diff_robot_gazebo)/config/dwa_local_planner.yaml" command="load"/>
+    <rosparam file="$(find simple_diff_robot_gazebo)/config/teb_local_planner.yaml" command="load"/>
     <param name="base_global_planner" value="navfn/NavfnROS"/>
-    <param name="base_local_planner" value="dwa_local_planner/DWAPlannerROS"/>
+    <param name="base_local_planner" value="teb_local_planner/TebLocalPlannerROS"/>
     <param name="controller_frequency" value="10.0"/>
     <param name="planner_frequency" value="1.0"/>
     <param name="controller_patience" value="3.0"/>

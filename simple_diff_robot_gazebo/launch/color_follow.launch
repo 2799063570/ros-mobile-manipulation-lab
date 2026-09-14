@@ -9,8 +9,6 @@
   <arg name="start_rqt_reconfigure" default="false"/>
   <arg name="target_distance" default="0.5"/>
   <arg name="target_width" default="0.36"/>
-  <arg name="distance_resume_deadband" default="0.10"/>
-  <arg name="min_approach_speed" default="0.08"/>
   <arg name="search_enabled" default="true"/>
   <arg name="search_angular_speed" default="0.30"/>
   <arg name="search_switch_period" default="4.0"/>
@@ -25,8 +23,6 @@
     <arg name="use_laser_safety" value="$(arg use_laser_safety)"/>
     <arg name="color_target_distance" value="$(arg target_distance)"/>
     <arg name="color_target_width" value="$(arg target_width)"/>
-    <arg name="color_distance_resume_deadband" value="$(arg distance_resume_deadband)"/>
-    <arg name="color_min_approach_speed" value="$(arg min_approach_speed)"/>
     <arg name="color_search_enabled" value="$(arg search_enabled)"/>
     <arg name="color_search_angular_speed" value="$(arg search_angular_speed)"/>
     <arg name="color_search_switch_period" value="$(arg search_switch_period)"/>
