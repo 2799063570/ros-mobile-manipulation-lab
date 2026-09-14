@@ -11,11 +11,14 @@
 
 namespace aubo_sorting_core
 {
-// ROS-independent tracker. Its owner serializes access; no lock is held during motion.
+// 与 ROS 无关的目标实例缓存。调用方负责串行访问；机械臂运动期间不持有队列锁。
 template<class Payload> class InstanceQueue
 {
 public:
+  // 候选：等待多帧确认；就绪：允许分配；预留：正在执行抓取；
+  // 完成：短暂保留以屏蔽残留画面；复核：执行失败，不能直接再次分配。
   enum class Status { CANDIDATE, READY, RESERVED, DONE, REVIEW };
+  // 单帧观测。eligible 表示几何条件允许抓取；payload 保存业务层原始检测结果。
   struct Sample
   {
     std::string color;
@@ -23,6 +26,7 @@ public:
     bool eligible{true};
     Payload payload;
   };
+  // 同一物体跨帧形成的轨迹；id 在 clear() 后也不会重新使用。
   struct Track
   {
     std::uint64_t id{0};
@@ -34,8 +38,11 @@ public:
     double disturbance_distance{0};
     std::string disturbance_color;
   };
+  // 距离单位为米：关联半径、稳定确认半径、预留目标容差、同帧去重半径。
   double match_distance{0.04}, stable_distance{0.015}, reserved_distance{0.035}, duplicate_distance{0.008};
+  // 时间单位为秒：可分配观测时效、连续确认间隔、轨迹保留期、完成后屏蔽期。
   double max_age{3.0}, confirmation_gap{1.0}, retention{30.0}, done_hold{2.0};
+  // 达到确认帧数才可分配；容量限制防止轨迹无限增长。
   unsigned min_observations{5};
   std::size_t capacity{200};
 
@@ -51,7 +58,8 @@ public:
     return "review";
   }
   const std::map<std::uint64_t, Track>& tracks() const { return tracks_; }
-  void clear() { tracks_.clear(); } // Never recycle IDs across workspaces.
+  void clear() { tracks_.clear(); } // 清空工作区轨迹，但不回收已分配的 ID。
+  // 感知中断或抓取失败后，要求可用目标重新积累稳定观测。
   void invalidate()
   {
     for (auto& item : tracks_)
@@ -61,13 +69,17 @@ public:
         item.second.observations = 0;
       }
   }
+  // 处理一帧观测：清理过期轨迹、去重、一对一关联、更新确认状态并加入新目标。
+  // now 与其他时间参数必须使用同一种时钟。
   void update(const std::vector<Sample>& input, double now)
   {
+    // 预留中的目标即使暂时被遮挡，也由执行流程决定何时结束。
     for (auto it = tracks_.begin(); it != tracks_.end();) {
       if (it->second.status != Status::RESERVED && now - it->second.last_seen > retention)
         it = tracks_.erase(it);
       else ++it;
     }
+    // 同帧同色且位置几乎重合的检测框，只计作一次观测。
     std::vector<Sample> samples;
     for (const auto& sample : input) {
       if (!std::isfinite(sample.x) || !std::isfinite(sample.y) || !std::isfinite(sample.z)) continue;
@@ -79,8 +91,8 @@ public:
     struct Edge { double distance; std::uint64_t id; std::size_t sample; };
     std::vector<Edge> edges;
     std::set<std::size_t> used_samples;
-    // Reserved objects also participate in one-to-one matching. A radius-wide
-    // suppression would wrongly consume a distinct neighbouring object.
+    // 预留目标也参加一对一匹配，避免按半径屏蔽时误吞掉附近的另一物体。
+    // 按距离由近到远选边，每个观测和轨迹在本帧最多匹配一次。
     for (std::size_t i = 0; i < samples.size(); ++i)
       for (auto& item : tracks_) {
         auto& track = item.second;
@@ -108,6 +120,7 @@ public:
         } else track.last_seen = now;
         continue;
       }
+      // 已完成目标在屏蔽期内吸收原位置的残留检测，不重新成为可抓取目标。
       if (track.status == Status::DONE && now - track.changed_at < done_hold) continue;
       const Sample& sample = samples[edge.sample];
       const bool stable = edge.distance <= stable_distance && now - track.last_seen <= confirmation_gap &&
@@ -115,7 +128,7 @@ public:
                           track.sample.eligible && sample.eligible;
       track.observations = sample.eligible ? (stable ? track.observations + 1 : 1) : 0;
       Sample filtered = sample;
-      if (stable) { // Bounded-history smoothing; payload retains current grasp geometry.
+      if (stable) { // 坐标与上次轨迹坐标平滑；payload 保留当前帧的抓取几何信息。
         filtered.x = 0.5 * (sample.x + track.sample.x);
         filtered.y = 0.5 * (sample.y + track.sample.y);
         filtered.z = 0.5 * (sample.z + track.sample.z);
@@ -138,8 +151,8 @@ public:
     }
     for (std::size_t i = 0; i < samples.size() && tracks_.size() < capacity; ++i) {
       if (used_samples.count(i)) continue;
-      // A newly appearing same-class object could be an unmatched moved object.
-      // Reconfirm unmatched old tracks instead of dispatching their old coordinates.
+      // 未匹配的新观测可能是旧同色目标移动后的结果；旧目标须重新确认，
+      // 避免继续按旧坐标执行抓取。
       for (auto& item : tracks_)
         if (!used_tracks.count(item.first) && item.second.sample.color == samples[i].color &&
             item.second.status == Status::READY) {
@@ -154,6 +167,7 @@ public:
       tracks_[track.id] = track;
     }
   }
+  // 按 colors 的优先级查找近期就绪目标；同色目标按 id 顺序选取。
   bool reserve(const std::vector<std::string>& colors, double now, Track& result)
   {
     for (const auto& color : colors)
@@ -165,11 +179,12 @@ public:
         track.disturbance_distance = 0;
         track.disturbance_color.clear();
         track.changed_at = now;
-        result = track; // Immutable execution snapshot, never a pointer into the cache.
+        result = track; // 返回独立的执行快照，后续帧不会改变本次抓取坐标。
         return true;
       }
     return false;
   }
+  // 成功后进入残留画面屏蔽期；失败后隔离该目标并使其他可用目标重新确认。
   void finish(std::uint64_t id, bool success, double now)
   {
     auto found = tracks_.find(id);
@@ -177,8 +192,9 @@ public:
     found->second.status = success ? Status::DONE : Status::REVIEW;
     found->second.changed_at = found->second.last_seen = now;
     found->second.observations = 0;
-    if (!success) invalidate(); // A failed motion may have disturbed neighbours.
+    if (!success) invalidate(); // 失败的运动也可能碰动邻近目标。
   }
+  // 抓取下降前检查：目标仍被预留、未发现位移，且最近观测未超时。
   bool executionValid(std::uint64_t id, double now, double reserved_max_age) const
   {
     const auto found = tracks_.find(id);
