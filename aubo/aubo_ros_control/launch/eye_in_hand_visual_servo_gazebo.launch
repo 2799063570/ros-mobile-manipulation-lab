@@ -14,12 +14,19 @@
   <arg name="debug_view" default="false"/>
   <arg name="paused" default="false"/>
   <arg name="world" default="$(find aubo_sorting)/worlds/sorting.world"/>
+  <!-- Hybrid sorting needs a side-mounted camera behind the fingertips: the
+       ordinary camera is only 25 mm from the block surface at grasp height. -->
+  <arg if="$(arg hybrid_enabled)" name="robot_model"
+       default="$(find xacro)/xacro --inorder '$(find aubo_description)/urdf/aubo_i5_with_camera.xacro' camera_lateral_offset:=0.10 camera_mount_z_shift:=-0.085 camera_horizontal_fov:=1.91986217719"/>
+  <arg unless="$(arg hybrid_enabled)" name="robot_model"
+       default="$(find xacro)/xacro --inorder '$(find aubo_description)/urdf/aubo_i5_with_camera.xacro'"/>
 
   <!-- 加载带腕部相机的机械臂模型、Gazebo 场景和 robot_state_publisher。 -->
   <include file="$(find aubo_gazebo)/launch/aubo_world_gazebo.launch">
     <arg name="gui" value="$(arg gui)"/>
     <arg name="paused" value="$(arg paused)"/>
     <arg name="world_name" value="$(arg world)"/>
+    <arg name="model" value="$(arg robot_model)"/>
   </include>
 
   <!-- 视觉伺服使用六个单关节位置控制器，不能与 MoveIt 轨迹控制器同时占用关节。 -->
@@ -48,6 +55,7 @@
     <arg name="loss_strategy" value="$(arg loss_strategy)"/>
     <arg name="start_enabled" value="$(arg auto_start)"/>
     <arg name="hybrid_enabled" value="$(arg hybrid_enabled)"/>
+    <arg name="hybrid_lock_pregrasp_path" value="$(arg hybrid_enabled)"/>
     <arg name="hybrid_config" value="$(arg hybrid_config)"/>
   </include>
 
@@ -58,7 +66,8 @@
               command="load"/>
     <param name="target_label" value="$(arg target_label)"/>
     <param name="target_pose_topic" value="$(arg target_topic)"/>
-    <param if="$(arg hybrid_enabled)" name="minimum_depth" value="0.03"/>
+    <param if="$(arg hybrid_enabled)" name="minimum_depth" value="0.07"/>
+    <param if="$(arg hybrid_enabled)" name="position_filter_alpha" value="1.0"/>
     <param name="start_enabled" value="$(arg auto_start)"/>
   </node>
   <!-- RViz 和调试图像窗口均为可选项，关闭后可用于无桌面环境。 -->

@@ -18,6 +18,58 @@ def resolve(name, args=()):
 
 
 class GazeboLaunchTest(unittest.TestCase):
+    def test_algorithm_only_modes_require_existing_bringup(self):
+        for mount, camera in [('eye_in_hand', 'camera'),
+                              ('eye_to_hand', 'workspace_camera')]:
+            for detector, classes, height in [
+                    ('color', ['red', 'green', 'blue'], 0.04),
+                    ('yolo', ['can'], 0.05)]:
+                name = f'{mount}_{detector}_sorting.launch'
+                with self.subTest(launch=name):
+                    config = resolve(name)
+                    params = {key: value.value for key, value in config.params.items()}
+                    nodes = {node.name for node in config.nodes}
+                    self.assertNotIn('gazebo', nodes)
+                    self.assertNotIn('move_group', nodes)
+                    self.assertIn('color_sorting_task', nodes)
+                    self.assertEqual(params['/grasp_geometry/camera_mount'], mount)
+                    self.assertEqual(params['/grasp_geometry/camera_info_topic'],
+                                     f'/{camera}/color/camera_info')
+                    self.assertEqual(params['/color_sorting_task/sort_colors'], classes)
+                    self.assertEqual(params['/grasp_geometry/object_height'], height)
+
+    def test_four_moveit_sorting_modes_connect_camera_and_world(self):
+        for mount, camera in [('eye_in_hand', 'camera'),
+                              ('eye_to_hand', 'workspace_camera')]:
+            for detector, classes, world_name in [
+                    ('color', ['red', 'green', 'blue'], 'sorting.world'),
+                    ('yolo', ['can'], 'yolo_sorting.world')]:
+                name = f'{mount}_{detector}_sorting_gazebo.launch'
+                with self.subTest(launch=name):
+                    config = resolve(name, ['rviz:=false'])
+                    params = {key: value.value for key, value in config.params.items()}
+                    nodes = {node.name: node for node in config.nodes}
+
+                    self.assertEqual(params['/grasp_geometry/camera_mount'], mount)
+                    self.assertEqual(params['/grasp_geometry/camera_info_topic'],
+                                     f'/{camera}/color/camera_info')
+                    self.assertEqual(params['/grasp_geometry/aligned_depth_topic'],
+                                     f'/{camera}/aligned_depth_to_color/image_raw')
+                    self.assertEqual(params['/grasp_geometry/detections_topic'],
+                                     params['/color_sorting_task/detections_topic'])
+                    self.assertEqual(params['/color_sorting_task/sort_colors'], classes)
+                    self.assertIn('move_group', nodes)
+                    self.assertIn('color_sorting_task', nodes)
+                    self.assertIn('/worlds/' + world_name, nodes['gazebo'].args)
+                    self.assertEqual('hand_camera_link' in params['/robot_description'],
+                                     mount == 'eye_in_hand')
+                    self.assertEqual('workspace_camera_mount_tf' in nodes,
+                                     mount == 'eye_to_hand')
+                    if mount == 'eye_to_hand':
+                        self.assertIn('base_link workspace_camera_link',
+                                      nodes['workspace_camera_mount_tf'].args)
+                    self.assertFalse(params['/color_sorting_task/auto_start'])
+
     def test_yolo_uses_live_camera_and_lying_can(self):
         for name, args in [('yolo_sorting_gazebo.launch', []),
                            ('sorting_gazebo.launch', ['detector:=yolo'])]:

@@ -4,6 +4,8 @@ planning_service: /plan_kinematic_path
 hybrid_enter_distance: 0.10
 hybrid_exit_distance: 0.16
 hybrid_standoff: 0.06
+# Plan to a pre-grasp directly above the grasp TCP; PBVS performs the final descent.
+hybrid_vertical_approach: true
 hybrid_target_drift: 0.04
 hybrid_joint_error: 0.08  # maximum per-joint following error (rad)
 hybrid_planning_time: 3.0

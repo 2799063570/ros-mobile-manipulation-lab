@@ -19,10 +19,10 @@
   <arg name="camera_namespace" default="$(eval '/camera' if arg('camera_mount') == 'eye_in_hand' else '/workspace_camera')"/>
   <arg name="height_mode" default="table"/>
   <arg name="table_z" default="0.10"/>
-  <arg name="object_height" default="0.04"/>
+  <arg name="object_height" default="$(eval 0.05 if arg('detector') == 'yolo' else 0.04)"/>
   <arg name="use_detected_angle" default="true"/>
   <arg name="use_detected_width" default="false"/>
-  <arg name="task_config" default="$(find aubo_sorting)/config/sorting.yaml"/>
+  <arg name="task_config" default="$(eval find('aubo_sorting') + ('/config/yolo_sorting.yaml' if arg('detector') == 'yolo' else '/config/sorting.yaml'))"/>
   <arg name="colors_config" default="$(find aubo_sorting)/config/colors.yaml"/>
   <arg name="yolo_config" default="$(find aubo_perception)/config/ultralytics_yolo.yaml"/>
   <arg name="debug_image_topic" default="$(eval '/sorting/debug_image' if arg('detector') == 'color' else '/yolo/annotated_image')"/>

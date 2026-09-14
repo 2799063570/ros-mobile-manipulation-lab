@@ -111,8 +111,10 @@ MoveIt 负责抓取和放置，Gazebo 通用插件提高小物体夹持稳定性
 | `launch/sorting.launch` | 算法组合入口：加载检测器、几何计算和通用分拣任务 |
 | `launch/color_sorting.launch` | 颜色检测的便捷入口 |
 | `launch/yolo_sorting.launch` | YOLO 检测的便捷入口 |
+| `launch/eye_*_*_sorting.launch` | 眼在手上/眼在手外 × 颜色/YOLO 四种算法入口；复用已运行的 MoveIt、相机和控制器 |
 | `launch/sorting_gazebo.launch` | 固定机械臂仿真总入口：组合 Gazebo、MoveIt 和分拣算法 |
 | `launch/yolo_sorting_gazebo.launch` | YOLO 仿真便捷入口 |
+| `launch/eye_*_*_sorting_gazebo.launch` | 眼在手上/眼在手外 × 颜色/YOLO 四种 MoveIt 分拣仿真入口 |
 | `launch/sorting_real.launch` | 实机共用总入口：组合硬件、MoveIt、D435i、Inspire 夹爪和分拣算法 |
 | `launch/eye_*_*_sorting_real.launch` | 眼在手上/眼在手外 × 颜色/YOLO 四种实机便捷入口 |
 | `config/`、`worlds/`、`models/` | 固定平台参数、仿真世界和分拣标记模型 |
@@ -144,6 +146,25 @@ catkin_make
 source devel/setup.bash
 roslaunch aubo_sorting sorting_gazebo.launch
 ```
+
+四种仿真组合可直接选择：
+
+```bash
+roslaunch aubo_sorting eye_in_hand_color_sorting_gazebo.launch
+roslaunch aubo_sorting eye_in_hand_yolo_sorting_gazebo.launch model_path:=/实际路径/obb.pt
+roslaunch aubo_sorting eye_to_hand_color_sorting_gazebo.launch
+roslaunch aubo_sorting eye_to_hand_yolo_sorting_gazebo.launch model_path:=/实际路径/obb.pt
+```
+
+这些入口都启动固定机械臂、Gazebo、MoveIt、检测与分拣任务。眼在手上使用腕部相机
+`/camera`；眼在手外使用场景内的固定相机 `/workspace_camera`，并发布相机到
+`base_link` 的 TF。默认不会自动开始抓取。`sorting_gazebo.launch` 也可用
+`camera_mount:=eye_to_hand detector:=yolo` 等参数组合选择模式。YOLO 仿真默认
+类别为 `can`，权重须识别该类；其他模型需同步覆盖 `task_config` 和 `model_path`。
+
+如果 MoveIt、控制器和相机已由其他 launch 启动，可使用去掉 `_gazebo` 后缀的四个
+`eye_*_*_sorting.launch` 入口，仅启动感知与分拣任务。眼在手外还需先发布已标定的
+`base_link` 到相机光学坐标系的 TF。
 
 启动完成后，机械臂先进入 `observe` 观察姿态。确认调试图像和目标位置正常，再开始：
 

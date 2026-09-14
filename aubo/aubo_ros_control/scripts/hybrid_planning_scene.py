@@ -3,6 +3,7 @@
 
 import threading
 
+import rosgraph
 import rospy
 from geometry_msgs.msg import Pose
 from moveit_msgs.msg import CollisionObject, PlanningScene
@@ -19,6 +20,8 @@ class HybridPlanningScene:
         self._ready.publish(False)
         self._client = rospy.ServiceProxy(
             "/apply_planning_scene", ApplyPlanningScene, persistent=True)
+        self._master = rosgraph.Master(rospy.get_name())
+        self._applied_service_uri = None
 
         self._frame = rospy.get_param("~table_frame", "base_link")
         self._center = self._vector("table_center", [0.70, 0.0, 0.0])
@@ -73,11 +76,21 @@ class HybridPlanningScene:
             return
         try:
             try:
+                # A static table stays in the same move_group process. Avoid
+                # reconnecting to ApplyPlanningScene every two seconds: a
+                # transient service timeout must not revoke a valid scene in
+                # the middle of a pre-grasp or local servo motion.
+                service_uri = self._master.lookupService("/apply_planning_scene")
+                if service_uri == self._applied_service_uri:
+                    return
+                self._applied_service_uri = None
+                self._ready.publish(False)
                 self._client.wait_for_service(timeout=1.0)
                 request, primitive, pose = self._request()
                 response = self._client(request)
                 if not response.success:
                     raise RuntimeError("MoveIt rejected ApplyPlanningScene")
+                self._applied_service_uri = service_uri
                 self._ready.publish(True)
                 rospy.loginfo_throttle(
                     30.0,
@@ -85,7 +98,9 @@ class HybridPlanningScene:
                     "size=[%.3f, %.3f, %.3f]",
                     self._frame, pose.position.x, pose.position.y, pose.position.z,
                     *primitive.dimensions)
-            except (rospy.ROSException, rospy.ServiceException, RuntimeError) as error:
+            except (rosgraph.MasterError, rospy.ROSException, rospy.ServiceException,
+                    RuntimeError) as error:
+                self._applied_service_uri = None
                 self._ready.publish(False)
                 # Recreate a persistent proxy after move_group restarts.
                 self._client = rospy.ServiceProxy(

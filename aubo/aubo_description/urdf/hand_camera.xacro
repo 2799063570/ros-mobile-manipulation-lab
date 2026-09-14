@@ -3,40 +3,40 @@
 
   <!-- Eye-in-hand RGB-D camera with RealSense-compatible ROS topic names.
        Camera optical conventions: +Z forward, +X right, +Y down. -->
-  <xacro:macro name="aubo_hand_camera" params="parent_link">
+  <xacro:macro name="aubo_hand_camera" params="parent_link lateral_offset:=0.060 mount_z_shift:=0.0 horizontal_fov:=1.3962634016 clip_near:=0.05 pointcloud_cutoff:=0.08">
     <link name="hand_camera_mount_link">
       <visual>
         <!-- 安装底板：固定在夹爪基座中心。 -->
-        <origin xyz="0 0 0.020" rpy="0 0 0"/>
+        <origin xyz="0 0 ${0.020 + mount_z_shift}" rpy="0 0 0"/>
         <geometry><box size="0.050 0.050 0.012"/></geometry>
         <material name="hand_camera_black"><color rgba="0.025 0.03 0.04 1"/></material>
       </visual>
       <visual>
         <!-- 竖向支柱：连接安装底板与相机横梁。 -->
-        <origin xyz="0 0 0.0375" rpy="0 0 0"/>
+        <origin xyz="0 0 ${0.0375 + mount_z_shift}" rpy="0 0 0"/>
         <geometry><box size="0.024 0.024 0.035"/></geometry>
         <material name="hand_camera_black"/>
       </visual>
       <visual>
         <!-- 相机横梁：沿 X 方向延伸 60 mm，Y 方向保持居中。 -->
-        <origin xyz="0.030 0 0.055" rpy="0 0 0"/>
-        <geometry><box size="0.060 0.024 0.012"/></geometry>
+        <origin xyz="${lateral_offset / 2} 0 ${0.055 + mount_z_shift}" rpy="0 0 0"/>
+        <geometry><box size="${lateral_offset} 0.024 0.012"/></geometry>
         <material name="hand_camera_black"/>
       </visual>
       <collision>
-        <origin xyz="0 0 0.020" rpy="0 0 0"/>
+        <origin xyz="0 0 ${0.020 + mount_z_shift}" rpy="0 0 0"/>
         <geometry><box size="0.050 0.050 0.012"/></geometry>
       </collision>
       <collision>
-        <origin xyz="0 0 0.0375" rpy="0 0 0"/>
+        <origin xyz="0 0 ${0.0375 + mount_z_shift}" rpy="0 0 0"/>
         <geometry><box size="0.024 0.024 0.035"/></geometry>
       </collision>
       <collision>
-        <origin xyz="0.030 0 0.055" rpy="0 0 0"/>
-        <geometry><box size="0.060 0.024 0.012"/></geometry>
+        <origin xyz="${lateral_offset / 2} 0 ${0.055 + mount_z_shift}" rpy="0 0 0"/>
+        <geometry><box size="${lateral_offset} 0.024 0.012"/></geometry>
       </collision>
       <inertial>
-        <origin xyz="0.025 0 0.045" rpy="0 0 0"/>
+        <origin xyz="${0.025 + 0.5 * (lateral_offset - 0.060)} 0 ${0.045 + mount_z_shift}" rpy="0 0 0"/>
         <mass value="0.12"/>
         <inertia ixx="0.000066" ixy="0" ixz="0"
                  iyy="0.000018" iyz="0" izz="0.000080"/>
@@ -67,7 +67,7 @@
       <child link="hand_camera_link"/>
       <!-- 相机相对夹爪沿 X 方向偏移 60 mm，Y 方向无侧向偏移。
            相机局部 +X 方向旋转后指向夹爪的 +Z 工作方向。 -->
-      <origin xyz="0.060 0 0.055" rpy="0 -1.57079632679 0"/>
+      <origin xyz="${lateral_offset} 0 ${0.055 + mount_z_shift}" rpy="0 -1.57079632679 0"/>
     </joint>
 
     <link name="hand_camera_optical_frame"/>
@@ -123,13 +123,13 @@
         <camera name="hand_realsense_sensor">
           <!-- 80 deg horizontal FOV: wide enough to acquire targets during
                eye-in-hand search without excessive edge perspective. -->
-          <horizontal_fov>1.3962634016</horizontal_fov>
+          <horizontal_fov>${horizontal_fov}</horizontal_fov>
           <image>
             <width>1280</width>
             <height>720</height>
             <format>R8G8B8</format>
           </image>
-          <clip><near>0.05</near><far>20.0</far></clip>
+          <clip><near>${clip_near}</near><far>20.0</far></clip>
         </camera>
         <plugin name="hand_gazebo_realsense" filename="libgazebo_ros_openni_kinect.so">
           <robotNamespace>/</robotNamespace>
@@ -145,7 +145,7 @@
           <pointCloudTopicName>depth/color/points</pointCloudTopicName>
           <frameName>camera_color_optical_frame</frameName>
           <baseline>0.05</baseline>
-          <pointCloudCutoff>0.08</pointCloudCutoff>
+          <pointCloudCutoff>${pointcloud_cutoff}</pointCloudCutoff>
           <pointCloudCutoffMax>4.0</pointCloudCutoffMax>
           <distortion_k1>0.0</distortion_k1>
           <distortion_k2>0.0</distortion_k2>

@@ -1,6 +1,10 @@
 <?xml version="1.0"?>
 <launch>
   <arg name="detector" default="color"/>
+  <arg name="camera_mount" default="eye_in_hand" doc="eye_in_hand | eye_to_hand"/>
+  <arg name="camera_namespace" default="$(eval {'eye_in_hand': '/camera', 'eye_to_hand': '/workspace_camera'}[arg('camera_mount')])"/>
+  <arg name="robot_xacro" value="$(eval {'eye_in_hand': 'aubo_i5_with_camera.xacro', 'eye_to_hand': 'aubo_i5.xacro'}[arg('camera_mount')])"/>
+  <arg name="robot_srdf" value="$(eval {'eye_in_hand': 'aubo_i5_with_camera.srdf', 'eye_to_hand': 'aubo_i5.srdf'}[arg('camera_mount')])"/>
   <arg name="task_config" default="$(eval find('aubo_sorting') + ('/config/yolo_sorting.yaml' if arg('detector') == 'yolo' else '/config/sorting.yaml'))" />
   <arg name="perception_config" default="$(find aubo_perception)/config/grasp_pipeline.yaml" />
   <arg name="colors_config" default="$(find aubo_sorting)/config/colors.yaml" />
@@ -22,16 +26,26 @@
   <arg name="auto_move_to_observation" default="true"/>
   <arg name="auto_start" default="false"/>
   <arg name="task_executable" default="color_sorting_task_cpp"/>
+  <arg name="start_perception" default="true"/>
+  <arg name="start_task" default="true"/>
   <arg name="show_sorting_pads" default="$(eval arg('detector') == 'color')"/>
 
   <!-- Fixed-base AUBO i5; no mobile-base model or odometry is loaded. -->
   <include file="$(find aubo_gazebo)/launch/aubo_world_gazebo.launch">
+    <arg name="model" value="$(find xacro)/xacro --inorder '$(find aubo_description)/urdf/$(arg robot_xacro)'"/>
     <arg name="world_name" value="$(arg world)"/>
     <arg name="gui" value="$(arg gui)"/>
     <arg name="paused" value="$(arg paused)"/>
     <arg name="x_pos" value="0.0"/>
     <arg name="y_pos" value="0.0"/>
     <arg name="z_pos" value="0.0"/>
+  </include>
+
+  <!-- The fixed camera pose is defined in both sorting worlds. Its TF must be
+       connected to base_link so grasp geometry can produce MoveIt targets. -->
+  <include if="$(eval arg('camera_mount') == 'eye_to_hand')"
+           file="$(find aubo_description)/launch/eye_to_hand_camera_tf.launch">
+    <arg name="parent_frame" value="base_link"/>
   </include>
 
   <!-- 分拣目标引导垫是否加载到gazebo中
@@ -53,8 +67,8 @@
     <arg name="allow_trajectory_execution" value="true"/>
     <arg name="fake_execution" value="false"/>
     <arg name="load_robot_description" value="false"/>
-    <arg name="robot_xacro" value="aubo_i5_with_camera.xacro"/>
-    <arg name="robot_srdf" value="aubo_i5_with_camera.srdf"/>
+    <arg name="robot_xacro" value="$(arg robot_xacro)"/>
+    <arg name="robot_srdf" value="$(arg robot_srdf)"/>
   </include>
 
   <include file="$(find aubo_sorting)/launch/sorting.launch">
@@ -71,6 +85,10 @@
     <arg name="object_height" value="$(arg object_height)"/>
     <arg name="height_mode" value="$(arg height_mode)"/>
     <arg name="detector" value="$(arg detector)"/>
+    <arg name="camera_mount" value="$(arg camera_mount)"/>
+    <arg name="camera_namespace" value="$(arg camera_namespace)"/>
+    <arg name="start_perception" value="$(arg start_perception)"/>
+    <arg name="start_task" value="$(arg start_task)"/>
     <arg name="task_executable" value="$(arg task_executable)"/>
     <arg name="debug_view" value="$(arg debug_view)"/>
     <arg name="auto_move_to_observation" value="$(arg auto_move_to_observation)"/>

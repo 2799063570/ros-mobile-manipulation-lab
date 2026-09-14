@@ -18,9 +18,8 @@
     <include><uri>model://ground_plane</uri></include>
     <include><uri>model://sun</uri></include>
 
-    <!-- Shared fixed RGB-D camera for eye-to-hand visual servo. The sorting
-         and eye-in-hand nodes ignore these topics; keeping the sensor in this
-         common world lets both servo modes use exactly the same workcell. -->
+    <!-- Fixed RGB-D camera used by eye-to-hand sorting and visual servo.
+         Eye-in-hand modes use the wrist camera instead. -->
     <model name="workspace_camera">
       <static>true</static>
       <pose>0.55 0 1.60 0 1.57079632679 0</pose>

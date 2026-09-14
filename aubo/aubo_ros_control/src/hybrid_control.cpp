@@ -40,6 +40,8 @@ bool VisualServo::loadHybridParameters() {
                     hybrid_require_scene_ready_, false);
   private_nh_.param("hybrid_min_tcp_z", hybrid_min_tcp_z_, -1e9);
   private_nh_.param("hybrid_surface_to_grasp_z", hybrid_surface_to_grasp_z_, 0.0);
+  private_nh_.param("hybrid_vertical_approach", hybrid_vertical_approach_, false);
+  private_nh_.param("hybrid_lock_pregrasp_path", hybrid_lock_pregrasp_path_, false);
   private_nh_.param("hybrid_use_orientation_control",
                     hybrid_orientation_control_, false);
   std::vector<double> hybrid_rpy;
@@ -354,33 +356,38 @@ bool VisualServo::hybridControl(const JointPoint &feedback,
       return true;
     }
   }
-  if (!fresh_target) {
+  const bool locked_pregrasp = hybrid_lock_pregrasp_path_ && !hybrid_points_.empty();
+  if (!fresh_target && !locked_pregrasp) {
     // Once the mandatory observation posture has been reached, target loss
     // always stops and holds instead of moving the arm blindly.
+    ROS_WARN_THROTTLE(1.0, "[hybrid] Visual target expired or disappeared; holding instead of following an unobserved grasp point");
     resetHybrid();
     transitionTo(ServoState::WAITING);
     holdFeedback(feedback);
     return true;
   }
   geometry_msgs::Pose goal;
-  double distance;
-  if (!hybridGoal(feedback, target, goal, distance)) {
-    hybrid_fault_ = true;
-    transitionTo(ServoState::HOLD);
-    holdFeedback(feedback);
-    return true;
-  }
-  if ((!hybrid_plan_started_.isZero() || !hybrid_points_.empty()) &&
-      ((translation(goal) - translation(hybrid_goal_)).norm() > hybrid_target_drift_ ||
-       ((use_orientation_control_ || hybrid_orientation_control_) &&
-        Eigen::Quaterniond(goal.orientation.w, goal.orientation.x, goal.orientation.y,
-                           goal.orientation.z).angularDistance(
-          Eigen::Quaterniond(hybrid_goal_.orientation.w, hybrid_goal_.orientation.x,
-                             hybrid_goal_.orientation.y, hybrid_goal_.orientation.z)) > 0.15))) {
-    resetHybrid(); // Stop first, then plan again from measured joints.
-    transitionTo(ServoState::WAITING);
-    holdFeedback(feedback);
-    return true;
+  double distance = hybrid_standoff_;
+  if (!locked_pregrasp) {
+    if (!hybridGoal(feedback, target, goal, distance)) {
+      hybrid_fault_ = true;
+      transitionTo(ServoState::HOLD);
+      holdFeedback(feedback);
+      return true;
+    }
+    if ((!hybrid_plan_started_.isZero() || !hybrid_points_.empty()) &&
+        ((translation(goal) - translation(hybrid_goal_)).norm() > hybrid_target_drift_ ||
+         ((use_orientation_control_ || hybrid_orientation_control_) &&
+          Eigen::Quaterniond(goal.orientation.w, goal.orientation.x, goal.orientation.y,
+                             goal.orientation.z).angularDistance(
+            Eigen::Quaterniond(hybrid_goal_.orientation.w, hybrid_goal_.orientation.x,
+                               hybrid_goal_.orientation.y, hybrid_goal_.orientation.z)) > 0.15))) {
+      ROS_WARN_THROTTLE(1.0, "[hybrid] Grasp point moved beyond planning tolerance; stopping for a fresh plan");
+      resetHybrid(); // Stop first, then plan again from measured joints.
+      transitionTo(ServoState::WAITING);
+      holdFeedback(feedback);
+      return true;
+    }
   }
   if (!hybrid_points_.empty()) {
     if ((now - hybrid_execution_started_).toSec() > hybrid_execution_timeout_) {
@@ -425,7 +432,7 @@ bool VisualServo::hybridControl(const JointPoint &feedback,
       if (hybrid_settle_since_.isZero()) hybrid_settle_since_ = now;
       if ((now - hybrid_settle_since_).toSec() >= 0.3) {
         resetHybrid();
-        hybrid_near_ = distance <= hybrid_enter_;
+        hybrid_near_ = locked_pregrasp || distance <= hybrid_enter_;
         holdFeedback(feedback);
         transitionTo(ServoState::WAITING);
       }
@@ -474,8 +481,18 @@ bool VisualServo::hybridControl(const JointPoint &feedback,
     return true;
   }
   const Eigen::Vector3d current(frame.p.x(), frame.p.y(), frame.p.z());
-  const Eigen::Vector3d approach = translation(goal) -
-      hybrid_standoff_ * (translation(goal) - current).normalized();
+  // Sorting needs a pre-grasp directly above the block. A standoff along the
+  // arbitrary start-to-goal line can sweep the wrist camera behind the fingers
+  // and make the target disappear before PBVS takes over.
+  Eigen::Vector3d approach = translation(goal);
+  if (hybrid_vertical_approach_)
+    approach.z() += hybrid_standoff_;
+  else
+    approach -= hybrid_standoff_ * (translation(goal) - current).normalized();
+  ROS_INFO("[hybrid] TCP=[%.3f, %.3f, %.3f] grasp=[%.3f, %.3f, %.3f] pre-grasp=[%.3f, %.3f, %.3f]",
+           current.x(), current.y(), current.z(),
+           hybrid_goal_.position.x, hybrid_goal_.position.y, hybrid_goal_.position.z,
+           approach.x(), approach.y(), approach.z());
   goal.position.x = approach.x(); goal.position.y = approach.y(); goal.position.z = approach.z();
   hybrid_request_ = moveit_msgs::GetMotionPlan();
   auto &request = hybrid_request_.request.motion_plan_request;

@@ -117,6 +117,8 @@ private:
   bool hybrid_enabled_{false}, hybrid_pending_{false}, hybrid_fault_{false};
   bool hybrid_near_{false}, hybrid_observation_complete_{false};
   bool hybrid_orientation_control_{false};
+  bool hybrid_vertical_approach_{false};
+  bool hybrid_lock_pregrasp_path_{false};
   bool hybrid_require_scene_ready_{false};
   std::atomic<bool> hybrid_scene_ready_{false};
   std::string planning_group_, planning_service_;
