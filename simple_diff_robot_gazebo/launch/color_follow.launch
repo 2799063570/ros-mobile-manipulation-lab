@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="world" default="$(find simple_diff_robot_gazebo)/worlds/color_follow.world"/>
+  <arg name="gui" default="true"/>
+  <arg name="start_robot" default="true"/>
+  <arg name="use_laser_safety" default="true"/>
+  <arg name="start_target_control" default="true"/>
+  <arg name="start_rviz" default="true"/>
+  <arg name="start_rqt_reconfigure" default="false"/>
+  <arg name="target_distance" default="0.5"/>
+  <arg name="target_width" default="0.36"/>
+  <arg name="distance_resume_deadband" default="0.10"/>
+  <arg name="min_approach_speed" default="0.08"/>
+  <arg name="search_enabled" default="true"/>
+  <arg name="search_angular_speed" default="0.30"/>
+  <arg name="search_switch_period" default="4.0"/>
+  <arg name="search_start_delay" default="0.5"/>
+  <arg name="search_timeout" default="20.0"/>
+
+  <include file="$(find simple_diff_robot_gazebo)/launch/follow_base.launch">
+    <arg name="follower_type" value="color_follower.py"/>
+    <arg name="world" value="$(arg world)"/>
+    <arg name="gui" value="$(arg gui)"/>
+    <arg name="start_robot" value="$(arg start_robot)"/>
+    <arg name="use_laser_safety" value="$(arg use_laser_safety)"/>
+    <arg name="color_target_distance" value="$(arg target_distance)"/>
+    <arg name="color_target_width" value="$(arg target_width)"/>
+    <arg name="color_distance_resume_deadband" value="$(arg distance_resume_deadband)"/>
+    <arg name="color_min_approach_speed" value="$(arg min_approach_speed)"/>
+    <arg name="color_search_enabled" value="$(arg search_enabled)"/>
+    <arg name="color_search_angular_speed" value="$(arg search_angular_speed)"/>
+    <arg name="color_search_switch_period" value="$(arg search_switch_period)"/>
+    <arg name="color_search_start_delay" value="$(arg search_start_delay)"/>
+    <arg name="color_search_timeout" value="$(arg search_timeout)"/>
+  </include>
+
+  <node if="$(arg start_target_control)" pkg="aubo_mobile_follower"
+        type="target_interactive_marker.py" name="color_target_control" output="screen">
+    <param name="model_name" value="color_target"/>
+    <param name="marker_frame" value="odom"/>
+    <param name="target_z" value="0.35"/>
+    <param name="marker_size_x" value="0.36"/>
+    <param name="marker_size_y" value="0.36"/>
+    <param name="marker_size_z" value="0.70"/>
+  </node>
+  <node if="$(arg start_rqt_reconfigure)" pkg="rqt_reconfigure"
+        type="rqt_reconfigure" name="follower_reconfigure" output="screen"/>
+  <node if="$(arg start_rviz)" pkg="rviz" type="rviz"
+        name="simple_diff_color_rviz" output="screen"
+        args="-d $(find simple_diff_robot_gazebo)/rviz/color_follow.rviz"/>
+</launch>

@@ -33,6 +33,18 @@ color:
   hsv_upper: [10, 255, 255]
   min_area_fraction: 0.002
   target_area_fraction: 0.075
+  # Set target_distance > 0 to use CameraInfo and the known target width
+  # instead of image area. The default retains the original area controller.
+  target_distance: 0.0
+  target_width: 0.36
+  distance_deadband: 0.05
+  distance_resume_deadband: 0.10
+  min_approach_speed: 0.08
+  search_enabled: false
+  search_angular_speed: 0.30
+  search_switch_period: 4.0
+  search_start_delay: 0.5
+  search_timeout: 20.0
   x_deadband: 0.06
   area_deadband: 0.012
   linear_kp: 1.2

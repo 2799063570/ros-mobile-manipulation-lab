@@ -1,0 +1,36 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="world" default="$(find simple_diff_robot_gazebo)/worlds/empty.world"/>
+  <arg name="gui" default="true"/>
+  <arg name="start_robot" default="true"/>
+  <arg name="use_laser_safety" default="true"/>
+  <arg name="spawn_test_target" default="true"/>
+  <arg name="start_target_control" default="true"/>
+  <arg name="start_rviz" default="true"/>
+  <arg name="target_x" default="2.5"/>
+  <arg name="target_y" default="0.0"/>
+  <arg name="target_distance" default="1.0"/>
+
+  <include file="$(find simple_diff_robot_gazebo)/launch/follow_base.launch">
+    <arg name="follower_type" value="laser_follower.py"/>
+    <arg name="world" value="$(arg world)"/>
+    <arg name="gui" value="$(arg gui)"/>
+    <arg name="start_robot" value="$(arg start_robot)"/>
+    <arg name="use_laser_safety" value="$(arg use_laser_safety)"/>
+    <arg name="laser_target_distance" value="$(arg target_distance)"/>
+  </include>
+
+  <node if="$(arg spawn_test_target)" pkg="gazebo_ros" type="spawn_model"
+        name="spawn_follower_test_target" output="screen"
+        args="-sdf -file $(find aubo_mobile_follower)/models/laser_target/model.sdf
+              -model follower_target -x $(arg target_x) -y $(arg target_y) -z 0.5"/>
+  <node if="$(arg start_target_control)" pkg="aubo_mobile_follower"
+        type="target_interactive_marker.py" name="follower_target_control" output="screen">
+    <param name="model_name" value="follower_target"/>
+    <param name="marker_frame" value="odom"/>
+    <param name="target_z" value="0.5"/>
+  </node>
+  <node if="$(arg start_rviz)" pkg="rviz" type="rviz"
+        name="simple_diff_laser_rviz" output="screen"
+        args="-d $(find simple_diff_robot_gazebo)/rviz/laser_follow.rviz"/>
+</launch>

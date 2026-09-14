@@ -7,9 +7,10 @@
   <arg name="y" default="0.0"/>
   <!-- base_footprint is already the ground-contact plane. A small offset avoids initial penetration. -->
   <arg name="z" default="0.01"/>
+  <arg name="camera_pitch" default="0.0"/>
 
   <param name="robot_description"
-         command="$(find xacro)/xacro --inorder $(find simple_diff_robot_gazebo)/urdf/simple_diff_robot.xacro"/>
+         command="$(find xacro)/xacro --inorder $(find simple_diff_robot_gazebo)/urdf/simple_diff_robot.xacro camera_pitch:=$(arg camera_pitch)"/>
 
   <include file="$(find gazebo_ros)/launch/empty_world.launch">
     <arg name="world_name" value="$(arg world)"/>

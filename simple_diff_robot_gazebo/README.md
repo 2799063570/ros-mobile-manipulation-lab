@@ -1,5 +1,76 @@
 # simple_diff_robot_gazebo
 
+## 激光跟随、颜色跟随和循线
+
+本包复用 `aubo_mobile_follower` 的三个控制节点，但直接使用本车的 `/scan`、
+`/camera/image_raw` 和 `/cmd_vel`，不启动机械臂或 MoveIt。每次只运行一种模式，
+不要同时启动导航、键盘控制或其他向 `/cmd_vel` 发布速度的节点。
+
+在工作空间根目录编译并加载环境后，任选其一：
+
+```bash
+cd /home/zlab/aubo/ros_mobile_manipulation_lab
+catkin_make
+source devel/setup.bash
+
+# 前方测试立柱的激光跟随，默认保持约 1 m 距离
+roslaunch simple_diff_robot_gazebo laser_follow.launch
+
+# 例如将激光跟随目标距离设为 1.5 m
+roslaunch simple_diff_robot_gazebo laser_follow.launch target_distance:=1.5
+
+# 前视相机跟随 Gazebo 红色色块
+roslaunch simple_diff_robot_gazebo color_follow.launch
+
+# 将与红色目标正面的间隔设为约 1.5 m
+roslaunch simple_diff_robot_gazebo color_follow.launch target_distance:=1.5
+
+# 下视相机沿弯曲黑线行驶，线离开视野后停车
+roslaunch simple_diff_robot_gazebo line_follow.launch
+```
+
+没有桌面环境时追加 `gui:=false start_rviz:=false`。三个入口默认各自启动 Gazebo、
+RViz 和专用场景；
+若 Gazebo 已经运行，可用 `start_robot:=false`，并确认现有机器人话题和场景与所选模式匹配。
+激光入口可用 `spawn_test_target:=false start_target_control:=false` 关闭测试立柱及其
+RViz 交互控制；在 RViz 选 **Interact** 可拖动测试立柱或红色目标。颜色入口的场景自带红色目标，
+外部场景没有它时可用 `start_target_control:=false` 关闭目标交互节点。
+
+循线入口用 `camera_pitch:=0.8` 将相机向地面倾斜，其他入口保持原有前视安装。
+默认的循线 `line_steering_sign:=-1.0` 与本车相机左右方向匹配。若使用外部相机，
+应检查其画面方向，并按需覆盖这两个参数。颜色和循线可追加
+`start_rqt_reconfigure:=true`，在 `/simple_diff_follower` 调 HSV、速度和 PID；
+初始参数来自 `aubo_mobile_follower/config/follower.yaml`。循线速度由
+`follow_base.launch` 覆盖，当前设为 0.40 m/s。
+
+颜色模式传入正数 `target_distance` 时，使用 `/camera/camera_info` 的焦距与红色目标
+的已知宽度估计距离，单位为米；当前启动默认值为 `0.5`。
+显式传入 `target_distance:=0.0` 可使用原来的画面面积控制。
+演示目标宽 0.36 m，换成其他目标时需同时设置 `target_width:=实际宽度`。
+估计值发布在 `/simple_diff_robot/color_distance`。目标偏离画面中心时，小车先原地
+转向对准，再按距离前进；目标被画面裁切或相机标定信息不可用时仍可朝可见目标
+转向，但不会前进。单目估距属于近似值，设定距离应留出车体与目标的安全余量。
+米数控制接近目标时，以至少 0.08 m/s 发送有效的前进命令；进入目标距离
+±0.05 m 后停车，只有误差再次超过 0.10 m 才重新起步，避免估距小幅波动造成
+反复蠕动。可用 `min_approach_speed` 和 `distance_resume_deadband` 调整这两个参数。
+
+颜色目标消失但相机仍在更新时，小车先等待 0.5 秒，再以 0.30 rad/s 左右交替
+原地搜索；首次向左转 4 秒，随后向右转 8 秒，继续往复。若搜索超时设得比换向
+周期短，换向周期会自动缩短，确保左右方向都得到搜索机会。重新识别到目标就恢复
+跟随；搜索超过 20 秒仍未找到则停车。相机图像超时、机械臂未就绪（AUBO 模式）
+时都不会盲转。可用
+`search_enabled:=false` 关闭搜索，或用 `search_angular_speed`、
+`search_switch_period`、`search_start_delay`、`search_timeout` 调整搜索行为。
+状态话题会发布 `color_searching`、`color_aligning`、`color_following`、
+`color_waiting_for_range` 或 `color_target_lost`。
+
+状态、调试图像或标记、行驶轨迹分别发布到
+`/simple_diff_robot/follower_state`、`/simple_diff_robot/follower_debug`
+（激光为 `/simple_diff_robot/laser_debug`）和 `/simple_diff_robot/path`。
+可用 `rqt_image_view` 查看相机调试图像。速度先经过激光安全过滤器，再送到底盘；
+传感器超时会停车；激光目标丢失也会停车。仅在排查过滤器时才用
+`use_laser_safety:=false` 将控制速度直接转发给底盘。
+
 ## 单障碍物自动绕行
 
 下面的命令会启动一个封闭 Gazebo 场地。小车从左侧出发，沿三个相对航点从红色障碍物下方绕行，最后停在右侧绿色圆形标记处：

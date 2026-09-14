@@ -1,0 +1,74 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Shared bringup for the three mutually exclusive following modes. -->
+  <arg name="follower_type"/>
+  <arg name="world"/>
+  <arg name="camera_pitch" default="0.0"/>
+  <arg name="gui" default="true"/>
+  <arg name="start_robot" default="true"/>
+  <arg name="use_laser_safety" default="true"/>
+  <arg name="start_path_trail" default="true"/>
+  <arg name="line_steering_sign" default="-1.0"/>
+  <arg name="laser_target_distance" default="1.0"/>
+  <arg name="color_target_distance" default="0.0"/>
+  <arg name="color_target_width" default="0.36"/>
+  <arg name="color_distance_resume_deadband" default="0.10"/>
+  <arg name="color_min_approach_speed" default="0.08"/>
+  <arg name="color_search_enabled" default="false"/>
+  <arg name="color_search_angular_speed" default="0.30"/>
+  <arg name="color_search_switch_period" default="4.0"/>
+  <arg name="color_search_start_delay" default="0.5"/>
+  <arg name="color_search_timeout" default="20.0"/>
+
+  <include if="$(arg start_robot)" file="$(find simple_diff_robot_gazebo)/launch/gazebo.launch">
+    <arg name="world" value="$(arg world)"/>
+    <arg name="camera_pitch" value="$(arg camera_pitch)"/>
+    <arg name="gui" value="$(arg gui)"/>
+  </include>
+
+  <node pkg="aubo_mobile_follower" type="$(arg follower_type)"
+        name="simple_diff_follower" output="screen" required="true">
+    <rosparam file="$(find aubo_mobile_follower)/config/follower.yaml" command="load"/>
+    <param name="require_arm_ready" value="false"/>
+    <param name="scan_topic" value="/scan"/>
+    <param name="image_topic" value="/camera/image_raw"/>
+    <param name="cmd_vel_topic" value="/simple_diff_robot/follower_cmd"/>
+    <param name="state_topic" value="/simple_diff_robot/follower_state"/>
+    <param name="debug_topic" value="/simple_diff_robot/follower_debug"/>
+    <param name="debug_marker_topic" value="/simple_diff_robot/laser_debug"/>
+    <param name="line/steering_sign" value="$(arg line_steering_sign)"/>
+    <param name="line/linear_speed" value="0.40"/>
+    <param name="laser/target_distance" value="$(arg laser_target_distance)"/>
+    <param name="camera_info_topic" value="/camera/camera_info"/>
+    <param name="color/target_distance" value="$(arg color_target_distance)"/>
+    <param name="color/target_width" value="$(arg color_target_width)"/>
+    <param name="color/distance_resume_deadband" value="$(arg color_distance_resume_deadband)"/>
+    <param name="color/min_approach_speed" value="$(arg color_min_approach_speed)"/>
+    <param name="color/search_enabled" value="$(arg color_search_enabled)"/>
+    <param name="color/search_angular_speed" value="$(arg color_search_angular_speed)"/>
+    <param name="color/search_switch_period" value="$(arg color_search_switch_period)"/>
+    <param name="color/search_start_delay" value="$(arg color_search_start_delay)"/>
+    <param name="color/search_timeout" value="$(arg color_search_timeout)"/>
+    <param name="distance_topic" value="/simple_diff_robot/color_distance"/>
+  </node>
+
+  <include if="$(arg use_laser_safety)"
+           file="$(find aubo_mobile_navigation)/launch/laser_safety_filter.launch">
+    <arg name="scan_topic" value="/scan"/>
+    <arg name="input_cmd_vel" value="/simple_diff_robot/follower_cmd"/>
+    <arg name="output_cmd_vel" value="/cmd_vel"/>
+    <arg name="robot_half_width" value="0.18"/>
+    <arg name="safety_margin" value="0.08"/>
+    <arg name="stop_distance" value="0.35"/>
+    <arg name="reverse_stop_distance" value="0.35"/>
+    <arg name="rotation_clearance" value="0.30"/>
+  </include>
+  <node unless="$(arg use_laser_safety)" pkg="topic_tools" type="relay"
+        name="follower_cmd_relay"
+        args="/simple_diff_robot/follower_cmd /cmd_vel" output="screen"/>
+
+  <node if="$(arg start_path_trail)" pkg="aubo_mobile_follower"
+        type="follower_path.py" name="simple_diff_follower_path" output="screen">
+    <param name="path_topic" value="/simple_diff_robot/path"/>
+  </node>
+</launch>

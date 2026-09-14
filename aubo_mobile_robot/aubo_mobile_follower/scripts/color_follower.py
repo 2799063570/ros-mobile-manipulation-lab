@@ -5,6 +5,7 @@
 
 from __future__ import print_function
 
+import math
 import threading
 
 import cv2
@@ -16,13 +17,16 @@ from aubo_mobile_follower.image_message import bgr8_to_imgmsg
 from aubo_mobile_follower.pid import FilteredPid
 from dynamic_reconfigure.server import Server
 from geometry_msgs.msg import Twist
-from sensor_msgs.msg import Image
-from std_msgs.msg import Bool, String
+from sensor_msgs.msg import CameraInfo, Image
+from std_msgs.msg import Bool, Float32, String
 
 class ColorFollower(object):
     def __init__(self):
         self.image_topic = rospy.get_param(
             "~image_topic", "/hand_camera/image_raw"
+        )
+        self.camera_info_topic = rospy.get_param(
+            "~camera_info_topic", "/hand_camera/camera_info"
         )
         self.debug_topic = rospy.get_param(
             "~debug_topic", "/aubo_mobile_follower/color_debug"
@@ -50,6 +54,31 @@ class ColorFollower(object):
         self.target_area_fraction = float(
             rospy.get_param("~color/target_area_fraction", 0.075)
         )
+        # A positive target distance enables calibrated, known-width ranging.
+        # Zero preserves the original image-area controller.
+        self.target_distance = float(rospy.get_param("~color/target_distance", 0.0))
+        self.target_width = float(rospy.get_param("~color/target_width", 0.36))
+        self.distance_deadband = float(
+            rospy.get_param("~color/distance_deadband", 0.05)
+        )
+        self.distance_resume_deadband = float(
+            rospy.get_param("~color/distance_resume_deadband", 0.10)
+        )
+        self.min_approach_speed = float(
+            rospy.get_param("~color/min_approach_speed", 0.08)
+        )
+        if (
+            not all(math.isfinite(value) for value in (
+                self.target_distance, self.target_width, self.distance_deadband,
+                self.distance_resume_deadband, self.min_approach_speed
+            ))
+            or self.target_distance < 0.0
+            or self.target_width <= 0.0
+            or self.distance_deadband < 0.0
+            or self.distance_resume_deadband <= self.distance_deadband
+            or self.min_approach_speed < 0.0
+        ):
+            raise ValueError("color distance or approach speed parameter is invalid")
         self.x_deadband = float(rospy.get_param("~color/x_deadband", 0.06))
         self.area_deadband = float(rospy.get_param("~color/area_deadband", 0.012))
         self.linear_kp = float(rospy.get_param("~color/linear_kp", 1.2))
@@ -76,12 +105,39 @@ class ColorFollower(object):
         self.max_angular_speed = float(
             rospy.get_param("~color/max_angular_speed", 0.55)
         )
+        self.search_enabled = bool(rospy.get_param("~color/search_enabled", False))
+        self.search_angular_speed = float(
+            rospy.get_param("~color/search_angular_speed", 0.30)
+        )
+        self.search_switch_period = float(
+            rospy.get_param("~color/search_switch_period", 4.0)
+        )
+        self.search_start_delay = float(
+            rospy.get_param("~color/search_start_delay", 0.5)
+        )
+        self.search_timeout = float(rospy.get_param("~color/search_timeout", 20.0))
+        if (
+            not all(math.isfinite(value) for value in (
+                self.search_angular_speed, self.search_switch_period,
+                self.search_start_delay, self.search_timeout
+            ))
+            or self.search_angular_speed <= 0.0
+            or self.search_switch_period <= 0.0
+            or self.search_start_delay < 0.0
+            or self.search_timeout <= 0.0
+        ):
+            raise ValueError("color search speed or timing is invalid")
 
         self.bridge = cv_bridge.CvBridge()
         self._lock = threading.Lock()
         self._arm_ready = not self.require_arm_ready
         self._target = None
         self._last_image_time = None
+        self._first_image_time = None
+        self._last_target_time = None
+        self._searching = False
+        self._distance_settled = False
+        self._camera_intrinsics = None
         self._linear_pid = FilteredPid()
         self._angular_pid = FilteredPid()
 
@@ -123,9 +179,17 @@ class ColorFollower(object):
         self._state_publisher = rospy.Publisher(
             self.state_topic, String, queue_size=2
         )
+        self._distance_publisher = rospy.Publisher(
+            rospy.get_param("~distance_topic", "/aubo_mobile_follower/color_distance"),
+            Float32, queue_size=2,
+        )
         self._image_subscriber = rospy.Subscriber(
             self.image_topic, Image, self._image_callback, queue_size=1
         )
+        if self.target_distance > 0.0:
+            self._camera_info_subscriber = rospy.Subscriber(
+                self.camera_info_topic, CameraInfo, self._camera_info_callback, queue_size=1
+            )
         self._ready_subscriber = rospy.Subscriber(
             self.ready_topic, Bool, self._ready_callback, queue_size=1
         )
@@ -137,6 +201,12 @@ class ColorFollower(object):
     def _ready_callback(self, message):
         with self._lock:
             self._arm_ready = bool(message.data)
+
+    def _camera_info_callback(self, message):
+        focal_length = float(message.K[0])
+        if message.width > 0 and math.isfinite(focal_length) and focal_length > 0.0:
+            with self._lock:
+                self._camera_intrinsics = (focal_length, message.width)
 
     def _reconfigure_callback(self, config, _level):
         with self._lock:
@@ -191,6 +261,7 @@ class ColorFollower(object):
             hsv_lower = self.hsv_lower.copy()
             hsv_upper = self.hsv_upper.copy()
             min_area_fraction = self.min_area_fraction
+            intrinsics = self._camera_intrinsics
 
         hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
         mask = cv2.inRange(hsv, hsv_lower, hsv_upper)
@@ -212,7 +283,18 @@ class ColorFollower(object):
                 center_x = moments["m10"] / moments["m00"]
                 center_y = moments["m01"] / moments["m00"]
                 x_error = (center_x - width * 0.5) / (width * 0.5)
-                target = (x_error, area_fraction)
+                measured_distance = None
+                if intrinsics is not None:
+                    left, _top, pixel_width, _height = cv2.boundingRect(contour)
+                    # A cropped target cannot give a reliable size estimate.
+                    if left > 0 and left + pixel_width < width and pixel_width > 0:
+                        focal_length, calibration_width = intrinsics
+                        measured_distance = (
+                            focal_length * width / float(calibration_width)
+                            * self.target_width / float(pixel_width)
+                        )
+                        self._distance_publisher.publish(Float32(data=measured_distance))
+                target = (x_error, area_fraction, measured_distance)
                 cv2.drawContours(frame, [contour], -1, (0, 255, 0), 2)
                 cv2.circle(
                     frame, (int(center_x), int(center_y)), 7, (255, 0, 255), -1
@@ -220,7 +302,12 @@ class ColorFollower(object):
 
         with self._lock:
             self._target = target
-            self._last_image_time = rospy.Time.now()
+            image_time = rospy.Time.now()
+            self._last_image_time = image_time
+            if self._first_image_time is None:
+                self._first_image_time = image_time
+            if target is not None:
+                self._last_target_time = image_time
 
         if self._debug_publisher.get_num_connections() > 0:
             try:
@@ -238,6 +325,7 @@ class ColorFollower(object):
             ready = self._arm_ready
             target = self._target
             image_time = self._last_image_time
+            loss_start_time = self._last_target_time or self._first_image_time
             target_area_fraction = self.target_area_fraction
             x_deadband = self.x_deadband
             area_deadband = self.area_deadband
@@ -254,20 +342,61 @@ class ColorFollower(object):
             rospy.logwarn_throttle(2.0, "Colour follower image timeout")
             return
         if target is None:
+            loss_seconds = max(0.0, (now - loss_start_time).to_sec())
+            search_seconds = loss_seconds - self.search_start_delay
+            if self.search_enabled and 0.0 <= search_seconds < self.search_timeout:
+                # Sweep left once, then twice as far right. A short timeout
+                # must still leave enough time for the first reversal.
+                switch_period = min(
+                    self.search_switch_period, self.search_timeout / 3.0
+                )
+                phase = int((search_seconds + switch_period)
+                            / (2.0 * switch_period))
+                command = Twist()
+                search_speed = min(self.search_angular_speed, max_angular_speed)
+                command.angular.z = search_speed * (1.0 if phase % 2 == 0 else -1.0)
+                with self._lock:
+                    if not self._searching:
+                        self._linear_pid.reset()
+                        self._angular_pid.reset()
+                    self._searching = True
+                self._command_publisher.publish(command)
+                self._state_publisher.publish(String(data="color_searching"))
+                return
             self._stop(reset_pid=True)
             self._state_publisher.publish(String(data="color_target_lost"))
             return
 
-        x_error, area_fraction = target
+        x_error, area_fraction, measured_distance = target
         if abs(x_error) <= x_deadband:
             x_error = 0.0
-        area_error = target_area_fraction - area_fraction
-        if abs(area_error) <= area_deadband:
-            area_error = 0.0
+        if self.target_distance > 0.0:
+            linear_error = None if measured_distance is None else (
+                measured_distance - self.target_distance
+            )
+            with self._lock:
+                if linear_error is None:
+                    self._distance_settled = False
+                elif self._distance_settled:
+                    if abs(linear_error) <= self.distance_resume_deadband:
+                        linear_error = 0.0
+                    else:
+                        self._distance_settled = False
+                elif abs(linear_error) <= self.distance_deadband:
+                    self._distance_settled = True
+                    linear_error = 0.0
+        else:
+            linear_error = target_area_fraction - area_fraction
+            if abs(linear_error) <= area_deadband:
+                linear_error = 0.0
 
         command = Twist()
         measurement_time = image_time.to_sec()
         with self._lock:
+            if self._searching:
+                self._linear_pid.reset()
+                self._angular_pid.reset()
+                self._searching = False
             if x_error == 0.0:
                 self._angular_pid.reset()
             command.angular.z = self._angular_pid.update(
@@ -276,22 +405,43 @@ class ColorFollower(object):
                 -max_angular_speed,
                 max_angular_speed,
             )
-            if area_error == 0.0:
+            # First center a visible target. This also allows yaw correction
+            # when range is unavailable because the target is cropped.
+            if x_error != 0.0 or linear_error is None or linear_error == 0.0:
                 self._linear_pid.reset()
-            command.linear.x = self._linear_pid.update(
-                area_error,
-                measurement_time,
-                -max_reverse_speed,
-                max_linear_speed,
-            )
+            else:
+                linear_output = self._linear_pid.update(
+                    linear_error,
+                    measurement_time,
+                    -max_reverse_speed,
+                    max_linear_speed,
+                )
+                if (
+                    self.target_distance > 0.0
+                    and linear_error > 0.0
+                    and linear_output > 0.0
+                ):
+                    linear_output = max(
+                        linear_output,
+                        min(self.min_approach_speed, max_linear_speed),
+                    )
+                command.linear.x = linear_output
         self._command_publisher.publish(command)
-        self._state_publisher.publish(String(data="color_following"))
+        if x_error != 0.0:
+            state = "color_aligning"
+        elif linear_error is None:
+            state = "color_waiting_for_range"
+        else:
+            state = "color_following"
+        self._state_publisher.publish(String(data=state))
 
     def _stop(self, reset_pid=False):
         if reset_pid:
             with self._lock:
                 self._linear_pid.reset()
                 self._angular_pid.reset()
+                self._searching = False
+                self._distance_settled = False
         self._command_publisher.publish(Twist())
 
 

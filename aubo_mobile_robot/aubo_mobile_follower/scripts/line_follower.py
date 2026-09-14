@@ -68,6 +68,7 @@ class LineFollower(object):
         self.max_angular_speed = float(
             rospy.get_param("~line/max_angular_speed", 0.55)
         )
+        self.steering_sign = float(rospy.get_param("~line/steering_sign", 1.0))
 
         self.bridge = cv_bridge.CvBridge()
         self._lock = threading.Lock()
@@ -228,11 +229,11 @@ class LineFollower(object):
         command = Twist()
         # Slow down on sharp bends so that the extended arm remains stable.
         command.linear.x = linear_speed * max(0.35, 1.0 - abs(error))
-        # With the wrist-mounted camera in the ``observe`` pose, increasing
-        # image x corresponds to a positive base yaw correction.
+        # Camera mounting determines whether image-right calls for positive
+        # or negative yaw; the default preserves the AUBO observe pose.
         with self._lock:
             command.angular.z = self._angular_pid.update(
-                error,
+                self.steering_sign * error,
                 image_time.to_sec(),
                 -max_angular_speed,
                 max_angular_speed,
