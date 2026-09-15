@@ -52,8 +52,9 @@
     <rosparam file="$(find simple_diff_robot_gazebo)/config/costmap_common.yaml" command="load" ns="local_costmap"/>
     <rosparam file="$(find simple_diff_robot_gazebo)/config/global_costmap.yaml" command="load"/>
     <rosparam file="$(find simple_diff_robot_gazebo)/config/local_costmap.yaml" command="load"/>
+    <rosparam file="$(find simple_diff_robot_gazebo)/config/global_planner.yaml" command="load"/>
     <rosparam file="$(find simple_diff_robot_gazebo)/config/teb_local_planner.yaml" command="load"/>
-    <param name="base_global_planner" value="navfn/NavfnROS"/>
+    <param name="base_global_planner" value="global_planner/GlobalPlanner"/>
     <param name="base_local_planner" value="teb_local_planner/TebLocalPlannerROS"/>
     <param name="controller_frequency" value="10.0"/>
     <param name="planner_frequency" value="1.0"/>
@@ -97,7 +98,7 @@
     <param name="hysteresis_radius" value="$(arg hysteresis_radius)"/>
     <param name="hysteresis_gain" value="$(arg hysteresis_gain)"/>
     <param name="frontiers_topic" value="/filtered_points"/>
-    <param name="plan_service" value="/move_base/NavfnROS/make_plan"/>
+    <param name="plan_service" value="/move_base/GlobalPlanner/make_plan"/>
     <param name="namespace" value=""/>
     <param name="n_robots" value="1"/>
     <param name="delay_after_assignement" value="0.5"/>

@@ -178,7 +178,10 @@ roslaunch simple_diff_robot_gazebo navigation.launch map_file:=$HOME/maps/my_map
 
 在 RViz 中先用 **2D Pose Estimate** 指定初始位姿，再用 **2D Nav Goal** 指定目标。其他地图可通过 `map_file:=/绝对路径/map.yaml` 指定。
 
-导航、边建图边导航和 RRT 探索均使用 TEB 局部规划器，参数见 `config/teb_local_planner.yaml`。
+导航、边建图边导航和 RRT 探索均使用 `global_planner/GlobalPlanner` 全局规划器和 TEB 局部规划器，参数分别见
+`config/global_planner.yaml` 与 `config/teb_local_planner.yaml`。
+运行前可用 `rospack find global_planner` 检查全局规划器插件是否已安装；在 ROS Noetic 下缺少时安装
+`ros-noetic-global-planner`。
 运行前可用 `rospack find teb_local_planner` 检查插件是否已安装；在 ROS Noetic 下缺少时安装 `ros-noetic-teb-local-planner`。
 
 ## RRT 自主探索建图

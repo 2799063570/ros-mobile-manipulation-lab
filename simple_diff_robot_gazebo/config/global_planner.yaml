@@ -1,0 +1,23 @@
+GlobalPlanner:
+  # Use Dijkstra expansion and smooth quadratic potentials for stable paths.
+  use_dijkstra: true
+  use_quadratic: true
+  use_grid_path: false
+  old_navfn_behavior: false
+
+  # Require an exact reachable goal and allow planning through unknown cells
+  # while SLAM is still expanding the map.
+  default_tolerance: 0.0
+  allow_unknown: true
+
+  # Cost conversion values expected by the ROS navigation costmap.
+  lethal_cost: 253
+  neutral_cost: 50
+  cost_factor: 3.0
+
+  # Point the robot forward along the generated path.
+  orientation_mode: 1
+  orientation_window_size: 1
+
+  publish_potential: true
+  outline_map: true
