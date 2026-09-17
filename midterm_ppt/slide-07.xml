@@ -1,0 +1,149 @@
+<slide>
+  <style>
+    <fill><fillColor color="rgb(245,243,238)"/></fill>
+  </style>
+  <data>
+    <line startX="80" startY="44" endX="880" endY="44">
+      <border color="rgba(183,183,183,1)" width="1"/>
+    </line>
+    <shape type="text" topLeftX="80" topLeftY="26" width="500" height="20">
+      <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120,120,120,1)" letterSpacing="1">
+        <p>03　已完成的研究工作 · 7.1</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="80" topLeftY="60" width="760" height="44">
+      <content textType="title" fontSize="28" fontFamily="思源宋体" color="rgba(17,17,17,1)">
+        <p>基于深度学习的目标识别与位姿估计</p>
+      </content>
+    </shape>
+    <line startX="80" startY="112" endX="140" endY="112">
+      <border color="rgba(0,47,167,1)" width="2"/>
+    </line>
+
+    <shape type="text" topLeftX="80" topLeftY="138" width="380" height="24">
+      <content textType="body" fontSize="15" fontFamily="思源宋体" color="rgba(0,47,167,1)" bold="true">
+        <p>主要完成工作</p>
+      </content>
+    </shape>
+
+    <shape type="text" topLeftX="80" topLeftY="172" width="30" height="24">
+      <content textType="body" fontSize="13" fontFamily="思源宋体" color="rgba(0,47,167,1)" bold="true">
+        <p>①</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="108" topLeftY="172" width="350" height="24">
+      <content textType="body" fontSize="13" fontFamily="思源宋体" color="rgba(17,17,17,1)" bold="true">
+        <p>数据集构建与标注</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="108" topLeftY="198" width="350" height="44">
+      <content textType="body" fontSize="11" fontFamily="思源宋体" color="rgba(90,90,90,1)" lineSpacing="multiple:1.45">
+        <p>采集分拣工件 RGB-D 图像与点云，完成类别标注与 6D 位姿标注，构建训练 / 验证 / 测试集。</p>
+      </content>
+    </shape>
+
+    <shape type="text" topLeftX="80" topLeftY="252" width="30" height="24">
+      <content textType="body" fontSize="13" fontFamily="思源宋体" color="rgba(0,47,167,1)" bold="true">
+        <p>②</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="108" topLeftY="252" width="350" height="24">
+      <content textType="body" fontSize="13" fontFamily="思源宋体" color="rgba(17,17,17,1)" bold="true">
+        <p>改进目标检测网络</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="108" topLeftY="278" width="350" height="44">
+      <content textType="body" fontSize="11" fontFamily="思源宋体" color="rgba(90,90,90,1)" lineSpacing="multiple:1.45">
+        <p>以 YOLO 系列为基线，引入轻量注意力机制与多尺度特征融合，提升小目标与遮挡目标检测精度。</p>
+      </content>
+    </shape>
+
+    <shape type="text" topLeftX="80" topLeftY="332" width="30" height="24">
+      <content textType="body" fontSize="13" fontFamily="思源宋体" color="rgba(0,47,167,1)" bold="true">
+        <p>③</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="108" topLeftY="332" width="350" height="24">
+      <content textType="body" fontSize="13" fontFamily="思源宋体" color="rgba(17,17,17,1)" bold="true">
+        <p>抓取位姿估计</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="108" topLeftY="358" width="350" height="44">
+      <content textType="body" fontSize="11" fontFamily="思源宋体" color="rgba(90,90,90,1)" lineSpacing="multiple:1.45">
+        <p>在检测结果基础上估计物体 6D 位姿，结合夹爪尺寸求解可行抓取点与接近方向。</p>
+      </content>
+    </shape>
+
+    <line startX="500" startY="150" endX="500" endY="440">
+      <border color="rgba(183,183,183,1)" width="1"/>
+    </line>
+
+    <shape type="text" topLeftX="530" topLeftY="138" width="350" height="24">
+      <content textType="body" fontSize="15" fontFamily="思源宋体" color="rgba(0,47,167,1)" bold="true">
+        <p>初步训练结果</p>
+      </content>
+    </shape>
+
+    <table topLeftX="530" topLeftY="176" width="350" height="150">
+      <colgroup>
+        <col width="150"/>
+        <col width="100"/>
+        <col width="100"/>
+      </colgroup>
+      <tr height="34">
+        <td>
+          <fill><fillColor color="rgba(0,47,167,1)"/></fill>
+          <content textType="body" fontSize="11" bold="true" color="rgba(255,255,255,1)" textAlign="center"><p>指标</p></content>
+        </td>
+        <td>
+          <fill><fillColor color="rgba(0,47,167,1)"/></fill>
+          <content textType="body" fontSize="11" bold="true" color="rgba(255,255,255,1)" textAlign="center"><p>基线模型</p></content>
+        </td>
+        <td>
+          <fill><fillColor color="rgba(0,47,167,1)"/></fill>
+          <content textType="body" fontSize="11" bold="true" color="rgba(255,255,255,1)" textAlign="center"><p>改进模型</p></content>
+        </td>
+      </tr>
+      <tr height="32">
+        <td><content textType="body" fontSize="11" textAlign="left"><p>mAP@0.5</p></content></td>
+        <td><content textType="body" fontSize="11" textAlign="center"><p>待填</p></content></td>
+        <td><content textType="body" fontSize="11" textAlign="center" bold="true" color="rgba(0,47,167,1)"><p>待填</p></content></td>
+      </tr>
+      <tr height="32">
+        <td><content textType="body" fontSize="11" textAlign="left"><p>推理速度 (FPS)</p></content></td>
+        <td><content textType="body" fontSize="11" textAlign="center"><p>待填</p></content></td>
+        <td><content textType="body" fontSize="11" textAlign="center" bold="true" color="rgba(0,47,167,1)"><p>待填</p></content></td>
+      </tr>
+      <tr height="32">
+        <td><content textType="body" fontSize="11" textAlign="left"><p>位姿估计误差</p></content></td>
+        <td><content textType="body" fontSize="11" textAlign="center"><p>待填</p></content></td>
+        <td><content textType="body" fontSize="11" textAlign="center" bold="true" color="rgba(0,47,167,1)"><p>待填</p></content></td>
+      </tr>
+    </table>
+
+    <shape type="text" topLeftX="530" topLeftY="346" width="350" height="60">
+      <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(130,130,130,1)" lineSpacing="multiple:1.4">
+        <p>注：上表数值为占位，正式答辩前替换为真实训练结果；建议附检测 / 位姿估计可视化效果图。</p>
+      </content>
+    </shape>
+
+    <line startX="80" startY="490" endX="880" endY="490">
+      <border color="rgba(217,217,217,1)" width="1"/>
+    </line>
+    <shape type="text" topLeftX="80" topLeftY="498" width="500" height="18">
+      <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150,150,150,1)">
+        <p>基于深度学习和改进路径规划的机械臂分拣系统研究</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="800" topLeftY="498" width="80" height="18">
+      <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150,150,150,1)" textAlign="right">
+        <p>07</p>
+      </content>
+    </shape>
+  </data>
+  <note>
+    <content textType="body">
+      <p>第一部分已完成工作是视觉识别。我们构建了分拣工件数据集并完成标注；以YOLO系列为基线，引入注意力机制与多尺度特征融合改进检测网络；在检测基础上估计6D位姿并求解抓取位姿。右侧表格为初步训练结果对比，正式答辩前将替换为真实数据，并补充检测与位姿估计的可视化效果图。</p>
+    </content>
+  </note>
+</slide>

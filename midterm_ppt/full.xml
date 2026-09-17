@@ -1,0 +1,1502 @@
+<presentation id="ONxJsDomclEfWRdoBqcceVrOnxh" xmlns="https://www.larkoffice.com/sml/2.0" width="960" height="540">
+  <title>基于深度学习和改进路径规划的机械臂分拣系统研究-中期答辩</title>
+  <theme>
+    <textStyles>
+      <headline fontColor="rgba(31, 35, 41, 1)"/>
+      <sub-headline fontColor="rgba(31, 35, 41, 1)"/>
+      <body fontColor="rgba(31, 35, 41, 1)"/>
+      <caption fontColor="rgba(155, 158, 162, 1)" fontSize="14"/>
+    </textStyles>
+  </theme>
+  <slide id="pSS">
+    <style>
+      <fill id="fSS">
+        <fillColor color="rgba(245, 243, 238, 1)"/>
+      </fill>
+    </style>
+    <data>
+      <shape width="960" height="6" topLeftX="0" topLeftY="0" presetHandlers="0" type="rect" id="bhM">
+        <fill>
+          <fillColor color="rgba(0, 47, 167, 1)"/>
+        </fill>
+        <content fontSize="16" fontFamily="思源黑体" color="rgba(31, 35, 41, 1)"/>
+      </shape>
+      <shape width="3" height="190" topLeftX="80" topLeftY="178" presetHandlers="0" type="rect" id="bhC">
+        <fill>
+          <fillColor color="rgba(0, 47, 167, 1)"/>
+        </fill>
+        <content fontSize="16" fontFamily="思源黑体" color="rgba(31, 35, 41, 1)"/>
+      </shape>
+      <shape width="760" height="130" topLeftX="108" topLeftY="180" type="text" id="bhT">
+        <content textType="title" fontSize="40" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)" bold="true" lineSpacing="multiple:1.35">
+          <p>基于深度学习和改进路径规划的</p>
+          <p>机械臂分拣系统研究</p>
+        </content>
+      </shape>
+      <shape width="600" height="34" topLeftX="108" topLeftY="332" type="text" id="bho">
+        <content fontSize="18" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)">
+          <p>硕士学位论文中期答辩</p>
+        </content>
+      </shape>
+      <line id="bhz" startX="108" startY="388" endX="360.00198411917313" endY="388">
+        <border color="rgba(183, 183, 183, 1)" width="1"/>
+      </line>
+      <shape width="680" height="90" topLeftX="108" topLeftY="404" type="text" id="bhU">
+        <content fontSize="14" fontFamily="思源宋体" color="rgba(56, 56, 56, 1)" lineSpacing="multiple:1.7">
+          <p>答 辩 人：XXX　　指导教师：XXX 教授</p>
+          <p>学　　院：XXX学院　　学科专业：控制科学与工程</p>
+          <p>答辩日期：2026 年 9 月</p>
+        </content>
+      </shape>
+    </data>
+    <note id="bhh">
+      <content>
+        <p>各位老师好，我是XXX，指导教师是XXX教授。今天汇报的题目是《基于深度学习和改进路径规划的机械臂分拣系统研究》。汇报将从研究背景、已完成工作、阶段性实验结果、存在问题及后续工作计划几个方面展开。</p>
+      </content>
+    </note>
+  </slide>
+  <slide id="pSL">
+    <style>
+      <fill id="fSL">
+        <fillColor color="rgba(245, 243, 238, 1)"/>
+      </fill>
+    </style>
+    <data>
+      <shape width="400" height="46" topLeftX="80" topLeftY="56" type="text" id="bhL">
+        <content textType="title" fontSize="30" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)" bold="true">
+          <p>目　录</p>
+        </content>
+      </shape>
+      <shape width="400" height="20" topLeftX="82" topLeftY="102" type="text" id="boz">
+        <content textType="caption" fontSize="11" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" letterSpacing="2">
+          <p>CONTENTS</p>
+        </content>
+      </shape>
+      <line id="bok" startX="80" startY="134" endX="880.0006249997559" endY="134">
+        <border color="rgba(183, 183, 183, 1)" width="1"/>
+      </line>
+      <shape width="60" height="36" topLeftX="80" topLeftY="158" type="text" id="bog">
+        <content textType="headline" fontSize="24" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>01</p>
+        </content>
+      </shape>
+      <shape width="400" height="28" topLeftX="150" topLeftY="158" type="text" id="bhf">
+        <content fontSize="19" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)">
+          <p>研究背景与意义</p>
+        </content>
+      </shape>
+      <shape width="600" height="18" topLeftX="150" topLeftY="188" type="text" id="boh">
+        <content textType="caption" fontSize="11" fontFamily="思源宋体" color="rgba(120, 120, 120, 1)">
+          <p>行业需求、技术现状与研究缺口</p>
+        </content>
+      </shape>
+      <line id="boC" startX="80" startY="222" endX="880.0006249997559" endY="222">
+        <border color="rgba(217, 217, 217, 1)" width="1"/>
+      </line>
+      <shape width="60" height="36" topLeftX="80" topLeftY="236" type="text" id="boV">
+        <content textType="headline" fontSize="24" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>02</p>
+        </content>
+      </shape>
+      <shape width="400" height="28" topLeftX="150" topLeftY="236" type="text" id="boc">
+        <content fontSize="19" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)">
+          <p>研究目标与技术路线</p>
+        </content>
+      </shape>
+      <shape width="600" height="18" topLeftX="150" topLeftY="266" type="text" id="boQ">
+        <content textType="caption" fontSize="11" fontFamily="思源宋体" color="rgba(120, 120, 120, 1)">
+          <p>研究内容分解与系统总体方案</p>
+        </content>
+      </shape>
+      <line id="bhq" startX="80" startY="300" endX="880.0006249997559" endY="300">
+        <border color="rgba(217, 217, 217, 1)" width="1"/>
+      </line>
+      <shape width="60" height="36" topLeftX="80" topLeftY="314" type="text" id="boo">
+        <content textType="headline" fontSize="24" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>03</p>
+        </content>
+      </shape>
+      <shape width="500" height="28" topLeftX="150" topLeftY="314" type="text" id="boU">
+        <content fontSize="19" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)">
+          <p>已完成的研究工作</p>
+        </content>
+      </shape>
+      <shape width="600" height="18" topLeftX="150" topLeftY="344" type="text" id="boO">
+        <content textType="caption" fontSize="11" fontFamily="思源宋体" color="rgba(120, 120, 120, 1)">
+          <p>视觉识别模型、改进路径规划算法</p>
+        </content>
+      </shape>
+      <line id="boJ" startX="80" startY="378" endX="880.0006249997559" endY="378">
+        <border color="rgba(217, 217, 217, 1)" width="1"/>
+      </line>
+      <shape width="60" height="36" topLeftX="80" topLeftY="392" type="text" id="boA">
+        <content textType="headline" fontSize="24" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>04</p>
+        </content>
+      </shape>
+      <shape width="500" height="28" topLeftX="150" topLeftY="392" type="text" id="bhB">
+        <content fontSize="19" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)">
+          <p>阶段性实验与结果分析</p>
+        </content>
+      </shape>
+      <shape width="600" height="18" topLeftX="150" topLeftY="422" type="text" id="bhP">
+        <content textType="caption" fontSize="11" fontFamily="思源宋体" color="rgba(120, 120, 120, 1)">
+          <p>仿真平台搭建与关键指标对比</p>
+        </content>
+      </shape>
+      <line id="boM" startX="80" startY="456" endX="880.0006249997559" endY="456">
+        <border color="rgba(217, 217, 217, 1)" width="1"/>
+      </line>
+      <shape width="60" height="36" topLeftX="80" topLeftY="470" type="text" id="boT">
+        <content textType="headline" fontSize="24" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>05</p>
+        </content>
+      </shape>
+      <shape width="500" height="28" topLeftX="150" topLeftY="470" type="text" id="bon">
+        <content fontSize="19" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)">
+          <p>问题分析与后续计划</p>
+        </content>
+      </shape>
+      <shape width="600" height="18" topLeftX="150" topLeftY="500" type="text" id="box">
+        <content textType="caption" fontSize="11" fontFamily="思源宋体" color="rgba(120, 120, 120, 1)">
+          <p>当前不足、时间安排与预期成果</p>
+        </content>
+      </shape>
+    </data>
+    <note id="bhS">
+      <content>
+        <p>本次汇报分为五个部分：首先回顾研究背景与意义，其次介绍研究目标与技术路线，重点汇报已完成的视觉识别与路径规划工作，随后展示阶段性实验结果，最后分析当前存在的问题并给出后续工作计划。</p>
+      </content>
+    </note>
+  </slide>
+  <slide id="pSn">
+    <style>
+      <fill id="fSn">
+        <fillColor color="rgba(245, 243, 238, 1)"/>
+      </fill>
+    </style>
+    <data>
+      <line id="bhg" startX="80" startY="44" endX="880.0006249997559" endY="44">
+        <border color="rgba(183, 183, 183, 1)" width="1"/>
+      </line>
+      <shape width="400" height="20" topLeftX="80" topLeftY="26" type="text" id="bhx">
+        <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120, 120, 120, 1)" letterSpacing="1">
+          <p>01　研究背景与意义</p>
+        </content>
+      </shape>
+      <shape width="760" height="44" topLeftX="80" topLeftY="60" type="text" id="bhX">
+        <content textType="title" fontSize="30" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)" bold="true">
+          <p>研究背景与意义</p>
+        </content>
+      </shape>
+      <line id="bhR" startX="80" startY="116" endX="140.00833275470998" endY="116">
+        <border color="rgba(0, 47, 167, 1)"/>
+      </line>
+      <shape width="380" height="26" topLeftX="80" topLeftY="140" type="text" id="bhn">
+        <content fontSize="15" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>制造业智能化转型的必然要求</p>
+        </content>
+      </shape>
+      <shape width="380" height="90" topLeftX="80" topLeftY="170" type="text" id="bhA">
+        <content fontSize="13" fontFamily="思源宋体" color="rgba(56, 56, 56, 1)">
+          <p>&quot;工业4.0&quot;&quot;中国制造2025&quot;推动制造业由自动化向柔性化、智能化升级。在物流仓储、电子装配、食品医药等环节，分拣是物料流转的核心，其效率与柔性直接决定整条产线的产能与成本。</p>
+        </content>
+      </shape>
+      <shape width="380" height="26" topLeftX="80" topLeftY="278" type="text" id="bhH">
+        <content fontSize="15" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>传统分拣方式难以适应柔性需求</p>
+        </content>
+      </shape>
+      <shape width="380" height="100" topLeftX="80" topLeftY="308" type="text" id="bhF">
+        <content fontSize="13" fontFamily="思源宋体" color="rgba(56, 56, 56, 1)">
+          <p>人工分拣劳动强度大、一致性差、人力成本上升；传统工业机械臂依赖固定示教编程，仅适应结构化环境，对目标位姿变化、杂乱堆叠及未知物体的适应能力不足。</p>
+        </content>
+      </shape>
+      <line id="bhO" startX="490" startY="150" endX="490.00000000000006" endY="430.0017857085915">
+        <border color="rgba(183, 183, 183, 1)" width="1"/>
+      </line>
+      <shape width="360" height="26" topLeftX="520" topLeftY="140" type="text" id="bhJ">
+        <content fontSize="15" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>深度学习与智能规划带来新机遇</p>
+        </content>
+      </shape>
+      <shape width="360" height="130" topLeftX="520" topLeftY="170" type="text" id="bhQ">
+        <content fontSize="13" fontFamily="思源宋体" color="rgba(56, 56, 56, 1)">
+          <p>以 CNN 为代表的深度学习在目标检测、语义分割与 6D 位姿估计上取得突破，使机器人具备非结构化环境感知能力；A*、RRT*、智能优化等路径规划算法不断改进，为&quot;看得准、抓得稳、走得快&quot;的智能分拣提供了技术基础。</p>
+        </content>
+      </shape>
+      <shape width="3" height="86" topLeftX="520" topLeftY="336" presetHandlers="0" type="rect" id="bhi">
+        <fill>
+          <fillColor color="rgba(0, 47, 167, 1)"/>
+        </fill>
+        <content fontSize="16" fontFamily="思源黑体" color="rgba(31, 35, 41, 1)"/>
+      </shape>
+      <shape width="342" height="84" topLeftX="538" topLeftY="338" type="text" id="bhV">
+        <content fontSize="13" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)">
+          <p><strong><span color="rgba(0, 47, 167, 1)">研究意义　</span></strong>融合深度学习视觉感知与改进路径规划，提升机械臂在复杂分拣场景中的识别精度、抓取成功率与分拣效率，具有理论价值与工程意义。</p>
+        </content>
+      </shape>
+      <line id="bhc" startX="80" startY="490" endX="880.0006249997559" endY="490">
+        <border color="rgba(217, 217, 217, 1)" width="1"/>
+      </line>
+      <shape width="500" height="18" topLeftX="80" topLeftY="498" type="text" id="bhZ">
+        <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150, 150, 150, 1)">
+          <p>基于深度学习和改进路径规划的机械臂分拣系统研究</p>
+        </content>
+      </shape>
+      <shape width="80" height="18" topLeftX="800" topLeftY="498" type="text" id="bhu">
+        <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150, 150, 150, 1)" textAlign="right">
+          <p>03</p>
+        </content>
+      </shape>
+    </data>
+    <note id="bhk">
+      <content>
+        <p>首先介绍研究背景。制造业智能化转型对柔性分拣提出迫切需求，而传统人工与示教式机械臂在非结构化场景下适应性不足。深度学习与智能路径规划的发展，为解决这一矛盾提供了新的技术路径，这正是本课题的出发点。</p>
+      </content>
+    </note>
+  </slide>
+  <slide id="pSA">
+    <style>
+      <fill id="fSA">
+        <fillColor color="rgba(245, 243, 238, 1)"/>
+      </fill>
+    </style>
+    <data>
+      <line id="bhj" startX="80" startY="44" endX="880.0006249997559" endY="44">
+        <border color="rgba(183, 183, 183, 1)" width="1"/>
+      </line>
+      <shape width="400" height="20" topLeftX="80" topLeftY="26" type="text" id="bhW">
+        <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120, 120, 120, 1)" letterSpacing="1">
+          <p>02　研究目标与技术路线</p>
+        </content>
+      </shape>
+      <shape width="760" height="44" topLeftX="80" topLeftY="60" type="text" id="bhl">
+        <content textType="title" fontSize="30" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)" bold="true">
+          <p>研究目标与研究内容</p>
+        </content>
+      </shape>
+      <line id="bhI" startX="80" startY="116" endX="140.00833275470998" endY="116">
+        <border color="rgba(0, 47, 167, 1)"/>
+      </line>
+      <shape width="280" height="26" topLeftX="80" topLeftY="146" type="text" id="bhY">
+        <content fontSize="15" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>总体研究目标</p>
+        </content>
+      </shape>
+      <shape width="3" height="240" topLeftX="80" topLeftY="182" presetHandlers="0" type="rect" id="bhE">
+        <fill>
+          <fillColor color="rgba(0, 47, 167, 1)"/>
+        </fill>
+        <content fontSize="16" fontFamily="思源黑体" color="rgba(31, 35, 41, 1)"/>
+      </shape>
+      <shape width="260" height="240" topLeftX="100" topLeftY="184" type="text" id="bha">
+        <content fontSize="14" fontFamily="思源宋体" color="rgba(56, 56, 56, 1)" lineSpacing="multiple:1.7">
+          <p>面向复杂分拣场景，构建集<strong><span color="rgba(17, 17, 17, 1)">视觉感知、位姿估计与运动规划</span></strong>于一体的机械臂智能分拣系统。</p>
+          <p/>
+          <p>在保证目标识别精度与抓取成功率的同时，提升路径规划的<strong><span color="rgba(17, 17, 17, 1)">实时性与轨迹最优性</span></strong>，实现&quot;看得准、抓得稳、走得快&quot;。</p>
+        </content>
+      </shape>
+      <line id="bhv" startX="390.00000000000006" startY="150" endX="390.0000000000001" endY="440.0017241328058">
+        <border color="rgba(183, 183, 183, 1)" width="1"/>
+      </line>
+      <shape width="460" height="26" topLeftX="420" topLeftY="146" type="text" id="bht">
+        <content fontSize="15" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>主要研究内容</p>
+        </content>
+      </shape>
+      <shape width="50" height="30" topLeftX="420" topLeftY="186" type="text" id="bhr">
+        <content textType="headline" fontSize="20" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>1</p>
+        </content>
+      </shape>
+      <shape width="430" height="26" topLeftX="450" topLeftY="186" type="text" id="bhK">
+        <content fontSize="14" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)" bold="true">
+          <p>基于深度学习的目标识别与位姿估计</p>
+        </content>
+      </shape>
+      <shape width="430" height="52" topLeftX="450" topLeftY="214" type="text" id="bhs">
+        <content fontSize="12" fontFamily="思源宋体" color="rgba(90, 90, 90, 1)" lineSpacing="multiple:1.45">
+          <p>构建分拣工件数据集，研究改进的目标检测网络与 6D 位姿估计方法，实现对杂乱堆叠工件的识别与抓取位姿求解。</p>
+        </content>
+      </shape>
+      <shape width="50" height="30" topLeftX="420" topLeftY="278" type="text" id="bhb">
+        <content textType="headline" fontSize="20" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>2</p>
+        </content>
+      </shape>
+      <shape width="430" height="26" topLeftX="450" topLeftY="278" type="text" id="bhm">
+        <content fontSize="14" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)" bold="true">
+          <p>改进机械臂路径规划算法</p>
+        </content>
+      </shape>
+      <shape width="430" height="52" topLeftX="450" topLeftY="306" type="text" id="bhy">
+        <content fontSize="12" fontFamily="思源宋体" color="rgba(90, 90, 90, 1)" lineSpacing="multiple:1.45">
+          <p>针对 RRT* 等算法收敛慢、路径冗余问题，改进采样策略与代价函数，兼顾规划效率、路径长度与轨迹平滑度。</p>
+        </content>
+      </shape>
+      <shape width="50" height="30" topLeftX="420" topLeftY="370" type="text" id="bhw">
+        <content textType="headline" fontSize="20" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>3</p>
+        </content>
+      </shape>
+      <shape width="430" height="26" topLeftX="450" topLeftY="370" type="text" id="bhp">
+        <content fontSize="14" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)" bold="true">
+          <p>分拣系统集成与实验验证</p>
+        </content>
+      </shape>
+      <shape width="430" height="52" topLeftX="450" topLeftY="398" type="text" id="bhe">
+        <content fontSize="12" fontFamily="思源宋体" color="rgba(90, 90, 90, 1)" lineSpacing="multiple:1.45">
+          <p>搭建仿真（及实物）实验平台，完成视觉—规划—控制闭环，通过对比实验验证所提方法的有效性。</p>
+        </content>
+      </shape>
+      <line id="bhG" startX="80" startY="490" endX="880.0006249997559" endY="490">
+        <border color="rgba(217, 217, 217, 1)" width="1"/>
+      </line>
+      <shape width="500" height="18" topLeftX="80" topLeftY="498" type="text" id="bhD">
+        <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150, 150, 150, 1)">
+          <p>基于深度学习和改进路径规划的机械臂分拣系统研究</p>
+        </content>
+      </shape>
+      <shape width="80" height="18" topLeftX="800" topLeftY="498" type="text" id="bhd">
+        <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150, 150, 150, 1)" textAlign="right">
+          <p>04</p>
+        </content>
+      </shape>
+    </data>
+    <note id="bhN">
+      <content>
+        <p>本课题的总体目标是构建一套视觉感知与运动规划融合的智能分拣系统。围绕这一目标分解为三项研究内容：一是基于深度学习的目标识别与位姿估计，二是改进的机械臂路径规划算法，三是系统集成与实验验证。三者构成从感知到决策再到执行的完整链路。</p>
+      </content>
+    </note>
+  </slide>
+  <slide id="pSx">
+    <style>
+      <fill id="fSx">
+        <fillColor color="rgba(245, 243, 238, 1)"/>
+      </fill>
+    </style>
+    <data>
+      <line id="boL" startX="80" startY="44" endX="880.0006249997559" endY="44">
+        <border color="rgba(183, 183, 183, 1)" width="1"/>
+      </line>
+      <shape width="400" height="20" topLeftX="80" topLeftY="26" type="text" id="bMz">
+        <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120, 120, 120, 1)" letterSpacing="1">
+          <p>02　研究目标与技术路线</p>
+        </content>
+      </shape>
+      <shape width="760" height="44" topLeftX="80" topLeftY="60" type="text" id="bMk">
+        <content textType="title" fontSize="30" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)" bold="true">
+          <p>系统总体技术路线</p>
+        </content>
+      </shape>
+      <line id="bMg" startX="80" startY="116" endX="140.00833275470998" endY="116">
+        <border color="rgba(0, 47, 167, 1)"/>
+      </line>
+      <shape width="760" height="24" topLeftX="80" topLeftY="140" type="text" id="bMx">
+        <content fontSize="13" fontFamily="思源宋体" color="rgba(90, 90, 90, 1)">
+          <p>系统按&quot;感知—决策—执行&quot;三级闭环运行，视觉模块输出抓取位姿，规划模块输出无碰撞最优轨迹。</p>
+        </content>
+      </shape>
+      <shape width="175" height="150" topLeftX="80" topLeftY="200" presetHandlers="4" type="rect" id="bof">
+        <fill>
+          <fillColor color="rgba(255, 255, 255, 1)"/>
+        </fill>
+        <border color="rgba(0, 47, 167, 1)" width="1"/>
+        <content fontSize="16" fontFamily="思源黑体" color="rgba(31, 35, 41, 1)"/>
+      </shape>
+      <shape width="145" height="24" topLeftX="95" topLeftY="216" type="text" id="bMh">
+        <content fontSize="14" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>① 数据采集</p>
+        </content>
+      </shape>
+      <shape width="145" height="90" topLeftX="95" topLeftY="248" type="text" id="bMC">
+        <content fontSize="11" fontFamily="思源宋体" color="rgba(80, 80, 80, 1)" lineSpacing="multiple:1.45">
+          <p>RGB-D 相机采集点云与彩色图像；工件数据集构建与标注；点云预处理、配准与分割。</p>
+        </content>
+      </shape>
+      <line id="bMV" startX="262" startY="275" endX="298.01388621073824" endY="275">
+        <border color="rgba(0, 47, 167, 1)"/>
+        <endArrow type="arrow"/>
+      </line>
+      <shape width="175" height="150" topLeftX="305" topLeftY="200" presetHandlers="4" type="rect" id="bMc">
+        <fill>
+          <fillColor color="rgba(255, 255, 255, 1)"/>
+        </fill>
+        <border color="rgba(0, 47, 167, 1)" width="1"/>
+        <content fontSize="16" fontFamily="思源黑体" color="rgba(31, 35, 41, 1)"/>
+      </shape>
+      <shape width="145" height="24" topLeftX="320" topLeftY="216" type="text" id="bMQ">
+        <content fontSize="14" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>② 视觉感知</p>
+        </content>
+      </shape>
+      <shape width="145" height="90" topLeftX="320" topLeftY="248" type="text" id="boK">
+        <content fontSize="11" fontFamily="思源宋体" color="rgba(80, 80, 80, 1)" lineSpacing="multiple:1.45">
+          <p>改进目标检测网络识别工件类别；6D 位姿估计求解物体空间位姿；输出抓取点与抓取方向。</p>
+        </content>
+      </shape>
+      <line id="boq" startX="487" startY="275" endX="523.0138862107382" endY="275">
+        <border color="rgba(0, 47, 167, 1)"/>
+        <endArrow type="arrow"/>
+      </line>
+      <shape width="175" height="150" topLeftX="530" topLeftY="200" presetHandlers="4" type="rect" id="bMo">
+        <fill>
+          <fillColor color="rgba(255, 255, 255, 1)"/>
+        </fill>
+        <border color="rgba(0, 47, 167, 1)" width="1"/>
+        <content fontSize="16" fontFamily="思源黑体" color="rgba(31, 35, 41, 1)"/>
+      </shape>
+      <shape width="145" height="24" topLeftX="545" topLeftY="216" type="text" id="bMU">
+        <content fontSize="14" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>③ 路径规划</p>
+        </content>
+      </shape>
+      <shape width="145" height="90" topLeftX="545" topLeftY="248" type="text" id="bMO">
+        <content fontSize="11" fontFamily="思源宋体" color="rgba(80, 80, 80, 1)" lineSpacing="multiple:1.45">
+          <p>改进 RRT* / 智能优化算法；碰撞检测；路径平滑与时间最优参数化。</p>
+        </content>
+      </shape>
+      <line id="bMJ" startX="712" startY="275" endX="748.0138862107382" endY="275">
+        <border color="rgba(0, 47, 167, 1)"/>
+        <endArrow type="arrow"/>
+      </line>
+      <shape width="125" height="150" topLeftX="755" topLeftY="200" presetHandlers="4" type="rect" id="bMH">
+        <fill>
+          <fillColor color="rgba(0, 47, 167, 1)"/>
+        </fill>
+        <content fontSize="16" fontFamily="思源黑体" color="rgba(31, 35, 41, 1)"/>
+      </shape>
+      <shape width="95" height="24" topLeftX="770" topLeftY="216" type="text" id="boB">
+        <content fontSize="14" fontFamily="思源宋体" color="rgba(255, 255, 255, 1)" bold="true">
+          <p>④ 分拣执行</p>
+        </content>
+      </shape>
+      <shape width="95" height="90" topLeftX="770" topLeftY="248" type="text" id="boP">
+        <content fontSize="11" fontFamily="思源宋体" color="rgba(230, 230, 230, 1)" lineSpacing="multiple:1.45">
+          <p>机械臂轨迹跟踪抓取与放置；多工件连续分拣闭环。</p>
+        </content>
+      </shape>
+      <line id="bMM" startX="80" startY="400" endX="880.0006249997559" endY="400">
+        <border color="rgba(217, 217, 217, 1)" width="1"/>
+      </line>
+      <shape width="760" height="24" topLeftX="80" topLeftY="414" type="text" id="bMT">
+        <content fontSize="12" fontFamily="思源宋体" color="rgba(90, 90, 90, 1)">
+          <p><strong><span color="rgba(0, 47, 167, 1)">两条主线：</span></strong>视觉感知保证&quot;看得准&quot;，改进路径规划保证&quot;走得快&quot;，二者在分拣任务层协同优化。</p>
+        </content>
+      </shape>
+      <line id="bMn" startX="80" startY="490" endX="880.0006249997559" endY="490">
+        <border color="rgba(217, 217, 217, 1)" width="1"/>
+      </line>
+      <shape width="500" height="18" topLeftX="80" topLeftY="498" type="text" id="bMA">
+        <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150, 150, 150, 1)">
+          <p>基于深度学习和改进路径规划的机械臂分拣系统研究</p>
+        </content>
+      </shape>
+      <shape width="80" height="18" topLeftX="800" topLeftY="498" type="text" id="bMX">
+        <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150, 150, 150, 1)" textAlign="right">
+          <p>05</p>
+        </content>
+      </shape>
+    </data>
+    <note id="boS">
+      <content>
+        <p>这是系统总体技术路线。整个系统按感知—决策—执行三级闭环运行：首先通过RGB-D相机采集数据并构建数据集；随后由深度学习模型完成目标检测与6D位姿估计，输出抓取位姿；接着由改进路径规划算法生成无碰撞最优轨迹；最后驱动机械臂完成抓取与放置。视觉与规划两条主线在分拣任务层协同。</p>
+      </content>
+    </note>
+  </slide>
+  <slide id="pSf">
+    <style>
+      <fill id="fSf">
+        <fillColor color="rgba(245, 243, 238, 1)"/>
+      </fill>
+    </style>
+    <data>
+      <line id="bop" startX="80" startY="44" endX="880.0006249997559" endY="44">
+        <border color="rgba(183, 183, 183, 1)" width="1"/>
+      </line>
+      <shape width="400" height="20" topLeftX="80" topLeftY="26" type="text" id="bom">
+        <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120, 120, 120, 1)" letterSpacing="1">
+          <p>03　已完成的研究工作</p>
+        </content>
+      </shape>
+      <shape width="760" height="44" topLeftX="80" topLeftY="60" type="text" id="bow">
+        <content textType="title" fontSize="30" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)" bold="true">
+          <p>研究进度总览</p>
+        </content>
+      </shape>
+      <line id="boY" startX="80" startY="116" endX="140.00833275470998" endY="116">
+        <border color="rgba(0, 47, 167, 1)"/>
+      </line>
+      <shape width="760" height="24" topLeftX="80" topLeftY="140" type="text" id="boZ">
+        <content fontSize="13" fontFamily="思源宋体" color="rgba(90, 90, 90, 1)">
+          <p>截至目前，课题按计划推进，主体算法已完成仿真验证，整体进度约完成 60%。</p>
+        </content>
+      </shape>
+      <line id="boN" startX="140" startY="280" endX="460.00156249618533" endY="280">
+        <border color="rgba(183, 183, 183, 1)"/>
+      </line>
+      <line id="boG" startX="508" startY="280" endX="820.0016025599868" endY="280">
+        <border color="rgba(183, 183, 183, 1)"/>
+      </line>
+      <shape width="200" height="24" topLeftX="82" topLeftY="180" type="text" id="bod">
+        <content fontSize="14" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true" textAlign="center">
+          <p>开题阶段</p>
+        </content>
+      </shape>
+      <shape width="200" height="56" topLeftX="82" topLeftY="210" type="text" id="boi">
+        <content textType="caption" fontSize="11" fontFamily="思源宋体" color="rgba(90, 90, 90, 1)" lineSpacing="multiple:1.4" textAlign="center">
+          <p>文献调研　开题报告</p>
+          <p>方案论证　任务分解</p>
+        </content>
+      </shape>
+      <shape width="24" height="24" topLeftX="170" topLeftY="268" type="ellipse" id="boa">
+        <fill>
+          <fillColor color="rgba(0, 47, 167, 1)"/>
+        </fill>
+        <content fontSize="16" fontFamily="思源黑体" color="rgba(31, 35, 41, 1)"/>
+      </shape>
+      <shape width="200" height="20" topLeftX="82" topLeftY="300" type="text" id="bol">
+        <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120, 120, 120, 1)" textAlign="center">
+          <p>已完成</p>
+        </content>
+      </shape>
+      <shape width="44" height="44" topLeftX="462" topLeftY="262" type="ellipse" id="boF">
+        <border color="rgba(0, 47, 167, 1)" width="1"/>
+        <content fontSize="16" fontFamily="思源黑体" color="rgba(31, 35, 41, 1)"/>
+      </shape>
+      <shape width="32" height="32" topLeftX="468" topLeftY="268" type="ellipse" id="bob">
+        <fill>
+          <fillColor color="rgba(0, 47, 167, 1)"/>
+        </fill>
+        <content fontSize="16" fontFamily="思源黑体" color="rgba(31, 35, 41, 1)"/>
+      </shape>
+      <shape width="200" height="24" topLeftX="384" topLeftY="180" type="text" id="bot">
+        <content fontSize="14" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)" bold="true" textAlign="center">
+          <p>中期阶段（当前）</p>
+        </content>
+      </shape>
+      <shape width="220" height="50" topLeftX="374" topLeftY="206" type="text" id="boy">
+        <content textType="caption" fontSize="11" fontFamily="思源宋体" color="rgba(60, 60, 60, 1)" lineSpacing="multiple:1.4" textAlign="center">
+          <p>视觉模型搭建　路径规划算法改进</p>
+          <p>仿真实验与对比分析</p>
+        </content>
+      </shape>
+      <shape width="200" height="20" topLeftX="384" topLeftY="318" type="text" id="boR">
+        <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true" textAlign="center">
+          <p>进行中 · 本次汇报重点</p>
+        </content>
+      </shape>
+      <shape width="200" height="24" topLeftX="670" topLeftY="180" type="text" id="boe">
+        <content fontSize="14" fontFamily="思源宋体" color="rgba(90, 90, 90, 1)" bold="true" textAlign="center">
+          <p>结题阶段</p>
+        </content>
+      </shape>
+      <shape width="180" height="56" topLeftX="680" topLeftY="210" type="text" id="boD">
+        <content textType="caption" fontSize="11" fontFamily="思源宋体" color="rgba(120, 120, 120, 1)" lineSpacing="multiple:1.4" textAlign="center">
+          <p>系统集成　实物验证</p>
+          <p>论文撰写　答辩</p>
+        </content>
+      </shape>
+      <shape width="24" height="24" topLeftX="758" topLeftY="268" type="ellipse" id="bou">
+        <fill>
+          <fillColor color="rgba(245, 243, 238, 1)"/>
+        </fill>
+        <border color="rgba(150, 150, 150, 1)"/>
+        <content fontSize="16" fontFamily="思源黑体" color="rgba(31, 35, 41, 1)"/>
+      </shape>
+      <shape width="200" height="20" topLeftX="670" topLeftY="300" type="text" id="boj">
+        <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(150, 150, 150, 1)" textAlign="center">
+          <p>待开展</p>
+        </content>
+      </shape>
+      <line id="boE" startX="80" startY="380" endX="880.0006249997559" endY="380">
+        <border color="rgba(217, 217, 217, 1)" width="1"/>
+      </line>
+      <shape width="760" height="24" topLeftX="80" topLeftY="394" type="text" id="boW">
+        <content fontSize="13" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)" bold="true">
+          <p>已完成工作清单</p>
+        </content>
+      </shape>
+      <shape width="380" height="60" topLeftX="80" topLeftY="424" type="text" id="boI">
+        <content fontSize="12" fontFamily="思源宋体" color="rgba(56, 56, 56, 1)" lineSpacing="multiple:1.6">
+          <p>· 分拣工件数据集采集与标注</p>
+          <p>· 目标检测与位姿估计模型搭建训练</p>
+        </content>
+      </shape>
+      <shape width="380" height="60" topLeftX="490" topLeftY="424" type="text" id="boH">
+        <content fontSize="12" fontFamily="思源宋体" color="rgba(56, 56, 56, 1)" lineSpacing="multiple:1.6">
+          <p>· 改进路径规划算法设计与仿真</p>
+          <p>· 对比实验平台搭建与初步验证</p>
+        </content>
+      </shape>
+      <line id="bos" startX="80" startY="490" endX="880.0006249997559" endY="490">
+        <border color="rgba(217, 217, 217, 1)" width="1"/>
+      </line>
+      <shape width="500" height="18" topLeftX="80" topLeftY="498" type="text" id="bov">
+        <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150, 150, 150, 1)">
+          <p>基于深度学习和改进路径规划的机械臂分拣系统研究</p>
+        </content>
+      </shape>
+      <shape width="80" height="18" topLeftX="800" topLeftY="498" type="text" id="bor">
+        <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150, 150, 150, 1)" textAlign="right">
+          <p>06</p>
+        </content>
+      </shape>
+    </data>
+    <note id="boX">
+      <content>
+        <p>这是课题整体进度。开题阶段的文献调研、开题报告和方案论证已完成；当前处于中期阶段，视觉模型与改进路径规划算法的主体工作已经完成，正在进行仿真实验与优化；后续将开展系统集成、实物验证和论文撰写。整体进度约完成百分之六十，符合预期计划。</p>
+      </content>
+    </note>
+  </slide>
+  <slide id="pSg">
+    <style>
+      <fill id="fSg">
+        <fillColor color="rgba(245, 243, 238, 1)"/>
+      </fill>
+    </style>
+    <data>
+      <line id="bzA" startX="80" startY="44" endX="880.0006249997559" endY="44">
+        <border color="rgba(183, 183, 183, 1)" width="1"/>
+      </line>
+      <shape width="500" height="20" topLeftX="80" topLeftY="26" type="text" id="bzu">
+        <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120, 120, 120, 1)" letterSpacing="1">
+          <p>03　已完成的研究工作 · 7.1</p>
+        </content>
+      </shape>
+      <shape width="760" height="44" topLeftX="80" topLeftY="60" type="text" id="bMP">
+        <content textType="title" fontSize="28" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)" bold="true">
+          <p>基于深度学习的目标识别与位姿估计</p>
+        </content>
+      </shape>
+      <line id="bzU" startX="80" startY="112" endX="140.00833275470998" endY="112">
+        <border color="rgba(0, 47, 167, 1)"/>
+      </line>
+      <shape width="380" height="24" topLeftX="80" topLeftY="138" type="text" id="bzJ">
+        <content fontSize="15" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>主要完成工作</p>
+        </content>
+      </shape>
+      <shape width="30" height="24" topLeftX="80" topLeftY="172" type="text" id="bzR">
+        <content fontSize="13" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>①</p>
+        </content>
+      </shape>
+      <shape width="350" height="24" topLeftX="108" topLeftY="172" type="text" id="bMq">
+        <content fontSize="13" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)" bold="true">
+          <p>数据集构建与标注</p>
+        </content>
+      </shape>
+      <shape width="350" height="44" topLeftX="108" topLeftY="198" type="text" id="bzC">
+        <content fontSize="11" fontFamily="思源宋体" color="rgba(90, 90, 90, 1)" lineSpacing="multiple:1.45">
+          <p>采集分拣工件 RGB-D 图像与点云，完成类别标注与 6D 位姿标注，构建训练 / 验证 / 测试集。</p>
+        </content>
+      </shape>
+      <shape width="30" height="24" topLeftX="80" topLeftY="252" type="text" id="bzc">
+        <content fontSize="13" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>②</p>
+        </content>
+      </shape>
+      <shape width="350" height="24" topLeftX="108" topLeftY="252" type="text" id="bzF">
+        <content fontSize="13" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)" bold="true">
+          <p>改进目标检测网络</p>
+        </content>
+      </shape>
+      <shape width="350" height="44" topLeftX="108" topLeftY="278" type="text" id="bMf">
+        <content fontSize="11" fontFamily="思源宋体" color="rgba(90, 90, 90, 1)" lineSpacing="multiple:1.45">
+          <p>以 YOLO 系列为基线，引入轻量注意力机制与多尺度特征融合，提升小目标与遮挡目标检测精度。</p>
+        </content>
+      </shape>
+      <shape width="30" height="24" topLeftX="80" topLeftY="332" type="text" id="bzz">
+        <content fontSize="13" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>③</p>
+        </content>
+      </shape>
+      <shape width="350" height="24" topLeftX="108" topLeftY="332" type="text" id="bzg">
+        <content fontSize="13" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)" bold="true">
+          <p>抓取位姿估计</p>
+        </content>
+      </shape>
+      <shape width="350" height="44" topLeftX="108" topLeftY="358" type="text" id="bzZ">
+        <content fontSize="11" fontFamily="思源宋体" color="rgba(90, 90, 90, 1)" lineSpacing="multiple:1.45">
+          <p>在检测结果基础上估计物体 6D 位姿，结合夹爪尺寸求解可行抓取点与接近方向。</p>
+        </content>
+      </shape>
+      <line id="bzi" startX="499.99999999999994" startY="150" endX="500" endY="440.0017241328058">
+        <border color="rgba(183, 183, 183, 1)" width="1"/>
+      </line>
+      <shape width="350" height="24" topLeftX="530" topLeftY="138" type="text" id="bMS">
+        <content fontSize="15" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>初步训练结果</p>
+        </content>
+      </shape>
+      <table id="bzM" width="350" height="150" topLeftX="530" topLeftY="176">
+        <colgroup>
+          <col span="1" width="150"/>
+          <col span="2" width="100"/>
+        </colgroup>
+        <tr height="39">
+          <td id="bzO">
+            <fill>
+              <fillColor color="rgba(0, 47, 167, 1)"/>
+            </fill>
+            <content fontSize="11" fontFamily="思源黑体" color="rgba(255, 255, 255, 1)" bold="true">
+              <p>指标</p>
+            </content>
+          </td>
+          <td id="bzH">
+            <fill>
+              <fillColor color="rgba(0, 47, 167, 1)"/>
+            </fill>
+            <content fontSize="11" fontFamily="思源黑体" color="rgba(255, 255, 255, 1)" bold="true">
+              <p>基线模型</p>
+            </content>
+          </td>
+          <td id="bMK">
+            <fill>
+              <fillColor color="rgba(0, 47, 167, 1)"/>
+            </fill>
+            <content fontSize="11" fontFamily="思源黑体" color="rgba(255, 255, 255, 1)" bold="true">
+              <p>改进模型</p>
+            </content>
+          </td>
+        </tr>
+        <tr height="37">
+          <td id="bzh">
+            <content fontSize="11" fontFamily="思源黑体" textAlign="left">
+              <p>mAP@0.5</p>
+            </content>
+          </td>
+          <td id="bzV">
+            <content fontSize="11" fontFamily="思源黑体">
+              <p>待填</p>
+            </content>
+          </td>
+          <td id="bzQ">
+            <content fontSize="11" fontFamily="思源黑体" color="rgba(0, 47, 167, 1)" bold="true">
+              <p>待填</p>
+            </content>
+          </td>
+        </tr>
+        <tr height="37">
+          <td id="bMY">
+            <content fontSize="11" fontFamily="思源黑体" textAlign="left">
+              <p>推理速度 (FPS)</p>
+            </content>
+          </td>
+          <td id="bML">
+            <content fontSize="11" fontFamily="思源黑体">
+              <p>待填</p>
+            </content>
+          </td>
+          <td id="bzk">
+            <content fontSize="11" fontFamily="思源黑体" color="rgba(0, 47, 167, 1)" bold="true">
+              <p>待填</p>
+            </content>
+          </td>
+        </tr>
+        <tr height="37">
+          <td id="bzx">
+            <content fontSize="11" fontFamily="思源黑体" textAlign="left">
+              <p>位姿估计误差</p>
+            </content>
+          </td>
+          <td id="bzE">
+            <content fontSize="11" fontFamily="思源黑体">
+              <p>待填</p>
+            </content>
+          </td>
+          <td id="bMd">
+            <content fontSize="11" fontFamily="思源黑体" color="rgba(0, 47, 167, 1)" bold="true">
+              <p>待填</p>
+            </content>
+          </td>
+        </tr>
+      </table>
+      <shape width="350" height="60" topLeftX="530" topLeftY="346" type="text" id="bzn">
+        <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(130, 130, 130, 1)" lineSpacing="multiple:1.4">
+          <p>注：上表数值为占位，正式答辩前替换为真实训练结果；建议附检测 / 位姿估计可视化效果图。</p>
+        </content>
+      </shape>
+      <line id="bzX" startX="80" startY="490" endX="880.0006249997559" endY="490">
+        <border color="rgba(217, 217, 217, 1)" width="1"/>
+      </line>
+      <shape width="500" height="18" topLeftX="80" topLeftY="498" type="text" id="bMB">
+        <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150, 150, 150, 1)">
+          <p>基于深度学习和改进路径规划的机械臂分拣系统研究</p>
+        </content>
+      </shape>
+      <shape width="80" height="18" topLeftX="800" topLeftY="498" type="text" id="bzo">
+        <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150, 150, 150, 1)" textAlign="right">
+          <p>07</p>
+        </content>
+      </shape>
+    </data>
+    <note id="bzT">
+      <content>
+        <p>第一部分已完成工作是视觉识别。我们构建了分拣工件数据集并完成标注；以YOLO系列为基线，引入注意力机制与多尺度特征融合改进检测网络；在检测基础上估计6D位姿并求解抓取位姿。右侧表格为初步训练结果对比，正式答辩前将替换为真实数据，并补充检测与位姿估计的可视化效果图。</p>
+      </content>
+    </note>
+  </slide>
+  <slide id="pSP">
+    <style>
+      <fill id="fSP">
+        <fillColor color="rgba(245, 243, 238, 1)"/>
+      </fill>
+    </style>
+    <data>
+      <line id="bME" startX="80" startY="44" endX="880.0006249997559" endY="44">
+        <border color="rgba(183, 183, 183, 1)" width="1"/>
+      </line>
+      <shape width="500" height="20" topLeftX="80" topLeftY="26" type="text" id="bMa">
+        <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120, 120, 120, 1)" letterSpacing="1">
+          <p>03　已完成的研究工作 · 7.2</p>
+        </content>
+      </shape>
+      <shape width="760" height="44" topLeftX="80" topLeftY="60" type="text" id="bMW">
+        <content textType="title" fontSize="28" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)" bold="true">
+          <p>改进机械臂路径规划算法</p>
+        </content>
+      </shape>
+      <line id="bMl" startX="80" startY="112" endX="140.00833275470998" endY="112">
+        <border color="rgba(0, 47, 167, 1)"/>
+      </line>
+      <shape width="360" height="24" topLeftX="80" topLeftY="140" type="text" id="bMI">
+        <content fontSize="15" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>基线算法与存在问题</p>
+        </content>
+      </shape>
+      <shape width="360" height="44" topLeftX="80" topLeftY="174" type="text" id="bMF">
+        <content fontSize="12" fontFamily="思源宋体" color="rgba(56, 56, 56, 1)">
+          <p>选取 RRT* 作为基线。其在机械臂高维构型空间中具备概率完备性，但直接应用于分拣任务存在以下不足：</p>
+        </content>
+      </shape>
+      <shape width="360" height="130" topLeftX="80" topLeftY="232" type="text" id="bMN">
+        <content fontSize="12" fontFamily="思源宋体" color="rgba(56, 56, 56, 1)" lineSpacing="multiple:1.7">
+          <p>· 随机采样导致初始可行解获取慢，规划时间长</p>
+          <p>· 路径含冗余节点，转折多、不平滑</p>
+          <p>· 仅以路径长度为代价，未考虑碰撞风险与执行效率</p>
+        </content>
+      </shape>
+      <line id="bMj" startX="480.00000000000006" startY="150" endX="480.0000000000001" endY="430.0017857085915">
+        <border color="rgba(183, 183, 183, 1)" width="1"/>
+      </line>
+      <shape width="370" height="24" topLeftX="510" topLeftY="140" type="text" id="bMG">
+        <content fontSize="15" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>本文改进策略</p>
+        </content>
+      </shape>
+      <shape width="30" height="24" topLeftX="510" topLeftY="176" type="text" id="bMD">
+        <content fontSize="13" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>①</p>
+        </content>
+      </shape>
+      <shape width="340" height="24" topLeftX="538" topLeftY="176" type="text" id="bMi">
+        <content fontSize="13" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)" bold="true">
+          <p>目标偏置混合采样</p>
+        </content>
+      </shape>
+      <shape width="340" height="40" topLeftX="538" topLeftY="202" type="text" id="bMp">
+        <content fontSize="11" fontFamily="思源宋体" color="rgba(90, 90, 90, 1)" lineSpacing="multiple:1.45">
+          <p>引入目标偏向采样与启发式引导，引导树向目标生长，加速初始可行解收敛。</p>
+        </content>
+      </shape>
+      <shape width="30" height="24" topLeftX="510" topLeftY="252" type="text" id="bMe">
+        <content fontSize="13" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>②</p>
+        </content>
+      </shape>
+      <shape width="340" height="24" topLeftX="538" topLeftY="252" type="text" id="bMm">
+        <content fontSize="13" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)" bold="true">
+          <p>综合代价函数</p>
+        </content>
+      </shape>
+      <shape width="340" height="40" topLeftX="538" topLeftY="278" type="text" id="bMy">
+        <content fontSize="11" fontFamily="思源宋体" color="rgba(90, 90, 90, 1)" lineSpacing="multiple:1.45">
+          <p>融合路径长度、关节运动平滑度与障碍距离，构造综合代价函数优化重选父节点。</p>
+        </content>
+      </shape>
+      <shape width="30" height="24" topLeftX="510" topLeftY="328" type="text" id="bMw">
+        <content fontSize="13" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>③</p>
+        </content>
+      </shape>
+      <shape width="340" height="24" topLeftX="538" topLeftY="328" type="text" id="bMZ">
+        <content fontSize="13" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)" bold="true">
+          <p>路径剪枝与平滑</p>
+        </content>
+      </shape>
+      <shape width="340" height="40" topLeftX="538" topLeftY="354" type="text" id="bMu">
+        <content fontSize="11" fontFamily="思源宋体" color="rgba(90, 90, 90, 1)" lineSpacing="multiple:1.45">
+          <p>对规划路径进行冗余节点剪枝，并采用 B 样条插值平滑，生成可直接跟踪的连续轨迹。</p>
+        </content>
+      </shape>
+      <line id="bMs" startX="80" startY="430" endX="880.0006249997559" endY="430">
+        <border color="rgba(217, 217, 217, 1)" width="1"/>
+      </line>
+      <shape width="800" height="24" topLeftX="80" topLeftY="444" type="text" id="bMb">
+        <content fontSize="12" fontFamily="思源宋体" color="rgba(56, 56, 56, 1)">
+          <p><strong><span color="rgba(0, 47, 167, 1)">算法流程：</span></strong>初始化构型树 → 改进采样 → 碰撞检测与最近邻 → 综合代价重选父节点 → 路径剪枝平滑 → 输出最优轨迹</p>
+        </content>
+      </shape>
+      <line id="bMv" startX="80" startY="490" endX="880.0006249997559" endY="490">
+        <border color="rgba(217, 217, 217, 1)" width="1"/>
+      </line>
+      <shape width="500" height="18" topLeftX="80" topLeftY="498" type="text" id="bMt">
+        <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150, 150, 150, 1)">
+          <p>基于深度学习和改进路径规划的机械臂分拣系统研究</p>
+        </content>
+      </shape>
+      <shape width="80" height="18" topLeftX="800" topLeftY="498" type="text" id="bMr">
+        <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150, 150, 150, 1)" textAlign="right">
+          <p>08</p>
+        </content>
+      </shape>
+    </data>
+    <note id="bMR">
+      <content>
+        <p>第二部分是改进路径规划算法。我们以RRT*为基线，针对其收敛慢、路径冗余、代价单一三个问题，从目标偏置混合采样、综合代价函数、路径剪枝与B样条平滑三方面进行改进。改进后算法在保证概率完备的同时，提升了规划速度与轨迹质量，下一页将给出与基线算法的对比实验结果。</p>
+      </content>
+    </note>
+  </slide>
+  <slide id="pSe">
+    <style>
+      <fill id="fSe">
+        <fillColor color="rgba(245, 243, 238, 1)"/>
+      </fill>
+    </style>
+    <data>
+      <line id="bCZ" startX="80" startY="44" endX="880.0006249997559" endY="44">
+        <border color="rgba(183, 183, 183, 1)" width="1"/>
+      </line>
+      <shape width="500" height="20" topLeftX="80" topLeftY="26" type="text" id="bzD">
+        <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120, 120, 120, 1)" letterSpacing="1">
+          <p>04　阶段性实验与结果分析</p>
+        </content>
+      </shape>
+      <shape width="760" height="44" topLeftX="80" topLeftY="60" type="text" id="bzS">
+        <content textType="title" fontSize="28" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)" bold="true">
+          <p>阶段性实验与结果分析</p>
+        </content>
+      </shape>
+      <line id="bCz" startX="80" startY="112" endX="140.00833275470998" endY="112">
+        <border color="rgba(0, 47, 167, 1)"/>
+      </line>
+      <shape width="300" height="24" topLeftX="80" topLeftY="140" type="text" id="bCn">
+        <content fontSize="15" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>实验设置</p>
+        </content>
+      </shape>
+      <shape width="300" height="200" topLeftX="80" topLeftY="174" type="text" id="bCX">
+        <content fontSize="12" fontFamily="思源宋体" color="rgba(56, 56, 56, 1)" lineSpacing="multiple:1.75">
+          <p><strong>仿真平台：</strong>ROS + Gazebo / MoveIt</p>
+          <p><strong>机械臂：</strong>6 自由度工业机械臂</p>
+          <p><strong>实验场景：</strong>含障碍的分拣工位</p>
+          <p><strong>对比方法：</strong>RRT*、改进 RRT*</p>
+          <p><strong>评价指标：</strong>规划时间、路径长度、转折数、成功率</p>
+          <p><strong>实验次数：</strong>每组 20 次取均值</p>
+        </content>
+      </shape>
+      <line id="bzy" startX="410" startY="150" endX="410.00000000000006" endY="430.0017857085915">
+        <border color="rgba(183, 183, 183, 1)" width="1"/>
+      </line>
+      <shape width="440" height="24" topLeftX="440" topLeftY="140" type="text" id="bzB">
+        <content fontSize="15" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>路径规划算法对比（示意数据）</p>
+        </content>
+      </shape>
+      <table id="bCM" width="440" height="180" topLeftX="440" topLeftY="178">
+        <colgroup>
+          <col span="1" width="170"/>
+          <col span="2" width="100"/>
+          <col span="1" width="70"/>
+        </colgroup>
+        <tr height="38">
+          <td id="bCh">
+            <fill>
+              <fillColor color="rgba(0, 47, 167, 1)"/>
+            </fill>
+            <content fontSize="11" fontFamily="思源黑体" color="rgba(255, 255, 255, 1)" bold="true">
+              <p>评价指标</p>
+            </content>
+          </td>
+          <td id="bCV">
+            <fill>
+              <fillColor color="rgba(0, 47, 167, 1)"/>
+            </fill>
+            <content fontSize="11" fontFamily="思源黑体" color="rgba(255, 255, 255, 1)" bold="true">
+              <p>RRT*</p>
+            </content>
+          </td>
+          <td id="bCx">
+            <fill>
+              <fillColor color="rgba(0, 47, 167, 1)"/>
+            </fill>
+            <content fontSize="11" fontFamily="思源黑体" color="rgba(255, 255, 255, 1)" bold="true">
+              <p>改进算法</p>
+            </content>
+          </td>
+          <td id="bzd">
+            <fill>
+              <fillColor color="rgba(0, 47, 167, 1)"/>
+            </fill>
+            <content fontSize="11" fontFamily="思源黑体" color="rgba(255, 255, 255, 1)" bold="true">
+              <p>提升</p>
+            </content>
+          </td>
+        </tr>
+        <tr height="36">
+          <td id="bzL">
+            <content fontSize="11" fontFamily="思源黑体" textAlign="left">
+              <p>平均规划时间 (s)</p>
+            </content>
+          </td>
+          <td id="bCk">
+            <content fontSize="11" fontFamily="思源黑体">
+              <p>待填</p>
+            </content>
+          </td>
+          <td id="bCA">
+            <content fontSize="11" fontFamily="思源黑体" color="rgba(0, 47, 167, 1)" bold="true">
+              <p>待填</p>
+            </content>
+          </td>
+          <td id="bzw">
+            <content fontSize="11" fontFamily="思源黑体" color="rgba(0, 47, 167, 1)">
+              <p>↓</p>
+            </content>
+          </td>
+        </tr>
+        <tr height="36">
+          <td id="bzP">
+            <content fontSize="11" fontFamily="思源黑体" textAlign="left">
+              <p>路径长度</p>
+            </content>
+          </td>
+          <td id="bCT">
+            <content fontSize="11" fontFamily="思源黑体">
+              <p>待填</p>
+            </content>
+          </td>
+          <td id="bCJ">
+            <content fontSize="11" fontFamily="思源黑体" color="rgba(0, 47, 167, 1)" bold="true">
+              <p>待填</p>
+            </content>
+          </td>
+          <td id="bCF">
+            <content fontSize="11" fontFamily="思源黑体" color="rgba(0, 47, 167, 1)">
+              <p>↓</p>
+            </content>
+          </td>
+        </tr>
+        <tr height="36">
+          <td id="bzr">
+            <content fontSize="11" fontFamily="思源黑体" textAlign="left">
+              <p>路径转折数</p>
+            </content>
+          </td>
+          <td id="bzq">
+            <content fontSize="11" fontFamily="思源黑体">
+              <p>待填</p>
+            </content>
+          </td>
+          <td id="bCU">
+            <content fontSize="11" fontFamily="思源黑体" color="rgba(0, 47, 167, 1)" bold="true">
+              <p>待填</p>
+            </content>
+          </td>
+          <td id="bCc">
+            <content fontSize="11" fontFamily="思源黑体" color="rgba(0, 47, 167, 1)">
+              <p>↓</p>
+            </content>
+          </td>
+        </tr>
+        <tr height="34">
+          <td id="bCi">
+            <content fontSize="11" fontFamily="思源黑体" textAlign="left">
+              <p>规划成功率 (%)</p>
+            </content>
+          </td>
+          <td id="bzI">
+            <content fontSize="11" fontFamily="思源黑体">
+              <p>待填</p>
+            </content>
+          </td>
+          <td id="bzf">
+            <content fontSize="11" fontFamily="思源黑体" color="rgba(0, 47, 167, 1)" bold="true">
+              <p>待填</p>
+            </content>
+          </td>
+          <td id="bCC">
+            <content fontSize="11" fontFamily="思源黑体" color="rgba(0, 47, 167, 1)">
+              <p>↑</p>
+            </content>
+          </td>
+        </tr>
+      </table>
+      <shape width="440" height="20" topLeftX="440" topLeftY="376" type="text" id="bCH">
+        <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(130, 130, 130, 1)">
+          <p>注：表中数值为占位，正式答辩前替换为真实实验均值。</p>
+        </content>
+      </shape>
+      <line id="bzK" startX="80" startY="430" endX="880.0006249997559" endY="430">
+        <border color="rgba(217, 217, 217, 1)" width="1"/>
+      </line>
+      <shape width="800" height="40" topLeftX="80" topLeftY="444" type="text" id="bCo">
+        <content fontSize="12" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)">
+          <p><strong><span color="rgba(0, 47, 167, 1)">初步结论：</span></strong>改进算法在规划时间、路径长度与转折数上均优于 RRT* 基线，成功率相当或更高，验证了目标偏置采样与综合代价函数的有效性。</p>
+        </content>
+      </shape>
+      <line id="bCO" startX="80" startY="490" endX="880.0006249997559" endY="490">
+        <border color="rgba(217, 217, 217, 1)" width="1"/>
+      </line>
+      <shape width="500" height="18" topLeftX="80" topLeftY="498" type="text" id="bCQ">
+        <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150, 150, 150, 1)">
+          <p>基于深度学习和改进路径规划的机械臂分拣系统研究</p>
+        </content>
+      </shape>
+      <shape width="80" height="18" topLeftX="800" topLeftY="498" type="text" id="bzY">
+        <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150, 150, 150, 1)" textAlign="right">
+          <p>09</p>
+        </content>
+      </shape>
+    </data>
+    <note id="bCg">
+      <content>
+        <p>在ROS+Gazebo仿真平台上搭建了含障碍的分拣工位，对比RRT*与改进算法。从规划时间、路径长度、转折数和成功率四个指标进行评价，每组重复20次取均值。初步结果表明，改进算法在各项指标上均优于基线。正式答辩前将填入真实数据，并补充路径规划轨迹对比图。</p>
+      </content>
+    </note>
+  </slide>
+  <slide id="pSl">
+    <style>
+      <fill id="fSl">
+        <fillColor color="rgba(245, 243, 238, 1)"/>
+      </fill>
+    </style>
+    <data>
+      <line id="bzj" startX="80" startY="44" endX="880.0006249997559" endY="44">
+        <border color="rgba(183, 183, 183, 1)" width="1"/>
+      </line>
+      <shape width="500" height="20" topLeftX="80" topLeftY="26" type="text" id="bzv">
+        <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120, 120, 120, 1)" letterSpacing="1">
+          <p>05　问题分析与后续计划</p>
+        </content>
+      </shape>
+      <shape width="760" height="44" topLeftX="80" topLeftY="60" type="text" id="bzG">
+        <content textType="title" fontSize="28" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)" bold="true">
+          <p>当前存在的问题与不足</p>
+        </content>
+      </shape>
+      <line id="bzt" startX="80" startY="112" endX="140.00833275470998" endY="112">
+        <border color="rgba(0, 47, 167, 1)"/>
+      </line>
+      <shape width="360" height="26" topLeftX="80" topLeftY="146" type="text" id="bzs">
+        <content fontSize="15" fontFamily="思源宋体" color="rgba(76, 122, 90, 1)" bold="true">
+          <p>已初步验证</p>
+        </content>
+      </shape>
+      <shape width="360" height="220" topLeftX="80" topLeftY="186" type="text" id="bzN">
+        <content fontSize="13" fontFamily="思源宋体" color="rgba(56, 56, 56, 1)" lineSpacing="multiple:2">
+          <p>· 数据集采集与模型训练流程已跑通</p>
+          <p>· 改进路径规划算法仿真对比有效</p>
+          <p>· 感知模块与规划模块接口已打通</p>
+          <p>· 分拣任务主流程闭环可复现</p>
+        </content>
+      </shape>
+      <shape width="2" height="320" topLeftX="470" topLeftY="150" presetHandlers="0" type="rect" id="bze">
+        <fill>
+          <fillColor color="rgba(0, 47, 167, 1)"/>
+        </fill>
+        <content fontSize="16" fontFamily="思源黑体" color="rgba(31, 35, 41, 1)"/>
+      </shape>
+      <shape width="380" height="26" topLeftX="500" topLeftY="146" type="text" id="bzW">
+        <content fontSize="15" fontFamily="思源宋体" color="rgba(180, 60, 60, 1)" bold="true">
+          <p>尚未解决 / 待完善</p>
+        </content>
+      </shape>
+      <shape width="380" height="260" topLeftX="500" topLeftY="186" type="text" id="bzm">
+        <content fontSize="13" fontFamily="思源宋体" color="rgba(56, 56, 56, 1)" lineSpacing="multiple:1.9">
+          <p>· 复杂光照、强遮挡下识别鲁棒性不足</p>
+          <p>· 动态障碍下在线重规划实时性待提升</p>
+          <p>· 尚未在真实机械臂上完成闭环验证</p>
+          <p>· 多工件连续分拣的任务调度研究不足</p>
+        </content>
+      </shape>
+      <line id="bzl" startX="80" startY="490" endX="880.0006249997559" endY="490">
+        <border color="rgba(217, 217, 217, 1)" width="1"/>
+      </line>
+      <shape width="500" height="18" topLeftX="80" topLeftY="498" type="text" id="bzp">
+        <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150, 150, 150, 1)">
+          <p>基于深度学习和改进路径规划的机械臂分拣系统研究</p>
+        </content>
+      </shape>
+      <shape width="80" height="18" topLeftX="800" topLeftY="498" type="text" id="bza">
+        <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150, 150, 150, 1)" textAlign="right">
+          <p>10</p>
+        </content>
+      </shape>
+    </data>
+    <note id="bzb">
+      <content>
+        <p>客观汇报当前工作的不足。左侧是已经初步验证的部分，右侧是下一阶段需要重点解决的问题：一是复杂场景下视觉鲁棒性，二是动态重规划实时性，三是实物平台闭环验证，四是多工件连续分拣调度。这些问题将在后续工作中逐一解决。</p>
+      </content>
+    </note>
+  </slide>
+  <slide id="pSM">
+    <style>
+      <fill id="fSM">
+        <fillColor color="rgba(245, 243, 238, 1)"/>
+      </fill>
+    </style>
+    <data>
+      <line id="bCy" startX="80" startY="44" endX="880.0006249997559" endY="44">
+        <border color="rgba(183, 183, 183, 1)" width="1"/>
+      </line>
+      <shape width="500" height="20" topLeftX="80" topLeftY="26" type="text" id="bCw">
+        <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120, 120, 120, 1)" letterSpacing="1">
+          <p>05　问题分析与后续计划</p>
+        </content>
+      </shape>
+      <shape width="760" height="44" topLeftX="80" topLeftY="60" type="text" id="bCR">
+        <content textType="title" fontSize="28" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)" bold="true">
+          <p>后续工作计划</p>
+        </content>
+      </shape>
+      <line id="bCp" startX="80" startY="112" endX="140.00833275470998" endY="112">
+        <border color="rgba(0, 47, 167, 1)"/>
+      </line>
+      <shape width="80" height="18" topLeftX="200" topLeftY="140" type="text" id="bCe">
+        <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120, 120, 120, 1)" textAlign="center">
+          <p>2026.09</p>
+        </content>
+      </shape>
+      <shape width="80" height="18" topLeftX="340" topLeftY="140" type="text" id="bCG">
+        <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120, 120, 120, 1)" textAlign="center">
+          <p>2026.11</p>
+        </content>
+      </shape>
+      <shape width="80" height="18" topLeftX="480" topLeftY="140" type="text" id="bCD">
+        <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120, 120, 120, 1)" textAlign="center">
+          <p>2027.01</p>
+        </content>
+      </shape>
+      <shape width="80" height="18" topLeftX="620" topLeftY="140" type="text" id="bCd">
+        <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120, 120, 120, 1)" textAlign="center">
+          <p>2027.03</p>
+        </content>
+      </shape>
+      <shape width="80" height="18" topLeftX="760" topLeftY="140" type="text" id="bCu">
+        <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120, 120, 120, 1)" textAlign="center">
+          <p>2027.04</p>
+        </content>
+      </shape>
+      <line id="bCN" startX="200" startY="164" endX="840.0007812495231" endY="164">
+        <border color="rgba(217, 217, 217, 1)" width="1"/>
+      </line>
+      <shape width="110" height="24" topLeftX="80" topLeftY="186" type="text" id="bCj">
+        <content fontSize="12" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)" bold="true">
+          <p>视觉模型优化</p>
+        </content>
+      </shape>
+      <shape width="280" height="22" topLeftX="200" topLeftY="186" presetHandlers="3" type="rect" id="bCl">
+        <fill>
+          <fillColor color="rgba(0, 47, 167, 1)"/>
+        </fill>
+        <content fontSize="16" fontFamily="思源黑体" color="rgba(31, 35, 41, 1)"/>
+      </shape>
+      <shape width="110" height="24" topLeftX="80" topLeftY="246" type="text" id="bCI">
+        <content fontSize="12" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)" bold="true">
+          <p>动态重规划</p>
+        </content>
+      </shape>
+      <shape width="280" height="22" topLeftX="270" topLeftY="246" presetHandlers="3" type="rect" id="bCY">
+        <fill>
+          <fillColor color="rgba(0, 47, 167, 0.75)"/>
+        </fill>
+        <content fontSize="16" fontFamily="思源黑体" color="rgba(31, 35, 41, 1)"/>
+      </shape>
+      <shape width="110" height="24" topLeftX="80" topLeftY="306" type="text" id="bCE">
+        <content fontSize="12" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)" bold="true">
+          <p>系统集成与实物</p>
+        </content>
+      </shape>
+      <shape width="280" height="22" topLeftX="410" topLeftY="306" presetHandlers="3" type="rect" id="bCa">
+        <fill>
+          <fillColor color="rgba(0, 47, 167, 0.55)"/>
+        </fill>
+        <content fontSize="16" fontFamily="思源黑体" color="rgba(31, 35, 41, 1)"/>
+      </shape>
+      <shape width="110" height="24" topLeftX="80" topLeftY="366" type="text" id="bCW">
+        <content fontSize="12" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)" bold="true">
+          <p>论文撰写与答辩</p>
+        </content>
+      </shape>
+      <shape width="360" height="22" topLeftX="480" topLeftY="366" presetHandlers="3" type="rect" id="bCt">
+        <fill>
+          <fillColor color="rgba(0, 47, 167, 0.35)"/>
+        </fill>
+        <content fontSize="16" fontFamily="思源黑体" color="rgba(31, 35, 41, 1)"/>
+      </shape>
+      <line id="bCr" startX="80" startY="450" endX="880.0006249997559" endY="450">
+        <border color="rgba(217, 217, 217, 1)" width="1"/>
+      </line>
+      <shape width="800" height="24" topLeftX="80" topLeftY="460" type="text" id="bCK">
+        <content fontSize="12" fontFamily="思源宋体" color="rgba(56, 56, 56, 1)">
+          <p><strong><span color="rgba(0, 47, 167, 1)">近期重点：</span></strong>9–11 月完成视觉模型鲁棒性提升与动态重规划算法，年底前进入实物集成。</p>
+        </content>
+      </shape>
+      <line id="bCs" startX="80" startY="490" endX="880.0006249997559" endY="490">
+        <border color="rgba(217, 217, 217, 1)" width="1"/>
+      </line>
+      <shape width="500" height="18" topLeftX="80" topLeftY="498" type="text" id="bCb">
+        <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150, 150, 150, 1)">
+          <p>基于深度学习和改进路径规划的机械臂分拣系统研究</p>
+        </content>
+      </shape>
+      <shape width="80" height="18" topLeftX="800" topLeftY="498" type="text" id="bCv">
+        <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150, 150, 150, 1)" textAlign="right">
+          <p>11</p>
+        </content>
+      </shape>
+    </data>
+    <note id="bCm">
+      <content>
+        <p>后续工作计划按四个阶段安排：9到11月优化视觉模型鲁棒性；10到12月研究动态障碍下的在线重规划；12月到次年2月进行系统集成与实物验证；1月到4月撰写学位论文并准备答辩。近期重点是视觉模型优化和动态重规划，为年底实物集成做准备。</p>
+      </content>
+    </note>
+  </slide>
+  <slide id="pST">
+    <style>
+      <fill id="fST">
+        <fillColor color="rgba(245, 243, 238, 1)"/>
+      </fill>
+    </style>
+    <data>
+      <line id="bUh" startX="80" startY="44" endX="880.0006249997559" endY="44">
+        <border color="rgba(183, 183, 183, 1)" width="1"/>
+      </line>
+      <shape width="500" height="20" topLeftX="80" topLeftY="26" type="text" id="bUC">
+        <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120, 120, 120, 1)" letterSpacing="1">
+          <p>05　问题分析与后续计划</p>
+        </content>
+      </shape>
+      <shape width="760" height="44" topLeftX="80" topLeftY="60" type="text" id="bUV">
+        <content textType="title" fontSize="28" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)" bold="true">
+          <p>预期研究成果与创新点</p>
+        </content>
+      </shape>
+      <line id="bCB" startX="80" startY="112" endX="140.00833275470998" endY="112">
+        <border color="rgba(0, 47, 167, 1)"/>
+      </line>
+      <shape width="360" height="26" topLeftX="80" topLeftY="146" type="text" id="bCq">
+        <content fontSize="15" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>预期成果</p>
+        </content>
+      </shape>
+      <shape width="360" height="240" topLeftX="80" topLeftY="186" type="text" id="bUo">
+        <content fontSize="13" fontFamily="思源宋体" color="rgba(56, 56, 56, 1)" lineSpacing="multiple:2">
+          <p>· 完成硕士学位论文一篇</p>
+          <p>· 形成一套机械臂智能分拣系统（仿真 + 实物）</p>
+          <p>· 拟投稿学术论文 1–2 篇</p>
+          <p>· 申请软件著作权 / 发明专利（视进展）</p>
+        </content>
+      </shape>
+      <line id="bUU" startX="480.00000000000006" startY="150" endX="480.0000000000001" endY="430.0017857085915">
+        <border color="rgba(183, 183, 183, 1)" width="1"/>
+      </line>
+      <shape width="370" height="26" topLeftX="510" topLeftY="146" type="text" id="bUO">
+        <content fontSize="15" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>主要创新点</p>
+        </content>
+      </shape>
+      <shape width="30" height="24" topLeftX="510" topLeftY="186" type="text" id="bCS">
+        <content fontSize="13" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>①</p>
+        </content>
+      </shape>
+      <shape width="342" height="50" topLeftX="538" topLeftY="186" type="text" id="bCP">
+        <content fontSize="12" fontFamily="思源宋体" color="rgba(56, 56, 56, 1)">
+          <p><strong>视觉感知与运动规划协同</strong>：面向分拣任务，将视觉置信度反馈融入规划代价，实现感知—决策联合优化。</p>
+        </content>
+      </shape>
+      <shape width="30" height="24" topLeftX="510" topLeftY="252" type="text" id="bUM">
+        <content fontSize="13" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>②</p>
+        </content>
+      </shape>
+      <shape width="342" height="50" topLeftX="538" topLeftY="252" type="text" id="bUT">
+        <content fontSize="12" fontFamily="思源宋体" color="rgba(56, 56, 56, 1)">
+          <p><strong>改进采样式路径规划</strong>：目标偏置混合采样 + 综合代价函数 + 路径平滑，兼顾实时性与轨迹质量。</p>
+        </content>
+      </shape>
+      <shape width="30" height="24" topLeftX="510" topLeftY="318" type="text" id="bUn">
+        <content fontSize="13" fontFamily="思源宋体" color="rgba(0, 47, 167, 1)" bold="true">
+          <p>③</p>
+        </content>
+      </shape>
+      <shape width="342" height="50" topLeftX="538" topLeftY="318" type="text" id="bCL">
+        <content fontSize="12" fontFamily="思源宋体" color="rgba(56, 56, 56, 1)">
+          <p><strong>闭环实验验证</strong>：在真实机械臂平台完成视觉—规划—执行闭环，验证方法的工程可用性。</p>
+        </content>
+      </shape>
+      <line id="bUz" startX="80" startY="490" endX="880.0006249997559" endY="490">
+        <border color="rgba(217, 217, 217, 1)" width="1"/>
+      </line>
+      <shape width="500" height="18" topLeftX="80" topLeftY="498" type="text" id="bUk">
+        <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150, 150, 150, 1)">
+          <p>基于深度学习和改进路径规划的机械臂分拣系统研究</p>
+        </content>
+      </shape>
+      <shape width="80" height="18" topLeftX="800" topLeftY="498" type="text" id="bUg">
+        <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150, 150, 150, 1)" textAlign="right">
+          <p>12</p>
+        </content>
+      </shape>
+    </data>
+    <note id="bCf">
+      <content>
+        <p>预期成果包括学位论文、完整的分拣系统、学术论文以及软著专利。主要创新点有三：一是视觉与规划的协同优化，二是改进的采样式路径规划算法，三是在真实机械臂平台上完成闭环验证。后续将围绕这些目标继续推进。</p>
+      </content>
+    </note>
+  </slide>
+  <slide id="pSX">
+    <style>
+      <fill id="fSX">
+        <fillColor color="rgba(245, 243, 238, 1)"/>
+      </fill>
+    </style>
+    <data>
+      <shape width="960" height="6" topLeftX="0" topLeftY="0" presetHandlers="0" type="rect" id="bUJ">
+        <fill>
+          <fillColor color="rgba(0, 47, 167, 1)"/>
+        </fill>
+        <content fontSize="16" fontFamily="思源黑体" color="rgba(31, 35, 41, 1)"/>
+      </shape>
+      <shape width="960" height="6" topLeftX="0" topLeftY="534" presetHandlers="0" type="rect" id="bUA">
+        <fill>
+          <fillColor color="rgba(0, 47, 167, 1)"/>
+        </fill>
+        <content fontSize="16" fontFamily="思源黑体" color="rgba(31, 35, 41, 1)"/>
+      </shape>
+      <shape width="720" height="60" topLeftX="120" topLeftY="210" type="text" id="bUx">
+        <content textType="title" fontSize="40" fontFamily="思源宋体" color="rgba(17, 17, 17, 1)" bold="true" textAlign="center">
+          <p>恳请各位老师批评指正</p>
+        </content>
+      </shape>
+      <line id="bUQ" startX="400" startY="296" endX="560.003124969483" endY="296">
+        <border color="rgba(0, 47, 167, 1)"/>
+      </line>
+      <shape width="720" height="30" topLeftX="120" topLeftY="316" type="text" id="bUH">
+        <content fontSize="16" fontFamily="思源宋体" color="rgba(90, 90, 90, 1)" letterSpacing="2" textAlign="center">
+          <p>THANKS　FOR　YOUR　ATTENTION</p>
+        </content>
+      </shape>
+    </data>
+    <note id="bUc">
+      <content>
+        <p>以上就是我的中期汇报内容。感谢导师和实验室同学在课题开展过程中的指导与帮助，恳请各位老师批评指正，谢谢！</p>
+      </content>
+    </note>
+  </slide>
+</presentation>

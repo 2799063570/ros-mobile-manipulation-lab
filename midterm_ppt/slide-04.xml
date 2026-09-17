@@ -1,0 +1,116 @@
+<slide>
+  <style>
+    <fill><fillColor color="rgb(245,243,238)"/></fill>
+  </style>
+  <data>
+    <line startX="80" startY="44" endX="880" endY="44">
+      <border color="rgba(183,183,183,1)" width="1"/>
+    </line>
+    <shape type="text" topLeftX="80" topLeftY="26" width="400" height="20">
+      <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120,120,120,1)" letterSpacing="1">
+        <p>02　研究目标与技术路线</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="80" topLeftY="60" width="760" height="44">
+      <content textType="title" fontSize="30" fontFamily="思源宋体" color="rgba(17,17,17,1)">
+        <p>研究目标与研究内容</p>
+      </content>
+    </shape>
+    <line startX="80" startY="116" endX="140" endY="116">
+      <border color="rgba(0,47,167,1)" width="2"/>
+    </line>
+
+    <shape type="text" topLeftX="80" topLeftY="146" width="280" height="26">
+      <content textType="body" fontSize="15" fontFamily="思源宋体" color="rgba(0,47,167,1)" bold="true">
+        <p>总体研究目标</p>
+      </content>
+    </shape>
+    <shape type="rect" topLeftX="80" topLeftY="182" width="3" height="240">
+      <fill><fillColor color="rgba(0,47,167,1)"/></fill>
+    </shape>
+    <shape type="text" topLeftX="100" topLeftY="184" width="260" height="240">
+      <content textType="body" fontSize="14" fontFamily="思源宋体" color="rgba(56,56,56,1)" lineSpacing="multiple:1.7">
+        <p>面向复杂分拣场景，构建集<span bold="true" color="rgba(17,17,17,1)">视觉感知、位姿估计与运动规划</span>于一体的机械臂智能分拣系统。</p>
+        <p></p>
+        <p>在保证目标识别精度与抓取成功率的同时，提升路径规划的<span bold="true" color="rgba(17,17,17,1)">实时性与轨迹最优性</span>，实现"看得准、抓得稳、走得快"。</p>
+      </content>
+    </shape>
+
+    <line startX="390" startY="150" endX="390" endY="440">
+      <border color="rgba(183,183,183,1)" width="1"/>
+    </line>
+
+    <shape type="text" topLeftX="420" topLeftY="146" width="460" height="26">
+      <content textType="body" fontSize="15" fontFamily="思源宋体" color="rgba(0,47,167,1)" bold="true">
+        <p>主要研究内容</p>
+      </content>
+    </shape>
+
+    <shape type="text" topLeftX="420" topLeftY="186" width="50" height="30">
+      <content textType="headline" fontSize="20" fontFamily="思源宋体" color="rgba(0,47,167,1)">
+        <p>1</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="450" topLeftY="186" width="430" height="26">
+      <content textType="body" fontSize="14" fontFamily="思源宋体" color="rgba(17,17,17,1)" bold="true">
+        <p>基于深度学习的目标识别与位姿估计</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="450" topLeftY="214" width="430" height="52">
+      <content textType="body" fontSize="12" fontFamily="思源宋体" color="rgba(90,90,90,1)" lineSpacing="multiple:1.45">
+        <p>构建分拣工件数据集，研究改进的目标检测网络与 6D 位姿估计方法，实现对杂乱堆叠工件的识别与抓取位姿求解。</p>
+      </content>
+    </shape>
+
+    <shape type="text" topLeftX="420" topLeftY="278" width="50" height="30">
+      <content textType="headline" fontSize="20" fontFamily="思源宋体" color="rgba(0,47,167,1)">
+        <p>2</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="450" topLeftY="278" width="430" height="26">
+      <content textType="body" fontSize="14" fontFamily="思源宋体" color="rgba(17,17,17,1)" bold="true">
+        <p>改进机械臂路径规划算法</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="450" topLeftY="306" width="430" height="52">
+      <content textType="body" fontSize="12" fontFamily="思源宋体" color="rgba(90,90,90,1)" lineSpacing="multiple:1.45">
+        <p>针对 RRT* 等算法收敛慢、路径冗余问题，改进采样策略与代价函数，兼顾规划效率、路径长度与轨迹平滑度。</p>
+      </content>
+    </shape>
+
+    <shape type="text" topLeftX="420" topLeftY="370" width="50" height="30">
+      <content textType="headline" fontSize="20" fontFamily="思源宋体" color="rgba(0,47,167,1)">
+        <p>3</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="450" topLeftY="370" width="430" height="26">
+      <content textType="body" fontSize="14" fontFamily="思源宋体" color="rgba(17,17,17,1)" bold="true">
+        <p>分拣系统集成与实验验证</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="450" topLeftY="398" width="430" height="52">
+      <content textType="body" fontSize="12" fontFamily="思源宋体" color="rgba(90,90,90,1)" lineSpacing="multiple:1.45">
+        <p>搭建仿真（及实物）实验平台，完成视觉—规划—控制闭环，通过对比实验验证所提方法的有效性。</p>
+      </content>
+    </shape>
+
+    <line startX="80" startY="490" endX="880" endY="490">
+      <border color="rgba(217,217,217,1)" width="1"/>
+    </line>
+    <shape type="text" topLeftX="80" topLeftY="498" width="500" height="18">
+      <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150,150,150,1)">
+        <p>基于深度学习和改进路径规划的机械臂分拣系统研究</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="800" topLeftY="498" width="80" height="18">
+      <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150,150,150,1)" textAlign="right">
+        <p>04</p>
+      </content>
+    </shape>
+  </data>
+  <note>
+    <content textType="body">
+      <p>本课题的总体目标是构建一套视觉感知与运动规划融合的智能分拣系统。围绕这一目标分解为三项研究内容：一是基于深度学习的目标识别与位姿估计，二是改进的机械臂路径规划算法，三是系统集成与实验验证。三者构成从感知到决策再到执行的完整链路。</p>
+    </content>
+  </note>
+</slide>

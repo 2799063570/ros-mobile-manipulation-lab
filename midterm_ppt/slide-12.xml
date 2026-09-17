@@ -1,0 +1,99 @@
+<slide>
+  <style>
+    <fill><fillColor color="rgb(245,243,238)"/></fill>
+  </style>
+  <data>
+    <line startX="80" startY="44" endX="880" endY="44">
+      <border color="rgba(183,183,183,1)" width="1"/>
+    </line>
+    <shape type="text" topLeftX="80" topLeftY="26" width="500" height="20">
+      <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120,120,120,1)" letterSpacing="1">
+        <p>05　问题分析与后续计划</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="80" topLeftY="60" width="760" height="44">
+      <content textType="title" fontSize="28" fontFamily="思源宋体" color="rgba(17,17,17,1)">
+        <p>预期研究成果与创新点</p>
+      </content>
+    </shape>
+    <line startX="80" startY="112" endX="140" endY="112">
+      <border color="rgba(0,47,167,1)" width="2"/>
+    </line>
+
+    <shape type="text" topLeftX="80" topLeftY="146" width="360" height="26">
+      <content textType="body" fontSize="15" fontFamily="思源宋体" color="rgba(0,47,167,1)" bold="true">
+        <p>预期成果</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="80" topLeftY="186" width="360" height="240">
+      <content textType="body" fontSize="13" fontFamily="思源宋体" color="rgba(56,56,56,1)" lineSpacing="multiple:2.0">
+        <p>· 完成硕士学位论文一篇</p>
+        <p>· 形成一套机械臂智能分拣系统（仿真 + 实物）</p>
+        <p>· 拟投稿学术论文 1–2 篇</p>
+        <p>· 申请软件著作权 / 发明专利（视进展）</p>
+      </content>
+    </shape>
+
+    <line startX="480" startY="150" endX="480" endY="430">
+      <border color="rgba(183,183,183,1)" width="1"/>
+    </line>
+
+    <shape type="text" topLeftX="510" topLeftY="146" width="370" height="26">
+      <content textType="body" fontSize="15" fontFamily="思源宋体" color="rgba(0,47,167,1)" bold="true">
+        <p>主要创新点</p>
+      </content>
+    </shape>
+
+    <shape type="text" topLeftX="510" topLeftY="186" width="30" height="24">
+      <content textType="body" fontSize="13" fontFamily="思源宋体" color="rgba(0,47,167,1)" bold="true">
+        <p>①</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="538" topLeftY="186" width="342" height="50">
+      <content textType="body" fontSize="12" fontFamily="思源宋体" color="rgba(56,56,56,1)" lineSpacing="multiple:1.5">
+        <p><span bold="true">视觉感知与运动规划协同</span>：面向分拣任务，将视觉置信度反馈融入规划代价，实现感知—决策联合优化。</p>
+      </content>
+    </shape>
+
+    <shape type="text" topLeftX="510" topLeftY="252" width="30" height="24">
+      <content textType="body" fontSize="13" fontFamily="思源宋体" color="rgba(0,47,167,1)" bold="true">
+        <p>②</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="538" topLeftY="252" width="342" height="50">
+      <content textType="body" fontSize="12" fontFamily="思源宋体" color="rgba(56,56,56,1)" lineSpacing="multiple:1.5">
+        <p><span bold="true">改进采样式路径规划</span>：目标偏置混合采样 + 综合代价函数 + 路径平滑，兼顾实时性与轨迹质量。</p>
+      </content>
+    </shape>
+
+    <shape type="text" topLeftX="510" topLeftY="318" width="30" height="24">
+      <content textType="body" fontSize="13" fontFamily="思源宋体" color="rgba(0,47,167,1)" bold="true">
+        <p>③</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="538" topLeftY="318" width="342" height="50">
+      <content textType="body" fontSize="12" fontFamily="思源宋体" color="rgba(56,56,56,1)" lineSpacing="multiple:1.5">
+        <p><span bold="true">闭环实验验证</span>：在真实机械臂平台完成视觉—规划—执行闭环，验证方法的工程可用性。</p>
+      </content>
+    </shape>
+
+    <line startX="80" startY="490" endX="880" endY="490">
+      <border color="rgba(217,217,217,1)" width="1"/>
+    </line>
+    <shape type="text" topLeftX="80" topLeftY="498" width="500" height="18">
+      <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150,150,150,1)">
+        <p>基于深度学习和改进路径规划的机械臂分拣系统研究</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="800" topLeftY="498" width="80" height="18">
+      <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150,150,150,1)" textAlign="right">
+        <p>12</p>
+      </content>
+    </shape>
+  </data>
+  <note>
+    <content textType="body">
+      <p>预期成果包括学位论文、完整的分拣系统、学术论文以及软著专利。主要创新点有三：一是视觉与规划的协同优化，二是改进的采样式路径规划算法，三是在真实机械臂平台上完成闭环验证。后续将围绕这些目标继续推进。</p>
+    </content>
+  </note>
+</slide>

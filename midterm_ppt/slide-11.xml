@@ -1,0 +1,99 @@
+<slide>
+  <style>
+    <fill><fillColor color="rgb(245,243,238)"/></fill>
+  </style>
+  <data>
+    <line startX="80" startY="44" endX="880" endY="44">
+      <border color="rgba(183,183,183,1)" width="1"/>
+    </line>
+    <shape type="text" topLeftX="80" topLeftY="26" width="500" height="20">
+      <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120,120,120,1)" letterSpacing="1">
+        <p>05　问题分析与后续计划</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="80" topLeftY="60" width="760" height="44">
+      <content textType="title" fontSize="28" fontFamily="思源宋体" color="rgba(17,17,17,1)">
+        <p>后续工作计划</p>
+      </content>
+    </shape>
+    <line startX="80" startY="112" endX="140" endY="112">
+      <border color="rgba(0,47,167,1)" width="2"/>
+    </line>
+
+    <shape type="text" topLeftX="200" topLeftY="140" width="80" height="18">
+      <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120,120,120,1)" textAlign="center"><p>2026.09</p></content>
+    </shape>
+    <shape type="text" topLeftX="340" topLeftY="140" width="80" height="18">
+      <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120,120,120,1)" textAlign="center"><p>2026.11</p></content>
+    </shape>
+    <shape type="text" topLeftX="480" topLeftY="140" width="80" height="18">
+      <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120,120,120,1)" textAlign="center"><p>2027.01</p></content>
+    </shape>
+    <shape type="text" topLeftX="620" topLeftY="140" width="80" height="18">
+      <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120,120,120,1)" textAlign="center"><p>2027.03</p></content>
+    </shape>
+    <shape type="text" topLeftX="760" topLeftY="140" width="80" height="18">
+      <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120,120,120,1)" textAlign="center"><p>2027.04</p></content>
+    </shape>
+
+    <line startX="200" startY="164" endX="840" endY="164">
+      <border color="rgba(217,217,217,1)" width="1"/>
+    </line>
+
+    <shape type="text" topLeftX="80" topLeftY="186" width="110" height="24">
+      <content textType="body" fontSize="12" fontFamily="思源宋体" color="rgba(17,17,17,1)" bold="true"><p>视觉模型优化</p></content>
+    </shape>
+    <shape type="rect" topLeftX="200" topLeftY="186" width="280" height="22" presetHandlers="3">
+      <fill><fillColor color="rgba(0,47,167,1)"/></fill>
+    </shape>
+
+    <shape type="text" topLeftX="80" topLeftY="246" width="110" height="24">
+      <content textType="body" fontSize="12" fontFamily="思源宋体" color="rgba(17,17,17,1)" bold="true"><p>动态重规划</p></content>
+    </shape>
+    <shape type="rect" topLeftX="270" topLeftY="246" width="280" height="22" presetHandlers="3">
+      <fill><fillColor color="rgba(0,47,167,0.75)"/></fill>
+    </shape>
+
+    <shape type="text" topLeftX="80" topLeftY="306" width="110" height="24">
+      <content textType="body" fontSize="12" fontFamily="思源宋体" color="rgba(17,17,17,1)" bold="true"><p>系统集成与实物</p></content>
+    </shape>
+    <shape type="rect" topLeftX="410" topLeftY="306" width="280" height="22" presetHandlers="3">
+      <fill><fillColor color="rgba(0,47,167,0.55)"/></fill>
+    </shape>
+
+    <shape type="text" topLeftX="80" topLeftY="366" width="110" height="24">
+      <content textType="body" fontSize="12" fontFamily="思源宋体" color="rgba(17,17,17,1)" bold="true"><p>论文撰写与答辩</p></content>
+    </shape>
+    <shape type="rect" topLeftX="480" topLeftY="366" width="360" height="22" presetHandlers="3">
+      <fill><fillColor color="rgba(0,47,167,0.35)"/></fill>
+    </shape>
+
+    <line startX="80" startY="450" endX="880" endY="450">
+      <border color="rgba(217,217,217,1)" width="1"/>
+    </line>
+    <shape type="text" topLeftX="80" topLeftY="460" width="800" height="24">
+      <content textType="body" fontSize="12" fontFamily="思源宋体" color="rgba(56,56,56,1)">
+        <p><span bold="true" color="rgba(0,47,167,1)">近期重点：</span>9–11 月完成视觉模型鲁棒性提升与动态重规划算法，年底前进入实物集成。</p>
+      </content>
+    </shape>
+
+    <line startX="80" startY="490" endX="880" endY="490">
+      <border color="rgba(217,217,217,1)" width="1"/>
+    </line>
+    <shape type="text" topLeftX="80" topLeftY="498" width="500" height="18">
+      <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150,150,150,1)">
+        <p>基于深度学习和改进路径规划的机械臂分拣系统研究</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="800" topLeftY="498" width="80" height="18">
+      <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150,150,150,1)" textAlign="right">
+        <p>11</p>
+      </content>
+    </shape>
+  </data>
+  <note>
+    <content textType="body">
+      <p>后续工作计划按四个阶段安排：9到11月优化视觉模型鲁棒性；10到12月研究动态障碍下的在线重规划；12月到次年2月进行系统集成与实物验证；1月到4月撰写学位论文并准备答辩。近期重点是视觉模型优化和动态重规划，为年底实物集成做准备。</p>
+    </content>
+  </note>
+</slide>

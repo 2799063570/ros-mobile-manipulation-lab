@@ -1,0 +1,140 @@
+<slide>
+  <style>
+    <fill><fillColor color="rgb(245,243,238)"/></fill>
+  </style>
+  <data>
+    <line startX="80" startY="44" endX="880" endY="44">
+      <border color="rgba(183,183,183,1)" width="1"/>
+    </line>
+    <shape type="text" topLeftX="80" topLeftY="26" width="400" height="20">
+      <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120,120,120,1)" letterSpacing="1">
+        <p>03　已完成的研究工作</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="80" topLeftY="60" width="760" height="44">
+      <content textType="title" fontSize="30" fontFamily="思源宋体" color="rgba(17,17,17,1)">
+        <p>研究进度总览</p>
+      </content>
+    </shape>
+    <line startX="80" startY="116" endX="140" endY="116">
+      <border color="rgba(0,47,167,1)" width="2"/>
+    </line>
+
+    <shape type="text" topLeftX="80" topLeftY="140" width="760" height="24">
+      <content textType="body" fontSize="13" fontFamily="思源宋体" color="rgba(90,90,90,1)">
+        <p>截至目前，课题按计划推进，主体算法已完成仿真验证，整体进度约完成 60%。</p>
+      </content>
+    </shape>
+
+    <line startX="140" startY="280" endX="460" endY="280">
+      <border color="rgba(183,183,183,1)" width="2"/>
+    </line>
+    <line startX="508" startY="280" endX="820" endY="280">
+      <border color="rgba(183,183,183,1)" width="2"/>
+    </line>
+
+    <shape type="text" topLeftX="82" topLeftY="180" width="200" height="24">
+      <content textType="body" fontSize="14" fontFamily="思源宋体" color="rgba(0,47,167,1)" bold="true" textAlign="center">
+        <p>开题阶段</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="82" topLeftY="210" width="200" height="56">
+      <content textType="caption" fontSize="11" fontFamily="思源宋体" color="rgba(90,90,90,1)" textAlign="center" lineSpacing="multiple:1.4">
+        <p>文献调研　开题报告</p>
+        <p>方案论证　任务分解</p>
+      </content>
+    </shape>
+    <shape type="ellipse" topLeftX="170" topLeftY="268" width="24" height="24">
+      <fill><fillColor color="rgba(0,47,167,1)"/></fill>
+    </shape>
+    <shape type="text" topLeftX="82" topLeftY="300" width="200" height="20">
+      <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120,120,120,1)" textAlign="center">
+        <p>已完成</p>
+      </content>
+    </shape>
+
+    <shape type="ellipse" topLeftX="462" topLeftY="262" width="44" height="44">
+      <border color="rgba(0,47,167,1)" width="1"/>
+    </shape>
+    <shape type="ellipse" topLeftX="468" topLeftY="268" width="32" height="32">
+      <fill><fillColor color="rgba(0,47,167,1)"/></fill>
+    </shape>
+    <shape type="text" topLeftX="384" topLeftY="180" width="200" height="24">
+      <content textType="body" fontSize="14" fontFamily="思源宋体" color="rgba(17,17,17,1)" bold="true" textAlign="center">
+        <p>中期阶段（当前）</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="374" topLeftY="206" width="220" height="50">
+      <content textType="caption" fontSize="11" fontFamily="思源宋体" color="rgba(60,60,60,1)" textAlign="center" lineSpacing="multiple:1.4">
+        <p>视觉模型搭建　路径规划算法改进</p>
+        <p>仿真实验与对比分析</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="384" topLeftY="318" width="200" height="20">
+      <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(0,47,167,1)" textAlign="center" bold="true">
+        <p>进行中 · 本次汇报重点</p>
+      </content>
+    </shape>
+
+    <shape type="text" topLeftX="670" topLeftY="180" width="200" height="24">
+      <content textType="body" fontSize="14" fontFamily="思源宋体" color="rgba(90,90,90,1)" bold="true" textAlign="center">
+        <p>结题阶段</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="680" topLeftY="210" width="180" height="56">
+      <content textType="caption" fontSize="11" fontFamily="思源宋体" color="rgba(120,120,120,1)" textAlign="center" lineSpacing="multiple:1.4">
+        <p>系统集成　实物验证</p>
+        <p>论文撰写　答辩</p>
+      </content>
+    </shape>
+    <shape type="ellipse" topLeftX="758" topLeftY="268" width="24" height="24">
+      <fill><fillColor color="rgba(245,243,238,1)"/></fill>
+      <border color="rgba(150,150,150,1)" width="2"/>
+    </shape>
+    <shape type="text" topLeftX="670" topLeftY="300" width="200" height="20">
+      <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(150,150,150,1)" textAlign="center">
+        <p>待开展</p>
+      </content>
+    </shape>
+
+    <line startX="80" startY="380" endX="880" endY="380">
+      <border color="rgba(217,217,217,1)" width="1"/>
+    </line>
+    <shape type="text" topLeftX="80" topLeftY="394" width="760" height="24">
+      <content textType="body" fontSize="13" fontFamily="思源宋体" color="rgba(17,17,17,1)" bold="true">
+        <p>已完成工作清单</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="80" topLeftY="424" width="380" height="60">
+      <content textType="body" fontSize="12" fontFamily="思源宋体" color="rgba(56,56,56,1)" lineSpacing="multiple:1.6">
+        <p>· 分拣工件数据集采集与标注</p>
+        <p>· 目标检测与位姿估计模型搭建训练</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="490" topLeftY="424" width="380" height="60">
+      <content textType="body" fontSize="12" fontFamily="思源宋体" color="rgba(56,56,56,1)" lineSpacing="multiple:1.6">
+        <p>· 改进路径规划算法设计与仿真</p>
+        <p>· 对比实验平台搭建与初步验证</p>
+      </content>
+    </shape>
+
+    <line startX="80" startY="490" endX="880" endY="490">
+      <border color="rgba(217,217,217,1)" width="1"/>
+    </line>
+    <shape type="text" topLeftX="80" topLeftY="498" width="500" height="18">
+      <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150,150,150,1)">
+        <p>基于深度学习和改进路径规划的机械臂分拣系统研究</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="800" topLeftY="498" width="80" height="18">
+      <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150,150,150,1)" textAlign="right">
+        <p>06</p>
+      </content>
+    </shape>
+  </data>
+  <note>
+    <content textType="body">
+      <p>这是课题整体进度。开题阶段的文献调研、开题报告和方案论证已完成；当前处于中期阶段，视觉模型与改进路径规划算法的主体工作已经完成，正在进行仿真实验与优化；后续将开展系统集成、实物验证和论文撰写。整体进度约完成百分之六十，符合预期计划。</p>
+    </content>
+  </note>
+</slide>

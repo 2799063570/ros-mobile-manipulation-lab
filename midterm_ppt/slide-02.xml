@@ -1,0 +1,117 @@
+<slide>
+  <style>
+    <fill><fillColor color="rgb(245,243,238)"/></fill>
+  </style>
+  <data>
+    <shape type="text" topLeftX="80" topLeftY="56" width="400" height="46">
+      <content textType="title" fontSize="30" fontFamily="思源宋体" color="rgba(17,17,17,1)">
+        <p>目　录</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="82" topLeftY="102" width="400" height="20">
+      <content textType="caption" fontSize="11" fontFamily="思源宋体" color="rgba(0,47,167,1)" letterSpacing="2">
+        <p>CONTENTS</p>
+      </content>
+    </shape>
+    <line startX="80" startY="134" endX="880" endY="134">
+      <border color="rgba(183,183,183,1)" width="1"/>
+    </line>
+
+    <shape type="text" topLeftX="80" topLeftY="158" width="60" height="36">
+      <content textType="headline" fontSize="24" fontFamily="思源宋体" color="rgba(0,47,167,1)">
+        <p>01</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="150" topLeftY="158" width="400" height="28">
+      <content textType="body" fontSize="19" fontFamily="思源宋体" color="rgba(17,17,17,1)">
+        <p>研究背景与意义</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="150" topLeftY="188" width="600" height="18">
+      <content textType="caption" fontSize="11" fontFamily="思源宋体" color="rgba(120,120,120,1)">
+        <p>行业需求、技术现状与研究缺口</p>
+      </content>
+    </shape>
+    <line startX="80" startY="222" endX="880" endY="222">
+      <border color="rgba(217,217,217,1)" width="1"/>
+    </line>
+
+    <shape type="text" topLeftX="80" topLeftY="236" width="60" height="36">
+      <content textType="headline" fontSize="24" fontFamily="思源宋体" color="rgba(0,47,167,1)">
+        <p>02</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="150" topLeftY="236" width="400" height="28">
+      <content textType="body" fontSize="19" fontFamily="思源宋体" color="rgba(17,17,17,1)">
+        <p>研究目标与技术路线</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="150" topLeftY="266" width="600" height="18">
+      <content textType="caption" fontSize="11" fontFamily="思源宋体" color="rgba(120,120,120,1)">
+        <p>研究内容分解与系统总体方案</p>
+      </content>
+    </shape>
+    <line startX="80" startY="300" endX="880" endY="300">
+      <border color="rgba(217,217,217,1)" width="1"/>
+    </line>
+
+    <shape type="text" topLeftX="80" topLeftY="314" width="60" height="36">
+      <content textType="headline" fontSize="24" fontFamily="思源宋体" color="rgba(0,47,167,1)">
+        <p>03</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="150" topLeftY="314" width="500" height="28">
+      <content textType="body" fontSize="19" fontFamily="思源宋体" color="rgba(17,17,17,1)">
+        <p>已完成的研究工作</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="150" topLeftY="344" width="600" height="18">
+      <content textType="caption" fontSize="11" fontFamily="思源宋体" color="rgba(120,120,120,1)">
+        <p>视觉识别模型、改进路径规划算法</p>
+      </content>
+    </shape>
+    <line startX="80" startY="378" endX="880" endY="378">
+      <border color="rgba(217,217,217,1)" width="1"/>
+    </line>
+
+    <shape type="text" topLeftX="80" topLeftY="392" width="60" height="36">
+      <content textType="headline" fontSize="24" fontFamily="思源宋体" color="rgba(0,47,167,1)">
+        <p>04</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="150" topLeftY="392" width="500" height="28">
+      <content textType="body" fontSize="19" fontFamily="思源宋体" color="rgba(17,17,17,1)">
+        <p>阶段性实验与结果分析</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="150" topLeftY="422" width="600" height="18">
+      <content textType="caption" fontSize="11" fontFamily="思源宋体" color="rgba(120,120,120,1)">
+        <p>仿真平台搭建与关键指标对比</p>
+      </content>
+    </shape>
+    <line startX="80" startY="456" endX="880" endY="456">
+      <border color="rgba(217,217,217,1)" width="1"/>
+    </line>
+
+    <shape type="text" topLeftX="80" topLeftY="470" width="60" height="36">
+      <content textType="headline" fontSize="24" fontFamily="思源宋体" color="rgba(0,47,167,1)">
+        <p>05</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="150" topLeftY="470" width="500" height="28">
+      <content textType="body" fontSize="19" fontFamily="思源宋体" color="rgba(17,17,17,1)">
+        <p>问题分析与后续计划</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="150" topLeftY="500" width="600" height="18">
+      <content textType="caption" fontSize="11" fontFamily="思源宋体" color="rgba(120,120,120,1)">
+        <p>当前不足、时间安排与预期成果</p>
+      </content>
+    </shape>
+  </data>
+  <note>
+    <content textType="body">
+      <p>本次汇报分为五个部分：首先回顾研究背景与意义，其次介绍研究目标与技术路线，重点汇报已完成的视觉识别与路径规划工作，随后展示阶段性实验结果，最后分析当前存在的问题并给出后续工作计划。</p>
+    </content>
+  </note>
+</slide>

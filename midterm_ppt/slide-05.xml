@@ -1,0 +1,131 @@
+<slide>
+  <style>
+    <fill><fillColor color="rgb(245,243,238)"/></fill>
+  </style>
+  <data>
+    <line startX="80" startY="44" endX="880" endY="44">
+      <border color="rgba(183,183,183,1)" width="1"/>
+    </line>
+    <shape type="text" topLeftX="80" topLeftY="26" width="400" height="20">
+      <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120,120,120,1)" letterSpacing="1">
+        <p>02　研究目标与技术路线</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="80" topLeftY="60" width="760" height="44">
+      <content textType="title" fontSize="30" fontFamily="思源宋体" color="rgba(17,17,17,1)">
+        <p>系统总体技术路线</p>
+      </content>
+    </shape>
+    <line startX="80" startY="116" endX="140" endY="116">
+      <border color="rgba(0,47,167,1)" width="2"/>
+    </line>
+
+    <shape type="text" topLeftX="80" topLeftY="140" width="760" height="24">
+      <content textType="body" fontSize="13" fontFamily="思源宋体" color="rgba(90,90,90,1)">
+        <p>系统按"感知—决策—执行"三级闭环运行，视觉模块输出抓取位姿，规划模块输出无碰撞最优轨迹。</p>
+      </content>
+    </shape>
+
+    <shape type="rect" topLeftX="80" topLeftY="200" width="175" height="150" presetHandlers="4">
+      <fill><fillColor color="rgba(255,255,255,1)"/></fill>
+      <border color="rgba(0,47,167,1)" width="1"/>
+    </shape>
+    <shape type="text" topLeftX="95" topLeftY="216" width="145" height="24">
+      <content textType="body" fontSize="14" fontFamily="思源宋体" color="rgba(0,47,167,1)" bold="true">
+        <p>① 数据采集</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="95" topLeftY="248" width="145" height="90">
+      <content textType="body" fontSize="11" fontFamily="思源宋体" color="rgba(80,80,80,1)" lineSpacing="multiple:1.45">
+        <p>RGB-D 相机采集点云与彩色图像；工件数据集构建与标注；点云预处理、配准与分割。</p>
+      </content>
+    </shape>
+
+    <line startX="262" startY="275" endX="298" endY="275">
+      <border color="rgba(0,47,167,1)" width="2"/>
+      <endArrow type="arrow"/>
+    </line>
+
+    <shape type="rect" topLeftX="305" topLeftY="200" width="175" height="150" presetHandlers="4">
+      <fill><fillColor color="rgba(255,255,255,1)"/></fill>
+      <border color="rgba(0,47,167,1)" width="1"/>
+    </shape>
+    <shape type="text" topLeftX="320" topLeftY="216" width="145" height="24">
+      <content textType="body" fontSize="14" fontFamily="思源宋体" color="rgba(0,47,167,1)" bold="true">
+        <p>② 视觉感知</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="320" topLeftY="248" width="145" height="90">
+      <content textType="body" fontSize="11" fontFamily="思源宋体" color="rgba(80,80,80,1)" lineSpacing="multiple:1.45">
+        <p>改进目标检测网络识别工件类别；6D 位姿估计求解物体空间位姿；输出抓取点与抓取方向。</p>
+      </content>
+    </shape>
+
+    <line startX="487" startY="275" endX="523" endY="275">
+      <border color="rgba(0,47,167,1)" width="2"/>
+      <endArrow type="arrow"/>
+    </line>
+
+    <shape type="rect" topLeftX="530" topLeftY="200" width="175" height="150" presetHandlers="4">
+      <fill><fillColor color="rgba(255,255,255,1)"/></fill>
+      <border color="rgba(0,47,167,1)" width="1"/>
+    </shape>
+    <shape type="text" topLeftX="545" topLeftY="216" width="145" height="24">
+      <content textType="body" fontSize="14" fontFamily="思源宋体" color="rgba(0,47,167,1)" bold="true">
+        <p>③ 路径规划</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="545" topLeftY="248" width="145" height="90">
+      <content textType="body" fontSize="11" fontFamily="思源宋体" color="rgba(80,80,80,1)" lineSpacing="multiple:1.45">
+        <p>改进 RRT* / 智能优化算法；碰撞检测；路径平滑与时间最优参数化。</p>
+      </content>
+    </shape>
+
+    <line startX="712" startY="275" endX="748" endY="275">
+      <border color="rgba(0,47,167,1)" width="2"/>
+      <endArrow type="arrow"/>
+    </line>
+
+    <shape type="rect" topLeftX="755" topLeftY="200" width="125" height="150" presetHandlers="4">
+      <fill><fillColor color="rgba(0,47,167,1)"/></fill>
+    </shape>
+    <shape type="text" topLeftX="770" topLeftY="216" width="95" height="24">
+      <content textType="body" fontSize="14" fontFamily="思源宋体" color="rgba(255,255,255,1)" bold="true">
+        <p>④ 分拣执行</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="770" topLeftY="248" width="95" height="90">
+      <content textType="body" fontSize="11" fontFamily="思源宋体" color="rgba(230,230,230,1)" lineSpacing="multiple:1.45">
+        <p>机械臂轨迹跟踪抓取与放置；多工件连续分拣闭环。</p>
+      </content>
+    </shape>
+
+    <line startX="80" startY="400" endX="880" endY="400">
+      <border color="rgba(217,217,217,1)" width="1"/>
+    </line>
+    <shape type="text" topLeftX="80" topLeftY="414" width="760" height="24">
+      <content textType="body" fontSize="12" fontFamily="思源宋体" color="rgba(90,90,90,1)">
+        <p><span bold="true" color="rgba(0,47,167,1)">两条主线：</span>视觉感知保证"看得准"，改进路径规划保证"走得快"，二者在分拣任务层协同优化。</p>
+      </content>
+    </shape>
+
+    <line startX="80" startY="490" endX="880" endY="490">
+      <border color="rgba(217,217,217,1)" width="1"/>
+    </line>
+    <shape type="text" topLeftX="80" topLeftY="498" width="500" height="18">
+      <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150,150,150,1)">
+        <p>基于深度学习和改进路径规划的机械臂分拣系统研究</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="800" topLeftY="498" width="80" height="18">
+      <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150,150,150,1)" textAlign="right">
+        <p>05</p>
+      </content>
+    </shape>
+  </data>
+  <note>
+    <content textType="body">
+      <p>这是系统总体技术路线。整个系统按感知—决策—执行三级闭环运行：首先通过RGB-D相机采集数据并构建数据集；随后由深度学习模型完成目标检测与6D位姿估计，输出抓取位姿；接着由改进路径规划算法生成无碰撞最优轨迹；最后驱动机械臂完成抓取与放置。视觉与规划两条主线在分拣任务层协同。</p>
+    </content>
+  </note>
+</slide>

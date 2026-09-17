@@ -1,0 +1,32 @@
+<slide>
+  <style>
+    <fill><fillColor color="rgb(245,243,238)"/></fill>
+  </style>
+  <data>
+    <shape type="rect" topLeftX="0" topLeftY="0" width="960" height="6">
+      <fill><fillColor color="rgba(0,47,167,1)"/></fill>
+    </shape>
+    <shape type="rect" topLeftX="0" topLeftY="534" width="960" height="6">
+      <fill><fillColor color="rgba(0,47,167,1)"/></fill>
+    </shape>
+
+    <shape type="text" topLeftX="120" topLeftY="210" width="720" height="60">
+      <content textType="title" fontSize="40" fontFamily="思源宋体" color="rgba(17,17,17,1)" textAlign="center">
+        <p>恳请各位老师批评指正</p>
+      </content>
+    </shape>
+    <line startX="400" startY="296" endX="560" endY="296">
+      <border color="rgba(0,47,167,1)" width="2"/>
+    </line>
+    <shape type="text" topLeftX="120" topLeftY="316" width="720" height="30">
+      <content textType="body" fontSize="16" fontFamily="思源宋体" color="rgba(90,90,90,1)" textAlign="center" letterSpacing="2">
+        <p>THANKS　FOR　YOUR　ATTENTION</p>
+      </content>
+    </shape>
+  </data>
+  <note>
+    <content textType="body">
+      <p>以上就是我的中期汇报内容。感谢导师和实验室同学在课题开展过程中的指导与帮助，恳请各位老师批评指正，谢谢！</p>
+    </content>
+  </note>
+</slide>

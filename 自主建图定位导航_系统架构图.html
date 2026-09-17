@@ -1,0 +1,156 @@
+<html style="margin:0;padding:0;">
+<div style="width:100%;box-sizing:border-box;font-family:'Microsoft YaHei','PingFang SC',system-ui,sans-serif;background:#f6f8fb;padding:18px;">
+  <div style="font-size:20px;font-weight:700;color:#1f2937;margin-bottom:4px;">自主建图、定位与导航 · 系统架构与数据流</div>
+  <div style="font-size:13px;color:#6b7280;margin-bottom:14px;">依据 aubo_mobile_robot 工程实际配置整理（示意）；实线箭头 = 主要数据/指令流，虚线箭头 = 里程计/低速协同链路</div>
+
+  <!-- 图例 -->
+  <div style="display:flex;gap:18px;font-size:13px;color:#374151;margin-bottom:14px;flex-wrap:wrap;">
+    <span>▢ 传感器/执行器</span>
+    <span style="color:#1d4ed8;">▢ 算法/规划节点</span>
+    <span style="color:#b45309;">▢ 安全/任务层</span>
+    <span style="color:#6b7280;">⚠ GlobalPlanner 与代码口径差异，见文档 §4.4</span>
+  </div>
+
+  <!-- ========== 阶段一：探索建图 ========== -->
+  <div style="background:#eef4fb;border:1px solid #c7d9ee;border-radius:10px;padding:12px 12px 10px;margin-bottom:14px;">
+    <div style="font-size:15px;font-weight:700;color:#1d4ed8;margin-bottom:10px;">阶段一 · 未知环境探索建图（Gmapping）</div>
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;">
+
+      <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:10px 12px;min-width:150px;flex:1;">
+        <div style="font-weight:700;font-size:14px;color:#111827;">前激光雷达</div>
+        <div style="font-size:13px;color:#4b5563;">/front/scan</div>
+      </div>
+      <div style="font-size:20px;color:#94a3b8;align-self:center;">→</div>
+      <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:10px 12px;min-width:150px;flex:1;">
+        <div style="font-weight:700;font-size:14px;color:#111827;">后激光雷达</div>
+        <div style="font-size:13px;color:#4b5563;">/rear/scan</div>
+      </div>
+      <div style="font-size:20px;color:#94a3b8;align-self:center;">→</div>
+      <div style="background:#dbeafe;border:1px solid #93c5fd;border-radius:8px;padding:10px 12px;min-width:190px;flex:1.4;">
+        <div style="font-weight:700;font-size:14px;color:#1e40af;">dual_laser_merger 双激光融合</div>
+        <div style="font-size:12.5px;color:#475569;margin-top:3px;">统一到 base_footprint 系 → 方位角合并、同角取近点<br/>输出 /scan · 15 Hz · 720 点 · 0.12–20 m</div>
+      </div>
+      <div style="font-size:20px;color:#94a3b8;align-self:center;">→</div>
+      <div style="background:#dbeafe;border:1px solid #93c5fd;border-radius:8px;padding:10px 12px;min-width:190px;flex:1.3;">
+        <div style="font-weight:700;font-size:14px;color:#1e40af;">slam_gmapping（Gmapping）</div>
+        <div style="font-size:12.5px;color:#475569;margin-top:3px;">RBPF 粒子滤波建图 · 40 粒子 · 5 cm 栅格<br/>位移/角度触发匹配（0.10 m / 0.10 rad）</div>
+      </div>
+      <div style="font-size:20px;color:#94a3b8;align-self:center;">→</div>
+      <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:10px 12px;min-width:170px;flex:1.2;">
+        <div style="font-weight:700;font-size:14px;color:#111827;">/map 占据栅格地图</div>
+        <div style="font-size:12.5px;color:#4b5563;margin-top:3px;">-1 未知 · 0 附近自由 · 高值障碍</div>
+      </div>
+      <div style="font-size:20px;color:#94a3b8;align-self:center;">→</div>
+      <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:10px 12px;min-width:150px;flex:1;">
+        <div style="font-weight:700;font-size:14px;color:#111827;">map_saver 保存地图</div>
+        <div style="font-size:12.5px;color:#4b5563;">.pgm + .yaml<br/>例：nav_sorting.yaml（0.20 m）</div>
+      </div>
+    </div>
+    <div style="margin-top:8px;font-size:12.5px;color:#64748b;border-top:1px dashed #c7d9ee;padding-top:6px;">
+      里程计输入：底盘控制器/Gazebo → <b>/odom</b> ⇢（虚线）slam_gmapping（激光 + 里程计联合估计）
+    </div>
+  </div>
+
+  <!-- ========== 阶段二：复用地图导航 ========== -->
+  <div style="background:#eefbf3;border:1px solid #b7e4c7;border-radius:10px;padding:12px 12px 10px;margin-bottom:14px;">
+    <div style="font-size:15px;font-weight:700;color:#047857;margin-bottom:10px;">阶段二 · 复用地图导航（AMCL 定位 + move_base）</div>
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;">
+
+      <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:10px 12px;min-width:140px;flex:1;">
+        <div style="font-weight:700;font-size:14px;color:#111827;">地图文件</div>
+        <div style="font-size:12.5px;color:#4b5563;">.yaml/.pgm</div>
+      </div>
+      <div style="font-size:20px;color:#94a3b8;align-self:center;">→</div>
+      <div style="background:#d1fae5;border:1px solid #6ee7b7;border-radius:8px;padding:10px 12px;min-width:140px;flex:1;">
+        <div style="font-weight:700;font-size:14px;color:#065f46;">map_server</div>
+        <div style="font-size:12.5px;color:#475569;">静态地图层 /map</div>
+      </div>
+      <div style="font-size:20px;color:#94a3b8;align-self:center;">→</div>
+      <div style="background:#d1fae5;border:1px solid #6ee7b7;border-radius:8px;padding:10px 12px;min-width:200px;flex:1.5;">
+        <div style="font-weight:700;font-size:14px;color:#065f46;">amcl（AMCL 定位）</div>
+        <div style="font-size:12.5px;color:#475569;margin-top:3px;">500–2000 粒子自适应（KLD）· 似然域观测模型 · diff 运动模型<br/>输入 /scan + /odom → 输出 map→odom TF、/amcl_pose</div>
+      </div>
+      <div style="font-size:20px;color:#94a3b8;align-self:center;">→</div>
+      <div style="background:#dbeafe;border:1px solid #93c5fd;border-radius:8px;padding:10px 12px;min-width:250px;flex:1.8;">
+        <div style="font-weight:700;font-size:14px;color:#1e40af;">move_base 导航栈（action 接口承接目标位姿）</div>
+        <div style="font-size:12.5px;color:#475569;margin-top:4px;">
+          · 全局代价地图：静态层 + 障碍层 + 膨胀层（infl. 0.50 m）→ 全局规划（GlobalPlanner/navfn ⚠）<br/>
+          · 局部代价地图：odom 系 6×6 m 滚动窗口（0.05 m）→ 局部规划（DWA 默认 / TEB 场景可选）<br/>
+          · 恢复行为：清代价地图 / 旋转清除（近场场景禁用旋转恢复）
+        </div>
+      </div>
+      <div style="font-size:20px;color:#94a3b8;align-self:center;">→</div>
+      <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:10px 12px;min-width:120px;flex:0.9;">
+        <div style="font-weight:700;font-size:14px;color:#111827;">/cmd_vel_raw</div>
+        <div style="font-size:12.5px;color:#4b5563;">规划输出</div>
+      </div>
+      <div style="font-size:20px;color:#94a3b8;align-self:center;">→</div>
+      <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px 12px;min-width:230px;flex:1.6;">
+        <div style="font-weight:700;font-size:14px;color:#92400e;">laser_safety_filter 激光安全过滤</div>
+        <div style="font-size:12.5px;color:#78350f;margin-top:3px;">
+          停车距离 = 基础 + 反应(0.25s) + 制动(v²/2a)<br/>
+          走廊/簇 ≥3 点判障 · 急停 0.18 m · 超时 0.5 s 零速<br/>
+          <b>/sorting/base_locked 互锁</b>（机械臂作业锁底盘）
+        </div>
+      </div>
+      <div style="font-size:20px;color:#94a3b8;align-self:center;">→</div>
+      <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:10px 12px;min-width:150px;flex:1;">
+        <div style="font-weight:700;font-size:14px;color:#111827;">/cmd_vel → 底盘控制器</div>
+        <div style="font-size:12.5px;color:#4b5563;">实车串口 / 仿真插件</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== 阶段三：任务层 ========== -->
+  <div style="background:#fdf2f8;border:1px solid #fbcfe8;border-radius:10px;padding:12px 12px 10px;">
+    <div style="font-size:15px;font-weight:700;color:#be185d;margin-bottom:10px;">阶段三 · 任务层：预停靠 → 精停位姿决策 → 抓取协同</div>
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;">
+
+      <div style="background:#fce7f3;border:1px solid #f9a8d4;border-radius:8px;padding:10px 12px;min-width:220px;flex:1.5;">
+        <div style="font-weight:700;font-size:14px;color:#9d174d;">nav_sorting_mission 任务节点（python / cpp）</div>
+        <div style="font-size:12.5px;color:#6b21a8;margin-top:3px;">
+          状态机 /nav_sorting/state · 服务 start/stop<br/>
+          导航重试 + /move_base/clear_costmaps 容错
+        </div>
+      </div>
+      <div style="font-size:20px;color:#94a3b8;align-self:center;">→</div>
+      <div style="background:#dbeafe;border:1px solid #93c5fd;border-radius:8px;padding:10px 12px;min-width:200px;flex:1.4;">
+        <div style="font-weight:700;font-size:14px;color:#1e40af;">move_base Action 预停靠</div>
+        <div style="font-size:12.5px;color:#475569;margin-top:3px;">pre_dock_goal（如 [1.85, 0, 0]）<br/>四桌场景位置容差收紧到 1 cm</div>
+      </div>
+      <div style="font-size:20px;color:#94a3b8;align-self:center;">→</div>
+      <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px 12px;min-width:250px;flex:1.8;">
+        <div style="font-weight:700;font-size:14px;color:#92400e;">近场候选位姿生成 + 评分</div>
+        <div style="font-size:12.5px;color:#78350f;margin-top:3px;">
+          候选：x∈{2.16,2.10,2.06} y∈{0,±0.08} yaw∈{0,±0.08}（≤6 个）<br/>
+          约束：桌边距 ≥0.40 m · 工件点 ∈ 检测工作区 [0.40,0.82,−0.22,0.22]（base 系）<br/>
+          评分：相机中心误差 + 0.15×位置误差 + 0.05×偏航误差 − 0.02×桌边距
+        </div>
+      </div>
+      <div style="font-size:20px;color:#94a3b8;align-self:center;">→</div>
+      <div style="background:#dbeafe;border:1px solid #93c5fd;border-radius:8px;padding:10px 12px;min-width:220px;flex:1.6;">
+        <div style="font-weight:700;font-size:14px;color:#1e40af;">航向对正 + 低速直线精靠</div>
+        <div style="font-size:12.5px;color:#475569;margin-top:3px;">
+          对正 ≤0.12 rad（≈6.9°）· 精靠 0.04 m/s<br/>
+          位置容差 0.06–0.07 m · 超时 15 s / 无进展 2.5 s<br/>
+          被安全层拦停 → 安全退出，不交回 DWA 转圈
+        </div>
+      </div>
+      <div style="font-size:20px;color:#94a3b8;align-self:center;">⇢</div>
+      <div style="background:#fef3c7;border:1px solid #fcd34d;border-radius:8px;padding:10px 12px;min-width:150px;flex:1.1;">
+        <div style="font-weight:700;font-size:14px;color:#92400e;">/cmd_vel_raw 低速指令</div>
+        <div style="font-size:12.5px;color:#78350f;margin-top:3px;">同安全过滤链路，不绕过急停</div>
+      </div>
+    </div>
+
+    <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;">
+      <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px;font-size:12.5px;color:#374151;flex:1;min-width:280px;">
+        <b>与机械臂/感知协同：</b>/sorting/home 收臂 · /sorting/prepare_work 就位 · /sorting/move_to_observation 观察（MoveIt 规划验证）· /sorting/start 分拣 · 机械臂作业期间 /sorting/base_locked 锁底盘
+      </div>
+      <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:8px 12px;font-size:12.5px;color:#374151;flex:1;min-width:280px;">
+        <b>TF 链路：</b>map → odom → base_footprint → base_link → 雷达/相机；AMCL 修正 map↔odom，任务层按 TF 闭环精靠（位姿新鲜度 ≤0.5 s）
+      </div>
+    </div>
+  </div>
+</div>
+</html>

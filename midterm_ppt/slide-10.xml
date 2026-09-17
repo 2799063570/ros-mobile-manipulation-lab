@@ -1,0 +1,74 @@
+<slide>
+  <style>
+    <fill><fillColor color="rgb(245,243,238)"/></fill>
+  </style>
+  <data>
+    <line startX="80" startY="44" endX="880" endY="44">
+      <border color="rgba(183,183,183,1)" width="1"/>
+    </line>
+    <shape type="text" topLeftX="80" topLeftY="26" width="500" height="20">
+      <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120,120,120,1)" letterSpacing="1">
+        <p>05　问题分析与后续计划</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="80" topLeftY="60" width="760" height="44">
+      <content textType="title" fontSize="28" fontFamily="思源宋体" color="rgba(17,17,17,1)">
+        <p>当前存在的问题与不足</p>
+      </content>
+    </shape>
+    <line startX="80" startY="112" endX="140" endY="112">
+      <border color="rgba(0,47,167,1)" width="2"/>
+    </line>
+
+    <shape type="text" topLeftX="80" topLeftY="146" width="360" height="26">
+      <content textType="body" fontSize="15" fontFamily="思源宋体" color="rgba(76,122,90,1)" bold="true">
+        <p>已初步验证</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="80" topLeftY="186" width="360" height="220">
+      <content textType="body" fontSize="13" fontFamily="思源宋体" color="rgba(56,56,56,1)" lineSpacing="multiple:2.0">
+        <p>· 数据集采集与模型训练流程已跑通</p>
+        <p>· 改进路径规划算法仿真对比有效</p>
+        <p>· 感知模块与规划模块接口已打通</p>
+        <p>· 分拣任务主流程闭环可复现</p>
+      </content>
+    </shape>
+
+    <shape type="rect" topLeftX="470" topLeftY="150" width="2" height="320">
+      <fill><fillColor color="rgba(0,47,167,1)"/></fill>
+    </shape>
+
+    <shape type="text" topLeftX="500" topLeftY="146" width="380" height="26">
+      <content textType="body" fontSize="15" fontFamily="思源宋体" color="rgba(180,60,60,1)" bold="true">
+        <p>尚未解决 / 待完善</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="500" topLeftY="186" width="380" height="260">
+      <content textType="body" fontSize="13" fontFamily="思源宋体" color="rgba(56,56,56,1)" lineSpacing="multiple:1.9">
+        <p>· 复杂光照、强遮挡下识别鲁棒性不足</p>
+        <p>· 动态障碍下在线重规划实时性待提升</p>
+        <p>· 尚未在真实机械臂上完成闭环验证</p>
+        <p>· 多工件连续分拣的任务调度研究不足</p>
+      </content>
+    </shape>
+
+    <line startX="80" startY="490" endX="880" endY="490">
+      <border color="rgba(217,217,217,1)" width="1"/>
+    </line>
+    <shape type="text" topLeftX="80" topLeftY="498" width="500" height="18">
+      <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150,150,150,1)">
+        <p>基于深度学习和改进路径规划的机械臂分拣系统研究</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="800" topLeftY="498" width="80" height="18">
+      <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150,150,150,1)" textAlign="right">
+        <p>10</p>
+      </content>
+    </shape>
+  </data>
+  <note>
+    <content textType="body">
+      <p>客观汇报当前工作的不足。左侧是已经初步验证的部分，右侧是下一阶段需要重点解决的问题：一是复杂场景下视觉鲁棒性，二是动态重规划实时性，三是实物平台闭环验证，四是多工件连续分拣调度。这些问题将在后续工作中逐一解决。</p>
+    </content>
+  </note>
+</slide>

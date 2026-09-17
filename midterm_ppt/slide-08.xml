@@ -1,0 +1,127 @@
+<slide>
+  <style>
+    <fill><fillColor color="rgb(245,243,238)"/></fill>
+  </style>
+  <data>
+    <line startX="80" startY="44" endX="880" endY="44">
+      <border color="rgba(183,183,183,1)" width="1"/>
+    </line>
+    <shape type="text" topLeftX="80" topLeftY="26" width="500" height="20">
+      <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120,120,120,1)" letterSpacing="1">
+        <p>03　已完成的研究工作 · 7.2</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="80" topLeftY="60" width="760" height="44">
+      <content textType="title" fontSize="28" fontFamily="思源宋体" color="rgba(17,17,17,1)">
+        <p>改进机械臂路径规划算法</p>
+      </content>
+    </shape>
+    <line startX="80" startY="112" endX="140" endY="112">
+      <border color="rgba(0,47,167,1)" width="2"/>
+    </line>
+
+    <shape type="text" topLeftX="80" topLeftY="140" width="360" height="24">
+      <content textType="body" fontSize="15" fontFamily="思源宋体" color="rgba(0,47,167,1)" bold="true">
+        <p>基线算法与存在问题</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="80" topLeftY="174" width="360" height="44">
+      <content textType="body" fontSize="12" fontFamily="思源宋体" color="rgba(56,56,56,1)" lineSpacing="multiple:1.5">
+        <p>选取 RRT* 作为基线。其在机械臂高维构型空间中具备概率完备性，但直接应用于分拣任务存在以下不足：</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="80" topLeftY="232" width="360" height="130">
+      <content textType="body" fontSize="12" fontFamily="思源宋体" color="rgba(56,56,56,1)" lineSpacing="multiple:1.7">
+        <p>· 随机采样导致初始可行解获取慢，规划时间长</p>
+        <p>· 路径含冗余节点，转折多、不平滑</p>
+        <p>· 仅以路径长度为代价，未考虑碰撞风险与执行效率</p>
+      </content>
+    </shape>
+
+    <line startX="480" startY="150" endX="480" endY="430">
+      <border color="rgba(183,183,183,1)" width="1"/>
+    </line>
+
+    <shape type="text" topLeftX="510" topLeftY="140" width="370" height="24">
+      <content textType="body" fontSize="15" fontFamily="思源宋体" color="rgba(0,47,167,1)" bold="true">
+        <p>本文改进策略</p>
+      </content>
+    </shape>
+
+    <shape type="text" topLeftX="510" topLeftY="176" width="30" height="24">
+      <content textType="body" fontSize="13" fontFamily="思源宋体" color="rgba(0,47,167,1)" bold="true">
+        <p>①</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="538" topLeftY="176" width="340" height="24">
+      <content textType="body" fontSize="13" fontFamily="思源宋体" color="rgba(17,17,17,1)" bold="true">
+        <p>目标偏置混合采样</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="538" topLeftY="202" width="340" height="40">
+      <content textType="body" fontSize="11" fontFamily="思源宋体" color="rgba(90,90,90,1)" lineSpacing="multiple:1.45">
+        <p>引入目标偏向采样与启发式引导，引导树向目标生长，加速初始可行解收敛。</p>
+      </content>
+    </shape>
+
+    <shape type="text" topLeftX="510" topLeftY="252" width="30" height="24">
+      <content textType="body" fontSize="13" fontFamily="思源宋体" color="rgba(0,47,167,1)" bold="true">
+        <p>②</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="538" topLeftY="252" width="340" height="24">
+      <content textType="body" fontSize="13" fontFamily="思源宋体" color="rgba(17,17,17,1)" bold="true">
+        <p>综合代价函数</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="538" topLeftY="278" width="340" height="40">
+      <content textType="body" fontSize="11" fontFamily="思源宋体" color="rgba(90,90,90,1)" lineSpacing="multiple:1.45">
+        <p>融合路径长度、关节运动平滑度与障碍距离，构造综合代价函数优化重选父节点。</p>
+      </content>
+    </shape>
+
+    <shape type="text" topLeftX="510" topLeftY="328" width="30" height="24">
+      <content textType="body" fontSize="13" fontFamily="思源宋体" color="rgba(0,47,167,1)" bold="true">
+        <p>③</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="538" topLeftY="328" width="340" height="24">
+      <content textType="body" fontSize="13" fontFamily="思源宋体" color="rgba(17,17,17,1)" bold="true">
+        <p>路径剪枝与平滑</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="538" topLeftY="354" width="340" height="40">
+      <content textType="body" fontSize="11" fontFamily="思源宋体" color="rgba(90,90,90,1)" lineSpacing="multiple:1.45">
+        <p>对规划路径进行冗余节点剪枝，并采用 B 样条插值平滑，生成可直接跟踪的连续轨迹。</p>
+      </content>
+    </shape>
+
+    <line startX="80" startY="430" endX="880" endY="430">
+      <border color="rgba(217,217,217,1)" width="1"/>
+    </line>
+    <shape type="text" topLeftX="80" topLeftY="444" width="800" height="24">
+      <content textType="body" fontSize="12" fontFamily="思源宋体" color="rgba(56,56,56,1)">
+        <p><span bold="true" color="rgba(0,47,167,1)">算法流程：</span>初始化构型树 → 改进采样 → 碰撞检测与最近邻 → 综合代价重选父节点 → 路径剪枝平滑 → 输出最优轨迹</p>
+      </content>
+    </shape>
+
+    <line startX="80" startY="490" endX="880" endY="490">
+      <border color="rgba(217,217,217,1)" width="1"/>
+    </line>
+    <shape type="text" topLeftX="80" topLeftY="498" width="500" height="18">
+      <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150,150,150,1)">
+        <p>基于深度学习和改进路径规划的机械臂分拣系统研究</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="800" topLeftY="498" width="80" height="18">
+      <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150,150,150,1)" textAlign="right">
+        <p>08</p>
+      </content>
+    </shape>
+  </data>
+  <note>
+    <content textType="body">
+      <p>第二部分是改进路径规划算法。我们以RRT*为基线，针对其收敛慢、路径冗余、代价单一三个问题，从目标偏置混合采样、综合代价函数、路径剪枝与B样条平滑三方面进行改进。改进后算法在保证概率完备的同时，提升了规划速度与轨迹质量，下一页将给出与基线算法的对比实验结果。</p>
+    </content>
+  </note>
+</slide>

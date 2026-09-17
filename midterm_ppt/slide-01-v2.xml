@@ -1,0 +1,42 @@
+<slide>
+  <style>
+    <fill><fillColor color="rgb(245,243,238)"/></fill>
+  </style>
+  <data>
+    <shape type="rect" topLeftX="0" topLeftY="0" width="960" height="6">
+      <fill><fillColor color="rgba(0,47,167,1)"/></fill>
+    </shape>
+
+    <img src="JxFhbgae7oICU8x73uzc1SO5nUf" topLeftX="540" topLeftY="150" width="340" height="191"/>
+
+    <shape type="rect" topLeftX="80" topLeftY="150" width="3" height="200">
+      <fill><fillColor color="rgba(0,47,167,1)"/></fill>
+    </shape>
+    <shape type="text" topLeftX="100" topLeftY="150" width="420" height="125">
+      <content textType="title" fontSize="32" fontFamily="思源宋体" color="rgba(17,17,17,1)" lineSpacing="multiple:1.35">
+        <p>基于深度学习和改进路径规划的</p>
+        <p>机械臂分拣系统研究</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="100" topLeftY="278" width="420" height="30">
+      <content textType="body" fontSize="16" fontFamily="思源宋体" color="rgba(0,47,167,1)">
+        <p>硕士学位论文中期答辩</p>
+      </content>
+    </shape>
+    <line startX="100" startY="326" endX="360" endY="326">
+      <border color="rgba(183,183,183,1)" width="1"/>
+    </line>
+    <shape type="text" topLeftX="100" topLeftY="342" width="420" height="90">
+      <content textType="body" fontSize="13" fontFamily="思源宋体" color="rgba(56,56,56,1)" lineSpacing="multiple:1.7">
+        <p>答 辩 人：XXX　　指导教师：XXX 教授</p>
+        <p>学　　院：XXX学院　　学科专业：控制科学与工程</p>
+        <p>答辩日期：2026 年 9 月</p>
+      </content>
+    </shape>
+  </data>
+  <note>
+    <content textType="body">
+      <p>各位老师好，我是XXX，指导教师是XXX教授。今天汇报的题目是《基于深度学习和改进路径规划的机械臂分拣系统研究》。汇报将从研究背景、已完成工作、阶段性实验结果、存在问题及后续工作计划几个方面展开。</p>
+    </content>
+  </note>
+</slide>

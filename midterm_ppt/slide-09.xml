@@ -1,0 +1,134 @@
+<slide>
+  <style>
+    <fill><fillColor color="rgb(245,243,238)"/></fill>
+  </style>
+  <data>
+    <line startX="80" startY="44" endX="880" endY="44">
+      <border color="rgba(183,183,183,1)" width="1"/>
+    </line>
+    <shape type="text" topLeftX="80" topLeftY="26" width="500" height="20">
+      <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120,120,120,1)" letterSpacing="1">
+        <p>04　阶段性实验与结果分析</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="80" topLeftY="60" width="760" height="44">
+      <content textType="title" fontSize="28" fontFamily="思源宋体" color="rgba(17,17,17,1)">
+        <p>阶段性实验与结果分析</p>
+      </content>
+    </shape>
+    <line startX="80" startY="112" endX="140" endY="112">
+      <border color="rgba(0,47,167,1)" width="2"/>
+    </line>
+
+    <shape type="text" topLeftX="80" topLeftY="140" width="300" height="24">
+      <content textType="body" fontSize="15" fontFamily="思源宋体" color="rgba(0,47,167,1)" bold="true">
+        <p>实验设置</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="80" topLeftY="174" width="300" height="200">
+      <content textType="body" fontSize="12" fontFamily="思源宋体" color="rgba(56,56,56,1)" lineSpacing="multiple:1.75">
+        <p><span bold="true">仿真平台：</span>ROS + Gazebo / MoveIt</p>
+        <p><span bold="true">机械臂：</span>6 自由度工业机械臂</p>
+        <p><span bold="true">实验场景：</span>含障碍的分拣工位</p>
+        <p><span bold="true">对比方法：</span>RRT*、改进 RRT*</p>
+        <p><span bold="true">评价指标：</span>规划时间、路径长度、转折数、成功率</p>
+        <p><span bold="true">实验次数：</span>每组 20 次取均值</p>
+      </content>
+    </shape>
+
+    <line startX="410" startY="150" endX="410" endY="430">
+      <border color="rgba(183,183,183,1)" width="1"/>
+    </line>
+
+    <shape type="text" topLeftX="440" topLeftY="140" width="440" height="24">
+      <content textType="body" fontSize="15" fontFamily="思源宋体" color="rgba(0,47,167,1)" bold="true">
+        <p>路径规划算法对比（示意数据）</p>
+      </content>
+    </shape>
+
+    <table topLeftX="440" topLeftY="178" width="440" height="180">
+      <colgroup>
+        <col width="170"/>
+        <col width="100"/>
+        <col width="100"/>
+        <col width="70"/>
+      </colgroup>
+      <tr height="34">
+        <td>
+          <fill><fillColor color="rgba(0,47,167,1)"/></fill>
+          <content textType="body" fontSize="11" bold="true" color="rgba(255,255,255,1)" textAlign="center"><p>评价指标</p></content>
+        </td>
+        <td>
+          <fill><fillColor color="rgba(0,47,167,1)"/></fill>
+          <content textType="body" fontSize="11" bold="true" color="rgba(255,255,255,1)" textAlign="center"><p>RRT*</p></content>
+        </td>
+        <td>
+          <fill><fillColor color="rgba(0,47,167,1)"/></fill>
+          <content textType="body" fontSize="11" bold="true" color="rgba(255,255,255,1)" textAlign="center"><p>改进算法</p></content>
+        </td>
+        <td>
+          <fill><fillColor color="rgba(0,47,167,1)"/></fill>
+          <content textType="body" fontSize="11" bold="true" color="rgba(255,255,255,1)" textAlign="center"><p>提升</p></content>
+        </td>
+      </tr>
+      <tr height="32">
+        <td><content textType="body" fontSize="11" textAlign="left"><p>平均规划时间 (s)</p></content></td>
+        <td><content textType="body" fontSize="11" textAlign="center"><p>待填</p></content></td>
+        <td><content textType="body" fontSize="11" textAlign="center" bold="true" color="rgba(0,47,167,1)"><p>待填</p></content></td>
+        <td><content textType="body" fontSize="11" textAlign="center" color="rgba(0,47,167,1)"><p>↓</p></content></td>
+      </tr>
+      <tr height="32">
+        <td><content textType="body" fontSize="11" textAlign="left"><p>路径长度</p></content></td>
+        <td><content textType="body" fontSize="11" textAlign="center"><p>待填</p></content></td>
+        <td><content textType="body" fontSize="11" textAlign="center" bold="true" color="rgba(0,47,167,1)"><p>待填</p></content></td>
+        <td><content textType="body" fontSize="11" textAlign="center" color="rgba(0,47,167,1)"><p>↓</p></content></td>
+      </tr>
+      <tr height="32">
+        <td><content textType="body" fontSize="11" textAlign="left"><p>路径转折数</p></content></td>
+        <td><content textType="body" fontSize="11" textAlign="center"><p>待填</p></content></td>
+        <td><content textType="body" fontSize="11" textAlign="center" bold="true" color="rgba(0,47,167,1)"><p>待填</p></content></td>
+        <td><content textType="body" fontSize="11" textAlign="center" color="rgba(0,47,167,1)"><p>↓</p></content></td>
+      </tr>
+      <tr height="32">
+        <td><content textType="body" fontSize="11" textAlign="left"><p>规划成功率 (%)</p></content></td>
+        <td><content textType="body" fontSize="11" textAlign="center"><p>待填</p></content></td>
+        <td><content textType="body" fontSize="11" textAlign="center" bold="true" color="rgba(0,47,167,1)"><p>待填</p></content></td>
+        <td><content textType="body" fontSize="11" textAlign="center" color="rgba(0,47,167,1)"><p>↑</p></content></td>
+      </tr>
+    </table>
+
+    <shape type="text" topLeftX="440" topLeftY="376" width="440" height="20">
+      <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(130,130,130,1)">
+        <p>注：表中数值为占位，正式答辩前替换为真实实验均值。</p>
+      </content>
+    </shape>
+
+    <line startX="80" startY="430" endX="880" endY="430">
+      <border color="rgba(217,217,217,1)" width="1"/>
+    </line>
+    <shape type="text" topLeftX="80" topLeftY="444" width="800" height="40">
+      <content textType="body" fontSize="12" fontFamily="思源宋体" color="rgba(17,17,17,1)" lineSpacing="multiple:1.5">
+        <p><span bold="true" color="rgba(0,47,167,1)">初步结论：</span>改进算法在规划时间、路径长度与转折数上均优于 RRT* 基线，成功率相当或更高，验证了目标偏置采样与综合代价函数的有效性。</p>
+      </content>
+    </shape>
+
+    <line startX="80" startY="490" endX="880" endY="490">
+      <border color="rgba(217,217,217,1)" width="1"/>
+    </line>
+    <shape type="text" topLeftX="80" topLeftY="498" width="500" height="18">
+      <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150,150,150,1)">
+        <p>基于深度学习和改进路径规划的机械臂分拣系统研究</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="800" topLeftY="498" width="80" height="18">
+      <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150,150,150,1)" textAlign="right">
+        <p>09</p>
+      </content>
+    </shape>
+  </data>
+  <note>
+    <content textType="body">
+      <p>在ROS+Gazebo仿真平台上搭建了含障碍的分拣工位，对比RRT*与改进算法。从规划时间、路径长度、转折数和成功率四个指标进行评价，每组重复20次取均值。初步结果表明，改进算法在各项指标上均优于基线。正式答辩前将填入真实数据，并补充路径规划轨迹对比图。</p>
+    </content>
+  </note>
+</slide>

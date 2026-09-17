@@ -1,0 +1,88 @@
+<slide>
+  <style>
+    <fill><fillColor color="rgb(245,243,238)"/></fill>
+  </style>
+  <data>
+    <line startX="80" startY="44" endX="880" endY="44">
+      <border color="rgba(183,183,183,1)" width="1"/>
+    </line>
+    <shape type="text" topLeftX="80" topLeftY="26" width="400" height="20">
+      <content textType="caption" fontSize="10" fontFamily="思源宋体" color="rgba(120,120,120,1)" letterSpacing="1">
+        <p>01　研究背景与意义</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="80" topLeftY="60" width="760" height="44">
+      <content textType="title" fontSize="30" fontFamily="思源宋体" color="rgba(17,17,17,1)">
+        <p>研究背景与意义</p>
+      </content>
+    </shape>
+    <line startX="80" startY="116" endX="140" endY="116">
+      <border color="rgba(0,47,167,1)" width="2"/>
+    </line>
+
+    <shape type="text" topLeftX="80" topLeftY="140" width="380" height="26">
+      <content textType="body" fontSize="15" fontFamily="思源宋体" color="rgba(0,47,167,1)" bold="true">
+        <p>制造业智能化转型的必然要求</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="80" topLeftY="170" width="380" height="90">
+      <content textType="body" fontSize="13" fontFamily="思源宋体" color="rgba(56,56,56,1)" lineSpacing="multiple:1.5">
+        <p>"工业4.0""中国制造2025"推动制造业由自动化向柔性化、智能化升级。在物流仓储、电子装配、食品医药等环节，分拣是物料流转的核心，其效率与柔性直接决定整条产线的产能与成本。</p>
+      </content>
+    </shape>
+
+    <shape type="text" topLeftX="80" topLeftY="278" width="380" height="26">
+      <content textType="body" fontSize="15" fontFamily="思源宋体" color="rgba(0,47,167,1)" bold="true">
+        <p>传统分拣方式难以适应柔性需求</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="80" topLeftY="308" width="380" height="100">
+      <content textType="body" fontSize="13" fontFamily="思源宋体" color="rgba(56,56,56,1)" lineSpacing="multiple:1.5">
+        <p>人工分拣劳动强度大、一致性差、人力成本上升；传统工业机械臂依赖固定示教编程，仅适应结构化环境，对目标位姿变化、杂乱堆叠及未知物体的适应能力不足。</p>
+      </content>
+    </shape>
+
+    <line startX="490" startY="150" endX="490" endY="430">
+      <border color="rgba(183,183,183,1)" width="1"/>
+    </line>
+
+    <shape type="text" topLeftX="520" topLeftY="140" width="360" height="26">
+      <content textType="body" fontSize="15" fontFamily="思源宋体" color="rgba(0,47,167,1)" bold="true">
+        <p>深度学习与智能规划带来新机遇</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="520" topLeftY="170" width="360" height="130">
+      <content textType="body" fontSize="13" fontFamily="思源宋体" color="rgba(56,56,56,1)" lineSpacing="multiple:1.5">
+        <p>以 CNN 为代表的深度学习在目标检测、语义分割与 6D 位姿估计上取得突破，使机器人具备非结构化环境感知能力；A*、RRT*、智能优化等路径规划算法不断改进，为"看得准、抓得稳、走得快"的智能分拣提供了技术基础。</p>
+      </content>
+    </shape>
+
+    <shape type="rect" topLeftX="520" topLeftY="336" width="3" height="86">
+      <fill><fillColor color="rgba(0,47,167,1)"/></fill>
+    </shape>
+    <shape type="text" topLeftX="538" topLeftY="338" width="342" height="84">
+      <content textType="body" fontSize="13" fontFamily="思源宋体" color="rgba(17,17,17,1)" lineSpacing="multiple:1.5">
+        <p><span bold="true" color="rgba(0,47,167,1)">研究意义　</span>融合深度学习视觉感知与改进路径规划，提升机械臂在复杂分拣场景中的识别精度、抓取成功率与分拣效率，具有理论价值与工程意义。</p>
+      </content>
+    </shape>
+
+    <line startX="80" startY="490" endX="880" endY="490">
+      <border color="rgba(217,217,217,1)" width="1"/>
+    </line>
+    <shape type="text" topLeftX="80" topLeftY="498" width="500" height="18">
+      <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150,150,150,1)">
+        <p>基于深度学习和改进路径规划的机械臂分拣系统研究</p>
+      </content>
+    </shape>
+    <shape type="text" topLeftX="800" topLeftY="498" width="80" height="18">
+      <content textType="caption" fontSize="9" fontFamily="思源宋体" color="rgba(150,150,150,1)" textAlign="right">
+        <p>03</p>
+      </content>
+    </shape>
+  </data>
+  <note>
+    <content textType="body">
+      <p>首先介绍研究背景。制造业智能化转型对柔性分拣提出迫切需求，而传统人工与示教式机械臂在非结构化场景下适应性不足。深度学习与智能路径规划的发展，为解决这一矛盾提供了新的技术路径，这正是本课题的出发点。</p>
+    </content>
+  </note>
+</slide>
