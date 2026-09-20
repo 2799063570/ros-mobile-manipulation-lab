@@ -170,8 +170,9 @@ public:
   // 按 colors 的优先级查找近期就绪目标；同色目标按 id 顺序选取。
   bool reserve(const std::vector<std::string>& colors, double now, Track& result)
   {
-    for (const auto& color : colors)
-      for (auto& item : tracks_) {
+    for (const auto& color : colors)// 按颜色优先级查找目标
+      for (auto& item : tracks_)  // 按照id顺序查找目标 先查找id较小的目标（先发现的目标）
+      {
         auto& track = item.second;
         if (track.sample.color != color || track.status != Status::READY || now - track.last_seen > max_age) continue;
         track.status = Status::RESERVED;

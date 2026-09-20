@@ -355,7 +355,7 @@ bool ColorSortingTask::homeService(std_srvs::Trigger::Request&,
 bool ColorSortingTask::observationOperation()
 {
   if (continuous_sorting_)
-    resetInstanceQueue();
+    resetInstanceQueue();// 清空目标队列
   if (!observation())
     return false;
   if (!continuous_sorting_ && verify_observation_detections_ && !verifyVisibleColors()) // Legacy per-class verification.

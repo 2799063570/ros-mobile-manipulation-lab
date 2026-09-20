@@ -167,7 +167,7 @@ bool ColorSortingTask::applyWorkspace(const WorkspaceConfig& workspace, std::str
       !std::all_of(workspace.table_center.begin(), workspace.table_center.end(),
                    [](double v) { return std::isfinite(v); }) ||
       !std::all_of(workspace.table_size.begin(), workspace.table_size.end(),
-                   [](double v) { return std::isfinite(v) && v > 0.0; }))
+                   [](double v) { return std::isfinite(v) && v > 0.0; }))// 检查工作台尺寸是否有效 大于0且有限值
   {
     error = "workspace table must have finite coordinates and positive dimensions";
     return false;

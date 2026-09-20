@@ -175,8 +175,9 @@ namespace aubo_sorting_core
     if (!private_nh_.getParam("place_targets", mappings) ||
         mappings.getType() != XmlRpc::XmlRpcValue::TypeStruct)
       throw std::runtime_error("required private parameter '~place_targets' is missing or invalid");
+    // 解析放置目标参数 例如 red: [0.84, 0.0, -0.06]
     for (auto iterator = mappings.begin(); iterator != mappings.end(); ++iterator)
-      place_targets_[iterator->first] = xmlVector(iterator->second, 2, "place_targets." + iterator->first);
+      place_targets_[iterator->first] = xmlVector(iterator->second, 2, "place_targets." + iterator->first);// 
 
     if (table_center_.size() != 3 || table_size_.size() != 3 || grasp_rpy_.size() != 3 ||
         observation_pose_.size() != 3)

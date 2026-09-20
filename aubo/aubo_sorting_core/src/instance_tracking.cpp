@@ -73,14 +73,15 @@ void ColorSortingTask::processInstanceFrame(const aubo_perception::DetectedObjec
     transform.setIdentity();
     if (to != from) tf_listener_.lookupTransform(to, from, stamp, transform);
   };
-  lookup(target_frame_, message.header.frame_id, source_to_target);
+  lookup(target_frame_, message.header.frame_id, source_to_target);// 获取坐标系变换
   lookup(table_frame_, target_frame_, target_to_table);
   lookup(target_frame_, place_frame_, place_to_target);
   // 抓取前必须继续跟踪预留目标；夹爪靠近时提前过滤会使它在下降前过期。
   // 夹紧后才屏蔽夹爪邻域，避免手中物体再次入队。
   tf::Vector3 gripper_projection;
   bool has_projection = false;
-  const bool exclude_gripper = state == State::PICKING && grasp_secured_.load();
+  // 是否需要屏蔽夹爪邻域 ： 抓取状态下 且 夹紧后
+  const bool exclude_gripper = (state == State::PICKING && grasp_secured_.load());
   if (exclude_gripper) {
     lookup(target_frame_, end_effector_link_, gripper);
     if (message.sensor_frame.empty()) {
@@ -88,42 +89,47 @@ void ColorSortingTask::processInstanceFrame(const aubo_perception::DetectedObjec
       return;
     }
     lookup(target_frame_, message.sensor_frame, camera);
+    // 夹爪在目标坐标系 - 相机在目标坐标系下的射线方向  向量方向
     const auto ray = gripper.getOrigin() - camera.getOrigin();
     if (std::abs(ray.z()) > 1e-6) {
       const double scale = (table_z_ + object_height_ - camera.getOrigin().z()) / ray.z();
       has_projection = scale > 0;
-      gripper_projection = camera.getOrigin() + scale * ray;
+      gripper_projection = camera.getOrigin() + scale * ray;// 求夹爪在目标坐标系下的投影点（与相机共线）
     }
   }
-  std::vector<ObjectQueue::Sample> samples;
+  std::vector<ObjectQueue::Sample> samples;// 目标队列样本
   bool valid = true;
   for (const auto& object : message.objects)
   {
-    if (std::find(sort_colors_.begin(), sort_colors_.end(), object.color) == sort_colors_.end()) continue;
-    const auto& p = object.pose.position;
+    if (std::find(sort_colors_.begin(), sort_colors_.end(), object.color) == sort_colors_.end()) continue;// 判断是否是需要抓取的颜色
+    const auto& p = object.pose.position;// 目标在源坐标系下的位置
     if (!std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z)) { valid = false; continue; }
     const tf::Vector3 point = source_to_target * tf::Vector3(p.x, p.y, p.z);
-    const tf::Vector3 table_point = target_to_table * point;
+    const tf::Vector3 table_point = target_to_table * point;// 目标在桌子坐标系下的位置
     if (std::abs(table_point.x() - table_center_[0]) > table_size_[0] / 2 ||
         std::abs(table_point.y() - table_center_[1]) > table_size_[1] / 2) continue;
     bool excluded = false;
     for (const auto& place : place_targets_) {
       const auto destination = place_to_target * tf::Vector3(place.second[0], place.second[1], 0);
+      // 判断目标与目标放置点的距离是否小于放置排除半径，如果小于则排除该目标
       if (std::hypot(point.x()-destination.x(), point.y()-destination.y()) < queue_place_exclusion_radius_)
         excluded = true;
     }
+    // 判断目标是否在夹爪邻域内，如果在则排除该目标
     if (exclude_gripper && (point - gripper.getOrigin()).length() < queue_gripper_exclusion_radius_)
       excluded = true;
+    // 判断目标是否在夹爪投影点邻域内，如果在则排除该目标
     if (has_projection && std::hypot(point.x()-gripper_projection.x(), point.y()-gripper_projection.y()) <
         queue_gripper_exclusion_radius_) excluded = true;
     if (excluded) continue;
-    ObjectQueue::Sample sample;
+    ObjectQueue::Sample sample;// 创建目标队列样本 
     sample.color = object.color;
     sample.x = point.x(); sample.y = point.y(); sample.z = point.z();
     sample.payload = object;
     sample.payload.pose.position.x = point.x();
     sample.payload.pose.position.y = point.y();
     sample.payload.pose.position.z = point.z();
+    // 使用观测高度还是默认高度
     const double height = object.object_height > 0 ? object.object_height : object_height_;
     sample.eligible = std::isfinite(height) && height > 0 &&
         std::abs(point.z() - (table_z_ + height / 2)) <= queue_height_tolerance_ &&
@@ -152,7 +158,7 @@ void ColorSortingTask::processInstanceFrame(const aubo_perception::DetectedObjec
       (now-queue_last_frame_).toSec() > queue_frame_max_age_;
   instance_queue_.update(samples, now.toSec());
   queue_last_frame_ = now;
-  if (observing && valid && samples.empty()) {
+  if (observing && valid && samples.empty()) {// 如果是观察模式，且检测到有效目标，且目标队列为空
     instance_queue_.invalidate();
     if (observation_gap) { queue_empty_since_ = ros::WallTime(); queue_empty_frames_ = 0; }
     if (queue_empty_since_.isZero()) queue_empty_since_ = now;

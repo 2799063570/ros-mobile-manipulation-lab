@@ -45,7 +45,19 @@ public:
   void start();
 
 private:
-  enum class State { DETECTING, ERROR, HOMING, IDLE, INITIALIZING, OBSERVING, OPENING, PICKING, PREPARING, READY, SORTING, STOPPED };
+  enum class State { 
+    DETECTING, 
+    ERROR, 
+    HOMING, 
+    IDLE, 
+    INITIALIZING, 
+    OBSERVING, 
+    OPENING, 
+    PICKING, 
+    PREPARING, 
+    READY, 
+    SORTING, 
+    STOPPED };
   static const char* stateName(State state);
 
   using GripperClient = actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction>;
