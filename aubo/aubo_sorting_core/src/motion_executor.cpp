@@ -1,4 +1,4 @@
-#include <aubo_sorting_core/color_sorting_task.hpp>
+#include <aubo_sorting_core/sorting_task.hpp>
 #include "task_utils.hpp"
 #include <aubo_sorting_core/height_recovery.hpp>
 #include <actionlib_msgs/GoalStatus.h>
@@ -21,7 +21,7 @@ namespace aubo_sorting_core
 {
 using detail::wallSleep;
 
-geometry_msgs::PoseStamped ColorSortingTask::makePose(double x, double y, double z) const
+geometry_msgs::PoseStamped SortingTask::makePose(double x, double y, double z) const
 {
   geometry_msgs::PoseStamped pose;
   pose.header.stamp = ros::Time::now();
@@ -35,7 +35,7 @@ geometry_msgs::PoseStamped ColorSortingTask::makePose(double x, double y, double
   return pose;
 }
 
-bool ColorSortingTask::xyInTargetFrame(const std::string& source_frame,
+bool SortingTask::xyInTargetFrame(const std::string& source_frame,
                                        const std::vector<double>& xy, double& x, double& y)
 {
   if (source_frame == target_frame_)
@@ -68,7 +68,7 @@ bool ColorSortingTask::xyInTargetFrame(const std::string& source_frame,
   }
 }
 
-bool ColorSortingTask::moveToPose(const geometry_msgs::PoseStamped& pose,
+bool SortingTask::moveToPose(const geometry_msgs::PoseStamped& pose,
                                   const std::string& description,
                                   bool constrain_pregrasp_wrist1)
 {
@@ -100,7 +100,7 @@ bool ColorSortingTask::moveToPose(const geometry_msgs::PoseStamped& pose,
       !stop_requested_.load();
 }
 
-bool ColorSortingTask::planAndExecute(const std::string& description, double wrist1_limit)
+bool SortingTask::planAndExecute(const std::string& description, double wrist1_limit)
 {
   arm_->setStartStateToCurrentState();
   moveit::planning_interface::MoveGroupInterface::Plan plan;
@@ -140,7 +140,7 @@ bool ColorSortingTask::planAndExecute(const std::string& description, double wri
   return success;
 }
 
-bool ColorSortingTask::moveNamed(const std::string& target)
+bool SortingTask::moveNamed(const std::string& target)
 {
   // 先判断这个目标是否已经在命名目标中
   // 判断当前关节值是否已经满足阈值
@@ -185,7 +185,7 @@ bool ColorSortingTask::moveNamed(const std::string& target)
   return planAndExecute("named target '" + target + "'") && !stop_requested_.load();
 }
 
-bool ColorSortingTask::cartesianTo(const geometry_msgs::PoseStamped& target_pose,
+bool SortingTask::cartesianTo(const geometry_msgs::PoseStamped& target_pose,
                                    const std::string& description, bool require_complete)
 {
   if (stop_requested_.load())
@@ -247,7 +247,7 @@ bool ColorSortingTask::cartesianTo(const geometry_msgs::PoseStamped& target_pose
   return success && !stop_requested_.load();
 }
 
-bool ColorSortingTask::liftWithRecovery(double x, double y, const std::string& description)
+bool SortingTask::liftWithRecovery(double x, double y, const std::string& description)
 {
   const auto heights = liftHeightCandidates(lift_height_, lift_min_height_,
                                             lift_height_step_, lift_max_attempts_);
@@ -278,7 +278,7 @@ bool ColorSortingTask::liftWithRecovery(double x, double y, const std::string& d
   return result == HeightAttemptResult::Succeeded;
 }
 
-bool ColorSortingTask::commandGripper(double position)
+bool SortingTask::commandGripper(double position)
 {
   // 通过action通信请求夹爪的控制器执行目标位置
   if (stop_requested_.load())

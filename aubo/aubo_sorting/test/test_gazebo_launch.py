@@ -35,7 +35,7 @@ class GazeboLaunchTest(unittest.TestCase):
                     self.assertEqual(params['/grasp_geometry/camera_mount'], mount)
                     self.assertEqual(params['/grasp_geometry/camera_info_topic'],
                                      f'/{camera}/color/camera_info')
-                    self.assertEqual(params['/color_sorting_task/sort_colors'], classes)
+                    self.assertEqual(params['/color_sorting_task/sort_classes'], classes)
                     self.assertEqual(params['/grasp_geometry/object_height'], height)
 
     def test_four_moveit_sorting_modes_connect_camera_and_world(self):
@@ -57,7 +57,7 @@ class GazeboLaunchTest(unittest.TestCase):
                                      f'/{camera}/aligned_depth_to_color/image_raw')
                     self.assertEqual(params['/grasp_geometry/detections_topic'],
                                      params['/color_sorting_task/detections_topic'])
-                    self.assertEqual(params['/color_sorting_task/sort_colors'], classes)
+                    self.assertEqual(params['/color_sorting_task/sort_classes'], classes)
                     self.assertIn('move_group', nodes)
                     self.assertIn('color_sorting_task', nodes)
                     self.assertIn('/worlds/' + world_name, nodes['gazebo'].args)
@@ -84,7 +84,7 @@ class GazeboLaunchTest(unittest.TestCase):
                 self.assertEqual(params['/grasp_geometry/detections_topic'],
                                  params['/color_sorting_task/detections_topic'])
                 self.assertTrue(params['/color_sorting_task/use_detected_angle'])
-                self.assertEqual(params['/color_sorting_task/sort_colors'], ['can'])
+                self.assertEqual(params['/color_sorting_task/sort_classes'], ['can'])
                 world = ET.parse(ROOT / 'worlds/yolo_sorting.world').getroot().find('world')
                 model = world.find("model[@name='beverage_can']")
                 pose = [float(v) for v in model.findtext('pose').split()]
@@ -102,7 +102,7 @@ class GazeboLaunchTest(unittest.TestCase):
     def test_color_keeps_blocks(self):
         config = resolve('sorting_gazebo.launch')
         self.assertFalse(any(n.name == 'ultralytics_yolo' for n in config.nodes))
-        self.assertEqual(config.params['/color_sorting_task/sort_colors'].value, ['red', 'green', 'blue'])
+        self.assertEqual(config.params['/color_sorting_task/sort_classes'].value, ['red', 'green', 'blue'])
         self.assertEqual(config.params['/grasp_geometry/object_height'].value, 0.04)
         self.assertIn('/worlds/sorting.world', next(n.args for n in config.nodes if n.name == 'gazebo'))
 

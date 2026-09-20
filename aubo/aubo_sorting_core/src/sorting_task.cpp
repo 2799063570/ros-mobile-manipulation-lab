@@ -1,4 +1,6 @@
-#include <aubo_sorting_core/color_sorting_task.hpp>
+#include <aubo_sorting_core/sorting_task.hpp>
+
+// Generic category-sorting task; the executable and ROS node retain their historical names.
 #include "task_utils.hpp"
 #include <inspire_gripper/move_max.h>
 #include <inspire_gripper/move_min.h>
@@ -14,7 +16,12 @@ namespace aubo_sorting_core
 {
 using detail::wallSleep;
 
-ColorSortingTask::ColorSortingTask(ros::NodeHandle nh, ros::NodeHandle private_nh)
+const std::string& SortingTask::objectCategory(const aubo_perception::DetectedObject& detected)
+{
+  return detected.class_name.empty() ? detected.color : detected.class_name;
+}
+
+SortingTask::SortingTask(ros::NodeHandle nh, ros::NodeHandle private_nh)
   : nh_(std::move(nh)), private_nh_(std::move(private_nh)), tf_listener_(ros::Duration(30.0))
 {
   loadParameters();
@@ -46,29 +53,29 @@ ColorSortingTask::ColorSortingTask(ros::NodeHandle nh, ros::NodeHandle private_n
   grasp_attach_publisher_ = nh_.advertise<std_msgs::String>(grasp_attach_topic_, 1);// 将目标吸附到夹爪上
   grasp_detach_publisher_ = nh_.advertise<std_msgs::String>(grasp_detach_topic_, 1);// 从夹爪上分离目标
 
-  detection_subscriber_ = nh_.subscribe(detections_topic_, 1, &ColorSortingTask::detectionCallback, this);
+  detection_subscriber_ = nh_.subscribe(detections_topic_, 1, &SortingTask::detectionCallback, this);
   grasp_status_subscriber_ = nh_.subscribe(grasp_status_topic_, 5,
-                                           &ColorSortingTask::graspStatusCallback, this);// 抓取状态的反馈
+                                           &SortingTask::graspStatusCallback, this);// 抓取状态的反馈
   workspace_subscriber_ = nh_.subscribe(workspace_update_topic_, 1,
-                                        &ColorSortingTask::workspaceUpdateCallback, this);// 动态接收新的工作区配置 例如换工作台、换桌子位置、换放置区域、换物体模型名称
+                                        &SortingTask::workspaceUpdateCallback, this);// 动态接收新的工作区配置 例如换工作台、换桌子位置、换放置区域、换物体模型名称
   if (require_octomap_)
   {
-    cloud_subscriber_ = nh_.subscribe(point_cloud_topic_, 1, &ColorSortingTask::cloudCallback, this);// 订阅点云话题
+    cloud_subscriber_ = nh_.subscribe(point_cloud_topic_, 1, &SortingTask::cloudCallback, this);// 订阅点云话题
     planning_scene_subscriber_ = nh_.subscribe(planning_scene_topic_, 5,
-                                               &ColorSortingTask::planningSceneCallback, this);// 订阅规划场景话题
+                                               &SortingTask::planningSceneCallback, this);// 订阅规划场景话题
     clear_octomap_client_ = nh_.serviceClient<std_srvs::Empty>(clear_octomap_service_);// 初始化清除Octomap服务客户端
   }
 
   services_.push_back(nh_.advertiseService("/sorting/move_to_observation",
-                                            &ColorSortingTask::observeService, this));// 请求机械臂移动到观测位置
-  services_.push_back(nh_.advertiseService("/sorting/start", &ColorSortingTask::startService, this));// 开始执行分拣任务请求
-  services_.push_back(nh_.advertiseService("/sorting/stop", &ColorSortingTask::stopService, this));// 停止执行分拣任务请求
-  services_.push_back(nh_.advertiseService("/sorting/open_gripper", &ColorSortingTask::openService, this));// 打开夹爪请求
+                                            &SortingTask::observeService, this));// 请求机械臂移动到观测位置
+  services_.push_back(nh_.advertiseService("/sorting/start", &SortingTask::startService, this));// 开始执行分拣任务请求
+  services_.push_back(nh_.advertiseService("/sorting/stop", &SortingTask::stopService, this));// 停止执行分拣任务请求
+  services_.push_back(nh_.advertiseService("/sorting/open_gripper", &SortingTask::openService, this));// 打开夹爪请求
   services_.push_back(nh_.advertiseService("/sorting/prepare_work",
-                                            &ColorSortingTask::prepareWorkService, this));//让机械臂移动跑动模式
-  services_.push_back(nh_.advertiseService("/sorting/home", &ColorSortingTask::homeService, this));// 请求机械臂移动到home
+                                            &SortingTask::prepareWorkService, this));//让机械臂移动跑动模式
+  services_.push_back(nh_.advertiseService("/sorting/home", &SortingTask::homeService, this));// 请求机械臂移动到home
   services_.push_back(nh_.advertiseService("/sorting/configure_workspace",
-                                            &ColorSortingTask::configureWorkspaceService, this));// 配置工作区请求
+                                            &SortingTask::configureWorkspaceService, this));// 配置工作区请求
 
   std_msgs::Bool unlocked;
   unlocked.data = false;
@@ -79,7 +86,7 @@ ColorSortingTask::ColorSortingTask(ros::NodeHandle nh, ros::NodeHandle private_n
   publishState(State::INITIALIZING, "waiting for Gazebo controllers");
 }
 
-ColorSortingTask::~ColorSortingTask()
+SortingTask::~SortingTask()
 {
   detection_subscriber_.shutdown();
   target_worker_shutdown_.store(true);
@@ -97,14 +104,14 @@ ColorSortingTask::~ColorSortingTask()
     target_thread_.join();
 }
 
-void ColorSortingTask::start()
+void SortingTask::start()
 {
   if (continuous_sorting_)
-    target_thread_ = std::thread(&ColorSortingTask::targetWorker, this);
-  initialization_thread_ = std::thread(&ColorSortingTask::initialize, this);
+    target_thread_ = std::thread(&SortingTask::targetWorker, this);
+  initialization_thread_ = std::thread(&SortingTask::initialize, this);
 }
 
-const char* ColorSortingTask::stateName(State state)
+const char* SortingTask::stateName(State state)
 {
   switch (state)
   {
@@ -124,7 +131,7 @@ const char* ColorSortingTask::stateName(State state)
   return "ERROR";
 }
 
-void ColorSortingTask::publishState(State state, const std::string& detail)
+void SortingTask::publishState(State state, const std::string& detail)
 {
   // 负责更新状态机的状态为state并通过话题发布
   {
@@ -139,7 +146,7 @@ void ColorSortingTask::publishState(State state, const std::string& detail)
   ROS_INFO_STREAM("Sorting state: " << message.data);
 }
 
-void ColorSortingTask::setFailure(const std::string& category, const std::string& detail)
+void SortingTask::setFailure(const std::string& category, const std::string& detail)
 {
   std_msgs::String message;
   message.data = category + " | " + detail;
@@ -151,7 +158,7 @@ void ColorSortingTask::setFailure(const std::string& category, const std::string
   ROS_ERROR_STREAM("Sorting failure: " << message.data);
 }
 
-void ColorSortingTask::initialize()
+void SortingTask::initialize()
 {
   // Resolve configured names against the actually loaded SRDF, before accepting work.
   const auto names = arm_->getNamedTargets();
@@ -204,12 +211,12 @@ void ColorSortingTask::initialize()
   busy_.store(false);
   publishState(State::IDLE, "controllers ready");
   if (auto_move_to_observation_)
-    startOperation(State::OBSERVING, std::bind(&ColorSortingTask::initialObservationOperation, this));
+    startOperation(State::OBSERVING, std::bind(&SortingTask::initialObservationOperation, this));
   else if (auto_start_)
-    startOperation(State::SORTING, std::bind(&ColorSortingTask::sortingOperation, this));
+    startOperation(State::SORTING, std::bind(&SortingTask::sortingOperation, this));
 }
 
-std::pair<bool, std::string> ColorSortingTask::startOperation(
+std::pair<bool, std::string> SortingTask::startOperation(
     State state, const std::function<bool()>& operation)
 {
   // 启动一个操作 在非busy_下 
@@ -267,17 +274,17 @@ std::pair<bool, std::string> ColorSortingTask::startOperation(
   return std::make_pair(true, "command accepted");
 }
 
-bool ColorSortingTask::observeService(std_srvs::Trigger::Request&,
+bool SortingTask::observeService(std_srvs::Trigger::Request&,
                                       std_srvs::Trigger::Response& response)
 {
   const auto result = startOperation(State::OBSERVING,
-      std::bind(&ColorSortingTask::observationOperation, this));
+      std::bind(&SortingTask::observationOperation, this));
   response.success = result.first;
   response.message = result.second;
   return true;
 }
 
-bool ColorSortingTask::startService(std_srvs::Trigger::Request&,
+bool SortingTask::startService(std_srvs::Trigger::Request&,
                                     std_srvs::Trigger::Response& response)
 {
   if (!observation_ready_.load())
@@ -286,13 +293,13 @@ bool ColorSortingTask::startService(std_srvs::Trigger::Request&,
     response.message = "move to observation pose and confirm detections first";
     return true;
   }
-  const auto result = startOperation(State::SORTING, std::bind(&ColorSortingTask::sortingOperation, this));
+  const auto result = startOperation(State::SORTING, std::bind(&SortingTask::sortingOperation, this));
   response.success = result.first;
   response.message = result.second;
   return true;
 }
 
-bool ColorSortingTask::stopService(std_srvs::Trigger::Request&,
+bool SortingTask::stopService(std_srvs::Trigger::Request&,
                                    std_srvs::Trigger::Response& response)
 {
   std::lock_guard<std::mutex> lock(operation_mutex_);
@@ -324,41 +331,41 @@ bool ColorSortingTask::stopService(std_srvs::Trigger::Request&,
   return true;
 }
 
-bool ColorSortingTask::openService(std_srvs::Trigger::Request&,
+bool SortingTask::openService(std_srvs::Trigger::Request&,
                                    std_srvs::Trigger::Response& response)
 {
-  const auto result = startOperation(State::OPENING, std::bind(&ColorSortingTask::openOperation, this));
+  const auto result = startOperation(State::OPENING, std::bind(&SortingTask::openOperation, this));
   response.success = result.first;
   response.message = result.second;
   return true;
 }
 
-bool ColorSortingTask::prepareWorkService(std_srvs::Trigger::Request&,
+bool SortingTask::prepareWorkService(std_srvs::Trigger::Request&,
                                           std_srvs::Trigger::Response& response)
 {
   const auto result = startOperation(State::PREPARING,
-      std::bind(&ColorSortingTask::prepareWorkOperation, this));
+      std::bind(&SortingTask::prepareWorkOperation, this));
   response.success = result.first;
   response.message = result.second;
   return true;
 }
 
-bool ColorSortingTask::homeService(std_srvs::Trigger::Request&,
+bool SortingTask::homeService(std_srvs::Trigger::Request&,
                                    std_srvs::Trigger::Response& response)
 {
-  const auto result = startOperation(State::HOMING, std::bind(&ColorSortingTask::homeOperation, this));
+  const auto result = startOperation(State::HOMING, std::bind(&SortingTask::homeOperation, this));
   response.success = result.first;
   response.message = result.second;
   return true;
 }
 
-bool ColorSortingTask::observationOperation()
+bool SortingTask::observationOperation()
 {
   if (continuous_sorting_)
     resetInstanceQueue();// 清空目标队列
   if (!observation())
     return false;
-  if (!continuous_sorting_ && verify_observation_detections_ && !verifyVisibleColors()) // Legacy per-class verification.
+  if (!continuous_sorting_ && verify_observation_detections_ && !verifyVisibleCategories()) // Legacy per-class verification.
   {
     observation_ready_.store(false);
     return false;
@@ -366,14 +373,14 @@ bool ColorSortingTask::observationOperation()
   return true;
 }
 
-bool ColorSortingTask::initialObservationOperation()
+bool SortingTask::initialObservationOperation()
 {
   if (!observationOperation())
     return false;
   return !auto_start_ || sortingOperation();
 }
 
-bool ColorSortingTask::openOperation()
+bool SortingTask::openOperation()
 {
   if (!commandGripper(gripper_open_))
     return false;
@@ -385,19 +392,19 @@ bool ColorSortingTask::openOperation()
   return model.empty() || setGraspAttachment(model, false);
 }
 
-bool ColorSortingTask::homeOperation()
+bool SortingTask::homeOperation()
 {
   observation_ready_.store(false);
   return moveNamed(finish_named_target_);
 }
 
-bool ColorSortingTask::prepareWorkOperation()
+bool SortingTask::prepareWorkOperation()
 {
   observation_ready_.store(false);
   return refreshOctomap() && addTableCollision() && moveNamed(work_ready_named_target_);
 }
 
-bool ColorSortingTask::observation()
+bool SortingTask::observation()
 {
   observation_ready_.store(false);
   if (!refreshOctomap() || !addTableCollision())  // 需要先更新octomap和场景碰撞模型

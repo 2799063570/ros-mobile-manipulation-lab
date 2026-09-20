@@ -38,7 +38,7 @@ ArmExecutor::ArmExecutor(MissionContext &context) : context_(context)
 
 bool ArmExecutor::waitForSortingReady()
 {
-  // 阻塞等待下游 ColorSortingTask 节点就绪
+  // 阻塞等待下游 SortingTask 节点就绪（ROS 节点名仍兼容保留为 color_sorting_task）
   const auto deadline = std::chrono::steady_clock::now() +
                         std::chrono::duration<double>(context_.initialization_timeout_);
   std::unique_lock<std::mutex> lock(context_.mutex_);

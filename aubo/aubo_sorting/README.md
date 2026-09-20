@@ -11,7 +11,8 @@ roslaunch aubo_sorting yolo_sorting.launch model_path:=/实际路径/obb.pt task
 
 也可继续使用 `sorting.launch detector:=color/yolo`。`config/sorting.yaml` 是共用的机械臂、
 桌面和夹爪任务配置，内含红绿蓝方块示例；YOLO 应通过 `task_config` 指定实际
-`sort_colors`（该旧参数名表示通用类别列表）和 `place_targets`，不要将示例颜色当成模型类别。
+`sort_classes` 和 `place_targets`，不要将示例颜色当成模型类别；旧参数
+`sort_colors` 仍可读取，但已弃用。
 `colors_config` 指定 HSV 阈值，`yolo_config` 指定模型推理配置，`perception_config` 指定共用 3D 规则。
 仿真入口按 `detector` 自动选择场景和任务配置：color 使用 `worlds/sorting.world`
 中的红绿蓝方块；yolo 使用独立的 `worlds/yolo_sorting.world` 和
@@ -83,7 +84,7 @@ roslaunch aubo_sorting sorting_gazebo.launch height_mode:=depth
 ```
 
 `table_z` 与 `object_height` 由 launch 同时传给感知和任务；`perception_config` 提供
-工作区、类别物高与深度误差容限，`task_config` 提供 `sort_colors/place_targets`、
+工作区、类别物高与深度误差容限，`task_config` 提供 `sort_classes/place_targets`、
 任务侧 `height_tolerance` 和夹爪配置。实机请设置 `use_grasp_attachment:=false`。
 眼在手外的真实相机话题与默认值不同可通过 `camera_namespace:=/实际相机` 覆盖。
 

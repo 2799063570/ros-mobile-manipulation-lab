@@ -1,5 +1,5 @@
 # Defaults in the robot base frame; adjust to the actual destination bins.
-sort_colors: [bottle, can, box]
+sort_classes: [bottle, can, box]
 place_frame: base_link
 place_targets:
   bottle: [0.45, -0.20]

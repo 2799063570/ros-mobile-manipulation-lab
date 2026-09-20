@@ -21,7 +21,7 @@ public:
   // 单帧观测。eligible 表示几何条件允许抓取；payload 保存业务层原始检测结果。
   struct Sample
   {
-    std::string color;
+    std::string category;
     double x{0}, y{0}, z{0};
     bool eligible{true};
     Payload payload;
@@ -36,7 +36,7 @@ public:
     double last_seen{0}, changed_at{0};
     bool disturbed{false};
     double disturbance_distance{0};
-    std::string disturbance_color;
+    std::string disturbance_category;
   };
   // 距离单位为米：关联半径、稳定确认半径、预留目标容差、同帧去重半径。
   double match_distance{0.04}, stable_distance{0.015}, reserved_distance{0.035}, duplicate_distance{0.008};
@@ -79,13 +79,13 @@ public:
         it = tracks_.erase(it);
       else ++it;
     }
-    // 同帧同色且位置几乎重合的检测框，只计作一次观测。
+    // 同帧同类别且位置几乎重合的检测框，只计作一次观测。
     std::vector<Sample> samples;
     for (const auto& sample : input) {
       if (!std::isfinite(sample.x) || !std::isfinite(sample.y) || !std::isfinite(sample.z)) continue;
       bool duplicate = false;
       for (const auto& kept : samples)
-        duplicate = duplicate || (sample.color == kept.color && distance(sample, kept) < duplicate_distance);
+        duplicate = duplicate || (sample.category == kept.category && distance(sample, kept) < duplicate_distance);
       if (!duplicate) samples.push_back(sample);
     }
     struct Edge { double distance; std::uint64_t id; std::size_t sample; };
@@ -97,7 +97,7 @@ public:
       for (auto& item : tracks_) {
         auto& track = item.second;
         const double d = distance(track.sample, samples[i]);
-        if ((track.sample.color == samples[i].color || track.status == Status::RESERVED) && d <= match_distance)
+        if ((track.sample.category == samples[i].category || track.status == Status::RESERVED) && d <= match_distance)
           edges.push_back({d, item.first, i});
       }
     std::sort(edges.begin(), edges.end(), [](const Edge& a, const Edge& b) {
@@ -113,10 +113,10 @@ public:
       auto& track = tracks_.at(edge.id);
       if (track.status == Status::RESERVED) {
         // 机械臂移动时手眼视角会让轮廓中心轻微偏移；预留目标采用独立的执行容差。
-        if (edge.distance > reserved_distance || samples[edge.sample].color != track.sample.color) {
+        if (edge.distance > reserved_distance || samples[edge.sample].category != track.sample.category) {
           track.disturbed = true;
           track.disturbance_distance = edge.distance;
-          track.disturbance_color = samples[edge.sample].color;
+          track.disturbance_category = samples[edge.sample].category;
         } else track.last_seen = now;
         continue;
       }
@@ -137,24 +137,24 @@ public:
       track.last_seen = now;
       track.status = sample.eligible && track.observations >= min_observations ? Status::READY : Status::CANDIDATE;
     }
-    // 超出关联半径的同色新观测也可能是预留目标的大幅位移，不能让旧坐标继续有效。
+    // 超出关联半径的同类新观测也可能是预留目标的大幅位移，不能让旧坐标继续有效。
     for (auto& item : tracks_) {
       auto& track = item.second;
       if (track.status != Status::RESERVED || used_tracks.count(item.first)) continue;
       for (std::size_t i = 0; i < samples.size(); ++i) {
-        if (used_samples.count(i) || samples[i].color != track.sample.color) continue;
+        if (used_samples.count(i) || samples[i].category != track.sample.category) continue;
         track.disturbed = true;
         track.disturbance_distance = distance(track.sample, samples[i]);
-        track.disturbance_color = samples[i].color;
+        track.disturbance_category = samples[i].category;
         break;
       }
     }
     for (std::size_t i = 0; i < samples.size() && tracks_.size() < capacity; ++i) {
       if (used_samples.count(i)) continue;
-      // 未匹配的新观测可能是旧同色目标移动后的结果；旧目标须重新确认，
+      // 未匹配的新观测可能是旧同类目标移动后的结果；旧目标须重新确认，
       // 避免继续按旧坐标执行抓取。
       for (auto& item : tracks_)
-        if (!used_tracks.count(item.first) && item.second.sample.color == samples[i].color &&
+        if (!used_tracks.count(item.first) && item.second.sample.category == samples[i].category &&
             item.second.status == Status::READY) {
           item.second.status = Status::CANDIDATE;
           item.second.observations = 0;
@@ -167,18 +167,18 @@ public:
       tracks_[track.id] = track;
     }
   }
-  // 按 colors 的优先级查找近期就绪目标；同色目标按 id 顺序选取。
-  bool reserve(const std::vector<std::string>& colors, double now, Track& result)
+  // 按 categories 的优先级查找近期就绪目标；同类目标按 id 顺序选取。
+  bool reserve(const std::vector<std::string>& categories, double now, Track& result)
   {
-    for (const auto& color : colors)// 按颜色优先级查找目标
+    for (const auto& category : categories)// 按类别优先级查找目标
       for (auto& item : tracks_)  // 按照id顺序查找目标 先查找id较小的目标（先发现的目标）
       {
         auto& track = item.second;
-        if (track.sample.color != color || track.status != Status::READY || now - track.last_seen > max_age) continue;
+        if (track.sample.category != category || track.status != Status::READY || now - track.last_seen > max_age) continue;
         track.status = Status::RESERVED;
         track.disturbed = false;
         track.disturbance_distance = 0;
-        track.disturbance_color.clear();
+        track.disturbance_category.clear();
         track.changed_at = now;
         result = track; // 返回独立的执行快照，后续帧不会改变本次抓取坐标。
         return true;

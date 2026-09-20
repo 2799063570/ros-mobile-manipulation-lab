@@ -35,7 +35,11 @@ from aubo_perception.msg import DetectedObject, DetectedObjectArray
 
 
 class ColorSortingTask(object):
-    """Service-controlled camera observation and color sorting state machine."""
+    """Service-controlled camera observation and category sorting state machine."""
+
+    @staticmethod
+    def _category(detected):
+        return str(getattr(detected, "class_name", "") or detected.color)
 
     def __init__(self):
         self.group_name = rospy.get_param("~planning_group", "aubo_i5")
@@ -127,7 +131,12 @@ class ColorSortingTask(object):
         self.grasp_attachment_timeout = float(
             rospy.get_param("~grasp_attachment_timeout", 3.0)
         )
-        self.sort_colors = rospy.get_param("~sort_colors", ["red", "green", "blue"])
+        if rospy.has_param("~sort_classes"):
+            self.sort_colors = rospy.get_param("~sort_classes")
+        else:
+            self.sort_colors = rospy.get_param("~sort_colors", ["red", "green", "blue"])
+            if rospy.has_param("~sort_colors"):
+                rospy.logwarn("Parameter '~sort_colors' is deprecated; use '~sort_classes' instead")
         self.grasp_model_names = rospy.get_param("~grasp_model_names", {})
         self.place_frame = rospy.get_param("~place_frame", self.target_frame)
         self.place_targets = rospy.get_param("~place_targets")
@@ -492,7 +501,7 @@ class ColorSortingTask(object):
     def _update_target_cache(self, message):
         selected = {}
         for detected in message.objects:
-            color = str(detected.color)
+            color = self._category(detected)
             previous = selected.get(color)
             if previous is None or detected.contour_area > previous.contour_area:
                 selected[color] = detected
@@ -574,6 +583,7 @@ class ColorSortingTask(object):
         if target_xy is None:
             return None
         detected = DetectedObject()
+        detected.class_name = color
         detected.color = color
         detected.pose.position.x = target_xy[0]
         detected.pose.position.y = target_xy[1]
@@ -601,7 +611,7 @@ class ColorSortingTask(object):
             self._update_target_cache(message)
         counts = []
         for color in self.sort_colors:
-            count = sum(1 for item in message.objects if item.color == color)
+            count = sum(1 for item in message.objects if self._category(item) == color)
             counts.append("{}:{}".format(color, count))
         self._detection_summary_publisher.publish(String(data="  ".join(counts)))
 
@@ -1248,7 +1258,7 @@ class ColorSortingTask(object):
                     and detections.header.stamp != rospy.Time(0)
                     and 0 <= (rospy.Time.now()-detections.header.stamp).to_sec() <= 1.0):
                 last_receipt_time = receipt_time
-                candidates = [item for item in detections.objects if item.color == color]
+                candidates = [item for item in detections.objects if self._category(item) == color]
                 if candidates:
                     candidate = max(candidates, key=lambda item: item.contour_area)
                     if samples and math.hypot(candidate.pose.position.x-samples[-1].pose.position.x,
@@ -1373,7 +1383,7 @@ class ColorSortingTask(object):
             # self-occlusion can make otherwise stable HSV contours alternate.
             if detections is not None and receipt_time > last_receipt_time:
                 last_receipt_time = receipt_time
-                visible = set(str(item.color) for item in detections.objects)
+                visible = set(self._category(item) for item in detections.objects)
                 for color in required.intersection(visible):
                     visible_counts[color] += 1
                 stable = set(
@@ -1417,7 +1427,7 @@ class ColorSortingTask(object):
             self._active_grasp_angle = 0.0
 
     def _pick_and_place_impl(self, detected):
-        color = detected.color
+        color = self._category(detected)
         object_x = detected.pose.position.x + self.grasp_offset_x
         object_y = detected.pose.position.y + self.grasp_offset_y
         height = detected.object_height if detected.object_height > 0 else self.object_height

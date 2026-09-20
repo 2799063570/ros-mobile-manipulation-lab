@@ -58,7 +58,7 @@ grasp_detach_topic: /sorting/grasp/detach
 grasp_status_topic: /sorting/grasp/status
 grasp_attachment_timeout: 3.0
 
-sort_colors: [red, green, blue]
+sort_classes: [red, green, blue]
 place_frame: base_link
 place_targets:
   red: [0.46, -0.24]

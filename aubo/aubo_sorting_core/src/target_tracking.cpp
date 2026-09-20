@@ -1,4 +1,4 @@
-#include <aubo_sorting_core/color_sorting_task.hpp>
+#include <aubo_sorting_core/sorting_task.hpp>
 #include "task_utils.hpp"
 #include <algorithm>
 #include <cmath>
@@ -10,7 +10,7 @@ namespace aubo_sorting_core
   using detail::join;
   using detail::jsonEscape;
 
-  void ColorSortingTask::detectionCallback(const aubo_perception::DetectedObjectArrayConstPtr &message)
+  void SortingTask::detectionCallback(const aubo_perception::DetectedObjectArrayConstPtr &message)
   {
     State state;
     {
@@ -31,20 +31,20 @@ namespace aubo_sorting_core
       updateTargetCache(*message); // 特定阶段更新目标抓取信息
 
     std::vector<std::string> counts;
-    for (const std::string &color : sort_colors_) // 颜色统计
+    for (const std::string &category : sort_classes_) // 类别统计
     {
       const int count = static_cast<int>(std::count_if(
           message->objects.begin(), message->objects.end(),
-          [&color](const aubo_perception::DetectedObject &item)
-          { return item.color == color; }));
-      counts.push_back(color + ":" + std::to_string(count)); // 颜色:数量
+          [this, &category](const aubo_perception::DetectedObject &item)
+          { return objectCategory(item) == category; }));
+      counts.push_back(category + ":" + std::to_string(count)); // 类别:数量
     }
     std_msgs::String summary;
     summary.data = join(counts, "  ");
     detection_summary_publisher_.publish(summary); // 发布检测到的对象统计信息
   }
 
-  bool ColorSortingTask::detectionInCacheFrame(
+  bool SortingTask::detectionInCacheFrame(
       const aubo_perception::DetectedObjectArray &message,
       const aubo_perception::DetectedObject &detected, double &x, double &y)
   {
@@ -84,21 +84,22 @@ namespace aubo_sorting_core
     }
   }
 
-  void ColorSortingTask::updateTargetCache(const aubo_perception::DetectedObjectArray &message)
+  void SortingTask::updateTargetCache(const aubo_perception::DetectedObjectArray &message)
   {
     // 每个类别仅保留图像面积最大的候选，再转换到统一缓存坐标系。
     // TF 查询放在 data_mutex_ 之外，避免等待变换时阻塞状态和检测回调。
     // 当前是“每类一个目标”的缓存，不是同类多目标的身份跟踪器。
-    std::map<std::string, const aubo_perception::DetectedObject *> selected; // 颜色+目标对象
+    std::map<std::string, const aubo_perception::DetectedObject *> selected; // 类别+目标对象
     for (const auto &detected : message.objects)                             // 遍历检测到的对象数组 aubo_perception/DetectedObject[]
     {
-      const auto found = selected.find(detected.color);
+      const std::string& category = objectCategory(detected);
+      const auto found = selected.find(category);
       if (found == selected.end() || detected.contour_area > found->second->contour_area) // 如果没有找到|检测到的面积大于已选面积
-        selected[detected.color] = &detected;                                             // 存储面积最大的目标对象 颜色:目标对象
+        selected[category] = &detected;                                                   // 存储面积最大的目标对象 类别:目标对象
     }
     struct Update
     {
-      std::string color;
+      std::string category;
       double x;
       double y;
     };
@@ -108,7 +109,7 @@ namespace aubo_sorting_core
       double x = 0.0;
       double y = 0.0;
       if (detectionInCacheFrame(message, *item.second, x, y)) // 将检测到的目标对象转换到目标缓存坐标系下
-        updates.push_back({item.first, x, y});                // 颜色:目标对象的x,y坐标
+        updates.push_back({item.first, x, y});                // 类别:目标对象的x,y坐标
     }
     if (updates.empty())
       return;
@@ -119,7 +120,7 @@ namespace aubo_sorting_core
       std::lock_guard<std::mutex> lock(data_mutex_);
       for (const Update &update : updates)
       {
-        auto found = target_tracks_.find(update.color); // 在目标跟踪中查找更新了颜色的目标对象
+        auto found = target_tracks_.find(update.category); // 在目标跟踪中查找更新类别的目标对象
         if (found == target_tracks_.end())              // 没找到  首次观测到
         {
           TargetTrack track;
@@ -127,7 +128,7 @@ namespace aubo_sorting_core
           track.y = update.y;
           track.count = 1;
           track.last_seen = now;
-          target_tracks_[update.color] = track;
+          target_tracks_[update.category] = track;
           changed = true;
           continue;
         }
@@ -138,7 +139,7 @@ namespace aubo_sorting_core
         if (distance > target_cache_outlier_distance_)                              // 超出异常距离
         {
           ROS_WARN_THROTTLE(2.0, "Rejecting %s target-cache outlier %.3f m from track",
-                            update.color.c_str(), distance);
+                            update.category.c_str(), distance);
           continue;
         }
         ++track.count; // 增加该目标被检测到的次数
@@ -156,7 +157,7 @@ namespace aubo_sorting_core
       publishTargetCache();
   }
 
-  void ColorSortingTask::publishTargetCache()
+  void SortingTask::publishTargetCache()
   {
     if (continuous_sorting_)
     {
@@ -199,18 +200,18 @@ namespace aubo_sorting_core
     target_cache_publisher_.publish(message);
   }
 
-  void ColorSortingTask::markTargetPicked(const std::string &color)
+  void SortingTask::markTargetPicked(const std::string &category)
   {
     {
       std::lock_guard<std::mutex> lock(data_mutex_);
-      const auto found = target_tracks_.find(color);
+      const auto found = target_tracks_.find(category);
       if (found != target_tracks_.end())
         found->second.picked = true;
     }
     publishTargetCache();
   }
 
-  bool ColorSortingTask::cachedObject(const std::string &color,
+  bool SortingTask::cachedObject(const std::string &category,
                                       aubo_perception::DetectedObject &detected)
   {
     // 使用目标缓存中的目标对象 存在时间|未被抓取|观测次数
@@ -219,7 +220,7 @@ namespace aubo_sorting_core
     TargetTrack track;
     {
       std::lock_guard<std::mutex> lock(data_mutex_);
-      const auto found = target_tracks_.find(color);
+      const auto found = target_tracks_.find(category);
       if (found == target_tracks_.end())
         return false;
       track = found->second; // 使用target_tracks_中保存的目标对象信息
@@ -233,17 +234,18 @@ namespace aubo_sorting_core
     if (!xyInTargetFrame(target_cache_frame_, {track.x, track.y}, x, y)) // 将目标对象的平均位置转换到目标缓存坐标系下
       return false;
     detected = aubo_perception::DetectedObject();
-    detected.color = color;
+    detected.class_name = category;
+    detected.color = category; // 兼容仍读取旧字段的下游节点。
     detected.pose.position.x = x;
     detected.pose.position.y = y;
     detected.pose.position.z = table_z_ + 0.5 * object_height_;
     detected.pose.orientation.w = 1.0;
     ROS_WARN("Using cached %s target after %.1f s without a fresh detection: [%.3f, %.3f] in %s (%d observations)",
-             color.c_str(), age, track.x, track.y, target_cache_frame_.c_str(), track.count);
+             category.c_str(), age, track.x, track.y, target_cache_frame_.c_str(), track.count);
     return true;
   }
 
-  bool ColorSortingTask::waitForObject(const std::string &color, const ros::WallTime &not_before,
+  bool SortingTask::waitForObject(const std::string &category, const ros::WallTime &not_before,
                                        aubo_perception::DetectedObject &detected)
   {
     // |←── 新鲜检测优先 ──→|target_cache_fallback_delay_|←── 缓存开始兜底 ──→|detection_timeout_|←── 硬超时 ──→
@@ -273,8 +275,8 @@ namespace aubo_sorting_core
         last_receipt = receipt;
         const aubo_perception::DetectedObject *largest = nullptr;
         for (const auto &candidate : detections->objects)
-          if (candidate.color == color && (!largest || candidate.contour_area > largest->contour_area))
-            largest = &candidate; // 找到最大的目标且颜色对应的对象
+          if (objectCategory(candidate) == category && (!largest || candidate.contour_area > largest->contour_area))
+            largest = &candidate; // 找到最大的目标且类别对应
         if (largest)
         {
           // 同类多个目标时避免把相隔较远的目标平均到两者中间。
@@ -298,41 +300,41 @@ namespace aubo_sorting_core
             detected.pose.position.y /= samples.size();
             detected.pose.position.z /= samples.size();
             ROS_INFO("Averaged %zu '%s' detections at [%.3f, %.3f]", samples.size(),
-                     color.c_str(), detected.pose.position.x, detected.pose.position.y);
+                     category.c_str(), detected.pose.position.x, detected.pose.position.y);
             return true;
           }
         }
       }
-      if (ros::WallTime::now() >= cache_deadline && cachedObject(color, detected)) // 目标回退时间到时 使用目标缓存中的目标对象
+      if (ros::WallTime::now() >= cache_deadline && cachedObject(category, detected)) // 目标回退时间到时 使用目标缓存中的目标对象
         return true;
       rate.sleep();
     }
-    if (cachedObject(color, detected))
+    if (cachedObject(category, detected))
       return true;
-    setFailure("DETECTION_FAILED", "no fresh or confident cached '" + color + "' target");
-    ROS_ERROR("No fresh '%s' object detected within %.1f seconds", color.c_str(), detection_timeout_);
+    setFailure("DETECTION_FAILED", "no fresh or confident cached '" + category + "' target");
+    ROS_ERROR("No fresh '%s' object detected within %.1f seconds", category.c_str(), detection_timeout_);
     return false;
   }
 
-  bool ColorSortingTask::verifyVisibleColors()
+  bool SortingTask::verifyVisibleCategories()
   {
     // 光照可能变化、物体可能被遮挡、机械臂移动可能导致相机视角偏移，需要确认确实能看清所有颜色再开始抓取
     // 就是检测当前得到的几帧图像中 是否包含了所有需要验证的颜色
     std::set<std::string> required; // 需要验证的颜色集合
-    for (const std::string &color : sort_colors_)
-      if (completed_colors_.count(color) == 0)
-        required.insert(color);
+    for (const std::string &category : sort_classes_)
+      if (completed_categories_.count(category) == 0)
+        required.insert(category);
     if (required.empty())
     {
-      ROS_INFO("Observation verification skipped: all colors completed");
+      ROS_INFO("Observation verification skipped: all categories completed");
       return true;
     }
     const ros::WallTime start = ros::WallTime::now();
     const ros::WallTime deadline = start + ros::WallDuration(observation_verification_timeout_);
     ros::WallTime last_receipt = start;
     std::map<std::string, int> counts;
-    for (const auto &color : required)
-      counts[color] = 0;
+    for (const auto &category : required)
+      counts[category] = 0;
     ros::WallRate rate(10.0);
     while (ros::ok() && ros::WallTime::now() < deadline)
     {
@@ -350,19 +352,19 @@ namespace aubo_sorting_core
         last_receipt = receipt;
         std::set<std::string> visible;
         for (const auto &item : detections->objects)
-          visible.insert(item.color); // 记录当前帧中可见的颜色
-        for (const auto &color : required)
-          if (visible.count(color))
-            ++counts[color];
+          visible.insert(objectCategory(item)); // 记录当前帧中可见的类别
+        for (const auto &category : required)
+          if (visible.count(category))
+            ++counts[category];
         bool complete = true;
-        for (const auto &color : required)
-          complete = complete && counts[color] >= observation_verification_min_frames_;
+        for (const auto &category : required)
+          complete = complete && counts[category] >= observation_verification_min_frames_;
         if (complete)
         {
           std::vector<std::string> values;
           for (const auto &item : counts)
             values.push_back(item.first + "=" + std::to_string(item.second));
-          ROS_INFO_STREAM("Observation verified all colors across frames: " << join(values, ", "));
+          ROS_INFO_STREAM("Observation verified all categories across frames: " << join(values, ", "));
           return true;
         }
       }
@@ -376,7 +378,7 @@ namespace aubo_sorting_core
       if (item.second < observation_verification_min_frames_)
         missing.push_back(item.first);
     }
-    ROS_WARN("Observation pose did not show all required colors within %.1f seconds: required_frames=%d, counts=[%s], missing=[%s]",
+    ROS_WARN("Observation pose did not show all required categories within %.1f seconds: required_frames=%d, counts=[%s], missing=[%s]",
              observation_verification_timeout_, observation_verification_min_frames_,
              join(count_values, ", ").c_str(), join(missing, ", ").c_str());
     return false;

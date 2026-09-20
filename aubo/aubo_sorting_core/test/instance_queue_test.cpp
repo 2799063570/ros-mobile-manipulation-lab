@@ -5,10 +5,10 @@
 
 #define CHECK(condition) do { if (!(condition)) throw std::runtime_error(#condition); } while (false)
 using Queue = aubo_sorting_core::InstanceQueue<int>;
-Queue::Sample object(double x, std::string color = "red", int payload = 7)
+Queue::Sample object(double x, std::string category = "red", int payload = 7)
 {
   Queue::Sample sample;
-  sample.color = color; sample.x = x; sample.z = .12; sample.payload = payload;
+  sample.category = category; sample.x = x; sample.z = .12; sample.payload = payload;
   return sample;
 }
 void confirm(Queue& queue, const std::vector<Queue::Sample>& samples, double start = 1)

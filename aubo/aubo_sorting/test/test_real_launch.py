@@ -34,14 +34,14 @@ class RealLaunchTest(unittest.TestCase):
         self.assertEqual(params['/color_sorting_task/acceleration_scaling'], 0.1)
         self.assertEqual(params['/grasp_geometry/camera_info_topic'],
                          '/camera/color/camera_info')
-        self.assertEqual(params['/color_sorting_task/sort_colors'],
+        self.assertEqual(params['/color_sorting_task/sort_classes'],
                          ['red', 'green', 'blue'])
 
     def test_yolo_and_external_drivers(self):
         config = resolve('sorting_real.launch', 'detector:=yolo', 'start_camera:=false',
                          'start_gripper:=false', 'rviz:=false')
         params = {key: value.value for key, value in config.params.items()}
-        self.assertEqual(params['/color_sorting_task/sort_colors'], ['can'])
+        self.assertEqual(params['/color_sorting_task/sort_classes'], ['can'])
         self.assertEqual(params['/ultralytics_yolo/input_mode'], 'topic')
         self.assertFalse(any(node.package == 'inspire_gripper' for node in config.nodes))
         self.assertFalse(any(node.package == 'realsense2_camera' for node in config.nodes))
@@ -62,7 +62,7 @@ class RealLaunchTest(unittest.TestCase):
                                      f'/{camera}/color/camera_info')
                     self.assertEqual(params['/grasp_geometry/aligned_depth_topic'],
                                      f'/{camera}/aligned_depth_to_color/image_raw')
-                    self.assertEqual(params['/color_sorting_task/sort_colors'], classes)
+                    self.assertEqual(params['/color_sorting_task/sort_classes'], classes)
                     self.assertEqual(params[f'/{camera}/realsense2_camera/serial_no'],
                                      'D435I_TEST_SERIAL')
                     for stream in ('enable_color', 'enable_depth', 'align_depth'):

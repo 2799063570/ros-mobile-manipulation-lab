@@ -1,0 +1,310 @@
+#ifndef AUBO_SORTING_CORE_SORTING_TASK_HPP
+#define AUBO_SORTING_CORE_SORTING_TASK_HPP
+
+#include <actionlib/client/simple_action_client.h>
+#include <aubo_perception/DetectedObject.h>
+#include <aubo_perception/DetectedObjectArray.h>
+#include <control_msgs/FollowJointTrajectoryAction.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <moveit/move_group_interface/move_group_interface.h>
+#include <moveit/planning_scene_interface/planning_scene_interface.h>
+#include <moveit_msgs/PlanningScene.h>
+#include <ros/ros.h>
+#include <sensor_msgs/PointCloud2.h>
+#include <std_msgs/String.h>
+#include <std_srvs/Empty.h>
+#include <std_srvs/Trigger.h>
+#include <tf/transform_listener.h>
+#include <aubo_sorting_core/instance_queue.hpp>
+
+#include <atomic>
+#include <cstdint>
+#include <condition_variable>
+#include <functional>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <set>
+#include <string>
+#include <thread>
+#include <utility>
+#include <vector>
+
+namespace aubo_sorting_core
+{
+
+class SortingTask
+{
+public:
+  SortingTask(ros::NodeHandle nh, ros::NodeHandle private_nh);
+  ~SortingTask();
+
+  SortingTask(const SortingTask&) = delete;
+  SortingTask& operator=(const SortingTask&) = delete;
+
+  void start();
+
+private:
+  enum class State { 
+    DETECTING, 
+    ERROR, 
+    HOMING, 
+    IDLE, 
+    INITIALIZING, 
+    OBSERVING, 
+    OPENING, 
+    PICKING, 
+    PREPARING, 
+    READY, 
+    SORTING, 
+    STOPPED };
+  static const char* stateName(State state);
+
+  using GripperClient = actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction>;
+
+  struct TargetTrack     // 目标跟踪结构体 
+  {
+    double x{0.0};
+    double y{0.0};
+    int count{0};// 被检测到的次数
+    double m2{0.0};
+    ros::WallTime last_seen;
+    bool picked{false};
+  };
+
+  struct WorkspaceConfig
+  {
+    std::string id;
+    std::vector<double> table_center;
+    std::vector<double> table_size;
+    std::string table_frame;
+    double table_z{0.0};
+    std::string place_frame;
+    std::map<std::string, std::vector<double>> place_targets;
+    std::map<std::string, std::string> grasp_model_names;
+  };
+
+  void loadParameters();
+  bool verifyLoadedUpperArmLimit() const;
+  void initialize();
+  void publishState(State state, const std::string& detail = std::string());
+  void setFailure(const std::string& category, const std::string& detail);
+
+  void detectionCallback(const aubo_perception::DetectedObjectArrayConstPtr& message);
+  void graspStatusCallback(const std_msgs::StringConstPtr& message);
+  void cloudCallback(const sensor_msgs::PointCloud2ConstPtr& message);
+  void planningSceneCallback(const moveit_msgs::PlanningSceneConstPtr& message);
+  void workspaceUpdateCallback(const std_msgs::StringConstPtr& message);
+
+  bool observeService(std_srvs::Trigger::Request&, std_srvs::Trigger::Response& response);
+  bool startService(std_srvs::Trigger::Request&, std_srvs::Trigger::Response& response);
+  bool stopService(std_srvs::Trigger::Request&, std_srvs::Trigger::Response& response);
+  bool openService(std_srvs::Trigger::Request&, std_srvs::Trigger::Response& response);
+  bool prepareWorkService(std_srvs::Trigger::Request&, std_srvs::Trigger::Response& response);
+  bool homeService(std_srvs::Trigger::Request&, std_srvs::Trigger::Response& response);
+  bool configureWorkspaceService(std_srvs::Trigger::Request&, std_srvs::Trigger::Response& response);
+
+  std::pair<bool, std::string> startOperation(State state,
+                                              const std::function<bool()>& operation);
+  bool observationOperation();
+  bool initialObservationOperation();
+  bool openOperation();
+  bool homeOperation();
+  bool prepareWorkOperation();
+  bool sortingOperation();
+  bool continuousSortingOperation();
+  void targetWorker();
+  void resetInstanceQueue();
+  void processInstanceFrame(const aubo_perception::DetectedObjectArray& message);
+  void publishInstanceQueue();
+  bool validateReservedTarget();
+  bool observation();
+  bool verifyVisibleCategories();
+  bool pickAndPlace(const aubo_perception::DetectedObject& detected);
+
+  geometry_msgs::PoseStamped makePose(double x, double y, double z) const;
+  bool xyInTargetFrame(const std::string& source_frame, const std::vector<double>& xy,
+                       double& x, double& y);
+  bool moveToPose(const geometry_msgs::PoseStamped& pose, const std::string& description,
+                  bool constrain_pregrasp_wrist1 = false);
+  bool moveNamed(const std::string& target);
+  bool planAndExecute(const std::string& description, double wrist1_limit = 0.0);
+  bool cartesianTo(const geometry_msgs::PoseStamped& target_pose,
+                   const std::string& description, bool require_complete = false);
+  bool liftWithRecovery(double x, double y, const std::string& description);
+  bool commandGripper(double position);
+  bool addTableCollision();
+  bool refreshOctomap();
+
+  bool waitForGraspPlugin();
+  bool setGraspAttachment(const std::string& model_name, bool attach);
+  void releaseAttachedObjectNoWait();
+
+  void updateTargetCache(const aubo_perception::DetectedObjectArray& message);
+  bool detectionInCacheFrame(const aubo_perception::DetectedObjectArray& message,
+                             const aubo_perception::DetectedObject& detected,
+                             double& x, double& y);
+  void publishTargetCache();
+  static const std::string& objectCategory(const aubo_perception::DetectedObject& detected);
+  void markTargetPicked(const std::string& category);
+  bool cachedObject(const std::string& category, aubo_perception::DetectedObject& detected);
+  bool waitForObject(const std::string& category, const ros::WallTime& not_before,
+                     aubo_perception::DetectedObject& detected);
+
+  bool workspaceFromParam(const XmlRpc::XmlRpcValue& value, WorkspaceConfig& workspace,
+                          std::string& error) const;
+  bool workspaceFromJson(const std::string& json, WorkspaceConfig& workspace,
+                         std::string& error) const;
+  bool applyWorkspace(const WorkspaceConfig& workspace, std::string& error);
+
+  ros::NodeHandle nh_;
+  ros::NodeHandle private_nh_;
+  tf::TransformListener tf_listener_;
+  std::unique_ptr<moveit::planning_interface::MoveGroupInterface> arm_;
+  moveit::planning_interface::PlanningSceneInterface scene_;
+  std::unique_ptr<GripperClient> gripper_client_;
+
+  ros::Publisher state_publisher_;
+  ros::Publisher detection_summary_publisher_;
+  ros::Publisher base_lock_publisher_;
+  ros::Publisher failure_publisher_;
+  ros::Publisher target_cache_publisher_;
+  ros::Publisher grasp_attach_publisher_;
+  ros::Publisher grasp_detach_publisher_;
+  ros::Subscriber detection_subscriber_;
+  ros::Subscriber grasp_status_subscriber_;
+  ros::Subscriber cloud_subscriber_;
+  ros::Subscriber planning_scene_subscriber_;
+  ros::Subscriber workspace_subscriber_;
+  ros::ServiceClient clear_octomap_client_;
+  ros::ServiceClient inspire_open_client_, inspire_close_client_, inspire_stop_client_, inspire_state_client_;
+  std::string gripper_backend_;
+  int inspire_speed_{500}, inspire_force_{100};
+  double inspire_motion_timeout_{5.0};
+  std::vector<ros::ServiceServer> services_;
+
+  std::string group_name_;
+  std::string end_effector_link_;
+  std::string target_frame_;
+  std::string detections_topic_;
+  std::string gripper_action_name_;
+  std::string table_frame_;
+  std::string observation_named_target_;
+  std::string work_ready_named_target_;
+  std::string grasp_attach_topic_;
+  std::string grasp_detach_topic_;
+  std::string grasp_status_topic_;
+  std::string place_frame_;
+  std::string finish_named_target_;
+  std::string point_cloud_topic_;
+  std::string planning_scene_topic_;
+  std::string clear_octomap_service_;
+  std::string base_lock_topic_;
+  std::string target_cache_frame_;
+  std::string failure_topic_;
+  std::string workspace_config_param_;
+  std::string workspace_update_topic_;
+  std::string planning_frame_;
+
+  std::vector<double> table_center_;// 桌面中心点坐标
+  std::vector<double> table_size_;// 桌面尺寸
+  std::vector<double> grasp_rpy_;
+  std::vector<double> observation_pose_;
+  std::vector<std::string> sort_classes_;
+  std::map<std::string, std::string> grasp_model_names_;
+  std::map<std::string, std::vector<double>> place_targets_;
+
+  // 感知抓取参数仅在一次抓放期间生效，观察位姿仍使用原始 grasp_rpy。
+  std::string height_mode_{"table"};
+  bool use_detected_angle_{false}, use_detected_width_{false};
+  double active_grasp_angle_{0.0}, height_tolerance_{0.02};
+  double gripper_width_open_{-1.0}, gripper_width_closed_{-1.0}, width_close_scale_{0.9};
+  double table_z_{0.14};
+  double table_collision_margin_{0.0};
+  double object_height_{0.04};
+  double grasp_height_offset_{0.01};
+  double pregrasp_height_{0.25};
+  double lift_height_{0.30};
+  double lift_min_height_{0.30};
+  double lift_height_step_{0.02};
+  int lift_max_attempts_{5};
+  double preplace_height_{0.30};  // Height above the table for placement approach/retreat.
+  double place_clearance_{0.02};
+  double cartesian_step_{0.01};
+  double minimum_cartesian_fraction_{0.90};
+  double gripper_open_{0.0};
+  double gripper_closed_{0.28};
+  double gripper_motion_time_{0.8};
+  double gripper_contact_tolerance_{0.30};
+  double grasp_attachment_timeout_{3.0};
+  double detection_timeout_{15.0};
+  double detection_settle_time_{1.0};
+  double observation_verification_timeout_{4.0};
+  double grasp_offset_x_{0.0};
+  double grasp_offset_y_{0.0};
+  double velocity_scaling_{0.15};
+  double acceleration_scaling_{0.15};
+  double gripper_server_timeout_{30.0};
+  double scene_update_timeout_{10.0};
+  double octomap_wait_timeout_{30.0};
+  double target_cache_max_age_{30.0};
+  double target_cache_outlier_distance_{0.12};
+  double target_cache_fallback_delay_{2.0};
+  double planning_time_{12.0};
+  double pregrasp_wrist1_limit_{0.0};
+  int detection_samples_{8};
+  int observation_verification_min_frames_{1};
+  int target_cache_min_observations_{5};
+  bool use_grasp_attachment_{true};
+  bool verify_observation_detections_{false};
+  bool auto_move_to_observation_{true};
+  bool auto_start_{false};
+  bool require_octomap_{false};
+  bool target_cache_fallback_enabled_{true};
+
+  mutable std::mutex data_mutex_;
+  mutable std::mutex operation_mutex_;
+  aubo_perception::DetectedObjectArrayConstPtr detections_;
+  ros::WallTime detections_wall_time_;
+  std::string grasp_status_;// attached:|detached: + model_name(碰撞体名称)
+  std::uint64_t grasp_status_sequence_{0};
+  std::string attached_model_;
+  ros::WallTime last_cloud_wall_time_;
+  std::size_t cloud_points_{0};
+  std::uint64_t octomap_sequence_{0};// Octomap更新计数器
+  std::string last_failure_;
+  std::string workspace_id_{"default"};
+  WorkspaceConfig pending_workspace_;
+  bool has_pending_workspace_{false};
+  std::set<std::string> completed_categories_;
+  std::map<std::string, TargetTrack> target_tracks_;
+  State state_{State::INITIALIZING};
+  std::atomic<bool> busy_{true};
+  std::atomic<bool> initialized_{false};
+  std::atomic<bool> observation_ready_{false};
+  std::atomic<bool> stop_requested_{false};
+  bool robot_limits_valid_{false};
+  std::thread initialization_thread_;
+  std::thread operation_thread_;
+  using ObjectQueue = InstanceQueue<aubo_perception::DetectedObject>;
+  ObjectQueue instance_queue_;
+  bool continuous_sorting_{true};
+  double queue_frame_max_age_{1.0}, queue_empty_confirmation_{2.0}, queue_reserved_max_age_{30.0};
+  double queue_place_exclusion_radius_{0.08}, queue_gripper_exclusion_radius_{0.10};
+  double queue_height_tolerance_{0.04};
+  int queue_empty_min_frames_{5};
+  std::mutex queue_mutex_;
+  std::condition_variable queue_condition_;
+  aubo_perception::DetectedObjectArrayConstPtr pending_detection_;
+  std::thread target_thread_;
+  std::atomic<bool> target_worker_shutdown_{false};
+  ros::Time queue_epoch_, queue_last_stamp_;
+  ros::WallTime queue_last_frame_, queue_empty_since_;
+  int queue_empty_frames_{0};
+  std::uint64_t active_instance_id_{0}; // Execution thread only.
+  std::atomic<bool> grasp_secured_{false}; // 夹紧前保留目标的视觉观测，夹紧后才屏蔽夹爪邻域。
+};
+
+}  // namespace aubo_sorting_core
+
+#endif  // AUBO_SORTING_CORE_SORTING_TASK_HPP

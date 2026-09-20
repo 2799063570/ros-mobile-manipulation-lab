@@ -1,4 +1,4 @@
-#include <aubo_sorting_core/color_sorting_task.hpp>
+#include <aubo_sorting_core/sorting_task.hpp>
 #include "task_utils.hpp"
 #include <aubo_sorting_core/height_recovery.hpp>
 #include <urdf/model.h>
@@ -10,7 +10,7 @@ namespace aubo_sorting_core
 {
   using detail::xmlVector;
 
-  void ColorSortingTask::loadParameters()
+  void SortingTask::loadParameters()
   {
     private_nh_.param<std::string>("planning_group", group_name_, "aubo_i5");
     private_nh_.param<std::string>("end_effector_link", end_effector_link_, "tcp_link");
@@ -158,12 +158,14 @@ namespace aubo_sorting_core
     table_size_ = {0.80, 1.20, 0.40};
     grasp_rpy_ = {3.14159265358979323846, 0.0, 0.0};
     observation_pose_ = {0.58, 0.0, 0.62};
-    sort_colors_ = {"red", "green", "blue"}; // 要进行分拣的颜色列表
+    sort_classes_ = {"red", "green", "blue"}; // 通用分拣类别列表
     private_nh_.getParam("table_center", table_center_);
     private_nh_.getParam("table_size", table_size_);
     private_nh_.getParam("grasp_rpy", grasp_rpy_);
     private_nh_.getParam("observation_pose", observation_pose_);
-    private_nh_.getParam("sort_colors", sort_colors_);
+    if (!private_nh_.getParam("sort_classes", sort_classes_) &&
+        private_nh_.getParam("sort_colors", sort_classes_))
+      ROS_WARN("Parameter '~sort_colors' is deprecated; use '~sort_classes' instead");
 
     XmlRpc::XmlRpcValue mappings;
     if (private_nh_.getParam("grasp_model_names", mappings) &&
@@ -184,7 +186,7 @@ namespace aubo_sorting_core
       throw std::runtime_error("table_center, table_size, grasp_rpy and observation_pose must each have 3 values");
   }
 
-  bool ColorSortingTask::verifyLoadedUpperArmLimit() const
+  bool SortingTask::verifyLoadedUpperArmLimit() const
   {
     std::string description;
     if (!nh_.getParam("/robot_description", description))

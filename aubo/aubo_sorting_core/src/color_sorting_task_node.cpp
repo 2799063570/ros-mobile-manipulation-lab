@@ -1,4 +1,4 @@
-#include <aubo_sorting_core/color_sorting_task.hpp>
+#include <aubo_sorting_core/sorting_task.hpp>
 
 #include <ros/ros.h>
 
@@ -14,7 +14,7 @@ int main(int argc, char** argv)
 
   try
   {
-    aubo_sorting_core::ColorSortingTask task(nh, private_nh);
+    aubo_sorting_core::SortingTask task(nh, private_nh);
     task.start();
     ros::waitForShutdown();
   }

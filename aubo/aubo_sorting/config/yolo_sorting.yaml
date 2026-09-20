@@ -44,7 +44,7 @@ grasp_detach_topic: /sorting/grasp/detach
 grasp_status_topic: /sorting/grasp/status
 grasp_attachment_timeout: 3.0
 
-sort_colors: [can]
+sort_classes: [can]
 place_targets:
   can: [0.44, -0.25]
 grasp_model_names:
@@ -71,4 +71,4 @@ gripper_width_open: -1.0
 gripper_width_closed: -1.0
 width_close_scale: 0.90
 # 检测角度以基座 XY 平面内的短边为准；上方 yaw 校正夹爪局部 Y 闭合轴。
-# sort_colors/place_targets 的键也可填写任意 YOLO 类别，例如 bottle。
+# sort_classes/place_targets 的键也可填写任意 YOLO 类别，例如 bottle。

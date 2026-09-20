@@ -298,7 +298,7 @@ bool NavigationSortingMission::sortAtWorkspaceWithRecovery(const XmlRpc::XmlRpcV
                                          MissionState::ADJUSTING_BASE, frame, 0.01))
       return false;
     // Observation and fresh detections must be reacquired after moving the base.
-    // Do not configureWorkspace here: that would erase completed_colors_.
+    // Do not configureWorkspace here: that would erase completed_categories_.
     if (!prepareAndObserveOnce())
       return false;
     if (arm_executor_->sort("pre-grasp recovery retry"))

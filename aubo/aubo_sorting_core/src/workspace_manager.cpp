@@ -1,4 +1,4 @@
-#include <aubo_sorting_core/color_sorting_task.hpp>
+#include <aubo_sorting_core/sorting_task.hpp>
 #include "task_utils.hpp"
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
@@ -14,7 +14,7 @@ namespace aubo_sorting_core
 using detail::xmlNumber;
 using detail::xmlVector;
 
-void ColorSortingTask::cloudCallback(const sensor_msgs::PointCloud2ConstPtr& message)
+void SortingTask::cloudCallback(const sensor_msgs::PointCloud2ConstPtr& message)
 {
   const std::size_t points = static_cast<std::size_t>(message->width) * message->height;
   if (!points)
@@ -24,7 +24,7 @@ void ColorSortingTask::cloudCallback(const sensor_msgs::PointCloud2ConstPtr& mes
   last_cloud_wall_time_ = ros::WallTime::now();
 }
 
-void ColorSortingTask::planningSceneCallback(const moveit_msgs::PlanningSceneConstPtr& message)
+void SortingTask::planningSceneCallback(const moveit_msgs::PlanningSceneConstPtr& message)
 {
   if (message->world.octomap.octomap.data.empty())
     return;
@@ -32,7 +32,7 @@ void ColorSortingTask::planningSceneCallback(const moveit_msgs::PlanningSceneCon
   ++octomap_sequence_;
 }
 
-bool ColorSortingTask::workspaceFromParam(const XmlRpc::XmlRpcValue& value,
+bool SortingTask::workspaceFromParam(const XmlRpc::XmlRpcValue& value,
                                           WorkspaceConfig& workspace,
                                           std::string& error) const
 {
@@ -73,9 +73,9 @@ bool ColorSortingTask::workspaceFromParam(const XmlRpc::XmlRpcValue& value,
       for (auto iterator = names.begin(); iterator != names.end(); ++iterator)
         workspace.grasp_model_names[iterator->first] = static_cast<std::string>(iterator->second);
     }
-    for (const std::string& color : sort_colors_)
-      if (workspace.place_targets.count(color) == 0 || workspace.place_targets[color].size() != 2)
-        throw std::runtime_error("workspace has no valid place target for '" + color + "'");
+    for (const std::string& category : sort_classes_)
+      if (workspace.place_targets.count(category) == 0 || workspace.place_targets[category].size() != 2)
+        throw std::runtime_error("workspace has no valid place target for '" + category + "'");
     return true;
   }
   catch (const std::exception& exception)
@@ -85,7 +85,7 @@ bool ColorSortingTask::workspaceFromParam(const XmlRpc::XmlRpcValue& value,
   }
 }
 
-bool ColorSortingTask::workspaceFromJson(const std::string& json, WorkspaceConfig& workspace,
+bool SortingTask::workspaceFromJson(const std::string& json, WorkspaceConfig& workspace,
                                          std::string& error) const
 {
   try
@@ -132,9 +132,9 @@ bool ColorSortingTask::workspaceFromJson(const std::string& json, WorkspaceConfi
       for (const auto& item : *names)
         workspace.grasp_model_names[item.first] = item.second.get_value<std::string>();
     }
-    for (const std::string& color : sort_colors_)
-      if (workspace.place_targets.count(color) == 0 || workspace.place_targets[color].size() != 2)
-        throw std::runtime_error("workspace has no valid place target for '" + color + "'");
+    for (const std::string& category : sort_classes_)
+      if (workspace.place_targets.count(category) == 0 || workspace.place_targets[category].size() != 2)
+        throw std::runtime_error("workspace has no valid place target for '" + category + "'");
     return true;
   }
   catch (const std::exception& exception)
@@ -144,7 +144,7 @@ bool ColorSortingTask::workspaceFromJson(const std::string& json, WorkspaceConfi
   }
 }
 
-void ColorSortingTask::workspaceUpdateCallback(const std_msgs::StringConstPtr& message)
+void SortingTask::workspaceUpdateCallback(const std_msgs::StringConstPtr& message)
 {
   WorkspaceConfig workspace;
   std::string error;
@@ -158,7 +158,7 @@ void ColorSortingTask::workspaceUpdateCallback(const std_msgs::StringConstPtr& m
   has_pending_workspace_ = true;
 }
 
-bool ColorSortingTask::applyWorkspace(const WorkspaceConfig& workspace, std::string& error)
+bool SortingTask::applyWorkspace(const WorkspaceConfig& workspace, std::string& error)
 {
   // Exclude the tracker while replacing coordinate frames, ROI and destinations.
   std::unique_lock<std::mutex> queue_lock(queue_mutex_);
@@ -191,7 +191,7 @@ bool ColorSortingTask::applyWorkspace(const WorkspaceConfig& workspace, std::str
   place_targets_ = workspace.place_targets;
   grasp_model_names_ = workspace.grasp_model_names;
   workspace_id_ = workspace.id;
-  completed_colors_.clear();
+  completed_categories_.clear();
   {
     std::lock_guard<std::mutex> lock(data_mutex_);
     target_tracks_.clear();
@@ -209,7 +209,7 @@ bool ColorSortingTask::applyWorkspace(const WorkspaceConfig& workspace, std::str
   return true;
 }
 
-bool ColorSortingTask::configureWorkspaceService(std_srvs::Trigger::Request&,
+bool SortingTask::configureWorkspaceService(std_srvs::Trigger::Request&,
                                                  std_srvs::Trigger::Response& response)
 {
   std::lock_guard<std::mutex> operation_lock(operation_mutex_);
@@ -249,7 +249,7 @@ bool ColorSortingTask::configureWorkspaceService(std_srvs::Trigger::Request&,
   return true;
 }
 
-bool ColorSortingTask::addTableCollision()
+bool SortingTask::addTableCollision()
 {
   const std::string object_name = "sorting_table";
   geometry_msgs::PoseStamped table_pose;
@@ -298,7 +298,7 @@ bool ColorSortingTask::addTableCollision()
   return true;
 }
 
-bool ColorSortingTask::refreshOctomap()
+bool SortingTask::refreshOctomap()
 {
   // 更新八叉树地图
   // 首先等待点云数据 等待点云回调数据中的时间戳大于当前时间戳 且点云数据非空 说明有新的点云支持我们重新构建八叉树

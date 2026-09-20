@@ -54,7 +54,7 @@ include_directories(
 )
 
 add_library(color_sorting_task
-  src/color_sorting_task.cpp
+  src/sorting_task.cpp
   src/task_parameters.cpp
   src/target_tracking.cpp
   src/instance_tracking.cpp

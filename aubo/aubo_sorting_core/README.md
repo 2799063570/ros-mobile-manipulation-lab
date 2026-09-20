@@ -10,7 +10,7 @@
 使用 `color_sorting_task_cpp`。`continuous_sorting=true` 时，历史 Python 入口也转交给
 C++ 执行器并保留 ROS 名称/命名空间参数，避免维护两份并发实现。仅当场景 YAML 设置
 `continuous_sorting: false` 时，`task_executable:=color_sorting_task.py` 才运行旧 Python 流程。C++ 类声明位于
-`include/aubo_sorting_core/color_sorting_task.hpp`，节点入口位于 `src/color_sorting_task_node.cpp`，实现按职责拆分如下。
+`include/aubo_sorting_core/sorting_task.hpp`，节点入口位于 `src/color_sorting_task_node.cpp`，实现按职责拆分如下。
 
 ## 程序职责与维护入口
 
@@ -20,8 +20,9 @@ C++ 执行器并保留 ROS 名称/命名空间参数，避免维护两份并发�
 | 文件 / 程序 | 职责 |
 | --- | --- |
 | `src/color_sorting_task_node.cpp` / `color_sorting_task_cpp` | 默认 ROS 节点入口，初始化并运行任务对象 |
-| `include/aubo_sorting_core/color_sorting_task.hpp` | 分拣任务类、状态及接口声明 |
-| `src/color_sorting_task.cpp` | 生命周期、ROS 服务、异步任务调度与状态发布 |
+| `include/aubo_sorting_core/sorting_task.hpp` | 通用 `SortingTask` 分拣任务类、状态及接口声明 |
+| `include/aubo_sorting_core/color_sorting_task.hpp` | 旧 C++ API 兼容头，将 `ColorSortingTask` 映射到 `SortingTask` |
+| `src/sorting_task.cpp` | 生命周期、ROS 服务、异步任务调度与状态发布 |
 | `src/task_parameters.cpp` | 参数读取、基本参数校验和机械臂关节限制检查 |
 | `src/target_tracking.cpp` | 检测订阅、坐标转换、目标缓存及多帧确认 |
 | `src/instance_tracking.cpp` | 最新帧后台线程、实例过滤、连续抓取调度、空场景确认 |
@@ -34,7 +35,8 @@ C++ 执行器并保留 ROS 名称/命名空间参数，避免维护两份并发�
 | `include/aubo_sorting_core/height_recovery.hpp` | 抓取后抬升的有界高度重试规则 |
 | `scripts/color_sorting_task.py` | 可选 Python 实现，用于回退和对照；不与 C++ 节点同时启动 |
 
-`color_sorting_task` 是历史命名，当前任务通过检测消息和类别参数支持颜色及 YOLO
+`color_sorting_task` 可执行文件和 ROS 节点名是兼容保留的历史命名；C++ 核心类为
+`SortingTask`。当前任务通过检测消息和类别参数支持颜色及 YOLO
 分拣。选择检测器和加载场景由上层 launch 完成，核心不执行图像识别或底盘导航。
 这些 C++ 文件共同构建 `color_sorting_task` 库，由一个任务对象共享状态和锁；
 它们不是单独启动的节点。公共头文件、节点名及 `/sorting/*` 接口保持不变。
@@ -118,7 +120,8 @@ Python 与 C++ 存在重复实现，修改共同抓放逻辑时需要同步检�
 根据实测延迟设置 `queue_frame_max_age`，不能通过重写图像时间戳规避过期检查。
 
 `/sorting/target_cache` 连续模式输出 `schema_version: 2`，`targets` 的键由类别改成
-实例 ID，每项包含 `id/color/status/position/observations/confidence/age/picked`。
+实例 ID，每项包含 `id/category/color/status/position/observations/confidence/age/picked`；
+`color` 是为旧面板保留的 `category` 别名。
 `confidence` 是稳定确认进度，不是检测模型概率；第三方按颜色解析的面板需适配 ID。
 
 ### 重新编译和验证

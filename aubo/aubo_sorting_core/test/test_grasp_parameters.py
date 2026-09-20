@@ -9,7 +9,7 @@ from unittest.mock import Mock
 source = ast.parse((Path(__file__).parents[1]/'scripts/color_sorting_task.py').read_text())
 original = next(n for n in source.body if isinstance(n, ast.ClassDef))
 methods = [n for n in original.body if isinstance(n, ast.FunctionDef)
-           and n.name in ('_pick_and_place', '_pick_and_place_impl')]
+           and n.name in ('_category', '_pick_and_place', '_pick_and_place_impl')]
 module = ast.Module(body=[ast.ClassDef(name='Task', bases=[], keywords=[], body=methods,
                                       decorator_list=[])], type_ignores=[])
 env = dict(math=math, rospy=NS(loginfo=Mock(), logerr=Mock(), sleep=Mock()))
@@ -42,6 +42,12 @@ class GraspTest(unittest.TestCase):
         # 放置仍按目的桌面 + 半物高，不沿用有测量偏差的抓取 Z。
         self.assertAlmostEqual(self.t._cartesian_to.call_args_list[1][0][0][2], .15)
         self.assertEqual(self.t._active_grasp_angle, 0.)
+
+    def test_category_prefers_class_name_and_falls_back_to_color(self):
+        self.d.class_name = 'can'
+        self.assertEqual(self.t._category(self.d), 'can')
+        self.d.class_name = ''
+        self.assertEqual(self.t._category(self.d), 'red')
 
     def test_invalid_geometry_cannot_move_robot(self):
         for field, value in [('depth_valid',False), ('grasp_geometry_valid',False),

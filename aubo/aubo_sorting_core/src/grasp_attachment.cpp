@@ -1,17 +1,17 @@
-#include <aubo_sorting_core/color_sorting_task.hpp>
+#include <aubo_sorting_core/sorting_task.hpp>
 #include <sstream>
 
 namespace aubo_sorting_core
 {
 
-void ColorSortingTask::graspStatusCallback(const std_msgs::StringConstPtr& message)
+void SortingTask::graspStatusCallback(const std_msgs::StringConstPtr& message)
 {
   std::lock_guard<std::mutex> lock(data_mutex_);
   grasp_status_ = message->data;// 抓取吸附的状态
   ++grasp_status_sequence_;
 }
 
-bool ColorSortingTask::waitForGraspPlugin()
+bool SortingTask::waitForGraspPlugin()
 {
   if (!use_grasp_attachment_) // 是否使用抓取吸附插件
     return true;
@@ -40,7 +40,7 @@ bool ColorSortingTask::waitForGraspPlugin()
   return false;
 }
 
-bool ColorSortingTask::setGraspAttachment(const std::string& model_name, bool attach)
+bool SortingTask::setGraspAttachment(const std::string& model_name, bool attach)
 {
   // 通过话题通信请求抓取吸附插件进行吸附或释放物体
   // 通过判断序列号和状态来判断是否执行成功
@@ -94,7 +94,7 @@ bool ColorSortingTask::setGraspAttachment(const std::string& model_name, bool at
   return false;
 }
 
-void ColorSortingTask::releaseAttachedObjectNoWait()
+void SortingTask::releaseAttachedObjectNoWait()
 {
   // 不用消息序列号和状态来判断是否执行成功 直接发送释放命令
   std::string model;

@@ -1,4 +1,4 @@
-#include <aubo_sorting_core/color_sorting_task.hpp>
+#include <aubo_sorting_core/sorting_task.hpp>
 #include "task_utils.hpp"
 #include <tf/transform_datatypes.h>
 #include <chrono>
@@ -7,7 +7,7 @@
 
 namespace aubo_sorting_core
 {
-void ColorSortingTask::resetInstanceQueue()
+void SortingTask::resetInstanceQueue()
 {
   std::lock_guard<std::mutex> lock(queue_mutex_);
   instance_queue_.clear();
@@ -18,7 +18,7 @@ void ColorSortingTask::resetInstanceQueue()
   queue_empty_frames_ = 0;
 }
 
-void ColorSortingTask::targetWorker()
+void SortingTask::targetWorker()
 {
   while (!target_worker_shutdown_.load() && ros::ok())
   {
@@ -45,7 +45,7 @@ void ColorSortingTask::targetWorker()
   }
 }
 
-void ColorSortingTask::processInstanceFrame(const aubo_perception::DetectedObjectArray& message)
+void SortingTask::processInstanceFrame(const aubo_perception::DetectedObjectArray& message)
 {
   State state;
   {
@@ -101,7 +101,8 @@ void ColorSortingTask::processInstanceFrame(const aubo_perception::DetectedObjec
   bool valid = true;
   for (const auto& object : message.objects)
   {
-    if (std::find(sort_colors_.begin(), sort_colors_.end(), object.color) == sort_colors_.end()) continue;// 判断是否是需要抓取的颜色
+    const std::string& category = objectCategory(object);
+    if (std::find(sort_classes_.begin(), sort_classes_.end(), category) == sort_classes_.end()) continue;// 判断是否是需要抓取的类别
     const auto& p = object.pose.position;// 目标在源坐标系下的位置
     if (!std::isfinite(p.x) || !std::isfinite(p.y) || !std::isfinite(p.z)) { valid = false; continue; }
     const tf::Vector3 point = source_to_target * tf::Vector3(p.x, p.y, p.z);
@@ -123,7 +124,7 @@ void ColorSortingTask::processInstanceFrame(const aubo_perception::DetectedObjec
         queue_gripper_exclusion_radius_) excluded = true;
     if (excluded) continue;
     ObjectQueue::Sample sample;// 创建目标队列样本 
-    sample.color = object.color;
+    sample.category = category;
     sample.x = point.x(); sample.y = point.y(); sample.z = point.z();
     sample.payload = object;
     sample.payload.pose.position.x = point.x();
@@ -169,7 +170,7 @@ void ColorSortingTask::processInstanceFrame(const aubo_perception::DetectedObjec
   }
 }
 
-bool ColorSortingTask::validateReservedTarget()
+bool SortingTask::validateReservedTarget()
 {
   if (!continuous_sorting_ || active_instance_id_ == 0) return true;
   std::string reason;
@@ -183,8 +184,8 @@ bool ColorSortingTask::validateReservedTarget()
     else if (found->second.disturbed) {
       std::ostringstream detail;
       detail << "reserved target association changed: distance="
-             << found->second.disturbance_distance << " m, observed color="
-             << found->second.disturbance_color;
+             << found->second.disturbance_distance << " m, observed category="
+             << found->second.disturbance_category;
       reason = detail.str();
     }
     else if (now.toSec() - found->second.last_seen > queue_reserved_max_age_) {
@@ -200,7 +201,7 @@ bool ColorSortingTask::validateReservedTarget()
   return reason.empty() && !stop_requested_.load();
 }
 
-void ColorSortingTask::publishInstanceQueue()
+void SortingTask::publishInstanceQueue()
 {
   std::ostringstream stream;
   stream.precision(15);
@@ -214,7 +215,8 @@ void ColorSortingTask::publishInstanceQueue()
       if (!first) stream << ',';
       first = false;
       stream << '"' << item.first << "\":{\"id\":" << item.first
-             << ",\"color\":\"" << detail::jsonEscape(track.sample.color)
+             << ",\"category\":\"" << detail::jsonEscape(track.sample.category)
+             << "\",\"color\":\"" << detail::jsonEscape(track.sample.category)
              << "\",\"status\":\"" << ObjectQueue::statusName(track.status)
              << "\",\"position\":[" << track.sample.x << ',' << track.sample.y << ',' << track.sample.z
              << "],\"observations\":" << track.observations
@@ -229,7 +231,7 @@ void ColorSortingTask::publishInstanceQueue()
   target_cache_publisher_.publish(message);
 }
 
-bool ColorSortingTask::continuousSortingOperation()
+bool SortingTask::continuousSortingOperation()
 {
   // A panel can wait with the base unlocked after observing; begin a fresh epoch.
   resetInstanceQueue();
@@ -244,14 +246,14 @@ bool ColorSortingTask::continuousSortingOperation()
       const auto now = ros::WallTime::now();
       // No new command after camera loss, even if a previously stable track survives.
       if (!queue_last_frame_.isZero() && (now-queue_last_frame_).toSec() <= queue_frame_max_age_)
-        reserved = instance_queue_.reserve(sort_colors_, now.toSec(), target);
+        reserved = instance_queue_.reserve(sort_classes_, now.toSec(), target);
       empty = observation_ready_.load() && !queue_empty_since_.isZero() &&
           (now-queue_empty_since_).toSec() >= queue_empty_confirmation_ &&
           (now-queue_last_frame_).toSec() <= queue_frame_max_age_ && queue_empty_frames_ >= queue_empty_min_frames_;
     }
     if (reserved) {
       observation_ready_.store(false);
-      publishState(State::PICKING, target.sample.color + " #" + std::to_string(target.id));
+      publishState(State::PICKING, target.sample.category + " #" + std::to_string(target.id));
       publishInstanceQueue();
       auto detected = target.sample.payload;
       detected.pose.position.x = target.sample.x;
