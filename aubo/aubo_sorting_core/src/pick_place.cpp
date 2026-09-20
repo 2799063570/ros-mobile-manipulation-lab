@@ -62,8 +62,13 @@ bool SortingTask::pickAndPlace(const aubo_perception::DetectedObject& detected)
   if (!validateReservedTarget() || !commandGripper(gripper_open_) ||
       !moveToPose(makePose(object_x, object_y, table_z_ + pregrasp_height_),
                   category + " pre-grasp", true) ||
-      !validateReservedTarget() ||
-      !cartesianTo(makePose(object_x, object_y, grasp_z), category + " grasp"))// 夹爪张开 移动到目标位置上方 移动到目标位置
+      !validateReservedTarget())
+    return false;
+  // The camera is most easily occluded and distorted during the vertical
+  // approach, grasp and lift.  Keep receiving source heartbeats but do not let
+  // these frames alter the instance queue.
+  queue_vision_phase_.store(QueueVisionPhase::MASKED);
+  if (!cartesianTo(makePose(object_x, object_y, grasp_z), category + " grasp"))
     return false;
   const auto model = grasp_model_names_.find(category);// 根据类别查找抓取碰撞体名称
   std::string object_model_name =
@@ -88,6 +93,10 @@ bool SortingTask::pickAndPlace(const aubo_perception::DetectedObject& detected)
       !liftWithRecovery(object_x, object_y, category + " lift"))// 抬升到指定高度
     return false;
 
+  // From the lifted pose to pre-place, cache other objects.  grasp_secured_
+  // keeps the carried object and its camera-ray projection out of the queue.
+  queue_vision_phase_.store(QueueVisionPhase::COLLECT);
+
   const auto place = place_targets_.find(category);
   if (place == place_targets_.end())
   {
@@ -97,8 +106,10 @@ bool SortingTask::pickAndPlace(const aubo_perception::DetectedObject& detected)
   double place_x = 0.0;
   double place_y = 0.0;
   if (!xyInTargetFrame(place_frame_, place->second, place_x, place_y) ||      // 将目标放置位置转换到目标坐标系下
-      !moveToPose(makePose(place_x, place_y, preplace_z), category + " pre-place") ||  // 移动到目标放置位置上方
-      !cartesianTo(makePose(place_x, place_y, expected_center + grasp_height_offset_ + place_clearance_), category + " place") || // 移动到目标放置位置
+      !moveToPose(makePose(place_x, place_y, preplace_z), category + " pre-place"))  // 移动到目标放置位置上方
+    return false;
+  queue_vision_phase_.store(QueueVisionPhase::MASKED);
+  if (!cartesianTo(makePose(place_x, place_y, expected_center + grasp_height_offset_ + place_clearance_), category + " place") || // 移动到目标放置位置
       !commandGripper(gripper_open_) || !setGraspAttachment(object_model_name, false) || // 夹爪张开 释放吸附
       !wallSleep(0.5, stop_requested_))
     return false;

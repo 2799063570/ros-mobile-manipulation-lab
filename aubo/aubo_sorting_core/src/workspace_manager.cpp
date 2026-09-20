@@ -200,8 +200,10 @@ bool SortingTask::applyWorkspace(const WorkspaceConfig& workspace, std::string& 
   instance_queue_.clear();
   pending_detection_.reset();
   queue_epoch_ = ros::Time::now();
-  queue_last_frame_ = queue_empty_since_ = ros::WallTime();
+  queue_last_stamp_ = ros::Time();
+  queue_last_frame_ = queue_last_source_frame_ = queue_empty_since_ = ros::WallTime();
   queue_empty_frames_ = 0;
+  queue_vision_phase_.store(QueueVisionPhase::DISABLED);
   queue_lock.unlock();
   publishTargetCache();
   observation_ready_.store(false);

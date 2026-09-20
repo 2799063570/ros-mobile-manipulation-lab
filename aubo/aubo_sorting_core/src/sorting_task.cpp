@@ -363,8 +363,13 @@ bool SortingTask::observationOperation()
 {
   if (continuous_sorting_)
     resetInstanceQueue();// 清空目标队列
+  queue_vision_phase_.store(continuous_sorting_ ? QueueVisionPhase::COLLECT :
+                                                QueueVisionPhase::DISABLED);
   if (!observation())
+  {
+    queue_vision_phase_.store(QueueVisionPhase::DISABLED);
     return false;
+  }
   if (!continuous_sorting_ && verify_observation_detections_ && !verifyVisibleCategories()) // Legacy per-class verification.
   {
     observation_ready_.store(false);
@@ -395,12 +400,14 @@ bool SortingTask::openOperation()
 bool SortingTask::homeOperation()
 {
   observation_ready_.store(false);
+  queue_vision_phase_.store(QueueVisionPhase::DISABLED);
   return moveNamed(finish_named_target_);
 }
 
 bool SortingTask::prepareWorkOperation()
 {
   observation_ready_.store(false);
+  queue_vision_phase_.store(QueueVisionPhase::DISABLED);
   return refreshOctomap() && addTableCollision() && moveNamed(work_ready_named_target_);
 }
 

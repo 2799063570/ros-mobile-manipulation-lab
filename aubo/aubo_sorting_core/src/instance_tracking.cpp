@@ -14,7 +14,7 @@ void SortingTask::resetInstanceQueue()
   pending_detection_.reset();
   queue_epoch_ = ros::Time::now();
   queue_last_stamp_ = ros::Time();
-  queue_last_frame_ = queue_empty_since_ = ros::WallTime();
+  queue_last_frame_ = queue_last_source_frame_ = queue_empty_since_ = ros::WallTime();
   queue_empty_frames_ = 0;
 }
 
@@ -47,26 +47,35 @@ void SortingTask::targetWorker()
 
 void SortingTask::processInstanceFrame(const aubo_perception::DetectedObjectArray& message)
 {
+  const QueueVisionPhase vision_phase = queue_vision_phase_.load();
+  if (stop_requested_.load() || vision_phase == QueueVisionPhase::DISABLED) return;
   State state;
   {
     std::lock_guard<std::mutex> lock(data_mutex_);
     state = state_;
   }
+  // OBSERVING is intentionally accepted before observation_ready_: frames seen
+  // while moving to the observation pose can already build stable world tracks.
+  const bool collecting_state = state == State::OBSERVING || state == State::PICKING ||
+      state == State::DETECTING || state == State::READY || state == State::SORTING;
+  if (!collecting_state) return;
   const bool observing = observation_ready_.load() &&
       (state == State::OBSERVING || state == State::DETECTING || state == State::READY);
-  const bool active = state == State::PICKING || state == State::DETECTING || state == State::SORTING;
-  if (stop_requested_.load() || (!observing && !active)) return;
   const auto stamp = message.header.stamp;
   const double age = (ros::Time::now() - stamp).toSec();
   if (stamp.isZero() || stamp <= queue_epoch_ || stamp <= queue_last_stamp_ ||
       !std::isfinite(age) || age < 0 || age > queue_frame_max_age_) return;
   queue_last_stamp_ = stamp;
   if (!message.observation_valid || message.header.frame_id.empty()) {
-    queue_last_frame_ = ros::WallTime();
     queue_empty_frames_ = 0;
     queue_empty_since_ = ros::WallTime();
     return;
   }
+  // This heartbeat remains meaningful during deliberately masked motion.  It
+  // lets a recent, already stable track be dispatched after placement without
+  // treating the intentional cache gap as a camera failure.
+  queue_last_source_frame_ = ros::WallTime::now();
+  if (vision_phase == QueueVisionPhase::MASKED) return;
   tf::StampedTransform source_to_target, target_to_table, place_to_target, gripper, camera;
   const auto lookup = [this, &stamp](const std::string& to, const std::string& from,
                                    tf::StampedTransform& transform) {
@@ -233,8 +242,9 @@ void SortingTask::publishInstanceQueue()
 
 bool SortingTask::continuousSortingOperation()
 {
-  // A panel can wait with the base unlocked after observing; begin a fresh epoch.
-  resetInstanceQueue();
+  // The observation operation owns the epoch reset.  Preserve the tracks built
+  // while travelling to, and settling at, the observation pose.
+  queue_vision_phase_.store(QueueVisionPhase::COLLECT);
   publishState(State::DETECTING, "building instance queue");
   auto deadline = ros::WallTime::now() + ros::WallDuration(detection_timeout_);
   ros::WallRate rate(20);
@@ -244,8 +254,10 @@ bool SortingTask::continuousSortingOperation()
     {
       std::lock_guard<std::mutex> lock(queue_mutex_);
       const auto now = ros::WallTime::now();
-      // No new command after camera loss, even if a previously stable track survives.
-      if (!queue_last_frame_.isZero() && (now-queue_last_frame_).toSec() <= queue_frame_max_age_)
+      // A masked frame may prove the source is alive without being allowed to
+      // modify tracks.  reserve() separately enforces each track's max_age.
+      if (!queue_last_source_frame_.isZero() &&
+          (now-queue_last_source_frame_).toSec() <= queue_frame_max_age_)
         reserved = instance_queue_.reserve(sort_classes_, now.toSec(), target);
       empty = observation_ready_.load() && !queue_empty_since_.isZero() &&
           (now-queue_empty_since_).toSec() >= queue_empty_confirmation_ &&
@@ -263,31 +275,39 @@ bool SortingTask::continuousSortingOperation()
       bool success = false;
       active_instance_id_ = target.id;
       grasp_secured_.store(false);
+      queue_vision_phase_.store(QueueVisionPhase::COLLECT);
       const auto clear_active = [this](void*) { active_instance_id_ = 0; };
       std::unique_ptr<void, decltype(clear_active)> active_guard(this, clear_active);
       try { success = refreshOctomap() && addTableCollision() && pickAndPlace(detected); }
       catch (...) {
         std::lock_guard<std::mutex> lock(queue_mutex_);
         instance_queue_.finish(target.id, false, ros::WallTime::now().toSec());
+        queue_vision_phase_.store(QueueVisionPhase::DISABLED);
         throw;
       }
       {
         std::lock_guard<std::mutex> lock(queue_mutex_);
         instance_queue_.finish(target.id, success, ros::WallTime::now().toSec());
-        // Reject frames captured before release/retreat; they may show the carried object.
+        // Reject any masked frame still waiting in the one-frame worker slot,
+        // while preserving safe tracks collected earlier in this pick/place.
         queue_epoch_ = ros::Time::now();
-        queue_last_frame_ = ros::WallTime();
+        pending_detection_.reset();
         queue_empty_since_ = ros::WallTime();
         queue_empty_frames_ = 0;
       }
       publishInstanceQueue();
-      if (!success) return false; // Existing stop/recovery flow owns uncertain gripper state.
+      if (!success) {
+        queue_vision_phase_.store(QueueVisionPhase::DISABLED);
+        return false; // Existing stop/recovery flow owns uncertain gripper state.
+      }
+      queue_vision_phase_.store(QueueVisionPhase::COLLECT);
       publishState(State::DETECTING, "next cached instance");
       deadline = ros::WallTime::now() + ros::WallDuration(target_cache_fallback_delay_);
       continue;
     }
     if (empty) {
       observation_ready_.store(false);
+      queue_vision_phase_.store(QueueVisionPhase::DISABLED);
       if (!finish_named_target_.empty()) {
         publishState(State::HOMING, finish_named_target_);
         return moveNamed(finish_named_target_);
@@ -296,23 +316,33 @@ bool SortingTask::continuousSortingOperation()
     }
     if (ros::WallTime::now() >= deadline) {
       if (observation_ready_.load()) {
+        queue_vision_phase_.store(QueueVisionPhase::DISABLED);
         setFailure("DETECTION_FAILED", "no stable instance or valid sustained empty observation");
         return false;
       }
       publishState(State::OBSERVING, "queue needs a fresh observation");
-      if (!observation()) return false;
       {
         std::lock_guard<std::mutex> lock(queue_mutex_);
+        // Start the new epoch before moving, so detections gathered on the way
+        // to the observation pose contribute to the rebuilt queue.
         instance_queue_.invalidate();
+        pending_detection_.reset();
         queue_epoch_ = ros::Time::now();
-        queue_last_frame_ = queue_empty_since_ = ros::WallTime();
+        queue_last_stamp_ = ros::Time();
+        queue_last_frame_ = queue_last_source_frame_ = queue_empty_since_ = ros::WallTime();
         queue_empty_frames_ = 0;
+      }
+      queue_vision_phase_.store(QueueVisionPhase::COLLECT);
+      if (!observation()) {
+        queue_vision_phase_.store(QueueVisionPhase::DISABLED);
+        return false;
       }
       publishState(State::DETECTING, "confirming remaining instances");
       deadline = ros::WallTime::now() + ros::WallDuration(detection_timeout_);
     }
     rate.sleep();
   }
+  queue_vision_phase_.store(QueueVisionPhase::DISABLED);
   return false;
 }
 } // namespace aubo_sorting_core

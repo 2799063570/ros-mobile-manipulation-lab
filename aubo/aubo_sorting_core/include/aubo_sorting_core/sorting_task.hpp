@@ -58,6 +58,9 @@ private:
     READY, 
     SORTING, 
     STOPPED };
+  // Detection messages keep arriving throughout arm motion.  Only frames from
+  // geometrically useful parts of the trajectory may update the instance queue.
+  enum class QueueVisionPhase { DISABLED, COLLECT, MASKED };
   static const char* stateName(State state);
 
   using GripperClient = actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction>;
@@ -299,10 +302,11 @@ private:
   std::thread target_thread_;
   std::atomic<bool> target_worker_shutdown_{false};
   ros::Time queue_epoch_, queue_last_stamp_;
-  ros::WallTime queue_last_frame_, queue_empty_since_;
+  ros::WallTime queue_last_frame_, queue_last_source_frame_, queue_empty_since_;
   int queue_empty_frames_{0};
   std::uint64_t active_instance_id_{0}; // Execution thread only.
   std::atomic<bool> grasp_secured_{false}; // 夹紧前保留目标的视觉观测，夹紧后才屏蔽夹爪邻域。
+  std::atomic<QueueVisionPhase> queue_vision_phase_{QueueVisionPhase::DISABLED};
 };
 
 }  // namespace aubo_sorting_core
