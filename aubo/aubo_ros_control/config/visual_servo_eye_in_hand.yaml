@@ -14,7 +14,7 @@ desired_target_rpy: [0.0, 0.0, 0.0]
 target_offset: [0.0, 0.0, 0.0]
 use_orientation_control: false
 
-# Eye-in-hand measurements arrive more slowly than the 100 Hz control loop.
+# Eye-in-hand measurements arrive more slowly than the 50 Hz control loop.
 # Conservative Cartesian gain/speed plus stronger DLS damping suppress delayed
 # corrections and joint amplification near singular configurations.
 linear_gain: 0.30
@@ -25,7 +25,8 @@ position_deadband: 0.006
 alignment_hold_time: 0.35
 alignment_release_multiplier: 2.0
 dls_lambda: 0.08
-tracking_velocity_filter_alpha: 0.15
+# 由原 100 Hz 的 0.15 换算到 50 Hz，保持相同低通时间常数。
+tracking_velocity_filter_alpha: 0.2775
 target_timeout: 0.40
 
 # The shared sorting scene puts all targets on the table. Use the same joint

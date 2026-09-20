@@ -156,7 +156,7 @@ VisualServo::VisualServo()
     }
     sdk_joint_pub_ =
         nh_.advertise<sensor_msgs::JointState>(joint_states_topic_, 2);
-    sdk_state_timer_ = nh_.createTimer(ros::Duration(0.02),
+    sdk_state_timer_ = nh_.createTimer(ros::Duration(1.0 / feedback_rate_),
                                        &VisualServo::sdkStateUpdate, this);
     // 同步读取一次初始状态，防止积分器从全零关节位置开始运行。
     JointPoint initial{};
@@ -181,9 +181,10 @@ VisualServo::VisualServo()
   control_timer_ = nh_.createTimer(ros::Duration(1.0 / control_rate_),
                                    &VisualServo::controlLoop, this);
   publishState();
-  ROS_INFO("[visual_servo] 初始化完成：mode=%s, backend=%s, chain=%s -> %s",
+  ROS_INFO("[visual_servo] 初始化完成：mode=%s, backend=%s, chain=%s -> %s, "
+           "feedback/control/output=%.1f/%.1f/%.1f Hz",
            servo_mode_.c_str(), backend_.c_str(), base_link_.c_str(),
-           control_link_.c_str());
+           control_link_.c_str(), feedback_rate_, control_rate_, output_rate_);
 }
 
 void VisualServo::planningSceneReadyCallback(
@@ -219,8 +220,9 @@ bool VisualServo::loadParameters() {
                                  "/joint_states");
   private_nh_.param<std::string>("loss_strategy", loss_strategy_,
                                  "coast_then_open");
-  private_nh_.param<double>("control_rate", control_rate_, 100.0);
-  private_nh_.param<double>("output_rate", output_rate_, 200.0);
+  private_nh_.param<double>("feedback_rate", feedback_rate_, 50.0);
+  private_nh_.param<double>("control_rate", control_rate_, 50.0);
+  private_nh_.param<double>("output_rate", output_rate_, 250.0);
   private_nh_.param<double>("linear_gain", linear_gain_, 0.8);
   private_nh_.param<double>("angular_gain", angular_gain_, 0.5);
   if (!private_nh_.getParam("max_linear_velocity", max_linear_velocity_))
@@ -248,9 +250,9 @@ bool VisualServo::loadParameters() {
   private_nh_.param<double>("open_posture_gain", open_posture_gain_, 0.7);
   private_nh_.param<double>("search_velocity_limit", search_velocity_limit_,
                             0.2);
-  private_nh_.param<double>("feedback_blend", feedback_blend_, 0.02);
+  private_nh_.param<double>("feedback_blend", feedback_blend_, 0.0396);
   private_nh_.param<double>("tracking_velocity_filter_alpha",
-                            tracking_velocity_filter_alpha_, 0.18);
+                            tracking_velocity_filter_alpha_, 0.3276);
   private_nh_.param<bool>("use_orientation_control", use_orientation_control_,
                           false);// 是否使用姿态控制(计算角度误差)
   private_nh_.param<bool>("initial_search_enabled", initial_search_enabled_,
@@ -262,9 +264,13 @@ bool VisualServo::loadParameters() {
     return false;
   }
 
-  if (control_rate_ <= 0.0 || output_rate_ < control_rate_ ||
+  if (!std::isfinite(feedback_rate_) || !std::isfinite(control_rate_) ||
+      !std::isfinite(output_rate_) || feedback_rate_ <= 0.0 ||
+      control_rate_ <= 0.0 ||
+      output_rate_ < control_rate_ ||
       output_rate_ > 500.0) {
-    ROS_ERROR("[visual_servo] 频率要求 0 < control_rate <= output_rate <= 500");
+    ROS_ERROR("[visual_servo] 频率要求 feedback_rate > 0 且 "
+              "0 < control_rate <= output_rate <= 500");
     return false;
   }
   if (loss_strategy_ != "stop" && loss_strategy_ != "coast" &&
@@ -967,7 +973,7 @@ void VisualServo::controlLoop(const ros::TimerEvent &event) {
 
     if (next == ServoState::TRACKING) {
       // The RGB-D pose changes only at camera rate and contains residual
-      // depth/centroid noise. Filtering joint velocity at the 100 Hz control
+      // depth/centroid noise. Filtering joint velocity at the 50 Hz control
       // rate prevents every image update from becoming a visible step while
       // holdFeedback still bypasses it for immediate safety stops.
       requested = tracking_velocity_filter_alpha_ * tracking_request +

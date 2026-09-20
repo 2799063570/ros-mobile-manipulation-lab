@@ -5,8 +5,10 @@ target_topic: /visual_servo/target_pose
 state_topic: /visual_servo/state
 joint_states_topic: /joint_states
 start_enabled: false
-control_rate: 100.0
-output_rate: 200.0
+# 统一调度：视觉闭环 20 ms，轨迹插值/伺服下发 4 ms。
+feedback_rate: 50.0
+control_rate: 50.0
+output_rate: 250.0
 
 linear_gain: 0.8
 angular_gain: 0.5
@@ -39,8 +41,9 @@ open_posture: [0.0, 0.20, 1.20, 0.0, 1.20, 0.0]
 open_posture_gain: 0.7
 search_velocity_limit: 0.20
 command_queue_capacity: 80
-feedback_blend: 0.02
-tracking_velocity_filter_alpha: 0.18
+# 由原 100 Hz 系数换算到 50 Hz，保持近似相同的时间常数。
+feedback_blend: 0.0396
+tracking_velocity_filter_alpha: 0.3276
 
 # Direct SDK backend only.
 robot_ip: 192.168.1.2

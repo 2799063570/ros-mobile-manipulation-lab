@@ -3,7 +3,7 @@
 # same PositionJointInterface resources.
 joint_state_controller:
   type: joint_state_controller/JointStateController
-  publish_rate: 100
+  publish_rate: 50
 
 shoulder_position_controller:
   type: position_controllers/JointPositionController
@@ -29,4 +29,3 @@ wrist3_position_controller:
   type: position_controllers/JointPositionController
   joint: wrist3_joint
   pid: {p: 40.0, i: 0.1, d: 0.8, i_clamp: 0.5}
-

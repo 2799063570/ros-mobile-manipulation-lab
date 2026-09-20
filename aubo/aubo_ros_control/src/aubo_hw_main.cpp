@@ -15,7 +15,7 @@
  * 用法：
  *  roslaunch aubo_ros_control aubo_control.launch \
  *    server_host:=192.168.1.2 \
- *    control_frequency:=200.0
+ *    control_frequency:=250.0
  *
  *  teach_pendant 模式：
  *  roslaunch aubo_ros_control teach_pendant.launch \
@@ -44,10 +44,11 @@ int main(int argc, char** argv)
     // ------------------------------------------------------------------
     // 控制频率（主循环驱动 controller_manager）
     // aubo_driver.cpp UPDATE_RATE_ = 500 Hz，但主循环与喂点线程分离，
-    // 此处设为 250 Hz（4ms 周期，与 tryPopWaypoint 中 CTRL_PERIOD_S 对应）
+    // 此处设为 250 Hz（4ms 周期，硬件接口读取同一参数用于限速/插值）
     // ------------------------------------------------------------------
-    double control_freq = 250.0;
-    nh_priv.param<double>("control_frequency", control_freq, 250.0);
+    double control_freq = aubo_ros_control::DEFAULT_CONTROL_FREQUENCY_HZ;
+    nh_priv.param<double>("control_frequency", control_freq,
+                          aubo_ros_control::DEFAULT_CONTROL_FREQUENCY_HZ);
     if (!std::isfinite(control_freq) || control_freq <= 0.0 || control_freq > 1000.0)
     {
         ROS_FATAL("[aubo_hw_node] control_frequency 必须在 (0, 1000] Hz 范围内");

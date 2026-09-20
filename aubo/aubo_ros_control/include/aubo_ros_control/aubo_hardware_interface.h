@@ -11,7 +11,7 @@
  *     持续监控 MAC 缓冲区 (macTargetPosDataSize)，
  *     当缓冲区 < expect_macsz(400) 时批量补充点位。
  *  4. 速度/加速度越限保护（tryPopWaypoint）：
- *     MaxVelc / MaxAcc 来自 aubo_driver.cpp，5ms 控制周期下验证。
+ *     MaxVelc / MaxAcc 来自 aubo_driver.cpp，周期与 control_frequency 一致。
  *  5. 点位去重阈值 THRESHHOLD = 0.000001 rad。
  *  6. 首次连接最多重试 5 次；运动中断线后保持停止并要求人工重启。
  *  7. timerCallback 方式读取当前路点（与 aubo_driver.cpp 一致）。
@@ -62,8 +62,8 @@ static constexpr double THRESHHOLD = 0.000001;
 /// 速度不一致判断阈值（来自 tryPopWaypoint: < 0.00015 rad 视为相同点）
 static constexpr double SAME_POINT_THRESHOLD = 0.00015;
 
-/// 控制周期 5ms（来自 aubo_driver.cpp: fabs(joint-joint_filter)/0.005）
-static constexpr double CTRL_PERIOD_S = 0.005;
+/// ros_control/轨迹点读写的统一默认频率。
+static constexpr double DEFAULT_CONTROL_FREQUENCY_HZ = 250.0;
 
 /// 喂点线程休眠间隔 4ms（来自 aubo_driver.cpp publishWaypointToRobot）
 static constexpr int FEED_THREAD_SLEEP_MS = 4;
@@ -248,6 +248,7 @@ private:
     double command_filter_alpha_;
     double command_deadband_;
     double max_command_step_scale_;
+    double control_period_s_;          ///< 与 control_frequency 对应的命令周期
 
     // -------------------------------------------------------------------------
     // 机器人诊断（对应 aubo_driver.cpp rs.robot_diagnosis_info_）

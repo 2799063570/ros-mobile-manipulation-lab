@@ -15,6 +15,7 @@ does not depend on OpenCV, class names, bounding-box messages or a YOLO package.
 from __future__ import print_function
 
 import threading
+import time
 
 import cv2
 import message_filters
@@ -192,11 +193,15 @@ class RgbdVisualTargetNode(object):
         self.filter_reset_timeout = float(rospy.get_param("~filter_reset_timeout", 0.50))
         self.sync_queue_size = int(rospy.get_param("~sync_queue_size", 8))
         self.sync_slop = float(rospy.get_param("~sync_slop", 0.08))
+        self.detection_rate = float(rospy.get_param("~detection_rate", 10.0))
 
         if self.selection_policy not in ("largest", "image_center", "nearest"):
             raise rospy.ROSInitException(
                 "selection_policy must be largest, image_center or nearest"
             )
+        if not np.isfinite(self.detection_rate) or self.detection_rate <= 0.0:
+            raise rospy.ROSInitException("detection_rate must be positive")
+        self.minimum_detection_interval = 1.0 / self.detection_rate
         colors = rospy.get_param("~colors")
         self.frontend = HsvColorFrontend(
             colors,
@@ -215,6 +220,7 @@ class RgbdVisualTargetNode(object):
         self.filtered_position = None
         self.filtered_label = None
         self.filtered_stamp = rospy.Time(0)
+        self.next_detection_monotonic = 0.0
         self.camera_info_lock = threading.Lock()
         self.depth_kernel = np.ones(
             (max(1, self.depth_mask_erosion), max(1, self.depth_mask_erosion)),
@@ -256,11 +262,12 @@ class RgbdVisualTargetNode(object):
         self._publish_state("SEARCHING" if self.enabled else "DISABLED")
 
         rospy.loginfo(
-            "RGB-D color target: color=%s depth=%s -> %s (label='%s')",
+            "RGB-D color target: color=%s depth=%s -> %s (label='%s', %.1f Hz)",
             self.color_topic,
             self.depth_topic,
             self.target_pose_topic,
             self.target_label or "*",
+            self.detection_rate,
         )
 
     def _publish_state(self, state, detail=""):
@@ -276,6 +283,7 @@ class RgbdVisualTargetNode(object):
             self.filtered_position = None
             self.filtered_label = None
             self.filtered_stamp = rospy.Time(0)
+            self.next_detection_monotonic = 0.0
 
     def _selection_callback(self, message):
         requested = message.data.strip().lower()
@@ -457,6 +465,25 @@ class RgbdVisualTargetNode(object):
         if camera_info is None:
             rospy.logwarn_throttle(2.0, "Waiting for color camera_info")
             return
+        # RGB-D callbacks may arrive at the camera rate. Keep the expensive
+        # segmentation/depth projection stage at the configured detector rate.
+        now_monotonic = time.monotonic()
+        with self.control_lock:
+            if (self.next_detection_monotonic > 0.0 and
+                    now_monotonic < self.next_detection_monotonic):
+                return
+            if self.next_detection_monotonic <= 0.0:
+                self.next_detection_monotonic = (
+                    now_monotonic + self.minimum_detection_interval
+                )
+            else:
+                missed_periods = int(
+                    (now_monotonic - self.next_detection_monotonic)
+                    / self.minimum_detection_interval
+                )
+                self.next_detection_monotonic += (
+                    (missed_periods + 1) * self.minimum_detection_interval
+                )
         try:
             bgr_image = self.bridge.imgmsg_to_cv2(color_message, desired_encoding="bgr8")
             depth_metres = self._depth_metres(depth_message)

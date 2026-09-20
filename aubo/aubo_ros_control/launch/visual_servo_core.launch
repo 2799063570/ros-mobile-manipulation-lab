@@ -33,7 +33,7 @@
     <param name="start_enabled" value="$(arg start_enabled)"/>
     <param if="$(eval arg('loss_strategy') != '')"
            name="loss_strategy" value="$(arg loss_strategy)"/>
-    <!-- Gazebo 后端向六个独立位置控制器发布 200 Hz 关节位置指令。 -->
+    <!-- Gazebo 后端向六个独立位置控制器发布 250 Hz 关节位置指令。 -->
     <rosparam if="$(eval arg('backend') == 'gazebo')" param="gazebo_command_topics">
       [/aubo_i5/shoulder_position_controller/command,
        /aubo_i5/upper_arm_position_controller/command,

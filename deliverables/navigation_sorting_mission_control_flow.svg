@@ -1,0 +1,152 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1200" viewBox="0 0 1920 1200">
+  <defs>
+    <style>
+      .title{font:700 34px "Microsoft YaHei","Noto Sans CJK SC",sans-serif;fill:#263238}
+      .subtitle{font:18px "Microsoft YaHei","Noto Sans CJK SC",sans-serif;fill:#52606d}
+      .section{font:700 22px "Microsoft YaHei","Noto Sans CJK SC",sans-serif;fill:#263238}
+      .boxTitle{font:700 17px "Microsoft YaHei","Noto Sans CJK SC",sans-serif;fill:#263238}
+      .body{font:15px "Microsoft YaHei","Noto Sans CJK SC",sans-serif;fill:#263238}
+      .small{font:13px "Microsoft YaHei","Noto Sans CJK SC",sans-serif;fill:#455a64}
+      .code{font:14px Consolas,"Microsoft YaHei",monospace;fill:#263238}
+      .edge{fill:none;stroke:#37474f;stroke-width:2.2;marker-end:url(#arrow)}
+      .edgeBlue{fill:none;stroke:#1976d2;stroke-width:2.3;marker-end:url(#arrowBlue)}
+      .edgeRed{fill:none;stroke:#c62828;stroke-width:2.3;marker-end:url(#arrowRed)}
+      .edgeDash{fill:none;stroke:#7b1fa2;stroke-width:2.1;stroke-dasharray:8 6;marker-end:url(#arrowPurple)}
+      .panel{stroke-width:2}
+      .round{rx:12;ry:12}
+    </style>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#37474f"/></marker>
+    <marker id="arrowBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#1976d2"/></marker>
+    <marker id="arrowRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#c62828"/></marker>
+    <marker id="arrowPurple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#7b1fa2"/></marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity=".13"/></filter>
+  </defs>
+
+  <rect width="1920" height="1200" fill="#fffdf8"/>
+  <text x="960" y="45" text-anchor="middle" class="title">navigation_sorting_mission 控制程序流程图</text>
+  <text x="960" y="76" text-anchor="middle" class="subtitle">四工位导航 → 精对接 → 观测 → 颜色分拣 → 撤离 → 返回起点</text>
+
+  <!-- ROS interfaces -->
+  <rect x="50" y="96" width="1820" height="118" rx="14" fill="#fff5cf" stroke="#d99a00" class="panel"/>
+  <text x="70" y="125" class="section">ROS 接口与外部节点</text>
+  <g filter="url(#shadow)">
+    <rect x="70" y="139" width="245" height="58" rx="9" fill="#fff9e6" stroke="#d99a00"/>
+    <text x="192" y="161" text-anchor="middle" class="boxTitle">任务状态输出</text><text x="192" y="184" text-anchor="middle" class="code">/nav_sorting/state</text>
+    <rect x="335" y="139" width="280" height="58" rx="9" fill="#fff9e6" stroke="#d99a00"/>
+    <text x="475" y="161" text-anchor="middle" class="boxTitle">任务控制服务</text><text x="475" y="184" text-anchor="middle" class="code">/start · /stop · /recover_stop</text>
+    <rect x="635" y="139" width="300" height="58" rx="9" fill="#fff9e6" stroke="#d99a00"/>
+    <text x="785" y="161" text-anchor="middle" class="boxTitle">分拣状态反馈</text><text x="785" y="184" text-anchor="middle" class="code">/sorting/state · /failure · /base_locked</text>
+    <rect x="955" y="139" width="285" height="58" rx="9" fill="#fff9e6" stroke="#d99a00"/>
+    <text x="1097" y="161" text-anchor="middle" class="boxTitle">底盘导航 / 速度控制</text><text x="1097" y="184" text-anchor="middle" class="code">/move_base · TF · /cmd_vel_raw</text>
+    <rect x="1260" y="139" width="590" height="58" rx="9" fill="#fff9e6" stroke="#d99a00"/>
+    <text x="1555" y="161" text-anchor="middle" class="boxTitle">机械臂 / 分拣服务</text><text x="1555" y="184" text-anchor="middle" class="code">/home · /prepare_work · /move_to_observation · /start · /stop · /configure_workspace</text>
+  </g>
+
+  <!-- Main thread -->
+  <rect x="50" y="242" width="330" height="433" rx="16" fill="#fbe9e7" stroke="#b65b51" class="panel"/>
+  <text x="215" y="278" text-anchor="middle" class="section">主线程与生命周期</text>
+  <rect x="78" y="302" width="274" height="92" rx="10" fill="#fff3f1" stroke="#b65b51"/>
+  <text x="215" y="329" text-anchor="middle" class="boxTitle">main()</text>
+  <text x="96" y="352" class="body">• ros::init / 创建 NodeHandle</text><text x="96" y="376" class="body">• 构造 NavigationSortingMission</text>
+  <path d="M215 394V424" class="edge"/>
+  <rect x="78" y="425" width="274" height="82" rx="10" fill="#fff3f1" stroke="#b65b51"/>
+  <text x="215" y="452" text-anchor="middle" class="boxTitle">构造任务对象</text>
+  <text x="96" y="476" class="body">加载参数、工作台；创建发布/订阅/服务</text><text x="96" y="498" class="body">发布 INITIALIZING</text>
+  <path d="M215 507V536" class="edge"/>
+  <polygon points="215,535 322,575 215,615 108,575" fill="#fff0c2" stroke="#c68a00" stroke-width="2"/>
+  <text x="215" y="569" text-anchor="middle" class="boxTitle">auto_start?</text><text x="215" y="591" text-anchor="middle" class="small">否：IDLE 等待 /start</text>
+  <path d="M215 615V642" class="edge"/>
+  <rect x="78" y="643" width="274" height="56" rx="10" fill="#fff3f1" stroke="#b65b51"/>
+  <text x="215" y="667" text-anchor="middle" class="boxTitle">AsyncSpinner(4)</text><text x="215" y="689" text-anchor="middle" class="small">并发处理服务、订阅与动态参数</text>
+
+  <!-- callbacks/shared state -->
+  <rect x="410" y="242" width="890" height="260" rx="16" fill="#e8f4fb" stroke="#1683c5" class="panel"/>
+  <text x="855" y="278" text-anchor="middle" class="section">ROS 回调层 × 4（AsyncSpinner）</text>
+  <rect x="435" y="302" width="190" height="82" rx="10" fill="#f4fbff" stroke="#1683c5"/>
+  <text x="530" y="329" text-anchor="middle" class="boxTitle">/start</text><text x="530" y="353" text-anchor="middle" class="body">submitMission()</text><text x="530" y="375" text-anchor="middle" class="small">busy 检查 → 创建任务线程</text>
+  <rect x="645" y="302" width="190" height="82" rx="10" fill="#f4fbff" stroke="#1683c5"/>
+  <text x="740" y="329" text-anchor="middle" class="boxTitle">/stop</text><text x="740" y="353" text-anchor="middle" class="body">stop_requested = true</text><text x="740" y="375" text-anchor="middle" class="small">取消导航 · 零速度 · 唤醒等待</text>
+  <rect x="855" y="302" width="200" height="82" rx="10" fill="#f4fbff" stroke="#1683c5"/>
+  <text x="955" y="329" text-anchor="middle" class="boxTitle">分拣反馈回调</text><text x="955" y="353" text-anchor="middle" class="body">state / failure / base_lock</text><text x="955" y="375" text-anchor="middle" class="small">更新序号并 condition.notify_all()</text>
+  <rect x="1075" y="302" width="200" height="82" rx="10" fill="#f4fbff" stroke="#1683c5"/>
+  <text x="1175" y="329" text-anchor="middle" class="boxTitle">dynamic_reconfigure</text><text x="1175" y="353" text-anchor="middle" class="body">仅空闲时允许修改</text><text x="1175" y="375" text-anchor="middle" class="small">目标点 · 超时 · 重试 · 近场参数</text>
+  <rect x="512" y="414" width="686" height="62" rx="12" fill="#d9edf8" stroke="#1683c5" stroke-width="2"/>
+  <text x="855" y="440" text-anchor="middle" class="boxTitle">共享任务上下文 MissionContext</text>
+  <text x="855" y="464" text-anchor="middle" class="body">busy · stop_requested · stop_unconfirmed · operation_active · base_locked · 条件变量</text>
+  <path d="M352 466H435" class="edgeBlue"/>
+  <path d="M530 384V414" class="edgeBlue"/>
+  <path d="M740 384V414" class="edgeBlue"/>
+  <path d="M955 384V414" class="edgeBlue"/>
+  <path d="M1175 384V414" class="edgeBlue"/>
+
+  <!-- failure/stop panel -->
+  <rect x="1330" y="242" width="540" height="433" rx="16" fill="#f2edf8" stroke="#7654a6" class="panel"/>
+  <text x="1600" y="278" text-anchor="middle" class="section">停止与失败恢复</text>
+  <rect x="1358" y="302" width="222" height="158" rx="12" fill="#fff0ee" stroke="#c62828"/>
+  <text x="1469" y="330" text-anchor="middle" class="boxTitle">异步停止链</text>
+  <text x="1378" y="355" class="body">1. stop_requested = true</text><text x="1378" y="379" class="body">2. cancel move_base / 发布零速</text><text x="1378" y="403" class="body">3. 调用 /sorting/stop</text><text x="1378" y="427" class="body">4. 等待 READY/ERROR/STOPPED</text><text x="1378" y="450" class="small">未确认 → STOP_UNCONFIRMED</text>
+  <rect x="1600" y="302" width="242" height="158" rx="12" fill="#fff7e8" stroke="#e07800"/>
+  <text x="1721" y="330" text-anchor="middle" class="boxTitle">导航失败恢复</text>
+  <text x="1620" y="355" class="body">navigate() 失败</text><text x="1620" y="379" class="body">→ /move_base/clear_costmaps</text><text x="1620" y="403" class="body">→ 重试（配置次数）</text><text x="1620" y="427" class="body">→ 耗尽则 FAILED</text><text x="1620" y="450" class="small">当前 four_tables.yaml：重试 1 次</text>
+  <rect x="1358" y="482" width="484" height="166" rx="12" fill="#faf5ff" stroke="#7654a6"/>
+  <text x="1600" y="510" text-anchor="middle" class="boxTitle">机械臂规划失败的受限恢复</text>
+  <text x="1380" y="537" class="body">观测规划失败：收臂 → 按 recovery_steps 微调底盘 → 重试</text>
+  <text x="1380" y="562" class="body">预抓取规划失败：收臂 → 前移 0.03 m → 重新观测与分拣</text>
+  <text x="1380" y="587" class="body">安全边界：最多 2 次，且底盘距桌边 ≥ 0.35 m</text>
+  <text x="1380" y="612" class="small">仅 PLANNING_FAILED 且底盘已解锁时允许；其余失败直接终止</text>
+  <path d="M1300 355H1358" class="edgeRed"/>
+
+  <!-- mission execution -->
+  <rect x="50" y="722" width="1820" height="395" rx="16" fill="#f3f8e8" stroke="#73983d" class="panel"/>
+  <text x="960" y="758" text-anchor="middle" class="section">任务执行线程 mission_thread_：runMission()</text>
+  <rect x="78" y="790" width="210" height="72" rx="10" fill="#f9fdea" stroke="#73983d"/>
+  <text x="183" y="816" text-anchor="middle" class="boxTitle">① 等待分拣节点就绪</text><text x="183" y="840" text-anchor="middle" class="body">READY / IDLE / STOPPED</text>
+  <rect x="316" y="790" width="200" height="72" rx="10" fill="#f9fdea" stroke="#73983d"/>
+  <text x="416" y="816" text-anchor="middle" class="boxTitle">② 记录出发位姿</text><text x="416" y="840" text-anchor="middle" class="body">return_to_start = true</text>
+  <rect x="544" y="790" width="220" height="72" rx="10" fill="#f9fdea" stroke="#73983d"/>
+  <text x="654" y="816" text-anchor="middle" class="boxTitle">③ 筛选启用工作台</text><text x="654" y="840" text-anchor="middle" class="body">table_1 → 2 → 3 → 4</text>
+  <path d="M288 826H316" class="edge"/><path d="M516 826H544" class="edge"/>
+  <rect x="790" y="780" width="790" height="92" rx="14" fill="#e8f3d2" stroke="#73983d" stroke-width="2"/>
+  <text x="1185" y="807" text-anchor="middle" class="boxTitle">④ 每个工作台循环</text>
+  <text x="820" y="833" class="body">CONFIGURING_WORKSTATION → 机械臂回零 → 下发 workspace → 导航到 pre_dock_goal</text>
+  <text x="820" y="858" class="body">→ driveStraightTo 精对接 → AT_WORKSTATION → 准备 / 观测 → SORTING</text>
+  <path d="M764 826H790" class="edge"/>
+
+  <rect x="98" y="907" width="216" height="98" rx="10" fill="#eef8dd" stroke="#73983d"/>
+  <text x="206" y="934" text-anchor="middle" class="boxTitle">配置当前工作台</text><text x="206" y="958" text-anchor="middle" class="code">/sorting/configure_workspace</text><text x="206" y="982" text-anchor="middle" class="small">发布 current_workstation</text>
+  <rect x="340" y="907" width="216" height="98" rx="10" fill="#eef8dd" stroke="#73983d"/>
+  <text x="448" y="934" text-anchor="middle" class="boxTitle">导航与精对接</text><text x="448" y="958" text-anchor="middle" class="code">move_base → pre_dock</text><text x="448" y="982" text-anchor="middle" class="code">cmd_vel 闭环 → goal</text>
+  <rect x="582" y="907" width="216" height="98" rx="10" fill="#eef8dd" stroke="#73983d"/>
+  <text x="690" y="934" text-anchor="middle" class="boxTitle">机械臂准备与观测</text><text x="690" y="958" text-anchor="middle" class="code">/prepare_work</text><text x="690" y="982" text-anchor="middle" class="code">/move_to_observation</text>
+  <rect x="824" y="907" width="216" height="98" rx="10" fill="#eef8dd" stroke="#73983d"/>
+  <text x="932" y="934" text-anchor="middle" class="boxTitle">执行颜色分拣</text><text x="932" y="958" text-anchor="middle" class="code">/sorting/start</text><text x="932" y="982" text-anchor="middle" class="small">运行态 → READY 且底盘解锁</text>
+  <rect x="1066" y="907" width="216" height="98" rx="10" fill="#eef8dd" stroke="#73983d"/>
+  <text x="1174" y="934" text-anchor="middle" class="boxTitle">收臂并撤离</text><text x="1174" y="958" text-anchor="middle" class="code">/sorting/home</text><text x="1174" y="982" text-anchor="middle" class="body">后退 0.30 m</text>
+  <polygon points="1403,900 1512,956 1403,1012 1294,956" fill="#fff0c2" stroke="#c68a00" stroke-width="2"/>
+  <text x="1403" y="950" text-anchor="middle" class="boxTitle">还有工作台？</text><text x="1403" y="975" text-anchor="middle" class="small">是：进入下一桌</text>
+  <rect x="1580" y="907" width="245" height="98" rx="10" fill="#e6f5e8" stroke="#2e8b45" stroke-width="2"/>
+  <text x="1702" y="934" text-anchor="middle" class="boxTitle">全部完成 / 返回起点</text><text x="1702" y="958" text-anchor="middle" class="body">收臂 → navigate(starting_pose)</text><text x="1702" y="982" text-anchor="middle" class="body">发布 SUCCEEDED</text>
+  <path d="M314 956H340" class="edge"/><path d="M556 956H582" class="edge"/><path d="M798 956H824" class="edge"/><path d="M1040 956H1066" class="edge"/><path d="M1282 956H1294" class="edge"/><path d="M1512 956H1580" class="edge"/>
+  <path d="M1403 1012V1022H206V1005" class="edgeDash"/>
+
+  <!-- terminal states -->
+  <text x="950" y="1044" text-anchor="middle" class="small">任务收尾：stopBase；必要时 cancelSortingAndWait；按停止确认与执行结果发布最终状态</text>
+  <rect x="368" y="1052" width="245" height="42" rx="12" fill="#e5f5e7" stroke="#2e8b45" stroke-width="2"/>
+  <text x="490" y="1079" text-anchor="middle" class="boxTitle">✓ SUCCEEDED</text>
+  <rect x="662" y="1052" width="245" height="42" rx="12" fill="#fff2d8" stroke="#e07800" stroke-width="2"/>
+  <text x="784" y="1079" text-anchor="middle" class="boxTitle">Ⅱ STOPPED</text>
+  <rect x="956" y="1052" width="245" height="42" rx="12" fill="#fde7e5" stroke="#c62828" stroke-width="2"/>
+  <text x="1078" y="1079" text-anchor="middle" class="boxTitle">× FAILED</text>
+  <rect x="1250" y="1052" width="280" height="42" rx="12" fill="#eee7f6" stroke="#7654a6" stroke-width="2"/>
+  <text x="1390" y="1079" text-anchor="middle" class="boxTitle">! STOP_UNCONFIRMED</text>
+
+  <!-- cross-section links -->
+  <path d="M855 476V705H183V790" class="edgeBlue"/>
+  <text x="870" y="699" class="small">创建 / 唤醒 mission_thread_</text>
+  <path d="M1600 648V690H932V907" class="edgeDash"/>
+  <text x="1335" y="686" class="small">仅在明确故障条件下进入恢复</text>
+
+  <!-- footer -->
+  <rect x="50" y="1140" width="1820" height="38" rx="10" fill="#f7f7f4" stroke="#a8a8a0"/>
+  <text x="960" y="1165" text-anchor="middle" class="small">依据：navigation_sorting_mission_node.cpp · navigation_sorting_mission.cpp · base_executor.cpp · arm_executor.cpp · four_tables.yaml</text>
+</svg>

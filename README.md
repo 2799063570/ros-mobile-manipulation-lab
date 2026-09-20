@@ -180,15 +180,15 @@ RGB 图像 + 对齐深度 (15/20 Hz) ─ 目标检测 (YOLO 默认 10 Hz) ─ RG
 
 【视觉伺服闭环：眼在手上或眼在手外】
 
-RGB 图像 + 对齐深度 (20 Hz) ─ 目标分割/深度投影 (≤20 Hz)
+RGB 图像 + 对齐深度 (20 Hz) ─ 目标分割/深度投影 (10 Hz)
                                       │
-                                      └─ /visual_servo/target_pose (≤20 Hz)
+                                      └─ /visual_servo/target_pose (≤10 Hz)
                                                         │
-         /joint_states (100 Hz) ─ 坐标误差 + TF ─ 雅可比阻尼逆解 (100 Hz)
+         /joint_states (50 Hz) ─ 坐标误差 + TF ─ 雅可比阻尼逆解 (50 Hz)
                                                         │
                                              限速/限加速度 + 有界队列
                                                         │
-                                  关节位置指令 (200 Hz) ─┴─ Gazebo 控制器
+                                  关节位置指令 (250 Hz) ─┴─ Gazebo 控制器
                                                         └─ AUBO SDK（真机）
 ```
 
@@ -218,11 +218,12 @@ Gazebo 单关节位置控制器与 MoveIt 的机械臂轨迹控制器会占用�
 | 代价地图 | 全局更新/发布；局部更新/发布 | 5/2 Hz；10/5 Hz | `global_costmap.yaml` / `local_costmap.yaml` |
 | 底盘安全层 | `/cmd_vel_raw` → `/cmd_vel` | 20 Hz | 激光急停、减速和命令超时检查 |
 | RGB-D 相机 | 移动复合场景 / 独立分拣与视觉伺服场景 | 15 Hz / 20 Hz | 对应 Gazebo world；真机频率由相机驱动决定 |
-| 目标感知 | YOLO 推理 / RGB-D 位姿输出 | 10 Hz / ≤相机帧率 | 位姿仅在彩色图和深度图同步且检测有效时发布 |
+| 目标感知 | YOLO 或 HSV RGB-D 检测 | 10 Hz | 位姿仅在彩色图和深度图同步且检测有效时发布 |
 | 三维避障 | 点云过滤 / MoveIt OctoMap 更新 | ≤相机帧率 / 最高 3 Hz | OctoMap 通过 `max_update_rate` 限频 |
 | 常规机械臂控制 | `/joint_states` / MoveIt 轨迹命令 | 50 Hz / 事件驱动 | 轨迹控制器按规划结果执行，不是周期性规划 |
-| 视觉伺服 | 误差闭环 / 关节指令输出 | 100 Hz / 200 Hz | `control_rate` / `output_rate`；视觉反馈仍受相机帧率限制 |
-| 视觉伺服关节状态 | `/joint_states` | 100 Hz | 视觉伺服专用控制器配置 |
+| 视觉伺服 | 误差闭环 / 轨迹插值与关节指令输出 | 50 Hz / 250 Hz | `control_rate` / `output_rate`；视觉反馈仍受相机帧率限制 |
+| 视觉伺服关节状态 | `/joint_states` | 50 Hz | 视觉伺服专用控制器配置；真机 SDK 状态轮询同为 50 Hz |
+| 机械臂 `ros_control` | 状态读取 / 控制器读写与指令入队 | 50 Hz / 250 Hz | 状态与控制解耦，250 Hz 层只做轨迹采样、整形和下发，不重复运行规划 |
 | 任务编排与分拣 | 导航、互锁、抓放状态机 | 事件驱动 | 由 action、service、检测消息和超时条件推进 |
 
 表中 `≤` 表示模块由上游消息触发，实际频率不会高于输入频率；`15/20 Hz` 分别对应

@@ -51,6 +51,7 @@ AuboHardwareInterface::AuboHardwareInterface(ros::NodeHandle& nh)
     , command_filter_alpha_(0.25)
     , command_deadband_(0.0005)
     , max_command_step_scale_(1.0)
+    , control_period_s_(1.0 / DEFAULT_CONTROL_FREQUENCY_HZ)
 {
     joint_position_.fill(0.0);
     joint_velocity_.fill(0.0);
@@ -106,14 +107,20 @@ bool AuboHardwareInterface::init()
     nh_.param<double>     ("command_filter_alpha", command_filter_alpha_, 0.25);
     nh_.param<double>     ("command_deadband", command_deadband_, 0.0005);
     nh_.param<double>     ("max_command_step_scale", max_command_step_scale_, 1.0);
+    double control_frequency_hz = DEFAULT_CONTROL_FREQUENCY_HZ;
+    nh_.param<double>     ("control_frequency", control_frequency_hz,
+                           DEFAULT_CONTROL_FREQUENCY_HZ);
 
     if (server_port_ <= 0 || server_port_ > 65535 || collision_class_ < 1 || collision_class_ > 6 ||
         command_filter_alpha_ <= 0.0 || command_filter_alpha_ > 1.0 ||
-        command_deadband_ < 0.0 || max_command_step_scale_ <= 0.0 || max_command_step_scale_ > 1.0)
+        command_deadband_ < 0.0 || max_command_step_scale_ <= 0.0 || max_command_step_scale_ > 1.0 ||
+        !std::isfinite(control_frequency_hz) || control_frequency_hz <= 0.0 ||
+        control_frequency_hz > 1000.0)
     {
         ROS_ERROR("[AuboHW] 参数无效：请检查端口、碰撞等级和命令平滑参数");
         return false;
     }
+    control_period_s_ = 1.0 / control_frequency_hz;
 
     if (nh_.hasParam("joint_names"))
     {
@@ -293,7 +300,7 @@ void AuboHardwareInterface::write(const ros::Time& /*time*/,
                             + (1.0 - command_filter_alpha_) * filtered_cmd_[i];
 
             double delta = smoothed_cmd[i] - filtered_cmd_[i];
-            double max_step = MAX_VELC[i] * CTRL_PERIOD_S * max_command_step_scale_;
+            double max_step = MAX_VELC[i] * control_period_s_ * max_command_step_scale_;
             if (std::fabs(delta) > max_step)
             {
                 smoothed_cmd[i] = filtered_cmd_[i] + (delta > 0.0 ? max_step : -max_step);
@@ -745,12 +752,12 @@ std::vector<wayPoint_S> AuboHardwareInterface::tryPopWaypoint(int count)
         if (same_point == 0x3F)  // 全部关节相同，跳过(6位)
             continue;
 
-        // --- 速度限幅检测（来自 aubo_driver.cpp，控制周期 = 0.005s） ---
+        // --- 速度限幅检测（周期与 ros_control 主循环保持一致） ---
         over_speed_flag_ = false;
         for (int i = 0; i < NUM_JOINTS; ++i)
         {
             target_joint_velc_.jointPara[i] =
-                std::fabs(joint[i] - joint_filter_[i]) / CTRL_PERIOD_S;
+                std::fabs(joint[i] - joint_filter_[i]) / control_period_s_;
 
             if (target_joint_velc_.jointPara[i] > MAX_VELC[i])
             {
@@ -792,7 +799,7 @@ std::vector<wayPoint_S> AuboHardwareInterface::tryPopWaypoint(int count)
         {
             double acc = std::fabs(
                 target_joint_velc_.jointPara[i] - last_joint_velc_.jointPara[i])
-                / CTRL_PERIOD_S;
+                / control_period_s_;
             if (acc > MAX_ACC[i])
             {
                 ROS_WARN_THROTTLE(1.0,

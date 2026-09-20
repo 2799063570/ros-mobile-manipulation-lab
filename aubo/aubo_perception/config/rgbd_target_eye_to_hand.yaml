@@ -8,6 +8,7 @@ target_label_topic: /visual_servo/target_label
 target_selection_topic: /visual_servo/target_selection
 perception_state_topic: /visual_servo/perception_state
 start_enabled: false
+detection_rate: 10.0          # HSV detection + depth projection frequency (Hz)
 target_label: red
 selection_policy: image_center
 minimum_contour_area: 180.0
