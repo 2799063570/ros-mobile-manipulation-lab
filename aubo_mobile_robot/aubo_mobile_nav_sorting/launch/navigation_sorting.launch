@@ -18,7 +18,7 @@
   <arg name="goal_y" default="0.0"/>
   <arg name="goal_yaw" default="0.0"/>
   <arg name="mission_implementation" default="cpp"/>
-  <arg name="task_executable" default="color_sorting_task_cpp"/>
+  <arg name="task_executable" default="sorting_task_cpp"/>
 
   <!-- The mobile robot description/base driver must already be loaded. -->
   <include if="$(arg start_arm_driver)" file="$(find aubo_ros_control)/launch/aubo_control.launch">

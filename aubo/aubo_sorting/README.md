@@ -67,7 +67,8 @@ roslaunch aubo_ros_control eye_to_hand_visual_servo_gazebo.launch
 ## 通用颜色 / YOLO 抓取入口
 
 感知规则与消息定义见 [aubo_perception](../aubo_perception/README.md)。
-`sorting.launch` 现在通过共用几何层接收颜色旋转框或 YOLO OBB，任务默认为 C++，
+`sorting.launch` 现在通过共用几何层接收颜色旋转框或 YOLO OBB，任务默认使用通用
+C++ 入口 `sorting_task_cpp`；旧的 `color_sorting_task_cpp` 仍可作为兼容参数使用，
 备用 `task_executable:=color_sorting_task.py` 使用相同参数。
 
 ```bash

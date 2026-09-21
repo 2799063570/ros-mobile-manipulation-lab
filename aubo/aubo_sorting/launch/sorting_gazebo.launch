@@ -25,7 +25,7 @@
   <arg name="paused" default="false"/>
   <arg name="auto_move_to_observation" default="true"/>
   <arg name="auto_start" default="false"/>
-  <arg name="task_executable" default="color_sorting_task_cpp"/>
+  <arg name="task_executable" default="sorting_task_cpp"/>
   <arg name="start_perception" default="true"/>
   <arg name="start_task" default="true"/>
   <arg name="show_sorting_pads" default="$(eval arg('detector') == 'color')"/>

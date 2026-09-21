@@ -190,7 +190,7 @@ IDLE → STOWING_ARM → NAVIGATING → ALIGNING_BASE / DIRECT_DOCKING
 | 导航到分拣工位的启动入口 | `aubo_mobile_robot/aubo_mobile_nav_sorting/launch/mission_gazebo.launch` |
 | 任务状态及 C++ 实现 | `aubo_mobile_robot/aubo_mobile_nav_sorting/include/aubo_mobile_nav_sorting/mission_state.h`、`aubo_mobile_robot/aubo_mobile_nav_sorting/src/navigation_sorting_mission.cpp` |
 | 工位几何、超时和安全参数 | `aubo_mobile_robot/aubo_mobile_nav_sorting/config/scenario.yaml` |
-| 目标检测和机械臂抓放 | `aubo/aubo_perception/scripts/color_object_detector.py`、`aubo/aubo_sorting_core/src/color_sorting_task.cpp` |
+| 目标检测和机械臂抓放 | `aubo/aubo_perception/scripts/color_object_detector.py`、`aubo/aubo_sorting_core/src/sorting_task_node.cpp`、`sorting_task.cpp` |
 | 主从编队 | `wheeltec_multi/README.md`、`wheeltec_multi/msg/LeaderState.msg`、`wheeltec_multi/src/slave_tf_listener_mecanum.cpp` |
 
 ## 十、投递前填写清单

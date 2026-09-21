@@ -7,7 +7,7 @@
   <arg name="yolo_model" default="/home/zlab/deepL/code/ultralytics-main-modify/weights/GC-yolo.pt"/>
   <arg name="depth_save_directory" default=""/>
   <arg name="start_task" default="true"/>
-  <arg name="task_executable" default="color_sorting_task_cpp"/>
+  <arg name="task_executable" default="sorting_task_cpp"/>
   <arg name="config" default="$(find aubo_mobile_sorting)/config/sorting.yaml"/>
   <arg name="debug_view" default="true"/>
   <arg name="auto_move_to_observation" default="true"/>
@@ -33,7 +33,7 @@
     </group>
   </group>
 
-  <node if="$(arg start_task)" pkg="aubo_sorting_core" type="$(eval {'color_sorting_task_cpp': 'color_sorting_task_cpp'}[arg('task_executable')] if arg('gripper_backend') == 'inspire' else arg('task_executable'))"
+  <node if="$(arg start_task)" pkg="aubo_sorting_core" type="$(eval 'sorting_task_cpp' if arg('gripper_backend') == 'inspire' and arg('task_executable') == 'color_sorting_task.py' else arg('task_executable'))"
         name="color_sorting_task" output="screen">
     <rosparam file="$(arg config)" command="load"/>
     <rosparam if="$(eval arg('perception_mode') == 'yolo')" command="load"

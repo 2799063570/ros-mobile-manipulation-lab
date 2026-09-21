@@ -4,9 +4,13 @@
 
 #include <exception>
 
+#ifndef AUBO_SORTING_NODE_NAME
+#define AUBO_SORTING_NODE_NAME "sorting_task_cpp"
+#endif
+
 int main(int argc, char** argv)
 {
-  ros::init(argc, argv, "color_sorting_task_cpp");
+  ros::init(argc, argv, AUBO_SORTING_NODE_NAME);
   ros::NodeHandle nh;
   ros::NodeHandle private_nh("~");
   ros::AsyncSpinner spinner(4);
@@ -20,7 +24,7 @@ int main(int argc, char** argv)
   }
   catch (const std::exception& exception)
   {
-    ROS_FATAL_STREAM("Color sorting task failed: " << exception.what());
+    ROS_FATAL_STREAM("Sorting task failed: " << exception.what());
     return 1;
   }
   return 0;

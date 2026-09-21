@@ -21,6 +21,12 @@ roslaunch aubo_mobile_bringup simulation.launch mode:=sorting
 
 调试本模块时，原入口 `roslaunch aubo_mobile_sorting sorting_gazebo.launch` 仍可使用。
 
+分拣任务默认启动通用 C++ 可执行文件 `sorting_task_cpp`。历史名称
+`color_sorting_task_cpp` 仍可通过
+`task_executable:=color_sorting_task_cpp` 显式选择；两者运行同一套 `SortingTask`
+实现。为兼容既有参数文件、RViz 面板和导航任务，ROS 节点及私有参数空间仍为
+`/color_sorting_task`。
+
 该启动文件会同时运行：
 
 - `worlds/sorting.world` 分拣场景和复合机器人

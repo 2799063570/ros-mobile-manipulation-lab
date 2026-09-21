@@ -49,7 +49,8 @@
 | --- | --- | --- |
 | YOLO 如何接收相机图像 | `aubo_perception/scripts/ultralytics_yolo_node.py` | 行步长、颜色通道、推理限频及原始图像时间戳 |
 | 检测框如何变成抓取坐标 | `aubo_perception/scripts/yolo_rgbd_target_node.py`、`src/aubo_perception/grasp_geometry.py` | 深度帧配对、TF、顶面高度与物体中心高度的区别 |
-| 分拣何时开始、停止 | `aubo_sorting_core/src/color_sorting_task.cpp` | 状态转换、初始化条件及停止请求 |
+| 分拣节点如何启动 | `aubo_sorting_core/src/sorting_task_node.cpp` | ROS 初始化、回调线程和通用 `SortingTask` 的创建 |
+| 分拣何时开始、停止 | `aubo_sorting_core/src/sorting_task.cpp` | 状态转换、初始化条件及停止请求 |
 | 目标位置如何稳定 | `aubo_sorting_core/src/target_tracking.cpp` | 每类一个候选、离群点过滤和位置离散程度；不是同类多目标跟踪 |
 | 抓取动作如何执行 | `aubo_sorting_core/src/pick_place.cpp`、`motion_executor.cpp` | 接近、夹取、抬升、放置及失败返回路径 |
 | 场景和抓取辅助如何配合 | `workspace_manager.cpp`、`grasp_attachment.cpp`（均在核心包 `src/` 下） | 规划场景与 Gazebo 附着状态是两套不同机制 |
@@ -75,7 +76,7 @@ MoveIt和独立启动入口复用这些能力。
         ├── aubo_perception/color_object_detector.py
         │       └── aubo_perception/DetectedObjectArray
         │
-        ├── aubo_sorting_core/color_sorting_task_cpp
+        ├── aubo_sorting_core/sorting_task_cpp
         │       ├── MoveIt
         │       ├── 夹爪 FollowJointTrajectory
         │       └── /sorting/* 服务和状态话题

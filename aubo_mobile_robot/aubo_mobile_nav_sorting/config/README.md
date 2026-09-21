@@ -13,7 +13,11 @@
 | [four_tables_yolo.yaml](four_tables_yolo.yaml) | 四桌 YOLO 任务：将 bottle/can/box 对应到工位与仿真实体 | `four_tables_gazebo.launch perception_mode:=yolo`，加载到 `/nav_sorting_mission` |
 | [four_tables_colors.yaml](four_tables_colors.yaml) | HSV、轮廓过滤、深度顶面定位、感知工作区 | 四桌颜色模式经移动感知入口加载到 `/color_object_detector` |
 | [four_tables_navigation.yaml](four_tables_navigation.yaml) | 全局规划频率，以及 TEB/DWA 速度、容差和避障参数 | 四桌入口的导航配置，加载到 `/move_base` |
-| [sorting.yaml](sorting.yaml) | 机械臂观察、抓取、放置、夹爪、检测采样与缓存 | 四桌入口及 `mission_gazebo.launch`，加载到 `/color_sorting_task` |
+| [sorting.yaml](sorting.yaml) | 机械臂观察、抓取、放置、夹爪、检测采样与缓存 | 四桌入口及 `mission_gazebo.launch`，加载到兼容保留的 `/color_sorting_task` 参数空间 |
+
+分拣可执行文件默认已使用通用名称 `sorting_task_cpp`；`/color_sorting_task` 这里只是为
+兼容已有 YAML、面板和任务编排而保留的 ROS 节点及私有参数命名空间，并不表示核心仅
+支持颜色检测。YOLO 与颜色分拣共用同一个 `SortingTask` 节点。
 
 `four_tables_yolo.yaml` 不是 YOLO 网络配置。模型权重和 RGB-D 适配参数由
 `aubo_mobile_perception/launch/yolo_rgbd_detector.launch` 及其引用的共享感知入口提供。

@@ -7,10 +7,11 @@
 启动核心脚本。
 
 核心同时提供 Python 和 C++ 两个实现。固定平台和移动平台的分拣 launch 默认
-使用 `color_sorting_task_cpp`。`continuous_sorting=true` 时，历史 Python 入口也转交给
+使用通用入口 `sorting_task_cpp`。旧入口 `color_sorting_task_cpp` 继续指向同一实现，
+兼容已有 launch 和 `rosrun` 命令。`continuous_sorting=true` 时，历史 Python 入口也转交给
 C++ 执行器并保留 ROS 名称/命名空间参数，避免维护两份并发实现。仅当场景 YAML 设置
 `continuous_sorting: false` 时，`task_executable:=color_sorting_task.py` 才运行旧 Python 流程。C++ 类声明位于
-`include/aubo_sorting_core/sorting_task.hpp`，节点入口位于 `src/color_sorting_task_node.cpp`，实现按职责拆分如下。
+`include/aubo_sorting_core/sorting_task.hpp`，节点入口位于 `src/sorting_task_node.cpp`，实现按职责拆分如下。
 
 ## 程序职责与维护入口
 
@@ -19,7 +20,8 @@ C++ 执行器并保留 ROS 名称/命名空间参数，避免维护两份并发�
 
 | 文件 / 程序 | 职责 |
 | --- | --- |
-| `src/color_sorting_task_node.cpp` / `color_sorting_task_cpp` | 默认 ROS 节点入口，初始化并运行任务对象 |
+| `src/sorting_task_node.cpp` / `sorting_task_cpp` | 通用 ROS 节点入口，初始化并运行任务对象 |
+| `color_sorting_task_cpp` | 旧 C++ 可执行文件名的兼容入口，与 `sorting_task_cpp` 使用同一源码和状态机 |
 | `include/aubo_sorting_core/sorting_task.hpp` | 通用 `SortingTask` 分拣任务类、状态及接口声明 |
 | `include/aubo_sorting_core/color_sorting_task.hpp` | 旧 C++ API 兼容头，将 `ColorSortingTask` 映射到 `SortingTask` |
 | `src/sorting_task.cpp` | 生命周期、ROS 服务、异步任务调度与状态发布 |
@@ -35,13 +37,40 @@ C++ 执行器并保留 ROS 名称/命名空间参数，避免维护两份并发�
 | `include/aubo_sorting_core/height_recovery.hpp` | 抓取后抬升的有界高度重试规则 |
 | `scripts/color_sorting_task.py` | 可选 Python 实现，用于回退和对照；不与 C++ 节点同时启动 |
 
-`color_sorting_task` 可执行文件和 ROS 节点名是兼容保留的历史命名；C++ 核心类为
-`SortingTask`。当前任务通过检测消息和类别参数支持颜色及 YOLO
+`color_sorting_task` 库名、`color_sorting_task_cpp` 可执行文件及
+`/color_sorting_task` ROS 节点/参数命名空间均为兼容保留的历史名称；新的默认可执行
+文件为 `sorting_task_cpp`，C++ 核心类为 `SortingTask`。当前任务通过检测消息和类别参数支持颜色及 YOLO
 分拣。选择检测器和加载场景由上层 launch 完成，核心不执行图像识别或底盘导航。
 这些 C++ 文件共同构建 `color_sorting_task` 库，由一个任务对象共享状态和锁；
 它们不是单独启动的节点。公共头文件、节点名及 `/sorting/*` 接口保持不变。
 
 Python 与 C++ 存在重复实现，修改共同抓放逻辑时需要同步检查；Inspire 夹爪仅支持 C++。
+
+## 入口命名与兼容性
+
+新代码和新 launch 应使用通用名称：
+
+```bash
+rosrun aubo_sorting_core sorting_task_cpp
+```
+
+旧命令仍然有效，并运行相同的 `SortingTask` 实现：
+
+```bash
+rosrun aubo_sorting_core color_sorting_task_cpp
+```
+
+| 项目 | 推荐名称 | 兼容名称／说明 |
+| --- | --- | --- |
+| C++ 源码入口 | `src/sorting_task_node.cpp` | 旧文件 `src/color_sorting_task_node.cpp` 已更名 |
+| C++ 可执行文件 | `sorting_task_cpp` | `color_sorting_task_cpp` 继续构建和安装 |
+| C++ 任务类 | `SortingTask` | `ColorSortingTask` 头文件别名继续可用 |
+| ROS 节点及私有参数空间 | `/color_sorting_task` | 暂不更名，保证现有 YAML、面板和外部编排兼容 |
+| 内部共享库 | `color_sorting_task` | 暂不更名，保证已有链接方兼容 |
+
+launch 参数 `task_executable` 默认是 `sorting_task_cpp`；需要验证旧部署时仍可显式传入
+`task_executable:=color_sorting_task_cpp`。颜色与 YOLO 不需要分别创建任务节点，两者通过
+统一的 `/sorting/detections` 消息和 `sort_classes` 等参数选择行为。
 
 ## 输入与输出
 
@@ -179,7 +208,8 @@ C++ 实现内部使用 `enum class State`；`/sorting/state` 仍保留原字符�
 
 `gripper_backend=trajectory` 用于 Gazebo，轨迹包含当前关节位置和目标点，
 两端速度为零，默认运动时间 0.8 秒，可按仿真控制器响应调节。
-`gripper_backend=inspire` 仅支持 `color_sorting_task_cpp`，调用
+`gripper_backend=inspire` 仅支持 C++ 入口（推荐 `sorting_task_cpp`，兼容
+`color_sorting_task_cpp`），调用
 `/inspire_gripper/move_max`、`move_min`、`get_state`、`set_es`。
 参数 `inspire_speed=500`、`inspire_force=100`、`inspire_motion_timeout=5.0` 可调整。
 张开等待状态 1；闭合等待状态 2 或 6；超时/异常调用停止服务。

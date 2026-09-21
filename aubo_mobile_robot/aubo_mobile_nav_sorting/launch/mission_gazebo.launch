@@ -12,7 +12,7 @@
   <arg name="goal_yaw" default="0.0"/>
   <arg name="direct_dock" default="true"/>
   <arg name="mission_implementation" default="cpp"/>
-  <arg name="task_executable" default="color_sorting_task_cpp"/>
+  <arg name="task_executable" default="sorting_task_cpp"/>
 
   <include file="$(find aubo_mobile_robot)/launch/gazebo.launch">
     <arg name="world" value="$(arg world)"/>

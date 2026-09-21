@@ -3,7 +3,7 @@
   <!--兼容/便捷入口；参数与执行逻辑统一由 aubo_sorting 维护。-->
   <arg name="start_perception" default="true" />
   <arg name="start_task" default="true" />
-  <arg name="task_executable" default="color_sorting_task_cpp" />
+  <arg name="task_executable" default="sorting_task_cpp" />
 
   <arg name="debug_view" default="false" />
   <arg name="auto_move_to_observation" default="true" />

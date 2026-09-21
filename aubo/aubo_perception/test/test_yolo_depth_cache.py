@@ -31,6 +31,9 @@ class DepthCacheTest(unittest.TestCase):
         self.node.task_mode = 'sorting'
         self.node.target_frame = 'base_link'
         self.node.detections_publisher = Mock()
+        self.node.tf_listener = Mock()
+        self.node.tf_listener.lookupTransform.return_value = (
+            [0., 0., 0.], [0., 0., 0., 1.])
         self.node.maximum_depth_age = 0.05
         self.node._callback = Mock()
 

@@ -76,7 +76,7 @@
     <arg name="use_detected_angle" value="$(arg use_detected_angle)"/>
     <arg name="use_detected_width" value="$(arg use_detected_width)"/>
     <!-- Inspire 后端仅由 C++ 分拣节点实现。 -->
-    <arg name="task_executable" value="color_sorting_task_cpp"/>
+    <arg name="task_executable" value="sorting_task_cpp"/>
     <arg name="gripper_backend" value="inspire"/>
     <arg name="start_perception" value="$(arg start_perception)"/>
     <arg name="start_task" value="$(arg start_task)"/>

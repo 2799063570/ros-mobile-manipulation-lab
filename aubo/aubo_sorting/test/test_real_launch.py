@@ -24,7 +24,7 @@ class RealLaunchTest(unittest.TestCase):
 
         self.assertIn(('aubo_ros_control', 'aubo_hw_node'), nodes)
         self.assertIn(('inspire_gripper', 'inspire_gripper'), nodes)
-        self.assertIn(('aubo_sorting_core', 'color_sorting_task_cpp'), nodes)
+        self.assertIn(('aubo_sorting_core', 'sorting_task_cpp'), nodes)
         self.assertFalse(any(node.package == 'gazebo_ros' for node in config.nodes))
         self.assertEqual(params['/color_sorting_task/gripper_backend'], 'inspire')
         self.assertFalse(params['/color_sorting_task/use_grasp_attachment'])

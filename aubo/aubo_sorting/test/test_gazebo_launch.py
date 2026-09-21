@@ -112,6 +112,12 @@ class GazeboLaunchTest(unittest.TestCase):
             self.assertEqual(config.params['/' + node + '/object_height'].value, 0.06)
         self.assertEqual(config.params['/ultralytics_yolo/input_mode'].value, 'topic')
 
+    def test_legacy_cpp_executable_remains_selectable(self):
+        config = resolve('sorting_gazebo.launch',
+                         ['rviz:=false', 'task_executable:=color_sorting_task_cpp'])
+        task = next(node for node in config.nodes if node.name == 'color_sorting_task')
+        self.assertEqual(task.type, 'color_sorting_task_cpp')
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -67,7 +67,14 @@ add_library(color_sorting_task
 add_dependencies(color_sorting_task ${catkin_EXPORTED_TARGETS})
 target_link_libraries(color_sorting_task ${catkin_LIBRARIES})
 
-add_executable(color_sorting_task_cpp src/color_sorting_task_node.cpp)
+add_executable(sorting_task_cpp src/sorting_task_node.cpp)
+add_dependencies(sorting_task_cpp ${catkin_EXPORTED_TARGETS})
+target_link_libraries(sorting_task_cpp color_sorting_task ${catkin_LIBRARIES})
+
+# Backward-compatible executable for existing rosrun commands and custom launch files.
+add_executable(color_sorting_task_cpp src/sorting_task_node.cpp)
+target_compile_definitions(color_sorting_task_cpp PRIVATE
+  AUBO_SORTING_NODE_NAME="color_sorting_task_cpp")
 add_dependencies(color_sorting_task_cpp ${catkin_EXPORTED_TARGETS})
 target_link_libraries(color_sorting_task_cpp color_sorting_task ${catkin_LIBRARIES})
 
@@ -76,7 +83,7 @@ catkin_install_python(PROGRAMS
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
-install(TARGETS color_sorting_task color_sorting_task_cpp
+install(TARGETS color_sorting_task sorting_task_cpp color_sorting_task_cpp
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
