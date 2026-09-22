@@ -71,6 +71,9 @@ rosservice call /nav_sorting/start
 ```
 
 任务编排节点同时提供 Python 和 C++ 两种实现，对外话题、服务和 YAML 参数兼容。
+RViz 的 `aubo_mobile_nav_sorting/NavSortingPanel` 可直接调用
+`/nav_sorting_mission/set_parameters` 在线调节单工位导航参数，无需启动 rqt。
+面板订阅参数更新并检查服务返回的实际值；任务执行期间节点拒绝修改。
 默认使用 C++；显式选择时执行：
 
 ```bash

@@ -78,6 +78,12 @@ roslaunch aubo_mobile_sorting sorting_gazebo.launch rviz:=false debug_view:=fals
 - **张开夹爪**：在待命状态下手动打开夹爪
 - **机械臂归位**：移动到 `finish_named_target`，默认是 `down`
 - 运行状态以及红、绿、蓝目标识别数量
+- 在线调节识别等待、采样帧数、抓取 X/Y 偏移及运动速度/加速度比例；
+  点击“读取当前值”查看节点参数，机械臂空闲时点击“应用参数”生效
+
+在线调参连接默认 C++ 任务节点的 `/color_sorting_task/set_parameters`。
+任务运行中节点会回退到原参数；备用 Python 任务脚本目前不提供该动态服务。
+在线值只在当前进程生效，不会回写 `config/sorting.yaml`。
 
 如果面板没有自动显示，在 RViz 菜单中选择：
 

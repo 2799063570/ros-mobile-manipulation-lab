@@ -1,17 +1,44 @@
 #include <aubo_ros_control/visual_servo_panel.h>
 
 #include <moveit_msgs/GetMotionPlan.h>
+#include <dynamic_reconfigure/DoubleParameter.h>
+#include <dynamic_reconfigure/Reconfigure.h>
+#include <dynamic_reconfigure/StrParameter.h>
 #include <pluginlib/class_list_macros.h>
 #include <std_srvs/SetBool.h>
 #include <std_srvs/Trigger.h>
 
 #include <QComboBox>
+#include <QDoubleSpinBox>
 #include <QFont>
+#include <QFormLayout>
 #include <QGridLayout>
+#include <QGroupBox>
 #include <QLabel>
 #include <QPushButton>
+#include <QScrollArea>
 #include <QTimer>
 #include <QVBoxLayout>
+#include <cmath>
+
+namespace {
+QDoubleSpinBox* parameterBox(double minimum, double maximum, double step, int decimals)
+{
+  QDoubleSpinBox* box = new QDoubleSpinBox();
+  box->setRange(minimum, maximum);
+  box->setSingleStep(step);
+  box->setDecimals(decimals);
+  return box;
+}
+
+void addDouble(dynamic_reconfigure::Config& config, const std::string& name, double value)
+{
+  dynamic_reconfigure::DoubleParameter parameter;
+  parameter.name = name;
+  parameter.value = value;
+  config.doubles.push_back(parameter);
+}
+}  // namespace
 
 namespace aubo_ros_control
 {
@@ -28,6 +55,15 @@ VisualServoPanel::VisualServoPanel(QWidget* parent)
   , start_button_(new QPushButton(tr("启动两阶段流程")))
   , stop_button_(new QPushButton(tr("停止并保持")))
   , reset_button_(new QPushButton(tr("复位流程")))
+  , parameter_label_(new QLabel(tr("等待动态参数服务...")))
+  , linear_gain_(parameterBox(0.0, 5.0, 0.1, 3))
+  , angular_gain_(parameterBox(0.0, 5.0, 0.1, 3))
+  , max_linear_velocity_(parameterBox(0.0, 0.5, 0.01, 3))
+  , max_angular_velocity_(parameterBox(0.0, 2.0, 0.01, 3))
+  , position_deadband_(parameterBox(0.0, 0.1, 0.001, 4))
+  , orientation_deadband_(parameterBox(0.0, 0.5, 0.01, 3))
+  , target_timeout_(parameterBox(0.01, 10.0, 0.05, 3))
+  , loss_strategy_(new QComboBox())
   , readiness_timer_(new QTimer(this))
 {
   QLabel* title = new QLabel(tr("AUBO 路径规划 + 位置伺服"));
@@ -40,6 +76,9 @@ VisualServoPanel::VisualServoPanel(QWidget* parent)
   target_combo_->addItem(tr("绿色目标"), "green");
   target_combo_->addItem(tr("蓝色目标"), "blue");
   target_combo_->addItem(tr("任意已配置目标"), "any");
+  loss_strategy_->addItem(tr("立即保持"), "stop");
+  loss_strategy_->addItem(tr("短时衰减续行"), "coast");
+  loss_strategy_->addItem(tr("续行后恢复观察"), "coast_then_open");
 
   QLabel* flow = new QLabel(tr("准备：眼在手上先移动到观察位\n"
                                "阶段 1：MoveIt 路径规划与接近\n"
@@ -66,6 +105,29 @@ VisualServoPanel::VisualServoPanel(QWidget* parent)
   buttons->addWidget(stop_button_, 0, 1);
   buttons->addWidget(reset_button_, 1, 0, 1, 2);
 
+  QGroupBox* tuning_group = new QGroupBox(tr("在线动态调参"));
+  QFormLayout* tuning = new QFormLayout();
+  tuning->addRow(tr("位置增益"), linear_gain_);
+  tuning->addRow(tr("姿态增益"), angular_gain_);
+  tuning->addRow(tr("最大线速度 m/s"), max_linear_velocity_);
+  tuning->addRow(tr("最大角速度 rad/s"), max_angular_velocity_);
+  tuning->addRow(tr("位置死区 m"), position_deadband_);
+  tuning->addRow(tr("姿态死区 rad"), orientation_deadband_);
+  tuning->addRow(tr("目标超时 s"), target_timeout_);
+  tuning->addRow(tr("目标丢失策略"), loss_strategy_);
+  QPushButton* apply_button = new QPushButton(tr("应用参数"));
+  QPushButton* refresh_button = new QPushButton(tr("读取当前值"));
+  QGridLayout* tuning_buttons = new QGridLayout();
+  tuning_buttons->addWidget(apply_button, 0, 0);
+  tuning_buttons->addWidget(refresh_button, 0, 1);
+  tuning->addRow(tuning_buttons);
+  tuning->addRow(parameter_label_);
+  tuning_group->setLayout(tuning);
+  QScrollArea* tuning_scroll = new QScrollArea();
+  tuning_scroll->setWidgetResizable(true);
+  tuning_scroll->setMaximumHeight(300);
+  tuning_scroll->setWidget(tuning_group);
+
   QVBoxLayout* layout = new QVBoxLayout();
   layout->addWidget(title);
   layout->addWidget(flow);
@@ -81,6 +143,7 @@ VisualServoPanel::VisualServoPanel(QWidget* parent)
   layout->addWidget(new QLabel(tr("相机系目标位置：")));
   layout->addWidget(target_pose_label_);
   layout->addLayout(buttons);
+  layout->addWidget(tuning_scroll);
   layout->addWidget(command_label_);
   layout->addStretch();
   setLayout(layout);
@@ -95,6 +158,8 @@ VisualServoPanel::VisualServoPanel(QWidget* parent)
       "/visual_servo/perception/reset");
   planning_client_ = node_handle_.serviceClient<moveit_msgs::GetMotionPlan>(
       "/plan_kinematic_path");
+  reconfigure_client_ = node_handle_.serviceClient<dynamic_reconfigure::Reconfigure>(
+      "/aubo_visual_servo/set_parameters");
   target_selection_publisher_ = node_handle_.advertise<std_msgs::String>(
       "/visual_servo/target_selection", 1, true);
   servo_state_subscriber_ = node_handle_.subscribe(
@@ -107,10 +172,16 @@ VisualServoPanel::VisualServoPanel(QWidget* parent)
   planning_scene_ready_subscriber_ = node_handle_.subscribe(
       "/hybrid/planning_scene_ready", 1,
       &VisualServoPanel::planningSceneReadyCallback, this);
+  parameter_subscriber_ = node_handle_.subscribe(
+      "/aubo_visual_servo/parameter_updates", 1,
+      &VisualServoPanel::parameterUpdateCallback, this);
 
   connect(start_button_, SIGNAL(clicked()), this, SLOT(startServo()));
   connect(stop_button_, SIGNAL(clicked()), this, SLOT(stopServo()));
   connect(reset_button_, SIGNAL(clicked()), this, SLOT(resetServo()));
+  connect(apply_button, SIGNAL(clicked()), this, SLOT(applyParameters()));
+  connect(refresh_button, SIGNAL(clicked()), this, SLOT(refreshParameters()));
+  connect(this, SIGNAL(parametersChanged()), this, SLOT(refreshParameters()), Qt::QueuedConnection);
   connect(target_combo_, SIGNAL(currentIndexChanged(QString)),
           this, SLOT(selectTarget(QString)));
   connect(this, SIGNAL(servoStateReceived(QString)),
@@ -124,6 +195,81 @@ VisualServoPanel::VisualServoPanel(QWidget* parent)
   selectTarget(target_combo_->currentText());
   readiness_timer_->start(500);
   updateReadiness();
+  refreshParameters();
+}
+
+void VisualServoPanel::parameterUpdateCallback(const dynamic_reconfigure::Config::ConstPtr&)
+{
+  Q_EMIT parametersChanged();
+}
+
+void VisualServoPanel::refreshParameters()
+{
+  const std::string prefix = "/aubo_visual_servo/";
+  double value;
+  bool found = false;
+#define READ_DOUBLE(name, widget) \
+  if (node_handle_.getParam(prefix + name, value)) { widget->setValue(value); found = true; }
+  READ_DOUBLE("linear_gain", linear_gain_)
+  READ_DOUBLE("angular_gain", angular_gain_)
+  READ_DOUBLE("max_linear_velocity", max_linear_velocity_)
+  READ_DOUBLE("max_angular_velocity", max_angular_velocity_)
+  READ_DOUBLE("position_deadband", position_deadband_)
+  READ_DOUBLE("orientation_deadband", orientation_deadband_)
+  READ_DOUBLE("target_timeout", target_timeout_)
+#undef READ_DOUBLE
+  std::string strategy;
+  if (node_handle_.getParam(prefix + "loss_strategy", strategy))
+  {
+    const int index = loss_strategy_->findData(QString::fromStdString(strategy));
+    if (index >= 0) loss_strategy_->setCurrentIndex(index);
+    found = true;
+  }
+  parameter_label_->setText(found && reconfigure_client_.exists() ?
+      tr("已读取当前生效值") : tr("控制器尚未启动或动态服务不可用"));
+}
+
+void VisualServoPanel::applyParameters()
+{
+  if (!reconfigure_client_.exists())
+  {
+    parameter_label_->setText(tr("动态参数服务不可用"));
+    return;
+  }
+  dynamic_reconfigure::Reconfigure service;
+  addDouble(service.request.config, "linear_gain", linear_gain_->value());
+  addDouble(service.request.config, "angular_gain", angular_gain_->value());
+  addDouble(service.request.config, "max_linear_velocity", max_linear_velocity_->value());
+  addDouble(service.request.config, "max_angular_velocity", max_angular_velocity_->value());
+  addDouble(service.request.config, "position_deadband", position_deadband_->value());
+  addDouble(service.request.config, "orientation_deadband", orientation_deadband_->value());
+  addDouble(service.request.config, "target_timeout", target_timeout_->value());
+  dynamic_reconfigure::StrParameter strategy;
+  strategy.name = "loss_strategy";
+  strategy.value = loss_strategy_->currentData().toString().toStdString();
+  service.request.config.strs.push_back(strategy);
+  if (!reconfigure_client_.call(service))
+  {
+    parameter_label_->setText(tr("参数应用失败：服务调用未完成"));
+    return;
+  }
+  bool accepted = true;
+  for (const auto& parameter : service.request.config.doubles)
+  {
+    bool matched = false;
+    for (const auto& actual : service.response.config.doubles)
+      if (actual.name == parameter.name)
+        matched = std::abs(actual.value - parameter.value) < 1e-6;
+    accepted = accepted && matched;
+  }
+  bool strategy_matched = false;
+  for (const auto& actual : service.response.config.strs)
+    if (actual.name == strategy.name)
+      strategy_matched = actual.value == strategy.value;
+  accepted = accepted && strategy_matched;
+  refreshParameters();
+  command_label_->setText(accepted ? tr("动态参数已生效") :
+      tr("控制器修正了部分参数，请检查当前值"));
 }
 
 bool VisualServoPanel::setEnabled(ros::ServiceClient& client, bool enabled,

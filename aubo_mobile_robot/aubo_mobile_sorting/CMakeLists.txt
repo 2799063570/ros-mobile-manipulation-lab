@@ -3,6 +3,7 @@ project(aubo_mobile_sorting)
 
 set(CMAKE_AUTOMOC ON)
 find_package(catkin REQUIRED COMPONENTS
+  dynamic_reconfigure
   pluginlib
   roscpp
   rviz
@@ -13,7 +14,7 @@ find_package(Qt5 REQUIRED COMPONENTS Widgets)
 
 catkin_package(
   LIBRARIES aubo_mobile_sorting_panel
-  CATKIN_DEPENDS pluginlib roscpp rviz std_msgs std_srvs
+  CATKIN_DEPENDS dynamic_reconfigure pluginlib roscpp rviz std_msgs std_srvs
 )
 
 include_directories(

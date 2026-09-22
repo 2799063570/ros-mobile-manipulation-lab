@@ -77,6 +77,8 @@ SortingTask::SortingTask(ros::NodeHandle nh, ros::NodeHandle private_nh)
   services_.push_back(nh_.advertiseService("/sorting/configure_workspace",
                                             &SortingTask::configureWorkspaceService, this));// 配置工作区请求
 
+  setupDynamicReconfigure();
+
   std_msgs::Bool unlocked;
   unlocked.data = false;
   base_lock_publisher_.publish(unlocked);
@@ -88,6 +90,7 @@ SortingTask::SortingTask(ros::NodeHandle nh, ros::NodeHandle private_nh)
 
 SortingTask::~SortingTask()
 {
+  reconfigure_server_.reset();
   detection_subscriber_.shutdown();
   target_worker_shutdown_.store(true);
   queue_condition_.notify_all();
@@ -402,6 +405,53 @@ bool SortingTask::homeOperation()
   observation_ready_.store(false);
   queue_vision_phase_.store(QueueVisionPhase::DISABLED);
   return moveNamed(finish_named_target_);
+}
+
+void SortingTask::setupDynamicReconfigure()
+{
+  // Seed the server with the YAML values already loaded by loadParameters().
+  private_nh_.setParam("detection_timeout", detection_timeout_);
+  private_nh_.setParam("detection_samples", detection_samples_);
+  private_nh_.setParam("grasp_offset_x", grasp_offset_x_);
+  private_nh_.setParam("grasp_offset_y", grasp_offset_y_);
+  private_nh_.setParam("velocity_scaling", velocity_scaling_);
+  private_nh_.setParam("acceleration_scaling", acceleration_scaling_);
+  reconfigure_server_.reset(new dynamic_reconfigure::Server<SortingTaskConfig>(private_nh_));
+  dynamic_reconfigure::Server<SortingTaskConfig>::CallbackType callback =
+      [this](SortingTaskConfig& config, uint32_t level) { reconfigureCallback(config, level); };
+  reconfigure_server_->setCallback(callback);
+}
+
+void SortingTask::reconfigureCallback(SortingTaskConfig& config, uint32_t)
+{
+  // startOperation() uses this mutex when claiming the only motion worker.
+  std::lock_guard<std::mutex> lock(operation_mutex_);
+  const bool unchanged = config.detection_timeout == detection_timeout_ &&
+      config.detection_samples == detection_samples_ &&
+      config.grasp_offset_x == grasp_offset_x_ &&
+      config.grasp_offset_y == grasp_offset_y_ &&
+      config.velocity_scaling == velocity_scaling_ &&
+      config.acceleration_scaling == acceleration_scaling_;
+  if (busy_.load() || config.detection_timeout <= queue_empty_confirmation_)
+  {
+    config.detection_timeout = detection_timeout_;
+    config.detection_samples = detection_samples_;
+    config.grasp_offset_x = grasp_offset_x_;
+    config.grasp_offset_y = grasp_offset_y_;
+    config.velocity_scaling = velocity_scaling_;
+    config.acceleration_scaling = acceleration_scaling_;
+    if (!unchanged)
+      ROS_WARN_THROTTLE(2.0, "Sorting parameters rejected: arm busy or detection timeout too short");
+    return;
+  }
+  detection_timeout_ = config.detection_timeout;
+  detection_samples_ = config.detection_samples;
+  grasp_offset_x_ = config.grasp_offset_x;
+  grasp_offset_y_ = config.grasp_offset_y;
+  velocity_scaling_ = config.velocity_scaling;
+  acceleration_scaling_ = config.acceleration_scaling;
+  arm_->setMaxVelocityScalingFactor(velocity_scaling_);
+  arm_->setMaxAccelerationScalingFactor(acceleration_scaling_);
 }
 
 bool SortingTask::prepareWorkOperation()

@@ -19,6 +19,7 @@
 #include <QVBoxLayout>
 #include <QTableWidget>
 #include <QHeaderView>
+#include <cmath>
 
 namespace
 {
@@ -157,12 +158,16 @@ NavSortingPanel::NavSortingPanel(QWidget* parent)
       "/nav_sorting/state", 1, &NavSortingPanel::missionStateCallback, this);
   sorting_state_subscriber_ = node_handle_.subscribe(
       "/sorting/state", 1, &NavSortingPanel::sortingStateCallback, this);
+  parameter_subscriber_ = node_handle_.subscribe(
+      "/nav_sorting_mission/parameter_updates", 1,
+      &NavSortingPanel::parameterUpdateCallback, this);
 
   connect(start_button_, SIGNAL(clicked()), this, SLOT(startMission()));
   connect(stop_button_, SIGNAL(clicked()), this, SLOT(stopMission()));
   connect(recover_button_, SIGNAL(clicked()), this, SLOT(recoverStop()));
   connect(apply_button, SIGNAL(clicked()), this, SLOT(applyParameters()));
-  connect(refresh_button, SIGNAL(clicked()), this, SLOT(refreshParameters()));
+  connect(refresh_button, SIGNAL(clicked()), this, SLOT(readParameters()));
+  connect(this, SIGNAL(parametersChanged()), this, SLOT(refreshParameters()), Qt::QueuedConnection);
   connect(this, SIGNAL(missionStateReceived(QString)), this,
           SLOT(showMissionState(QString)), Qt::QueuedConnection);
   connect(this, SIGNAL(sortingStateReceived(QString)), this,
@@ -234,8 +239,46 @@ void NavSortingPanel::applyParameters()
     command_label_->setText(tr("应用参数：动态调参服务不可用"));
     return;
   }
-  command_label_->setText(tr("参数已应用；下一次任务将使用新值"));
+  bool accepted = true;
+  for (const auto& parameter : service.request.config.doubles)
+  {
+    bool matched = false;
+    for (const auto& actual : service.response.config.doubles)
+      if (actual.name == parameter.name)
+        matched = std::abs(actual.value - parameter.value) < 1e-6;
+    accepted = accepted && matched;
+  }
+  for (const auto& parameter : service.request.config.ints)
+  {
+    bool matched = false;
+    for (const auto& actual : service.response.config.ints)
+      if (actual.name == parameter.name)
+        matched = actual.value == parameter.value;
+    accepted = accepted && matched;
+  }
+  for (const auto& parameter : service.request.config.bools)
+  {
+    bool matched = false;
+    for (const auto& actual : service.response.config.bools)
+      if (actual.name == parameter.name)
+        matched = actual.value == parameter.value;
+    accepted = accepted && matched;
+  }
   refreshParameters();
+  command_label_->setText(accepted ? tr("参数已应用；下一次任务将使用新值") :
+      tr("节点拒绝或修正了参数，请检查当前值"));
+}
+
+void NavSortingPanel::parameterUpdateCallback(const dynamic_reconfigure::Config::ConstPtr&)
+{
+  Q_EMIT parametersChanged();
+}
+
+void NavSortingPanel::readParameters()
+{
+  refreshParameters();
+  command_label_->setText(reconfigure_client_.exists() ? tr("已读取当前参数") :
+      tr("任务节点尚未启动"));
 }
 
 void NavSortingPanel::refreshParameters()
@@ -273,9 +316,8 @@ void NavSortingPanel::refreshParameters()
   double double_value;
   int int_value;
   bool bool_value;
-  bool found = false;
 #define READ_DOUBLE(name, widget) \
-  if (node_handle_.getParam(prefix + name, double_value)) { widget->setValue(double_value); found = true; }
+  if (node_handle_.getParam(prefix + name, double_value)) widget->setValue(double_value);
   READ_DOUBLE("goal_x", goal_x_)
   READ_DOUBLE("goal_y", goal_y_)
   READ_DOUBLE("goal_yaw", goal_yaw_)
@@ -288,14 +330,11 @@ void NavSortingPanel::refreshParameters()
   if (node_handle_.getParam(prefix + "navigation_retries", int_value))
   {
     navigation_retries_->setValue(int_value);
-    found = true;
   }
   if (node_handle_.getParam(prefix + "near_field_enabled", bool_value))
   {
     near_field_enabled_->setChecked(bool_value);
-    found = true;
   }
-  command_label_->setText(found ? tr("已读取当前参数") : tr("参数节点尚未启动，显示默认值"));
 }
 
 void NavSortingPanel::missionStateCallback(const std_msgs::String::ConstPtr& message)

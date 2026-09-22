@@ -452,7 +452,7 @@ void VisualServo::reconfigureCallback(VisualServoConfig &config,
   resetHybrid();
   queue_.clear();
   last_tracking_velocity_.setZero();
-  ROS_INFO_THROTTLE(1.0, "[visual_servo] rqt_reconfigure 参数已更新");
+  ROS_INFO_THROTTLE(1.0, "[visual_servo] 动态参数已更新");
 }
 
 bool VisualServo::initializeKinematics() {

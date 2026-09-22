@@ -8,6 +8,7 @@ find_package(catkin REQUIRED COMPONENTS
   actionlib_msgs
   aubo_perception
   control_msgs
+  dynamic_reconfigure
   geometry_msgs
   inspire_gripper
   moveit_core
@@ -24,6 +25,8 @@ find_package(catkin REQUIRED COMPONENTS
   urdf
 )
 
+generate_dynamic_reconfigure_options(cfg/SortingTask.cfg)
+
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES color_sorting_task
@@ -32,6 +35,7 @@ catkin_package(
     actionlib_msgs
     aubo_perception
     control_msgs
+    dynamic_reconfigure
     geometry_msgs
     inspire_gripper
     moveit_core
@@ -64,18 +68,18 @@ add_library(color_sorting_task
   src/pick_place.cpp
   src/task_utils.cpp
 )
-add_dependencies(color_sorting_task ${catkin_EXPORTED_TARGETS})
+add_dependencies(color_sorting_task ${PROJECT_NAME}_gencfg ${catkin_EXPORTED_TARGETS})
 target_link_libraries(color_sorting_task ${catkin_LIBRARIES})
 
 add_executable(sorting_task_cpp src/sorting_task_node.cpp)
-add_dependencies(sorting_task_cpp ${catkin_EXPORTED_TARGETS})
+add_dependencies(sorting_task_cpp ${PROJECT_NAME}_gencfg ${catkin_EXPORTED_TARGETS})
 target_link_libraries(sorting_task_cpp color_sorting_task ${catkin_LIBRARIES})
 
 # Backward-compatible executable for existing rosrun commands and custom launch files.
 add_executable(color_sorting_task_cpp src/sorting_task_node.cpp)
 target_compile_definitions(color_sorting_task_cpp PRIVATE
   AUBO_SORTING_NODE_NAME="color_sorting_task_cpp")
-add_dependencies(color_sorting_task_cpp ${catkin_EXPORTED_TARGETS})
+add_dependencies(color_sorting_task_cpp ${PROJECT_NAME}_gencfg ${catkin_EXPORTED_TARGETS})
 target_link_libraries(color_sorting_task_cpp color_sorting_task ${catkin_LIBRARIES})
 
 catkin_install_python(PROGRAMS

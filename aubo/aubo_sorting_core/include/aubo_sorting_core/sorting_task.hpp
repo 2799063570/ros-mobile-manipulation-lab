@@ -5,6 +5,8 @@
 #include <aubo_perception/DetectedObject.h>
 #include <aubo_perception/DetectedObjectArray.h>
 #include <control_msgs/FollowJointTrajectoryAction.h>
+#include <dynamic_reconfigure/server.h>
+#include <aubo_sorting_core/SortingTaskConfig.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <moveit/move_group_interface/move_group_interface.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
@@ -88,6 +90,8 @@ private:
   };
 
   void loadParameters();
+  void setupDynamicReconfigure();
+  void reconfigureCallback(SortingTaskConfig& config, uint32_t level);
   bool verifyLoadedUpperArmLimit() const;
   void initialize();
   void publishState(State state, const std::string& detail = std::string());
@@ -185,6 +189,7 @@ private:
   int inspire_speed_{500}, inspire_force_{100};
   double inspire_motion_timeout_{5.0};
   std::vector<ros::ServiceServer> services_;
+  std::unique_ptr<dynamic_reconfigure::Server<SortingTaskConfig>> reconfigure_server_;
 
   std::string group_name_;
   std::string end_effector_link_;

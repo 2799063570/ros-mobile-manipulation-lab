@@ -2,6 +2,7 @@
 #define AUBO_MOBILE_NAV_SORTING_NAV_SORTING_PANEL_H
 
 #include <ros/ros.h>
+#include <dynamic_reconfigure/Config.h>
 #include <rviz/panel.h>
 #include <std_msgs/String.h>
 
@@ -27,6 +28,7 @@ public:
 Q_SIGNALS:
   void missionStateReceived(const QString& text);
   void sortingStateReceived(const QString& text);
+  void parametersChanged();
 
 private Q_SLOTS:
   void startMission();
@@ -34,6 +36,7 @@ private Q_SLOTS:
   void recoverStop();
   void applyParameters();
   void refreshParameters();
+  void readParameters();
   void showMissionState(const QString& text);
   void showSortingState(const QString& text);
 
@@ -41,6 +44,7 @@ private:
   void callTrigger(ros::ServiceClient& client, const QString& command_name);
   void missionStateCallback(const std_msgs::String::ConstPtr& message);
   void sortingStateCallback(const std_msgs::String::ConstPtr& message);
+  void parameterUpdateCallback(const dynamic_reconfigure::Config::ConstPtr& message);
 
   ros::NodeHandle node_handle_;
   ros::ServiceClient start_client_;
@@ -49,6 +53,7 @@ private:
   ros::ServiceClient reconfigure_client_;
   ros::Subscriber mission_state_subscriber_;
   ros::Subscriber sorting_state_subscriber_;
+  ros::Subscriber parameter_subscriber_;
 
   QLabel* mission_state_label_;
   QLabel* sorting_state_label_;
