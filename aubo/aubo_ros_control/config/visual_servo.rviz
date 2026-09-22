@@ -85,11 +85,11 @@ Visualization Manager:
 Window Geometry:
   Displays:
     collapsed: false
-  Height: 900
+  Height: 1000
   Hide Left Dock: false
   Hide Right Dock: false
   Views:
     collapsed: false
   Width: 1440
   X: 80
-  Y: 40
+  Y: 20

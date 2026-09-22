@@ -20,6 +20,7 @@
 #include <QTableWidget>
 #include <QHeaderView>
 #include <cmath>
+#include <unordered_map>
 
 namespace
 {
@@ -182,25 +183,33 @@ NavSortingPanel::NavSortingPanel(QWidget* parent)
   refreshParameters();
 }
 
-void NavSortingPanel::callTrigger(ros::ServiceClient& client,
+bool NavSortingPanel::callTrigger(ros::ServiceClient& client,
                                   const QString& command_name)
 {
   std_srvs::Trigger service;
   if (!client.call(service))
   {
     command_label_->setText(command_name + tr("：服务不可用"));
-    return;
+    return false;
   }
   command_label_->setText(
       command_name + (service.response.success ? tr("：已接受，") : tr("：被拒绝，")) +
       QString::fromStdString(service.response.message));
+  return service.response.success;
 }
 
 void NavSortingPanel::startMission()
 {
-  for (int row = 0; row < workstations_table_->rowCount(); ++row)
-    workstations_table_->item(row, 2)->setText(tr("待执行"));
-  callTrigger(start_client_, tr("开始任务"));
+  const auto previous_progress = workstation_progress_;
+  for (auto& status : workstation_progress_)
+    if (status != WorkstationProgress::DISABLED)
+      status = WorkstationProgress::PENDING;
+  updateWorkstationTable();
+  if (!callTrigger(start_client_, tr("开始任务")))
+  {
+    workstation_progress_ = previous_progress;
+    updateWorkstationTable();
+  }
 }
 
 void NavSortingPanel::recoverStop()
@@ -284,6 +293,9 @@ void NavSortingPanel::readParameters()
 void NavSortingPanel::refreshParameters()
 {
   const std::string prefix = "/nav_sorting_mission/";
+  std::unordered_map<std::string, WorkstationProgress> previous_progress;
+  for (std::size_t row = 0; row < workstation_ids_.size(); ++row)
+    previous_progress[workstation_ids_[row]] = workstation_progress_[row];
   XmlRpc::XmlRpcValue stations;
   multi_workstation_ = node_handle_.getParam(prefix + "workstations", stations) &&
       stations.getType() == XmlRpc::XmlRpcValue::TypeArray && stations.size() > 0;
@@ -294,10 +306,13 @@ void NavSortingPanel::refreshParameters()
   if (multi_workstation_)
   {
     workstations_table_->setRowCount(stations.size());
+    workstation_ids_.clear();
+    workstation_progress_.clear();
     for (int row = 0; row < stations.size(); ++row)
     {
       const auto& station = stations[row];
       const QString id = QString::fromStdString(static_cast<std::string>(station["id"]));
+      const std::string id_text = id.toStdString();
       const auto& goal = station["navigation_goal"];
       QStringList coordinates;
       for (int axis = 0; axis < goal.size(); ++axis)
@@ -309,9 +324,21 @@ void NavSortingPanel::refreshParameters()
       workstations_table_->setItem(row, 0, new QTableWidgetItem(id));
       workstations_table_->setItem(row, 1, new QTableWidgetItem(coordinates.join(", ")));
       const bool enabled = !station.hasMember("enabled") || static_cast<bool>(station["enabled"]);
-      workstations_table_->setItem(row, 2, new QTableWidgetItem(enabled ? tr("待执行") : tr("已禁用")));
+      workstations_table_->setItem(row, 2, new QTableWidgetItem());
+      workstation_ids_.push_back(id_text);
+      const auto previous = previous_progress.find(id_text);
+      workstation_progress_.push_back(!enabled ? WorkstationProgress::DISABLED :
+          previous == previous_progress.end() || previous->second == WorkstationProgress::DISABLED
+              ? WorkstationProgress::PENDING : previous->second);
     }
+    updateWorkstationTable();
     start_button_->setText(tr("按顺序执行多工位分拣"));
+  }
+  else
+  {
+    workstation_ids_.clear();
+    workstation_progress_.clear();
+    workstations_table_->setRowCount(0);
   }
   double double_value;
   int int_value;
@@ -337,6 +364,25 @@ void NavSortingPanel::refreshParameters()
   }
 }
 
+void NavSortingPanel::updateWorkstationTable()
+{
+  for (std::size_t row = 0; row < workstation_progress_.size(); ++row)
+  {
+    QString text;
+    switch (workstation_progress_[row])
+    {
+      case WorkstationProgress::PENDING: text = tr("待执行"); break;
+      case WorkstationProgress::ACTIVE: text = tr("执行中"); break;
+      case WorkstationProgress::COMPLETE: text = tr("已完成"); break;
+      case WorkstationProgress::FAILED: text = tr("失败"); break;
+      case WorkstationProgress::STOPPED: text = tr("已停止"); break;
+      case WorkstationProgress::STOP_UNCONFIRMED: text = tr("停止未确认"); break;
+      case WorkstationProgress::DISABLED: text = tr("已禁用"); break;
+    }
+    workstations_table_->item(static_cast<int>(row), 2)->setText(text);
+  }
+}
+
 void NavSortingPanel::missionStateCallback(const std_msgs::String::ConstPtr& message)
 {
   Q_EMIT missionStateReceived(QString::fromStdString(message->data));
@@ -351,19 +397,11 @@ void NavSortingPanel::showMissionState(const QString& text)
 {
   const QString code = text.section('|', 0, 0).trimmed();
   const QString detail = text.section('|', 1).trimmed();
-  if (code == "CONFIGURING_WORKSTATION" && workstations_table_->rowCount() == 0)
+  if (workstations_table_->rowCount() == 0)
     refreshParameters();
-  for (int row = 0; row < workstations_table_->rowCount(); ++row)
-  {
-    const QString id = workstations_table_->item(row, 0)->text();
-    if (code == "CONFIGURING_WORKSTATION" && detail == id)
-      workstations_table_->item(row, 2)->setText(tr("执行中"));
-    else if (code == "WORKSTATION_COMPLETE" && detail == id)
-      workstations_table_->item(row, 2)->setText(tr("已完成"));
-    else if ((code == "FAILED" || code == "STOPPED") &&
-             workstations_table_->item(row, 2)->text() == tr("执行中"))
-      workstations_table_->item(row, 2)->setText(code == "FAILED" ? tr("失败") : tr("已停止"));
-  }
+  advanceWorkstationProgress(workstation_ids_, workstation_progress_,
+                             code.toStdString(), detail.toStdString());
+  updateWorkstationTable();
   mission_busy_ = !(code == "IDLE" || code == "STOPPED" ||
                     code == "SUCCEEDED" || code == "FAILED");
   start_button_->setEnabled(!mission_busy_);

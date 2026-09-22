@@ -92,6 +92,7 @@ install(FILES README.md plugin_description.xml
 if(CATKIN_ENABLE_TESTING)
   find_package(rostest REQUIRED)
   catkin_add_gtest(mission_state_test test/mission_state_test.cpp)
+  catkin_add_gtest(workstation_progress_test test/workstation_progress_test.cpp)
   catkin_add_nosetests(test/test_named_targets.py)
   catkin_install_python(PROGRAMS test/cpp_mission_rostest.py
     DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})

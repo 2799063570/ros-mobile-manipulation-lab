@@ -68,6 +68,8 @@ private:
   ros::Subscriber planning_scene_ready_subscriber_;
   ros::Subscriber parameter_subscriber_;
 
+  QLabel* title_label_;
+  QLabel* flow_label_;
   QComboBox* target_combo_;
   QLabel* servo_state_label_;
   QLabel* perception_state_label_;

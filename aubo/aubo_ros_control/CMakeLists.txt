@@ -130,6 +130,7 @@ if(CATKIN_ENABLE_TESTING)
   catkin_install_python(PROGRAMS test/hybrid_control_test.py
     DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
   add_rostest(test/hybrid_control.test)
+  add_rostest(test/initial_observation.test)
   catkin_add_gtest(visual_servo_common_test
     test/visual_servo_common_test.cpp
     src/visual_servo_common.cpp)

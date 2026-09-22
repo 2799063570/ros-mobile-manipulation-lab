@@ -574,7 +574,7 @@ bool VisualServo::setEnabled(std_srvs::SetBool::Request &request,
   std::lock_guard<std::mutex> control_lock(control_mutex_);
   enabled_ = request.data;
   resetHybrid();
-  hybrid_observation_complete_ = false;
+  observation_complete_ = false;
   integrator_initialized_ = false;
   safety_stop_.store(false);
   queue_.clear();
@@ -603,7 +603,7 @@ bool VisualServo::reset(std_srvs::Trigger::Request &,
                         std_srvs::Trigger::Response &response) {
   std::lock_guard<std::mutex> control_lock(control_mutex_);
   resetHybrid();
-  hybrid_observation_complete_ = false;
+  observation_complete_ = false;
   integrator_initialized_ = false;
   {
     std::lock_guard<std::mutex> target_lock(target_mutex_);
@@ -670,14 +670,16 @@ VisualServo::ServoState VisualServo::selectState(bool fresh_target,
     return ServoState::DISABLED;
   if (safety_stop_.load())
     return ServoState::HOLD;
+  if (servo_mode_ == "eye_in_hand" && initial_search_enabled_ &&
+      !observation_complete_)
+    return ServoState::SEARCH_INITIAL;
   if (fresh_target)
     return aligned_latched_ ? ServoState::ALIGNED : ServoState::TRACKING;
   // 已对齐后的短时遮挡不应触发回退搜索。
   if (aligned_latched_)
     return ServoState::HOLD;
   if (!have_ever_tracked_)
-    return initial_search_enabled_ ? ServoState::SEARCH_INITIAL
-                                   : ServoState::WAITING;
+    return ServoState::WAITING;
   const double lost_for = std::max(0.0, target_age - target_timeout_);
   if (loss_strategy_ == "stop")
     return ServoState::HOLD;
@@ -888,7 +890,17 @@ void VisualServo::controlLoop(const ros::TimerEvent &event) {
       return;
     // While moving to the mandatory eye-in-hand viewpoint, suppress target
     // tracking so the ordinary state machine selects SEARCH_INITIAL.
-    if (!hybrid_observation_complete_)
+    if (!observation_complete_)
+      fresh_target = false;
+  } else if (enabled_ && servo_mode_ == "eye_in_hand" &&
+             initial_search_enabled_ && !observation_complete_) {
+    bool at_observation = true;
+    for (std::size_t i = 0; i < kDof; ++i)
+      if (std::abs(feedback[i] - initial_search_posture_[i]) > 0.02)
+        at_observation = false;
+    if (at_observation)
+      observation_complete_ = true;
+    else
       fresh_target = false;
   }
 

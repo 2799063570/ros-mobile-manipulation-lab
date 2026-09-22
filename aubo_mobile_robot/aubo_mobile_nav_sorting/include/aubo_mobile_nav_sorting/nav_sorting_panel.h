@@ -7,6 +7,8 @@
 #include <std_msgs/String.h>
 
 #include <QString>
+#include <aubo_mobile_nav_sorting/workstation_progress.h>
+#include <vector>
 
 class QCheckBox;
 class QDoubleSpinBox;
@@ -41,10 +43,11 @@ private Q_SLOTS:
   void showSortingState(const QString& text);
 
 private:
-  void callTrigger(ros::ServiceClient& client, const QString& command_name);
+  bool callTrigger(ros::ServiceClient& client, const QString& command_name);
   void missionStateCallback(const std_msgs::String::ConstPtr& message);
   void sortingStateCallback(const std_msgs::String::ConstPtr& message);
   void parameterUpdateCallback(const dynamic_reconfigure::Config::ConstPtr& message);
+  void updateWorkstationTable();
 
   ros::NodeHandle node_handle_;
   ros::ServiceClient start_client_;
@@ -73,6 +76,8 @@ private:
   QSpinBox* navigation_retries_;
   bool mission_busy_;
   QTableWidget* workstations_table_;
+  std::vector<std::string> workstation_ids_;
+  std::vector<WorkstationProgress> workstation_progress_;
   bool multi_workstation_{false};
 };
 

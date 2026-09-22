@@ -344,13 +344,13 @@ bool VisualServo::hybridControl(const JointPoint &feedback,
   }
   // Eye-in-hand has a mandatory preparation step: reach the configured wrist
   // camera viewpoint before accepting even an already visible target.
-  if (!hybrid_observation_complete_) {
+  if (!observation_complete_) {
     if (servo_mode_ != "eye_in_hand" || !initial_search_enabled_) {
-      hybrid_observation_complete_ = true;
+      observation_complete_ = true;
     } else if (jointDistance(feedback, initial_search_posture_) > 0.02) {
       return false;  // controlLoop selects SEARCH_INITIAL and drives the posture.
     } else {
-      hybrid_observation_complete_ = true;
+      observation_complete_ = true;
       holdFeedback(feedback);
       transitionTo(ServoState::WAITING);
       return true;

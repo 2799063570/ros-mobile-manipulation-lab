@@ -47,18 +47,18 @@ public:
   void start();
 
 private:
-  enum class State { 
-    DETECTING, 
-    ERROR, 
-    HOMING, 
-    IDLE, 
-    INITIALIZING, 
-    OBSERVING, 
-    OPENING, 
-    PICKING, 
-    PREPARING, 
-    READY, 
-    SORTING, 
+  enum class State {
+    DETECTING,
+    ERROR,
+    HOMING,
+    IDLE,
+    INITIALIZING,
+    OBSERVING,
+    OPENING,
+    PICKING,
+    PREPARING,
+    READY,
+    SORTING,
     STOPPED };
   // Detection messages keep arriving throughout arm motion.  Only frames from
   // geometrically useful parts of the trajectory may update the instance queue.
@@ -67,7 +67,7 @@ private:
 
   using GripperClient = actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction>;
 
-  struct TargetTrack     // 目标跟踪结构体 
+  struct TargetTrack     // 目标跟踪结构体
   {
     double x{0.0};
     double y{0.0};

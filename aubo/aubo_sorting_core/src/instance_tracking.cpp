@@ -1,4 +1,5 @@
 #include <aubo_sorting_core/sorting_task.hpp>
+#include <aubo_sorting_core/observation_tf.hpp>
 #include "task_utils.hpp"
 #include <tf/transform_datatypes.h>
 #include <chrono>
@@ -78,13 +79,14 @@ void SortingTask::processInstanceFrame(const aubo_perception::DetectedObjectArra
   if (vision_phase == QueueVisionPhase::MASKED) return;
   tf::StampedTransform source_to_target, target_to_table, place_to_target, gripper, camera;
   const auto lookup = [this, &stamp](const std::string& to, const std::string& from,
-                                   tf::StampedTransform& transform) {
-    transform.setIdentity();
-    if (to != from) tf_listener_.lookupTransform(to, from, stamp, transform);
+                                     bool allow_recent_world_lag,
+                                     tf::StampedTransform& transform) {
+    lookupObservationTransform(tf_listener_, to, from, stamp,
+                               allow_recent_world_lag, transform);
   };
-  lookup(target_frame_, message.header.frame_id, source_to_target);// 获取坐标系变换
-  lookup(table_frame_, target_frame_, target_to_table);
-  lookup(target_frame_, place_frame_, place_to_target);
+  lookup(target_frame_, message.header.frame_id, false, source_to_target);// 获取坐标系变换
+  lookup(table_frame_, target_frame_, true, target_to_table);
+  lookup(target_frame_, place_frame_, true, place_to_target);
   // 抓取前必须继续跟踪预留目标；夹爪靠近时提前过滤会使它在下降前过期。
   // 夹紧后才屏蔽夹爪邻域，避免手中物体再次入队。
   tf::Vector3 gripper_projection;
@@ -92,12 +94,12 @@ void SortingTask::processInstanceFrame(const aubo_perception::DetectedObjectArra
   // 是否需要屏蔽夹爪邻域 ： 抓取状态下 且 夹紧后
   const bool exclude_gripper = (state == State::PICKING && grasp_secured_.load());
   if (exclude_gripper) {
-    lookup(target_frame_, end_effector_link_, gripper);
+    lookup(target_frame_, end_effector_link_, false, gripper);
     if (message.sensor_frame.empty()) {
       queue_last_frame_ = ros::WallTime();
       return;
     }
-    lookup(target_frame_, message.sensor_frame, camera);
+    lookup(target_frame_, message.sensor_frame, false, camera);
     // 夹爪在目标坐标系 - 相机在目标坐标系下的射线方向  向量方向
     const auto ray = gripper.getOrigin() - camera.getOrigin();
     if (std::abs(ray.z()) > 1e-6) {

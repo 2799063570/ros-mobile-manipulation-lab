@@ -73,6 +73,10 @@ roslaunch aubo_ros_control eye_to_hand_visual_servo_real.launch \
 
 启动后也可以在共用 RViz“视觉伺服控制”面板的“跟踪目标”下拉框中切换红、绿、蓝；
 该选择通过 `/visual_servo/target_selection` 同时适用于眼在手上和眼在手外。
+点击“启动视觉伺服”后，眼在手上模式会先到达 `initial_search_posture` 观察位，
+即使目标已经出现在画面中，也会完成观察位动作后再跟踪。启用
+`hybrid_enabled:=true` 时，面板显示“启动两阶段流程”，并要求 MoveIt 规划服务与
+碰撞场景均就绪；普通视觉伺服模式会将这两项显示为“不使用”。
 眼在手上使用完整画面，`ignored_regions` 为空；眼在手外保留固定相机画面
 下方的机械臂屏蔽区，并在调试图中标记为 `ROBOT MASK`。
 Gazebo 腕部相机使用 `1280×720` 分辨率和 80° 水平视场角；真实相机的视场角由镜头和采集模式决定，

@@ -12,8 +12,10 @@
 #include <QDoubleSpinBox>
 #include <QFont>
 #include <QFormLayout>
+#include <QFrame>
 #include <QGridLayout>
 #include <QGroupBox>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QPushButton>
 #include <QScrollArea>
@@ -45,6 +47,8 @@ namespace aubo_ros_control
 
 VisualServoPanel::VisualServoPanel(QWidget* parent)
   : rviz::Panel(parent)
+  , title_label_(new QLabel())
+  , flow_label_(new QLabel())
   , target_combo_(new QComboBox())
   , servo_state_label_(new QLabel(tr("等待控制器...")))
   , perception_state_label_(new QLabel(tr("等待视觉识别...")))
@@ -66,11 +70,10 @@ VisualServoPanel::VisualServoPanel(QWidget* parent)
   , loss_strategy_(new QComboBox())
   , readiness_timer_(new QTimer(this))
 {
-  QLabel* title = new QLabel(tr("AUBO 路径规划 + 位置伺服"));
-  QFont title_font = title->font();
+  QFont title_font = title_label_->font();
   title_font.setBold(true);
   title_font.setPointSize(title_font.pointSize() + 2);
-  title->setFont(title_font);
+  title_label_->setFont(title_font);
 
   target_combo_->addItem(tr("红色目标"), "red");
   target_combo_->addItem(tr("绿色目标"), "green");
@@ -80,10 +83,7 @@ VisualServoPanel::VisualServoPanel(QWidget* parent)
   loss_strategy_->addItem(tr("短时衰减续行"), "coast");
   loss_strategy_->addItem(tr("续行后恢复观察"), "coast_then_open");
 
-  QLabel* flow = new QLabel(tr("准备：眼在手上先移动到观察位\n"
-                               "阶段 1：MoveIt 路径规划与接近\n"
-                               "阶段 2：视觉位置伺服与对齐"));
-  flow->setStyleSheet("color: #666666;");
+  flow_label_->setStyleSheet("color: #666666;");
   phase_label_->setAlignment(Qt::AlignCenter);
   phase_label_->setStyleSheet(
       "font-weight: bold; padding: 8px; border-radius: 3px; "
@@ -106,31 +106,40 @@ VisualServoPanel::VisualServoPanel(QWidget* parent)
   buttons->addWidget(reset_button_, 1, 0, 1, 2);
 
   QGroupBox* tuning_group = new QGroupBox(tr("在线动态调参"));
-  QFormLayout* tuning = new QFormLayout();
-  tuning->addRow(tr("位置增益"), linear_gain_);
-  tuning->addRow(tr("姿态增益"), angular_gain_);
-  tuning->addRow(tr("最大线速度 m/s"), max_linear_velocity_);
-  tuning->addRow(tr("最大角速度 rad/s"), max_angular_velocity_);
-  tuning->addRow(tr("位置死区 m"), position_deadband_);
-  tuning->addRow(tr("姿态死区 rad"), orientation_deadband_);
-  tuning->addRow(tr("目标超时 s"), target_timeout_);
-  tuning->addRow(tr("目标丢失策略"), loss_strategy_);
+  QFormLayout* left_tuning = new QFormLayout();
+  left_tuning->addRow(tr("位置增益"), linear_gain_);
+  left_tuning->addRow(tr("最大线速度 m/s"), max_linear_velocity_);
+  left_tuning->addRow(tr("位置死区 m"), position_deadband_);
+  left_tuning->addRow(tr("目标超时 s"), target_timeout_);
+  QFormLayout* right_tuning = new QFormLayout();
+  right_tuning->addRow(tr("姿态增益"), angular_gain_);
+  right_tuning->addRow(tr("最大角速度 rad/s"), max_angular_velocity_);
+  right_tuning->addRow(tr("姿态死区 rad"), orientation_deadband_);
+  right_tuning->addRow(tr("目标丢失策略"), loss_strategy_);
+  QHBoxLayout* tuning_fields = new QHBoxLayout();
+  tuning_fields->addLayout(left_tuning);
+  tuning_fields->addLayout(right_tuning);
   QPushButton* apply_button = new QPushButton(tr("应用参数"));
   QPushButton* refresh_button = new QPushButton(tr("读取当前值"));
   QGridLayout* tuning_buttons = new QGridLayout();
   tuning_buttons->addWidget(apply_button, 0, 0);
   tuning_buttons->addWidget(refresh_button, 0, 1);
-  tuning->addRow(tuning_buttons);
-  tuning->addRow(parameter_label_);
+  QVBoxLayout* tuning = new QVBoxLayout();
+  tuning->addLayout(tuning_fields);
+  tuning->addLayout(tuning_buttons);
+  tuning->addWidget(parameter_label_);
   tuning_group->setLayout(tuning);
-  QScrollArea* tuning_scroll = new QScrollArea();
-  tuning_scroll->setWidgetResizable(true);
-  tuning_scroll->setMaximumHeight(300);
-  tuning_scroll->setWidget(tuning_group);
 
-  QVBoxLayout* layout = new QVBoxLayout();
-  layout->addWidget(title);
-  layout->addWidget(flow);
+  QScrollArea* panel_scroll = new QScrollArea(this);
+  panel_scroll->setWidgetResizable(true);
+  panel_scroll->setFrameShape(QFrame::NoFrame);
+  panel_scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  QWidget* content = new QWidget(panel_scroll);
+  QVBoxLayout* layout = new QVBoxLayout(content);
+  layout->setContentsMargins(4, 4, 4, 4);
+  layout->setSpacing(4);
+  layout->addWidget(title_label_);
+  layout->addWidget(flow_label_);
   layout->addWidget(phase_label_);
   layout->addWidget(new QLabel(tr("系统就绪状态：")));
   layout->addWidget(readiness_label_);
@@ -143,10 +152,13 @@ VisualServoPanel::VisualServoPanel(QWidget* parent)
   layout->addWidget(new QLabel(tr("相机系目标位置：")));
   layout->addWidget(target_pose_label_);
   layout->addLayout(buttons);
-  layout->addWidget(tuning_scroll);
+  layout->addWidget(tuning_group);
   layout->addWidget(command_label_);
-  layout->addStretch();
-  setLayout(layout);
+  panel_scroll->setWidget(content);
+  QVBoxLayout* panel_layout = new QVBoxLayout();
+  panel_layout->setContentsMargins(0, 0, 0, 0);
+  panel_layout->addWidget(panel_scroll);
+  setLayout(panel_layout);
 
   servo_enable_client_ = node_handle_.serviceClient<std_srvs::SetBool>(
       "/visual_servo/set_enabled");
@@ -300,6 +312,20 @@ bool VisualServoPanel::callReset(ros::ServiceClient& client, QString* response)
 
 void VisualServoPanel::startServo()
 {
+  bool hybrid_enabled = false;
+  if (!node_handle_.getParam("/aubo_visual_servo/hybrid_enabled", hybrid_enabled))
+  {
+    command_label_->setText(tr("控制器参数尚未就绪，请等待节点启动"));
+    return;
+  }
+  if (!servo_enable_client_.exists() || !perception_enable_client_.exists() ||
+      (hybrid_enabled && (!planning_client_.exists() || !planning_scene_ready_.load())))
+  {
+    command_label_->setText(hybrid_enabled
+        ? tr("启动受阻：请先启动 MoveIt 并等待碰撞场景就绪")
+        : tr("启动受阻：控制器或视觉识别服务未就绪"));
+    return;
+  }
   selectTarget(target_combo_->currentText());
   QString perception_response;
   if (!setEnabled(perception_enable_client_, true, &perception_response))
@@ -315,8 +341,9 @@ void VisualServoPanel::startServo()
     command_label_->setText(tr("控制器启动失败：") + servo_response);
     return;
   }
-  command_label_->setText(
-      tr("流程已启动：发现目标后先规划接近，再自动切换到位置伺服"));
+  command_label_->setText(hybrid_enabled
+      ? tr("流程已启动：先到观察位，发现目标后规划接近并切换到位置伺服")
+      : tr("视觉伺服已启动：眼在手上会先移动到观察位，再等待目标"));
 }
 
 void VisualServoPanel::stopServo()
@@ -451,23 +478,44 @@ void VisualServoPanel::showTargetPose(const QString& text)
 
 void VisualServoPanel::updateReadiness()
 {
+  bool hybrid_enabled = false;
+  const bool mode_known = node_handle_.getParam(
+      "/aubo_visual_servo/hybrid_enabled", hybrid_enabled);
+  std::string servo_mode;
+  node_handle_.getParam("/aubo_visual_servo/servo_mode", servo_mode);
+  const bool eye_in_hand = servo_mode == "eye_in_hand";
+  title_label_->setText(hybrid_enabled ? tr("AUBO 路径规划 + 位置伺服")
+                                        : tr("AUBO 视觉位置伺服"));
+  flow_label_->setText(hybrid_enabled
+      ? (eye_in_hand ? tr("准备：先移动到腕部相机观察位\n"
+                          "阶段 1：MoveIt 路径规划与接近\n"
+                          "阶段 2：视觉位置伺服与对齐")
+                     : tr("阶段 1：MoveIt 路径规划与接近\n"
+                          "阶段 2：视觉位置伺服与对齐"))
+      : (eye_in_hand ? tr("启动后自动移动到腕部相机观察位，再视觉跟踪目标")
+                     : tr("启动后使用固定相机目标进行视觉位置伺服")));
+  start_button_->setText(hybrid_enabled ? tr("启动两阶段流程")
+                                         : tr("启动视觉伺服"));
   const bool planning_ready = planning_client_.exists();
   const bool scene_ready = planning_scene_ready_.load();
   const bool servo_ready = servo_enable_client_.exists();
   const bool perception_ready = perception_enable_client_.exists();
   readiness_label_->setText(
       QString(tr("规划 %1  |  碰撞场景 %2  |  控制 %3  |  感知 %4"))
-          .arg(planning_ready ? tr("就绪") : tr("未就绪"))
-          .arg(scene_ready ? tr("就绪") : tr("未就绪"))
+          .arg(!mode_known ? tr("待确认") : hybrid_enabled
+                   ? (planning_ready ? tr("就绪") : tr("未就绪")) : tr("不使用"))
+          .arg(!mode_known ? tr("待确认") : hybrid_enabled
+                   ? (scene_ready ? tr("就绪") : tr("未就绪")) : tr("不使用"))
           .arg(servo_ready ? tr("就绪") : tr("未就绪"))
           .arg(perception_ready ? tr("就绪") : tr("未就绪")));
   readiness_label_->setStyleSheet(
-      planning_ready && scene_ready && servo_ready && perception_ready
+      mode_known && (!hybrid_enabled || (planning_ready && scene_ready)) &&
+          servo_ready && perception_ready
           ? "color: #2d8a45; font-weight: bold;"
           : "color: #b33a3a; font-weight: bold;");
   start_button_->setEnabled(
-      planning_ready && scene_ready && servo_ready && perception_ready &&
-      !flow_active_);
+      mode_known && (!hybrid_enabled || (planning_ready && scene_ready)) &&
+      servo_ready && perception_ready && !flow_active_);
 }
 
 }  // namespace aubo_ros_control

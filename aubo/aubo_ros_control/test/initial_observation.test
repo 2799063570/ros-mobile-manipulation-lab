@@ -1,0 +1,18 @@
+<launch>
+  <param name="robot_description" textfile="$(find aubo_ros_control)/test/hybrid_test.urdf"/>
+  <node pkg="aubo_ros_control" type="aubo_visual_servo_node"
+        name="aubo_visual_servo" required="true">
+    <rosparam file="$(find aubo_ros_control)/config/visual_servo_common.yaml"/>
+    <param name="servo_mode" value="eye_in_hand"/>
+    <param name="camera_link" value="tcp_link"/>
+    <param name="control_link" value="tcp_link"/>
+    <param name="backend" value="gazebo"/>
+    <param name="initial_search_enabled" value="true"/>
+    <rosparam param="initial_search_posture">[0.12, 0.0, 0.0, 0.0, 0.0, 0.0]</rosparam>
+    <rosparam param="desired_target_position">[0.0, 0.0, 0.0]</rosparam>
+    <rosparam param="desired_target_rpy">[0.0, 0.0, 0.0]</rosparam>
+    <rosparam param="gazebo_command_topics">[/initial_observation/q0, /initial_observation/q1, /initial_observation/q2, /initial_observation/q3, /initial_observation/q4, /initial_observation/q5]</rosparam>
+  </node>
+  <test test-name="initial_observation" pkg="aubo_ros_control"
+        type="initial_observation_test.py" time-limit="30"/>
+</launch>
