@@ -2,7 +2,7 @@
 <package format="2">
   <name>aubo_mobile_sorting</name>
   <version>0.2.0</version>
-  <description>Gazebo camera-guided color block grasping and sorting with MoveIt.</description>
+  <description>Camera-guided color and YOLO object grasping and sorting with MoveIt.</description>
 
   <maintainer email="wheeltec-client@todo.todo">wheeltec-client</maintainer>
   <license>MIT</license>

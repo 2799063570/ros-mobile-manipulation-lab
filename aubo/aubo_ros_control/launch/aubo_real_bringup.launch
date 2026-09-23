@@ -3,6 +3,7 @@
   <!-- AUBO 真机完整启动入口：硬件接口、TF、MoveIt，以及可选 RViz。 -->
   <arg name="robot_ip" default="192.168.1.2"/>
   <arg name="use_rviz" default="true"/>
+  <arg name="rviz_config" default="$(find aubo_moveit_config)/launch/moveit.rviz"/>
   <arg name="robot_xacro" default="aubo_i5_with_camera.xacro"/>
   <arg name="robot_srdf" default="aubo_i5_with_camera.srdf"/>
   <arg name="use_sensor_manager" default="false"/>
@@ -45,6 +46,6 @@
 
   <include if="$(arg use_rviz)"
            file="$(find aubo_moveit_config)/launch/moveit_rviz.launch">
-    <arg name="rviz_config" value="$(find aubo_moveit_config)/launch/moveit.rviz"/>
+    <arg name="rviz_config" value="$(arg rviz_config)"/>
   </include>
 </launch>

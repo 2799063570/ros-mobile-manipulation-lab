@@ -21,6 +21,12 @@ roslaunch aubo_mobile_bringup simulation.launch mode:=sorting
 
 调试本模块时，原入口 `roslaunch aubo_mobile_sorting sorting_gazebo.launch` 仍可使用。
 
+RViz 默认加载 `aubo_mobile_moveit_config/config/aubo_mobile_sort.rviz`，面板的「目标类别与数量」
+来自 `/sorting/detection_summary`，可同时显示颜色名称和 YOLO 类别；识别图像统一来自
+`/sorting/debug_image`。使用 YOLO 时可启动
+`roslaunch aubo_mobile_sorting sorting_gazebo.launch perception_mode:=yolo yolo_model:=/实际路径/模型.pt`。
+仿真场景中的物体需要与模型训练类别匹配，类别到放置点的映射在 `config/yolo_sorting.yaml` 中配置。
+
 分拣任务默认启动通用 C++ 可执行文件 `sorting_task_cpp`。历史名称
 `color_sorting_task_cpp` 仍可通过
 `task_executable:=color_sorting_task_cpp` 显式选择；两者运行同一套 `SortingTask`

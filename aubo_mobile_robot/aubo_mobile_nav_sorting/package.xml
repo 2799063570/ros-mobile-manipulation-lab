@@ -2,7 +2,7 @@
 <package format="2">
   <name>aubo_mobile_nav_sorting</name>
   <version>0.1.0</version>
-  <description>Navigation-to-workstation and color-sorting mission for the AUBO mobile manipulator.</description>
+  <description>Navigation-to-workstation and color or YOLO sorting mission for the AUBO mobile manipulator.</description>
 
   <maintainer email="wheeltec-client@todo.todo">wheeltec-client</maintainer>
   <license>MIT</license>

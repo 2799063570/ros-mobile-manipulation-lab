@@ -26,6 +26,10 @@ roslaunch aubo_sorting yolo_sorting_gazebo.launch
 roslaunch aubo_sorting sorting_gazebo.launch detector:=yolo
 ```
 
+分拣仿真和实机入口默认加载 `config/sorting.rviz`。RViz 中的「分拣识别结果（颜色 / YOLO）」
+统一订阅 `/sorting/debug_image`：颜色模式显示 HSV 检测框，YOLO 模式显示模型预测类别和框。
+可用 `rviz_config:=/实际路径/配置.rviz` 覆盖界面；`debug_view:=true` 仍会额外打开独立图像窗口。
+
 YOLO 示例使用 `can` 类别，罐体直径 5 cm、轴向长度 10 cm，默认平躺在桌面，类别映射到 Gazebo
 模型 `beverage_can`。感知与任务同步使用竖直高度 `object_height=0.05`，中心 Z 为 0.125 m；
 默认使用 OBB 短边方向抓取，不加载彩色分拣垫。默认权重 GC-yolo.pt 的类别为 bottle/can/box，无需将颜色名当作类别。

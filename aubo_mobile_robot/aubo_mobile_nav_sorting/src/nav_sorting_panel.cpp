@@ -70,6 +70,7 @@ NavSortingPanel::NavSortingPanel(QWidget* parent)
   : rviz::Panel(parent)
   , mission_state_label_(new QLabel(tr("等待 nav_sorting 节点...")))
   , sorting_state_label_(new QLabel(tr("等待 sorting 节点...")))
+  , detections_label_(new QLabel(tr("等待目标检测结果...")))
   , command_label_(new QLabel(tr("任务空闲时可以应用新参数")))
   , start_button_(new QPushButton(tr("开始导航分拣")))
   , stop_button_(new QPushButton(tr("停止当前任务")))
@@ -104,6 +105,7 @@ NavSortingPanel::NavSortingPanel(QWidget* parent)
   base_clearance_->setSuffix(tr(" 米"));
   mission_state_label_->setWordWrap(true);
   sorting_state_label_->setWordWrap(true);
+  detections_label_->setWordWrap(true);
   command_label_->setWordWrap(true);
 
   QHBoxLayout* command_buttons = new QHBoxLayout();
@@ -143,6 +145,8 @@ NavSortingPanel::NavSortingPanel(QWidget* parent)
   layout->addWidget(mission_state_label_);
   layout->addWidget(new QLabel(tr("抓取子任务状态：")));
   layout->addWidget(sorting_state_label_);
+  layout->addWidget(new QLabel(tr("目标类别与数量（颜色 / YOLO）：")));
+  layout->addWidget(detections_label_);
   layout->addLayout(command_buttons);
   layout->addWidget(workstations_table_);
   layout->addWidget(parameters_group);
@@ -159,6 +163,8 @@ NavSortingPanel::NavSortingPanel(QWidget* parent)
       "/nav_sorting/state", 1, &NavSortingPanel::missionStateCallback, this);
   sorting_state_subscriber_ = node_handle_.subscribe(
       "/sorting/state", 1, &NavSortingPanel::sortingStateCallback, this);
+  detections_subscriber_ = node_handle_.subscribe(
+      "/sorting/detection_summary", 1, &NavSortingPanel::detectionsCallback, this);
   parameter_subscriber_ = node_handle_.subscribe(
       "/nav_sorting_mission/parameter_updates", 1,
       &NavSortingPanel::parameterUpdateCallback, this);
@@ -173,6 +179,8 @@ NavSortingPanel::NavSortingPanel(QWidget* parent)
           SLOT(showMissionState(QString)), Qt::QueuedConnection);
   connect(this, SIGNAL(sortingStateReceived(QString)), this,
           SLOT(showSortingState(QString)), Qt::QueuedConnection);
+  connect(this, SIGNAL(detectionsReceived(QString)), this,
+          SLOT(showDetections(QString)), Qt::QueuedConnection);
 
   goal_x_->setValue(2.15);
   pre_dock_x_->setValue(1.85);
@@ -393,6 +401,11 @@ void NavSortingPanel::sortingStateCallback(const std_msgs::String::ConstPtr& mes
   Q_EMIT sortingStateReceived(QString::fromStdString(message->data));
 }
 
+void NavSortingPanel::detectionsCallback(const std_msgs::String::ConstPtr& message)
+{
+  Q_EMIT detectionsReceived(QString::fromStdString(message->data));
+}
+
 void NavSortingPanel::showMissionState(const QString& text)
 {
   const QString code = text.section('|', 0, 0).trimmed();
@@ -433,6 +446,11 @@ void NavSortingPanel::showMissionState(const QString& text)
 void NavSortingPanel::showSortingState(const QString& text)
 {
   sorting_state_label_->setText(text);
+}
+
+void NavSortingPanel::showDetections(const QString& text)
+{
+  detections_label_->setText(text);
 }
 
 }  // namespace aubo_mobile_nav_sorting

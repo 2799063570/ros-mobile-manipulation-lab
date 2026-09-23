@@ -25,7 +25,7 @@
   <arg name="task_config" default="$(eval find('aubo_sorting') + ('/config/yolo_sorting.yaml' if arg('detector') == 'yolo' else '/config/sorting.yaml'))"/>
   <arg name="colors_config" default="$(find aubo_sorting)/config/colors.yaml"/>
   <arg name="yolo_config" default="$(find aubo_perception)/config/ultralytics_yolo.yaml"/>
-  <arg name="debug_image_topic" default="$(eval '/sorting/debug_image' if arg('detector') == 'color' else '/yolo/annotated_image')"/>
+  <arg name="debug_image_topic" default="/sorting/debug_image"/>
   <arg name="perception_config" default="$(find aubo_perception)/config/grasp_pipeline.yaml"/>
   <arg name="python" default="/home/zlab/anaconda3/envs/yolo/bin/python"/>
   <arg name="model_path" default="/home/zlab/deepL/code/ultralytics-main-modify/weights/GC-yolo.pt"/>
@@ -41,6 +41,7 @@
     <arg name="config" value="$(arg perception_config)"/>
     <arg name="python" value="$(arg python)"/>
     <arg name="model_path" value="$(arg model_path)"/>
+    <arg name="annotated_image_topic" value="$(arg debug_image_topic)"/>
   </include>
 
   <node if="$(arg start_task)" pkg="aubo_sorting_core"

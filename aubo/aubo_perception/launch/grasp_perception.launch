@@ -28,6 +28,7 @@
   <arg name="target_frame" default="base_link"/>
   <!-- 话题接口：二维框是内部中间结果，detections_topic 为分拣三维目标数组。 -->
   <arg name="boxes_topic" default="/perception/boxes"/>
+  <arg name="annotated_image_topic" default="/yolo/annotated_image"/>
   <arg name="detections_topic" default="/sorting/detections"/>
   <arg name="image_topic" default="$(arg camera_namespace)/color/image_raw"/>
   <arg name="depth_topic" default="$(arg camera_namespace)/aligned_depth_to_color/image_raw"/>
@@ -44,6 +45,7 @@
       <arg name="model_path" value="$(arg model_path)"/>
       <arg name="image_topic" value="$(arg image_topic)"/>
       <arg name="detections_topic" value="$(arg boxes_topic)"/>
+      <arg name="annotated_image_topic" value="$(arg annotated_image_topic)"/>
     </include>
   </group>
   <!-- 颜色分支：HSV 分割与轮廓筛选，boxes 模式只提取二维旋转框；调试图像为 /sorting/debug_image。 -->

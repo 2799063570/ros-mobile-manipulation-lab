@@ -45,7 +45,7 @@ namespace aubo_mobile_sorting
 SortingPanel::SortingPanel(QWidget* parent)
   : rviz::Panel(parent)
   , state_label_(new QLabel(tr("等待分拣节点...")))
-  , detections_label_(new QLabel(tr("红:0  绿:0  蓝:0")))
+  , detections_label_(new QLabel(tr("等待目标检测结果...")))
   , command_label_(new QLabel(tr("请先移动到观察位并确认图像")))
   , parameter_label_(new QLabel(tr("等待动态参数服务...")))
   , detection_timeout_(parameterBox(1.0, 120.0, 1.0, 1))
@@ -107,7 +107,7 @@ SortingPanel::SortingPanel(QWidget* parent)
   layout->addWidget(title);
   layout->addWidget(new QLabel(tr("运行状态：")));
   layout->addWidget(state_label_);
-  layout->addWidget(new QLabel(tr("相机识别：")));
+  layout->addWidget(new QLabel(tr("目标类别与数量（颜色 / YOLO）：")));
   layout->addWidget(detections_label_);
   layout->addLayout(button_layout);
   layout->addWidget(tuning_scroll);

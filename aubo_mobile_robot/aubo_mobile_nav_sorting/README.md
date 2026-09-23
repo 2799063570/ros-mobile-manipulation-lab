@@ -60,6 +60,11 @@ roslaunch aubo_mobile_bringup simulation.launch mode:=mission
 调试本场景时仍可直接运行
 `roslaunch aubo_mobile_nav_sorting mission_gazebo.launch`。
 
+导航分拣入口默认加载 `config/navigation_sorting.rviz`，保留地图与导航工具，并显示
+`/sorting/debug_image` 的颜色检测框或 YOLO 类别标注。面板中的「目标类别与数量」
+订阅 `/sorting/detection_summary`。`navigation_sorting.launch`、`mission_gazebo.launch`
+和 `four_tables_gazebo.launch` 均可通过 `rviz_config:=/实际路径/配置.rviz` 覆盖界面。
+
 该仿真场景在源方块正上方 `(x=2.82, y=0, z=2.0 m)` 单独加载一台垂直向下的
 RGB-D 相机。相机固定在场景中，不连接移动底盘，也不修改通用机器人 URDF；机器人
 导航时，相机通过 `map` 坐标系保持固定。

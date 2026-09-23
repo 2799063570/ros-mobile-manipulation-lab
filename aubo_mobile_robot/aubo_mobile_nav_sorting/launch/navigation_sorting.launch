@@ -8,6 +8,7 @@
   <arg name="depth_save_directory" default="$(env HOME)/sorting_depth"/>
   <arg name="map_file" default="$(find aubo_mobile_nav_sorting)/maps/nav_sorting.yaml"/>
   <arg name="rviz" default="true"/>
+  <arg name="rviz_config" default="$(find aubo_mobile_nav_sorting)/config/navigation_sorting.rviz"/>
   <arg name="debug_view" default="false"/>
   <arg name="sorting_config" default="$(find aubo_mobile_sorting)/config/sorting.yaml"/>
   <arg name="auto_start" default="false"/>
@@ -40,6 +41,7 @@
   <include file="$(find aubo_mobile_navigation)/launch/navigation.launch">
     <arg name="map_file" value="$(arg map_file)"/>
     <arg name="rviz" value="$(arg rviz)"/>
+    <arg name="rviz_config" value="$(arg rviz_config)"/>
   </include>
 
   <include file="$(find aubo_mobile_moveit_config)/launch/move_group.launch">

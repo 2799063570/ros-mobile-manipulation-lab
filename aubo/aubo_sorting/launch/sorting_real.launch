@@ -8,6 +8,7 @@
   <arg name="start_gripper" default="true"/>
   <arg name="gripper_port" default="/dev/ttyUSB0"/>
   <arg name="rviz" default="true"/>
+  <arg name="rviz_config" default="$(find aubo_sorting)/config/sorting.rviz"/>
 
   <arg name="detector" default="color" doc="color | yolo"/>
   <arg name="camera_mount" default="eye_in_hand" doc="eye_in_hand | eye_to_hand"/>
@@ -37,6 +38,7 @@
   <include file="$(find aubo_ros_control)/launch/aubo_real_bringup.launch">
     <arg name="robot_ip" value="$(arg robot_ip)"/>
     <arg name="use_rviz" value="$(arg rviz)"/>
+    <arg name="rviz_config" value="$(arg rviz_config)"/>
     <arg name="robot_xacro" value="$(arg robot_xacro)"/>
     <arg name="robot_srdf" value="$(arg robot_srdf)"/>
   </include>

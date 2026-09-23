@@ -21,6 +21,7 @@
   <arg name="world" default="$(eval find('aubo_sorting') + ('/worlds/yolo_sorting.world' if arg('detector') == 'yolo' else '/worlds/sorting.world'))"/>
   <arg name="gui" default="true"/>
   <arg name="rviz" default="true"/>
+  <arg name="rviz_config" default="$(find aubo_sorting)/config/sorting.rviz"/>
   <arg name="debug_view" default="false"/>
   <arg name="paused" default="false"/>
   <arg name="auto_move_to_observation" default="true"/>
@@ -96,6 +97,6 @@
   </include>
 
   <include if="$(arg rviz)" file="$(find aubo_moveit_config)/launch/moveit_rviz.launch">
-    <arg name="rviz_config" value="$(find aubo_moveit_config)/launch/moveit.rviz"/>
+    <arg name="rviz_config" value="$(arg rviz_config)"/>
   </include>
 </launch>

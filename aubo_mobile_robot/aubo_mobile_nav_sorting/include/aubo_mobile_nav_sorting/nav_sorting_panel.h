@@ -30,6 +30,7 @@ public:
 Q_SIGNALS:
   void missionStateReceived(const QString& text);
   void sortingStateReceived(const QString& text);
+  void detectionsReceived(const QString& text);
   void parametersChanged();
 
 private Q_SLOTS:
@@ -41,11 +42,13 @@ private Q_SLOTS:
   void readParameters();
   void showMissionState(const QString& text);
   void showSortingState(const QString& text);
+  void showDetections(const QString& text);
 
 private:
   bool callTrigger(ros::ServiceClient& client, const QString& command_name);
   void missionStateCallback(const std_msgs::String::ConstPtr& message);
   void sortingStateCallback(const std_msgs::String::ConstPtr& message);
+  void detectionsCallback(const std_msgs::String::ConstPtr& message);
   void parameterUpdateCallback(const dynamic_reconfigure::Config::ConstPtr& message);
   void updateWorkstationTable();
 
@@ -56,10 +59,12 @@ private:
   ros::ServiceClient reconfigure_client_;
   ros::Subscriber mission_state_subscriber_;
   ros::Subscriber sorting_state_subscriber_;
+  ros::Subscriber detections_subscriber_;
   ros::Subscriber parameter_subscriber_;
 
   QLabel* mission_state_label_;
   QLabel* sorting_state_label_;
+  QLabel* detections_label_;
   QLabel* command_label_;
   QPushButton* start_button_;
   QPushButton* stop_button_;
