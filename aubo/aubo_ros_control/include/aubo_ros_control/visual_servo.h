@@ -150,7 +150,7 @@ private:
   std::string backend_, servo_mode_, base_link_, camera_link_, control_link_;
   std::string target_topic_, state_topic_, joint_states_topic_, loss_strategy_;
   std::vector<std::string> joint_names_, gazebo_topics_;
-  double feedback_rate_{50.0}, control_rate_{50.0}, output_rate_{250.0};
+  double feedback_rate_{50.0}, control_rate_{50.0}, output_rate_{200.0};
   double linear_gain_{0.8}, angular_gain_{0.5};
   double max_linear_velocity_{0.08}, max_angular_velocity_{0.2};
   double position_deadband_{0.004}, dls_lambda_{0.04},

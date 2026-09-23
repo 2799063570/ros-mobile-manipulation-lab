@@ -5,10 +5,10 @@ target_topic: /visual_servo/target_pose
 state_topic: /visual_servo/state
 joint_states_topic: /joint_states
 start_enabled: false
-# 统一调度：视觉闭环 20 ms，轨迹插值/伺服下发 4 ms。
+# 统一调度：视觉闭环 20 ms，轨迹插值/伺服路点 5 ms。
 feedback_rate: 50.0
 control_rate: 50.0
-output_rate: 250.0
+output_rate: 200.0
 
 linear_gain: 0.8
 angular_gain: 0.5

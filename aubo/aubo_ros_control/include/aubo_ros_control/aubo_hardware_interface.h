@@ -50,8 +50,14 @@ namespace aubo_ros_control
 /// 关节数
 static constexpr int NUM_JOINTS = aubo_robot_namespace::ARM_DOF;  // 6
 
-/// TCP2CANBUS MAC 缓冲区目标大小（与 aubo_driver.cpp publishWaypointToRobot 一致）
-static constexpr int EXPECT_MAC_BUF_SIZE = 400;
+/// TCP2CANBUS MAC 缓冲区目标大小。诊断值按关节标量计数，60 约为
+/// 10 个路点（50 ms @ 200 Hz）。标准 ros_control 轨迹控制器会实时检查
+/// path tolerance，不能照搬旧驱动的 400（约 335 ms），否则实机反馈
+/// 长期落后于期望状态。
+static constexpr int DEFAULT_MAC_BUF_SIZE = 120;
+
+/// 首次轨迹下发前累积的 5 ms 路点数，避免控制柜缓冲欠载。
+static constexpr int DEFAULT_TRAJECTORY_PRELOAD_POINTS = 20;
 
 /// 最小缓冲区阈值（参照 aubo_driver.h MINIMUM_BUFFER_SIZE）
 static constexpr int MINIMUM_BUFFER_SIZE = 300;
@@ -59,14 +65,16 @@ static constexpr int MINIMUM_BUFFER_SIZE = 300;
 /// 点位去重阈值（来自 aubo_driver.h THRESHHOLD）
 static constexpr double THRESHHOLD = 0.000001;
 
-/// 速度不一致判断阈值（来自 tryPopWaypoint: < 0.00015 rad 视为相同点）
-static constexpr double SAME_POINT_THRESHOLD = 0.00015;
+/// 只去除数值上重复的点。JointTrajectoryController 输出的小步进也是
+/// 有效样条点；使用旧驱动的 0.00015 rad 阈值会把低速轨迹量化成台阶。
+static constexpr double SAME_POINT_THRESHOLD = THRESHHOLD;
 
-/// ros_control/轨迹点读写的统一默认频率。
-static constexpr double DEFAULT_CONTROL_FREQUENCY_HZ = 250.0;
+/// AUBO TCP2CANBUS 每个路点的固定周期为 5 ms。命令生成频率必须
+/// 与消费频率一致，否则轨迹会被时间拉伸并触发 path tolerance。
+static constexpr double DEFAULT_CONTROL_FREQUENCY_HZ = 200.0;
 
-/// 喂点线程休眠间隔 4ms（来自 aubo_driver.cpp publishWaypointToRobot）
-static constexpr int FEED_THREAD_SLEEP_MS = 4;
+/// 喂点线程需比 5 ms 控制周期更快地检查欠载。
+static constexpr int FEED_THREAD_SLEEP_MS = 1;
 
 /// 最大连接重试次数（来自 aubo_driver.cpp connectToRobotController）
 static constexpr int MAX_CONNECT_RETRIES = 5;
@@ -249,6 +257,8 @@ private:
     double command_deadband_;
     double max_command_step_scale_;
     double control_period_s_;          ///< 与 control_frequency 对应的命令周期
+    int mac_buffer_target_;            ///< MAC 缓冲目标（SDK 关节标量计数）
+    int trajectory_preload_points_;    ///< 首次发送前的软件队列预装路点数
 
     // -------------------------------------------------------------------------
     // 机器人诊断（对应 aubo_driver.cpp rs.robot_diagnosis_info_）
