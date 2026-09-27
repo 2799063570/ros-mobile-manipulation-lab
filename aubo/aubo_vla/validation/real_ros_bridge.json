@@ -1,0 +1,180 @@
+{
+  "passed": true,
+  "samples": [
+    {
+      "status": "observed",
+      "observation_only": true,
+      "result": {
+        "model": "openvla/openvla-7b",
+        "revision": "47a0ec7fc4ec123775a391911046cf33cf9ed83f",
+        "unnorm_key": "bridge_orig",
+        "mock": false,
+        "observation_only": true,
+        "attention": "eager",
+        "quantization": "nf4",
+        "compute_dtype": "bfloat16",
+        "torch": "2.9.1+cu128",
+        "cuda": "12.8",
+        "gpu": "NVIDIA GeForce RTX 5060 Ti",
+        "model_dtype": "torch.bfloat16",
+        "load_peak_allocated_mib": 4207.31640625,
+        "request_id": "4fa1b850-4420-4ff4-b6b5-ef4723440d3e",
+        "stamp": 4276.92,
+        "frame_id": "workspace_camera_color_optical_frame",
+        "action": [
+          -0.0028928782168556808,
+          -0.009813157307751078,
+          0.001577533126315641,
+          -0.003970446181063694,
+          -0.012168297867564626,
+          0.004768682880728764,
+          0.996078431372549
+        ],
+        "inference_ms": 345.4868629996781,
+        "peak_allocated_mib": 4510.98828125,
+        "reserved_mib": 4620.0
+      },
+      "http_ms": 354.7300520003773
+    },
+    {
+      "status": "observed",
+      "observation_only": true,
+      "result": {
+        "model": "openvla/openvla-7b",
+        "revision": "47a0ec7fc4ec123775a391911046cf33cf9ed83f",
+        "unnorm_key": "bridge_orig",
+        "mock": false,
+        "observation_only": true,
+        "attention": "eager",
+        "quantization": "nf4",
+        "compute_dtype": "bfloat16",
+        "torch": "2.9.1+cu128",
+        "cuda": "12.8",
+        "gpu": "NVIDIA GeForce RTX 5060 Ti",
+        "model_dtype": "torch.bfloat16",
+        "load_peak_allocated_mib": 4207.31640625,
+        "request_id": "2cf90aff-9af5-4130-9710-7fdca5af9d7c",
+        "stamp": 4278.32,
+        "frame_id": "workspace_camera_color_optical_frame",
+        "action": [
+          -0.0028928782168556808,
+          -0.009813157307751078,
+          0.001577533126315641,
+          -0.011633576927231923,
+          -0.02757518613163165,
+          -0.009737499782852183,
+          0.996078431372549
+        ],
+        "inference_ms": 346.6502390001551,
+        "peak_allocated_mib": 4510.98828125,
+        "reserved_mib": 4620.0
+      },
+      "http_ms": 356.2460639996061
+    },
+    {
+      "status": "observed",
+      "observation_only": true,
+      "result": {
+        "model": "openvla/openvla-7b",
+        "revision": "47a0ec7fc4ec123775a391911046cf33cf9ed83f",
+        "unnorm_key": "bridge_orig",
+        "mock": false,
+        "observation_only": true,
+        "attention": "eager",
+        "quantization": "nf4",
+        "compute_dtype": "bfloat16",
+        "torch": "2.9.1+cu128",
+        "cuda": "12.8",
+        "gpu": "NVIDIA GeForce RTX 5060 Ti",
+        "model_dtype": "torch.bfloat16",
+        "load_peak_allocated_mib": 4207.31640625,
+        "request_id": "412e59a4-374b-4e3f-9d98-2f622c0fae58",
+        "stamp": 4279.671,
+        "frame_id": "workspace_camera_color_optical_frame",
+        "action": [
+          -0.0028928782168556808,
+          -0.009813157307751078,
+          0.001577533126315641,
+          -0.011633576927231923,
+          -0.02757518613163165,
+          0.016051269396847284,
+          0.996078431372549
+        ],
+        "inference_ms": 346.2688319996232,
+        "peak_allocated_mib": 4510.98828125,
+        "reserved_mib": 4620.0
+      },
+      "http_ms": 357.8831770000761
+    },
+    {
+      "status": "observed",
+      "observation_only": true,
+      "result": {
+        "model": "openvla/openvla-7b",
+        "revision": "47a0ec7fc4ec123775a391911046cf33cf9ed83f",
+        "unnorm_key": "bridge_orig",
+        "mock": false,
+        "observation_only": true,
+        "attention": "eager",
+        "quantization": "nf4",
+        "compute_dtype": "bfloat16",
+        "torch": "2.9.1+cu128",
+        "cuda": "12.8",
+        "gpu": "NVIDIA GeForce RTX 5060 Ti",
+        "model_dtype": "torch.bfloat16",
+        "load_peak_allocated_mib": 4207.31640625,
+        "request_id": "a06a6830-2c2b-4669-b24d-b84bd78e0ecb",
+        "stamp": 4281.021,
+        "frame_id": "workspace_camera_color_optical_frame",
+        "action": [
+          -0.0028928782168556808,
+          -0.009813157307751078,
+          0.001577533126315641,
+          -0.011633576927231923,
+          -0.02757518613163165,
+          0.016051269396847284,
+          0.996078431372549
+        ],
+        "inference_ms": 344.4969239999409,
+        "peak_allocated_mib": 4510.98828125,
+        "reserved_mib": 4620.0
+      },
+      "http_ms": 354.20208899995487
+    },
+    {
+      "status": "observed",
+      "observation_only": true,
+      "result": {
+        "model": "openvla/openvla-7b",
+        "revision": "47a0ec7fc4ec123775a391911046cf33cf9ed83f",
+        "unnorm_key": "bridge_orig",
+        "mock": false,
+        "observation_only": true,
+        "attention": "eager",
+        "quantization": "nf4",
+        "compute_dtype": "bfloat16",
+        "torch": "2.9.1+cu128",
+        "cuda": "12.8",
+        "gpu": "NVIDIA GeForce RTX 5060 Ti",
+        "model_dtype": "torch.bfloat16",
+        "load_peak_allocated_mib": 4207.31640625,
+        "request_id": "e3c83a3e-a950-45de-9041-7aa71de86741",
+        "stamp": 4282.371,
+        "frame_id": "workspace_camera_color_optical_frame",
+        "action": [
+          -0.0028928782168556808,
+          -0.009813157307751078,
+          0.001577533126315641,
+          -0.011633576927231923,
+          -0.02757518613163165,
+          0.016051269396847284,
+          0.996078431372549
+        ],
+        "inference_ms": 344.66324799996073,
+        "peak_allocated_mib": 4510.98828125,
+        "reserved_mib": 4620.0
+      },
+      "http_ms": 355.0067050000507
+    }
+  ]
+}

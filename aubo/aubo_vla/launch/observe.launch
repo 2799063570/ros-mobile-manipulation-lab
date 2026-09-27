@@ -1,0 +1,12 @@
+<launch>
+  <arg name="instruction" default="pick up the red block"/>
+  <arg name="image_topic" default="/workspace_camera/color/image_raw"/>
+  <arg name="timeout" default="30.0"/>
+  <arg name="max_age" default="30.0"/>
+  <node pkg="aubo_vla" type="observe_bridge.py" name="openvla_observe" output="screen">
+    <param name="instruction" value="$(arg instruction)"/>
+    <param name="image_topic" value="$(arg image_topic)"/>
+    <param name="timeout" value="$(arg timeout)"/>
+    <param name="max_age" value="$(arg max_age)"/>
+  </node>
+</launch>
