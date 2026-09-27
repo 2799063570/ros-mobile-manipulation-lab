@@ -7,7 +7,11 @@
   <arg name="username" default="aubo"/>
   <arg name="password" default="123456"/>
   <arg name="collision_class" default="6"/>
-  <arg name="control_frequency" default="250.0"/>
+  <!-- TCP2CANBUS 路点周期是 5 ms，必须以 200 Hz 生成命令。 -->
+  <arg name="control_frequency" default="200.0"/>
+  <!-- SDK 按 6 个关节标量计数：120 = 20 个路点 = 约 100 ms。 -->
+  <arg name="mac_buffer_target" default="120"/>
+  <arg name="trajectory_preload_points" default="20"/>
   <!-- true: ros_control/MoveIt 接管运动；false: 仅读取状态，运动由示教器控制。 -->
   <arg name="enable_motion_control" default="true"/>
   <arg name="load_robot_description" default="true"/>
@@ -37,12 +41,15 @@
       <param name="password" value="$(arg password)"/>
       <param name="collision_class" value="$(arg collision_class)"/>
       <param name="control_frequency" value="$(arg control_frequency)"/>
+      <param name="mac_buffer_target" value="$(arg mac_buffer_target)"/>
+      <param name="trajectory_preload_points" value="$(arg trajectory_preload_points)"/>
       <param name="require_real_robot" value="$(arg require_real_robot)"/>
       <!-- 是否由 ros_control 接管真机运动；硬件节点异常退出时 required 会终止整个 launch。 -->
       <param name="enable_motion_control" value="$(arg enable_motion_control)"/>
-      <param name="enable_command_smoothing" value="true"/>
-      <param name="command_filter_alpha" value="0.25"/>
-      <param name="command_deadband" value="0.0005"/>
+      <!-- JointTrajectoryController 已输出平滑样条，避免二次滤波造成滞后。 -->
+      <param name="enable_command_smoothing" value="false"/>
+      <param name="command_filter_alpha" value="1.0"/>
+      <param name="command_deadband" value="0.000001"/>
       <param name="max_command_step_scale" value="1.0"/>
       <rosparam param="joint_names">
         [shoulder_joint, upperArm_joint, foreArm_joint,

@@ -15,7 +15,7 @@
  * 用法：
  *  roslaunch aubo_ros_control aubo_control.launch \
  *    server_host:=192.168.1.2 \
- *    control_frequency:=250.0
+ *    control_frequency:=200.0
  *
  *  teach_pendant 模式：
  *  roslaunch aubo_ros_control teach_pendant.launch \
@@ -43,8 +43,8 @@ int main(int argc, char** argv)
 
     // ------------------------------------------------------------------
     // 控制频率（主循环驱动 controller_manager）
-    // aubo_driver.cpp UPDATE_RATE_ = 500 Hz，但主循环与喂点线程分离，
-    // 此处设为 250 Hz（4ms 周期，硬件接口读取同一参数用于限速/插值）
+    // TCP2CANBUS 固定以 5 ms 消费一个路点，控制器和硬件接口
+    // 读取同一个 200 Hz 参数，避免生产/消费节拍失配。
     // ------------------------------------------------------------------
     double control_freq = aubo_ros_control::DEFAULT_CONTROL_FREQUENCY_HZ;
     nh_priv.param<double>("control_frequency", control_freq,

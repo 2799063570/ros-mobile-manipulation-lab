@@ -47,11 +47,13 @@ AuboHardwareInterface::AuboHardwareInterface(ros::NodeHandle& nh)
     , require_real_robot_(true)
     , shutdown_started_(false)
     , collision_class_(6)
-    , enable_command_smoothing_(true)
-    , command_filter_alpha_(0.25)
-    , command_deadband_(0.0005)
+    , enable_command_smoothing_(false)
+    , command_filter_alpha_(1.0)
+    , command_deadband_(0.000001)
     , max_command_step_scale_(1.0)
     , control_period_s_(1.0 / DEFAULT_CONTROL_FREQUENCY_HZ)
+    , mac_buffer_target_(DEFAULT_MAC_BUF_SIZE)
+    , trajectory_preload_points_(DEFAULT_TRAJECTORY_PRELOAD_POINTS)
 {
     joint_position_.fill(0.0);
     joint_velocity_.fill(0.0);
@@ -103,10 +105,15 @@ bool AuboHardwareInterface::init()
     nh_.param<int>        ("collision_class", collision_class_, 6);
     nh_.param<bool>       ("enable_motion_control", enable_motion_control_, true);
     nh_.param<bool>       ("require_real_robot", require_real_robot_, true);
-    nh_.param<bool>       ("enable_command_smoothing", enable_command_smoothing_, true);
-    nh_.param<double>     ("command_filter_alpha", command_filter_alpha_, 0.25);
-    nh_.param<double>     ("command_deadband", command_deadband_, 0.0005);
+    // JointTrajectoryController 已按轨迹时间做三次样条插值。再次低通和
+    // 大死区会造成相位滞后与台阶命令，从而导致抖动和跟踪超差。
+    nh_.param<bool>       ("enable_command_smoothing", enable_command_smoothing_, false);
+    nh_.param<double>     ("command_filter_alpha", command_filter_alpha_, 1.0);
+    nh_.param<double>     ("command_deadband", command_deadband_, 0.000001);
     nh_.param<double>     ("max_command_step_scale", max_command_step_scale_, 1.0);
+    nh_.param<int>        ("mac_buffer_target", mac_buffer_target_, DEFAULT_MAC_BUF_SIZE);
+    nh_.param<int>        ("trajectory_preload_points", trajectory_preload_points_,
+                           DEFAULT_TRAJECTORY_PRELOAD_POINTS);
     double control_frequency_hz = DEFAULT_CONTROL_FREQUENCY_HZ;
     nh_.param<double>     ("control_frequency", control_frequency_hz,
                            DEFAULT_CONTROL_FREQUENCY_HZ);
@@ -114,6 +121,10 @@ bool AuboHardwareInterface::init()
     if (server_port_ <= 0 || server_port_ > 65535 || collision_class_ < 1 || collision_class_ > 6 ||
         command_filter_alpha_ <= 0.0 || command_filter_alpha_ > 1.0 ||
         command_deadband_ < 0.0 || max_command_step_scale_ <= 0.0 || max_command_step_scale_ > 1.0 ||
+        mac_buffer_target_ < NUM_JOINTS || mac_buffer_target_ > 400 ||
+        mac_buffer_target_ % NUM_JOINTS != 0 ||
+        trajectory_preload_points_ < 2 ||
+        trajectory_preload_points_ * NUM_JOINTS > mac_buffer_target_ ||
         !std::isfinite(control_frequency_hz) || control_frequency_hz <= 0.0 ||
         control_frequency_hz > 1000.0)
     {
@@ -121,6 +132,8 @@ bool AuboHardwareInterface::init()
         return false;
     }
     control_period_s_ = 1.0 / control_frequency_hz;
+    ROS_INFO("[AuboHW] 透传节拍 %.1f Hz，轨迹预装 %d 点，MAC 目标 %d",
+             control_frequency_hz, trajectory_preload_points_, mac_buffer_target_);
 
     if (nh_.hasParam("joint_names"))
     {
@@ -663,6 +676,8 @@ void AuboHardwareInterface::publishWaypointToRobot()
     std::vector<wayPoint_S> waypoint_vector;
     int current_macsz = 0;
     int cnt = 0;
+    bool stream_started = false;
+    int empty_polls = 0;
 
     while (feed_thread_running_.load())
     {
@@ -676,10 +691,6 @@ void AuboHardwareInterface::publishWaypointToRobot()
             rib_buffer_size_ = mac_diagnosis.macTargetPosDataSize;
             current_macsz    = rib_buffer_size_;
 
-            if (current_macsz == 0)
-            {
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
-            }
         }
         else
         {
@@ -688,10 +699,48 @@ void AuboHardwareInterface::publishWaypointToRobot()
             feed_thread_running_.store(false);
         }
 
-        // --- 当缓冲区未满且队列有数据时批量补充（来自 aubo_driver.cpp） ---
+        if (!diagnosis_ok)
+            continue;
+
+        const std::size_t queued_points = ros_motion_queue_.size_approx();
+
+        // 旧驱动先生成一段固定 5 ms 路点再启动控制柜。标准
+        // JointTrajectoryController 是逐周期产生点，若立即发送，MAC 会反复
+        // 归零；原有的零缓冲 10 ms sleep 会进一步形成周期性停顿。
+        if (!stream_started)
+        {
+            if (queued_points < static_cast<std::size_t>(trajectory_preload_points_))
+            {
+                std::this_thread::sleep_for(
+                    std::chrono::milliseconds(FEED_THREAD_SLEEP_MS));
+                continue;
+            }
+            stream_started = true;
+            empty_polls = 0;
+            ROS_INFO("[AuboHW] 轨迹已预装 %zu 点，开始连续透传", queued_points);
+        }
+
+        // 轨迹结束后回到预装状态；短暂的生产线程抖动不会立即
+        // 重启预装，以免在一条轨迹中途人为插入停顿。
+        if (current_macsz == 0 && queued_points == 0)
+        {
+            ++empty_polls;
+            if (empty_polls >= 20)
+            {
+                stream_started = false;
+                empty_polls = 0;
+            }
+        }
+        else
+        {
+            empty_polls = 0;
+        }
+
+        // --- 当缓冲区未满且队列有数据时批量补充 ---
         if (diagnosis_ok &&
-            current_macsz < EXPECT_MAC_BUF_SIZE &&
-            ros_motion_queue_.size_approx() > 0 &&
+            stream_started &&
+            current_macsz < mac_buffer_target_ &&
+            queued_points > 0 &&
             controller_connected_flag_.load() &&
             in_tcp2canbus_mode_ &&
             !emergency_stopped_.load() &&
@@ -699,7 +748,8 @@ void AuboHardwareInterface::publishWaypointToRobot()
         {
             // 计算需要补充的点数（来自 aubo_driver.cpp: ceil((expect-current)/6.0)）
             cnt = static_cast<int>(
-                std::ceil(static_cast<double>(EXPECT_MAC_BUF_SIZE - current_macsz) / 6.0));
+                std::ceil(static_cast<double>(mac_buffer_target_ - current_macsz) /
+                          static_cast<double>(NUM_JOINTS)));
 
             waypoint_vector = tryPopWaypoint(cnt);
 
@@ -717,7 +767,7 @@ void AuboHardwareInterface::publishWaypointToRobot()
             waypoint_vector.clear();
         }
 
-        // 4ms 间隔（来自 aubo_driver.cpp sleep_for(milliseconds(4))）
+        // 1 ms 检查周期，给 5 ms 硬件消费周期留出调度余量。
         std::this_thread::sleep_for(std::chrono::milliseconds(FEED_THREAD_SLEEP_MS));
     }
 }

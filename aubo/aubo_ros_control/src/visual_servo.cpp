@@ -222,7 +222,7 @@ bool VisualServo::loadParameters() {
                                  "coast_then_open");
   private_nh_.param<double>("feedback_rate", feedback_rate_, 50.0);
   private_nh_.param<double>("control_rate", control_rate_, 50.0);
-  private_nh_.param<double>("output_rate", output_rate_, 250.0);
+  private_nh_.param<double>("output_rate", output_rate_, 200.0);
   private_nh_.param<double>("linear_gain", linear_gain_, 0.8);
   private_nh_.param<double>("angular_gain", angular_gain_, 0.5);
   if (!private_nh_.getParam("max_linear_velocity", max_linear_velocity_))

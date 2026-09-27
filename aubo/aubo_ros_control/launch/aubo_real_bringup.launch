@@ -7,6 +7,9 @@
   <arg name="robot_xacro" default="aubo_i5_with_camera.xacro"/>
   <arg name="robot_srdf" default="aubo_i5_with_camera.srdf"/>
   <arg name="use_sensor_manager" default="false"/>
+  <arg name="control_frequency" default="200.0"/>
+  <arg name="mac_buffer_target" default="120"/>
+  <arg name="trajectory_preload_points" default="20"/>
   <!-- 运动指令源：move_group（ROS/MoveIt 接管）或 teach_pendant（示教器接管）。
        使用映射表可令非法取值在 roslaunch 解析阶段直接报错。 -->
   <arg name="motion_source" default="move_group"/>
@@ -21,6 +24,9 @@
     <arg name="robot_xacro" value="$(arg robot_xacro)"/>
     <arg name="robot_srdf" value="$(arg robot_srdf)"/>
     <arg name="enable_motion_control" value="$(arg enable_motion_control)"/>
+    <arg name="control_frequency" value="$(arg control_frequency)"/>
+    <arg name="mac_buffer_target" value="$(arg mac_buffer_target)"/>
+    <arg name="trajectory_preload_points" value="$(arg trajectory_preload_points)"/>
   </include>
 
   <node name="robot_state_publisher" pkg="robot_state_publisher"
