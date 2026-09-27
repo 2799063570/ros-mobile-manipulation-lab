@@ -21,6 +21,7 @@ catkin_install_python(PROGRAMS
   scripts/laser_follower.py
   scripts/color_follower.py
   scripts/line_follower.py
+  scripts/course_markers.py
   scripts/follower_path.py
   scripts/target_interactive_marker.py
   scripts/semantic_drive_supervisor.py

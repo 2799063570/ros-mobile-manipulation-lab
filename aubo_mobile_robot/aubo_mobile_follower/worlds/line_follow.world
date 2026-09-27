@@ -4,6 +4,13 @@
     <include><uri>model://ground_plane</uri></include>
     <include><uri>model://sun</uri></include>
 
+    <gui fullscreen="0">
+      <camera name="course_camera">
+        <pose>6 -7 7 0 0.65 2.0</pose>
+        <view_controller>orbit</view_controller>
+      </camera>
+    </gui>
+
     <!-- A continuous, gently curving black guide line.  The segments are
          visual-only so the wheels do not encounter artificial bumps. -->
     <model name="guide_line">

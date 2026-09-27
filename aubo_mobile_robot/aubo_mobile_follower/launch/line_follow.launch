@@ -11,6 +11,7 @@
   <arg name="world" default="$(find aubo_mobile_follower)/worlds/line_follow.world"/>
   <arg name="gui" default="true"/>
   <arg name="start_rviz" default="true"/>
+  <arg name="start_course_visuals" default="$(arg start_robot)"/>
   <arg name="start_rqt_reconfigure" default="false"/>
   <arg name="start_path_trail" default="true"/>
   <arg name="angular_kp" default="0.9"/>
@@ -46,6 +47,12 @@
 
   <node if="$(arg start_path_trail)" pkg="aubo_mobile_follower"
         type="follower_path.py" name="line_follower_path" output="screen"/>
+
+  <!-- Read the same world file as Gazebo; keep the course aligned in RViz. -->
+  <node if="$(arg start_course_visuals)" pkg="aubo_mobile_follower"
+        type="course_markers.py" name="line_course_markers" output="screen">
+    <param name="world" value="$(arg world)"/>
+  </node>
 
   <node if="$(arg start_rviz)" pkg="rviz" type="rviz"
         name="line_follow_rviz" output="screen"

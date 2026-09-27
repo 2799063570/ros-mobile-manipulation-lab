@@ -63,16 +63,17 @@
         <joint name="wrist2_joint" value="1.8979" />
         <joint name="wrist3_joint" value="0" />
     </group_state>
-    <!-- Low forward follower pose.  The first three joints retain the compact
-         A-shaped transport posture.  The wrist keeps both the hand-camera
-         optical axis and its image horizon level while facing mobile-base +X. -->
+    <!-- Forward follower pose raised 0.10 m from the original low pose to
+         clear the lidar scan plane at z=0.27 m in base_footprint.
+         Camera centre: (0.323294, -0.121502, 0.378339) m; optical axis
+         remains mobile-base +X with an unchanged, level image horizon. -->
     <group_state name="follow_forward" group="aubo_i5">
-        <joint name="foreArm_joint" value="2.7000" />
-        <joint name="shoulder_joint" value="0" />
-        <joint name="upperArm_joint" value="-0.3500" />
-        <joint name="wrist1_joint" value="-0.091589" />
-        <joint name="wrist2_joint" value="-1.5708" />
-        <joint name="wrist3_joint" value="1.5708" />
+        <joint name="foreArm_joint" value="2.617377" />
+        <joint name="shoulder_joint" value="-0.000002" />
+        <joint name="upperArm_joint" value="0.145125" />
+        <joint name="wrist1_joint" value="-0.669337" />
+        <joint name="wrist2_joint" value="-1.570806" />
+        <joint name="wrist3_joint" value="1.570795" />
     </group_state>
     <!-- 手部相机朝向桌面；近场停靠参数负责将其中心射线对准分拣区域。 -->
     <group_state name="observe" group="aubo_i5">

@@ -89,6 +89,12 @@ Visualization Manager:
       Transport Hint: raw
       Unreliable: false
       Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Name: Simulation Course
+      Marker Topic: /aubo_mobile_follower/course
+      Queue Size: 1
+      Value: true
   Enabled: true
   Global Options:
     Background Color: 35; 35; 35

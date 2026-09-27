@@ -8,10 +8,13 @@
   <arg name="start_scan_merger" default="true"/>
   <arg name="use_laser_safety" default="true"/>
   <arg name="move_group_wait_timeout" default="60.0"/>
-  <arg name="world" default="$(find aubo_mobile_robot)/worlds/empty.world"/>
+  <arg name="world" default="$(find aubo_mobile_follower)/worlds/laser_follow.world"/>
   <arg name="gui" default="true"/>
   <arg name="start_rviz" default="true"/>
-  <arg name="spawn_test_target" default="false"/>
+  <arg name="start_course_visuals" default="$(arg start_robot)"/>
+  <arg name="spawn_test_target" default="$(arg start_robot)"/>
+  <arg name="start_target_control" default="$(arg spawn_test_target)"/>
+  <arg name="start_path_trail" default="true"/>
   <arg name="target_x" default="2.5"/>
   <arg name="target_y" default="0.0"/>
   <arg name="linear_kp" default="0.55"/>
@@ -47,18 +50,27 @@
     <arg name="gui" value="$(arg gui)"/>
   </include>
 
-  <!-- Optional deterministic target for simulation tuning. -->
+  <!-- Spawn a movable target by default in standalone simulation. -->
   <node if="$(arg spawn_test_target)" pkg="gazebo_ros" type="spawn_model"
         name="spawn_follower_test_target" output="screen"
         args="-sdf -file $(find aubo_mobile_follower)/models/laser_target/model.sdf
               -model follower_target -x $(arg target_x) -y $(arg target_y) -z 0.5"/>
 
-  <node if="$(arg spawn_test_target)" pkg="aubo_mobile_follower"
+  <node if="$(arg start_target_control)" pkg="aubo_mobile_follower"
         type="target_interactive_marker.py" name="follower_target_control"
         output="screen">
     <param name="model_name" value="follower_target"/>
     <param name="marker_frame" value="odom"/>
     <param name="target_z" value="0.5"/>
+  </node>
+
+  <node if="$(arg start_path_trail)" pkg="aubo_mobile_follower"
+        type="follower_path.py" name="laser_follower_path" output="screen"/>
+
+  <!-- Read the same world file as Gazebo; keep the course aligned in RViz. -->
+  <node if="$(arg start_course_visuals)" pkg="aubo_mobile_follower"
+        type="course_markers.py" name="laser_course_markers" output="screen">
+    <param name="world" value="$(arg world)"/>
   </node>
 
   <node if="$(arg start_rviz)" pkg="rviz" type="rviz"

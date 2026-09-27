@@ -14,11 +14,13 @@
 `/aubo_mobile_follower/arm_ready=true`。因此机械臂不可达、规划失败或相机未启动时，
 底盘始终保持停止。
 
-`follow_forward` 保留 `transport` 的低位 A 形折叠构型，调整腕部使
-相机光轴水平对准车体正前方，同时用 `wrist3_joint` 校正相机横滚，
-保持图像地平线水平。这会将相机从高位观测
-收至靠近底盘的低位观测位置。六个关节值均在 URDF 限位内，并且不进行
-未经验证的笛卡尔目标直达。
+`follow_forward` 采用折叠前视构型，相机相对原低位姿态竖直上移 10 cm，
+水平位置和朝向保持不变，光轴仍对准车体正前方，图像地平线保持水平。
+按 URDF 正运动学计算，相机中心在 `base_footprint` 下约为
+`(0.323294, -0.121502, 0.378339)` m；原高度约为 0.278339 m，
+与离地 0.27 m 的雷达扫描平面重叠，抬高后相机外壳离开扫描平面。
+六个关节值均在 URDF 限位内，启动时仍由 MoveIt 规划并检查碰撞后执行。
+修改命名姿态后需重启 MoveIt 和跟随启动程序，以重新加载 SRDF。
 
 ## 使用方法
 
@@ -33,11 +35,11 @@ source devel/setup.bash
 以及对应的 RViz 配置；不要同时运行 `move_base`。直接选择一种模式：
 
 ```bash
-# 激光目标跟随
+# 激光目标跟随：默认生成可拖动红色立柱
 roslaunch aubo_mobile_follower laser_follow.launch
 
-# 激光仿真调参时生成可拖动的测试目标
-roslaunch aubo_mobile_follower laser_follow.launch spawn_test_target:=true
+# 自定义激光目标初始位置
+roslaunch aubo_mobile_follower laser_follow.launch target_x:=2.5 target_y:=0.5
 
 # 红色色块跟随：红色目标场景 + 前视相机 + RViz 目标控制/轨迹/调试图像
 roslaunch aubo_mobile_follower color_follow.launch
@@ -52,6 +54,21 @@ roslaunch aubo_mobile_follower semantic_line_follow.launch
 `laser_follow.launch` 与颜色、循线入口一样默认启动 Gazebo 机器人。只有已经通过其他
 bringup 启动机器人、加载 `/robot_description`、控制器和前后雷达时，才使用
 `start_robot:=false`；否则 MoveIt 无法构造机器人模型，`/scan` 也不会有数据。
+
+### 仿真场景与显示
+
+- `line_follow.launch` 默认加载 `worlds/line_follow.world`：连续黑色弯线和绿色终点标记。
+  Gazebo 显示真实路面；RViz 同步显示赛道、机器人、行驶轨迹和相机循线调试图像。
+- `laser_follow.launch` 默认加载 `worlds/laser_follow.world`：蓝色起点、1/2/3 米刻度，
+  并在 `(2.5, 0)` 生成红色立柱。RViz 选择 **Interact**，拖动目标 X/Y 箭头即可移动
+  Gazebo 中的目标；支持 `target_x`、`target_y`、`start_target_control` 和 `start_path_trail`。
+- 两种模式的地面标记都仅用于显示，不产生额外激光障碍或车轮碰撞。
+  `course_markers.py` 读取同一个 `world` 文件中的静态 box/cylinder visual，
+  按仿真的 world/odom 坐标显示在 RViz；不解析外部 include、动态模型或命名相对坐标系。
+- `start_robot:=false` 时，默认不生成激光测试目标、不启动目标控制，也不显示仿真赛道。
+  连接已有仿真时可显式添加 `spawn_test_target:=true start_course_visuals:=true`；
+  若已有 `follower_target`，使用 `spawn_test_target:=false start_target_control:=true`。
+  自定义场景仍可通过 `world:=/绝对路径/场景.world` 指定。
 
 需要运行时调参时，在对应启动命令后增加：
 
@@ -168,6 +185,6 @@ rostopic pub -r 10 /aubo_mobile_follower/semantic_detection \
 激光 RViz 诊断话题为 `/aubo_mobile_follower/laser_debug`：青色球表示通过点数和
 连续性检查的候选点簇，绿色球表示当前控制目标，黄色弧线表示期望跟随距离。
 `laser_follow.launch` 默认启动 RViz；传入 `start_rviz:=false` 可关闭。仿真调参时
-传入 `spawn_test_target:=true`，会在车前生成名为 `follower_target` 的红色测试立柱。
+独立仿真默认启用 `spawn_test_target`，会在车前生成名为 `follower_target` 的红色测试立柱。
 RViz 中的 `Target Control` 使用标准 Interactive Markers 插件显示 X/Y 拉杆；选择
 顶部的 Interact 工具后拖动拉杆，即可实时移动 Gazebo 中的测试立柱。
