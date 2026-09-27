@@ -8,6 +8,8 @@
   <arg name="goal_x" default="1.0"/><!-- 机器人抓取的位置 -->
   <arg name="goal_y" default="0.0"/>
   <arg name="goal_yaw" default="0.0"/>
+  <!-- 是否启用自动任务（机械臂 down → 发送导航目标 → 机械臂 up）；默认关闭。 -->
+  <arg name="send_navigation_goal" default="false"/>
   <arg name="goal_source" default="launch"/><!-- launch\rviz 防止两个数据源产生冲突-->
   <arg name="rviz_goal_topic" default="/nav_arm_coordinator/goal"/>
   <arg name="goal_wait_timeout" default="0.0"/>
@@ -42,6 +44,7 @@
     <arg name="goal_x" value="$(arg goal_x)"/>
     <arg name="goal_y" value="$(arg goal_y)"/>
     <arg name="goal_yaw" value="$(arg goal_yaw)"/>
+    <arg name="send_navigation_goal" value="$(arg send_navigation_goal)"/>
     <arg name="goal_source" value="$(arg goal_source)"/>
     <arg name="rviz_goal_topic" value="$(arg rviz_goal_topic)"/>
     <arg name="goal_wait_timeout" value="$(arg goal_wait_timeout)"/>

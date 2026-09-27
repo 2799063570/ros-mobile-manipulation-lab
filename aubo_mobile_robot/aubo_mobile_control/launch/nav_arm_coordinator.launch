@@ -5,6 +5,8 @@
   <arg name="goal_y" default="0.0"/>
   <arg name="goal_yaw" default="0.0"/>
   <!-- launch: use goal_x/y/yaw; rviz: wait for a remapped 2D Nav Goal. -->
+  <!-- 是否启用自动任务（机械臂 down → 发送导航目标 → 机械臂 up）；默认关闭。 -->
+  <arg name="send_navigation_goal" default="false"/>
   <arg name="goal_source" default="launch"/>
   <arg name="rviz_goal_topic" default="/nav_arm_coordinator/goal"/>
   <!-- Zero waits indefinitely in rviz mode. -->
@@ -18,7 +20,7 @@
   <arg name="camera_timeout" default="5.0"/>
 
   <node pkg="aubo_mobile_control" type="nav_arm_coordinator.py"
-        name="nav_arm_coordinator" output="screen">
+        name="nav_arm_coordinator" output="screen" if="$(arg send_navigation_goal)">
     <param name="planning_group" value="aubo_i5"/>
     <param name="end_effector_link" value="tcp_link"/>
     <param name="navigation_action" value="/move_base"/>
