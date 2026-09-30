@@ -1,0 +1,41 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- start_demo:=false when an existing robot/Gazebo MoveIt stack is running. -->
+  <arg name="start_demo" default="true"/>
+  <arg name="use_rviz" default="true"/>
+  <arg name="group_name" default="aubo_i5"/>
+  <arg name="end_effector_link" default="tcp_link"/>
+  <arg name="shape" default="circle" doc="circle or line"/>
+  <arg name="plane" default="xy" doc="xy, xz or yz for circle"/>
+  <arg name="radius" default="0.03"/>
+  <arg name="samples" default="36"/>
+  <arg name="eef_step" default="0.005"/>
+  <arg name="dx" default="0.05"/>
+  <arg name="dy" default="0.0"/>
+  <arg name="dz" default="0.0"/>
+  <arg name="max_joint_step" default="0.35"/>
+  <arg name="velocity_scaling" default="0.1"/>
+  <arg name="acceleration_scaling" default="0.1"/>
+  <arg name="execute" default="false"/>
+
+  <include if="$(arg start_demo)" file="$(find aubo_moveit_config)/launch/demo.launch">
+    <arg name="use_rviz" value="$(arg use_rviz)"/>
+  </include>
+  <node name="aubo_cartesian_path_demo" pkg="aubo_planning"
+        type="cartesian_path_demo" output="screen" required="true">
+    <param name="group_name" value="$(arg group_name)"/>
+    <param name="end_effector_link" value="$(arg end_effector_link)"/>
+    <param name="shape" value="$(arg shape)"/>
+    <param name="plane" value="$(arg plane)"/>
+    <param name="radius" value="$(arg radius)"/>
+    <param name="samples" value="$(arg samples)"/>
+    <param name="eef_step" value="$(arg eef_step)"/>
+    <param name="dx" value="$(arg dx)"/>
+    <param name="dy" value="$(arg dy)"/>
+    <param name="dz" value="$(arg dz)"/>
+    <param name="max_joint_step" value="$(arg max_joint_step)"/>
+    <param name="velocity_scaling" value="$(arg velocity_scaling)"/>
+    <param name="acceleration_scaling" value="$(arg acceleration_scaling)"/>
+    <param name="execute" value="$(arg execute)"/>
+  </node>
+</launch>

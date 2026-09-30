@@ -7,6 +7,8 @@
   <arg name="robot_xacro" default="aubo_i5_with_camera.xacro"/>
   <arg name="robot_srdf" default="aubo_i5_with_camera.srdf"/>
   <arg name="use_sensor_manager" default="false"/>
+  <arg name="publish_camera_stand" default="false"/>
+  <arg name="camera_stand_config" default="$(find aubo_planning)/config/camera_stand_reference.yaml"/>
   <arg name="control_frequency" default="200.0"/>
   <arg name="mac_buffer_target" default="120"/>
   <arg name="trajectory_preload_points" default="20"/>
@@ -48,6 +50,11 @@
     <arg name="robot_xacro" value="$(arg robot_xacro)"/>
     <arg name="robot_srdf" value="$(arg robot_srdf)"/>
     <arg name="use_sensor_manager" value="$(arg use_sensor_manager)"/>
+  </include>
+
+  <include if="$(arg publish_camera_stand)"
+           file="$(find aubo_planning)/launch/publish_camera_stand.launch">
+    <arg name="config" value="$(arg camera_stand_config)"/>
   </include>
 
   <include if="$(arg use_rviz)"

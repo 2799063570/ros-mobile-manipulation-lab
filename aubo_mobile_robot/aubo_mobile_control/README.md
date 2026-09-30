@@ -1,5 +1,20 @@
 # AUBO 移动机器人控制
 
+## 真机规划中的相机支架
+
+测量实际相机支架尺寸与位置后，复制并修改
+`aubo_planning/config/camera_stand_reference.yaml`，可在
+`navigation_arm.launch` 加入碰撞物体：
+
+```bash
+roslaunch aubo_mobile_control navigation_arm.launch \
+  publish_camera_stand:=true \
+  camera_stand_config:=/absolute/path/to/measured_camera_stand.yaml
+```
+
+该开关默认关闭。移动底盘旁的固定支架应使用固定世界坐标系，
+并确认它与 MoveIt 的规划坐标系存在有效 TF。
+
 ## 手眼标定（固定工位相机）
 
 先启动移动机器人模型、底盘状态与 `robot_state_publisher`，并使底盘在整个采样期间保持静止。模型中的手部相机应关闭（`enable_hand_camera:=false`）。确认没有其他节点发布 `base_link` 到工位相机的旧标定 TF，也不要同时启动 `eye_to_hand_camera_real.launch`。将 ArUco 标记固定在机械臂末端，测量实际边长（单位：米）。

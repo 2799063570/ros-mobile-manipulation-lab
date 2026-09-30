@@ -1,0 +1,11 @@
+# Reference geometry from arm_ws/aubo_demo/aubo_planning/src/pub_camera_frame.cpp.
+# Positions are only an example. Measure the real stand in frame_id before enabling.
+# For a fixed arm this may be base_link; for a world-fixed stand beside a mobile
+# robot use a stable world frame such as map or odom, with a valid TF to MoveIt.
+frame_id: base_link
+object_id: camera_stand
+parts:
+  - {name: lower_support, size: [0.09, 0.48, 0.30], center: [0.40, -0.65, 0.15]}
+  - {name: upright, size: [0.045, 0.045, 0.90], center: [0.40, -0.60, 0.75]}
+  - {name: crossbar, size: [0.45, 0.045, 0.045], center: [0.175, -0.60, 1.035]}
+  - {name: camera_body, size: [0.08, 0.10, 0.12], center: [0.0, -0.60, 0.96]}

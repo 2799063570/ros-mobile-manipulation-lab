@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Include after move_group is started. Edit a copy of the reference YAML
+       with dimensions/positions measured in the chosen planning frame. -->
+  <arg name="config" default="$(find aubo_planning)/config/camera_stand_reference.yaml"/>
+  <node pkg="aubo_planning" type="publish_camera_stand.py"
+        name="publish_camera_stand" output="screen" required="true">
+    <rosparam command="load" file="$(arg config)"/>
+  </node>
+</launch>

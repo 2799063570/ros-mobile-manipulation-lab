@@ -6,6 +6,7 @@ add_compile_options(-std=c++11 -Wall -Wextra)
 find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   moveit_msgs
+  moveit_core
   moveit_ros_planning_interface
   roscpp
   sensor_msgs
@@ -19,6 +20,7 @@ catkin_package(
   CATKIN_DEPENDS
     geometry_msgs
     moveit_msgs
+    moveit_core
     moveit_ros_planning_interface
     roscpp
     sensor_msgs
@@ -30,20 +32,31 @@ catkin_package(
 
 include_directories(${catkin_INCLUDE_DIRS})
 
+catkin_install_python(PROGRAMS scripts/publish_camera_stand.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
 add_executable(gripper_control_demo src/gripper_control_demo.cpp)
 target_link_libraries(gripper_control_demo ${catkin_LIBRARIES})
 
 add_executable(pick_place_demo src/pick_place_demo.cpp)
 target_link_libraries(pick_place_demo ${catkin_LIBRARIES})
 
+add_executable(cartesian_path_demo src/cartesian_path_demo.cpp)
+target_link_libraries(cartesian_path_demo ${catkin_LIBRARIES})
+
 add_executable(octomap_planning_demo src/octomap_planning_demo.cpp)
 target_link_libraries(octomap_planning_demo ${catkin_LIBRARIES})
 
-install(TARGETS gripper_control_demo pick_place_demo octomap_planning_demo
+install(TARGETS gripper_control_demo pick_place_demo octomap_planning_demo cartesian_path_demo
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
 install(DIRECTORY launch
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+)
+
+install(DIRECTORY config
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
 

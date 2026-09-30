@@ -16,6 +16,8 @@
   <arg name="camera_serial_no" default=""/>
   <arg name="calibration_file" doc="eye-on-base YAML saved by easy_handeye for this mobile camera"/>
   <arg name="use_octomap" default="true"/>
+  <arg name="publish_camera_stand" default="false"/>
+  <arg name="camera_stand_config" default="$(find aubo_planning)/config/camera_stand_reference.yaml"/>
   <arg name="require_octomap" default="true"/>
   <arg name="perception_mode" default="yolo"/>
   <arg name="goal_x" default="2.15"/>
@@ -55,6 +57,11 @@
     <arg name="load_robot_description" value="false"/>
     <!-- Populate the PlanningScene with collision objects and filtered RGB-D OctoMap. -->
     <arg name="use_sensor_manager" value="$(arg use_octomap)"/>
+  </include>
+
+  <include if="$(arg publish_camera_stand)"
+           file="$(find aubo_planning)/launch/publish_camera_stand.launch">
+    <arg name="config" value="$(arg camera_stand_config)"/>
   </include>
 
   <include file="$(find aubo_mobile_sorting)/launch/sorting.launch">

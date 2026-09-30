@@ -5,6 +5,71 @@
 - `gripper_control_demo`：按 MoveIt 命名状态执行夹爪打开、闭合或循环动作。
 - `pick_place_demo`：向 PlanningScene 加入工作台和物体，使用 MoveIt `pick()` / `place()` 完成抓取与放置。
 - `octomap_planning_demo`：等待深度点云生成非空 OctoMap，再进行带环境碰撞检测的机械臂规划。
+- `cartesian_path_demo`：以当前 TCP 位姿为起点，规划直线或圆形笛卡尔路径。
+- `publish_camera_stand.py`：把相机支架与相机本体加入 MoveIt 碰撞场景。
+
+## 真机相机支架碰撞物体
+
+`config/camera_stand_reference.yaml` 记录了参考工作空间
+`pub_camera_frame.cpp` 的四个盒体：下支架、立柱、横梁和相机。
+其中位置是参考装置数据，不是当前机器的实测值。先复制该文件，
+测量每个盒体相对所选 `frame_id` 的中心与尺寸并修改，再开启发布。
+固定机械臂可使用 `base_link`；移动机器人旁的固定支架应使用具有
+有效 TF 的固定世界坐标系，并在每次底盘换位后核对规划场景中的位置。
+
+已有 `move_group` 时单独发布：
+
+```bash
+roslaunch aubo_planning publish_camera_stand.launch \
+  config:=/absolute/path/to/measured_camera_stand.yaml
+```
+
+独立真机 MoveIt 启动时可一次完成：
+
+```bash
+roslaunch aubo_ros_control aubo_real_bringup.launch \
+  publish_camera_stand:=true \
+  camera_stand_config:=/absolute/path/to/measured_camera_stand.yaml
+```
+
+移动机器人真机入口 `aubo_mobile_nav_sorting/navigation_sorting.launch`
+和 `aubo_mobile_control/navigation_arm.launch` 也接受相同两个参数。
+三个入口默认都不发布支架，以免未经测量的参考几何阻塞规划。
+发布节点使用 `/apply_planning_scene` 服务添加一个包含四个盒体的
+`camera_stand` 碰撞物体，并从 `/get_planning_scene` 验证结果。
+在 RViz 的 PlanningScene 中确认位置，也可运行
+`rosservice call /get_planning_scene "{components: {components: 16}}"` 查询世界碰撞物体。支架属于固定环境障碍物，
+不应同时用其他节点发布同名物体。
+
+## 笛卡尔路径：直线与画圈
+
+默认打开 MoveIt fake controller，规划当前 `tcp_link` 在 XY 平面的 3 cm 半径圆。
+路径先显示在 RViz，`execute` 默认关闭：
+
+```bash
+roslaunch aubo_planning cartesian_path_demo.launch
+```
+
+直线示例从当前 TCP 沿规划坐标系移动 5 cm：
+
+```bash
+roslaunch aubo_planning cartesian_path_demo.launch shape:=line dx:=0.05 dy:=0 dz:=0
+```
+
+已有真机或 Gazebo 的 `move_group` 时，用 `start_demo:=false` 避免重复启动控制器。
+确认 RViz 轨迹、环境碰撞和末端活动空间后，才传 `execute:=true`：
+
+```bash
+roslaunch aubo_planning cartesian_path_demo.launch \
+  start_demo:=false shape:=circle plane:=yz radius:=0.03 execute:=false
+```
+
+圆形轨迹的起点就是当前 TCP 位姿，末点回到起点；`plane` 可选
+`xy`、`xz`、`yz`。姿态全程保持不变。程序只接受完整、无碰撞的笛卡尔路径，
+并检查相邻关节路点的最大跳变，随后按速度和加速度比例生成时间戳。
+`radius`、`samples`、`eef_step`、`max_joint_step`、
+`velocity_scaling` 和 `acceleration_scaling` 都可从 launch 调整。
+起始姿态附近需留有足够空间；如果部分圆弧无逆解或会碰撞，程序停止且不执行。
 
 ## 深度相机 OctoMap 避障示例
 
