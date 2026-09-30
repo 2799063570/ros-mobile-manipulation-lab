@@ -1,5 +1,31 @@
 # AUBO 移动机器人控制
 
+## 手眼标定（固定工位相机）
+
+先启动移动机器人模型、底盘状态与 `robot_state_publisher`，并使底盘在整个采样期间保持静止。模型中的手部相机应关闭（`enable_hand_camera:=false`）。确认没有其他节点发布 `base_link` 到工位相机的旧标定 TF，也不要同时启动 `eye_to_hand_camera_real.launch`。将 ArUco 标记固定在机械臂末端，测量实际边长（单位：米）。
+
+示教器移动、手动采样：
+
+```bash
+roslaunch aubo_mobile_control handeye_calibration.launch \
+  motion_mode:=teach robot_ip:=192.168.1.2 \
+  marker_id:=30 marker_size:=0.1
+```
+
+MoveIt 规划并执行采样位姿：
+
+```bash
+roslaunch aubo_mobile_control handeye_calibration.launch \
+  motion_mode:=moveit robot_ip:=192.168.1.2 \
+  marker_id:=30 marker_size:=0.1
+```
+
+`teach` 模式只启动 `joint_state_controller`，在示教器移动并停稳后到 easy_handeye 的 rqt 界面点击采样；`moveit` 模式启动 `aubo_i5_controller` 和移动机器人 MoveIt，用标定运动界面规划、检查轨迹并执行，再采样。两种模式均从实际关节状态获取 `base_link → tcp_link`，并从 ArUco 检测获取相机到标记的变换。改变机械臂姿态和标记朝向，采集多组清晰、分布充分的样本后计算并保存结果。
+
+默认使用 `/workspace_camera/color/image_raw`、`/workspace_camera/color/camera_info`、`workspace_camera_color_optical_frame` 和 `aubo_i5` 规划组。相机或标记不同，可传 `camera_name`、`camera_serial_no`、`image_topic`、`camera_info_topic`、`tracking_base_frame`、`tracking_marker_frame`、`marker_id`、`marker_size`；使用已有相机驱动时传 `start_camera:=false`。已有机械臂驱动时传 `start_arm_driver:=false`，并确保其控制模式和 `motion_mode` 一致。示教器模式不要另行启动 MoveIt 执行控制器。
+
+标定结果以 `aubo_mobile_handeye_eye_on_base` 命名空间保存。实际路径由 easy_handeye 的保存操作决定；在日常运行时，将保存的 YAML 路径传给 `aubo_mobile_nav_sorting/navigation_sorting.launch` 或 `aubo_mobile_bringup/mobile_manipulation_visual_servo.launch` 的 `calibration_file` 参数。具体链路检查见 `aubo_mobile_robot/EYE_TO_HAND_RGBD.md`。再次标定前关闭旧外参发布节点。当前入口默认是眼在手外：相机相对底盘固定、标记随末端运动。
+
 该 ROS 1 功能包提供底盘键盘控制，以及一个按顺序执行导航和机械臂规划的简单
 协调节点。机械臂动作均先规划，只有 MoveIt 返回非空、无碰撞轨迹时才会执行；
 规划失败时保持当前位置，不会盲目下发目标。

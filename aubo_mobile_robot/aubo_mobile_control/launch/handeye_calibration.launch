@@ -1,0 +1,83 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- The mobile robot_description and base TF must already be running. Keep the base stationary while sampling. -->
+  <arg name="motion_mode" default="teach" doc="teach or moveit"/>
+  <arg name="start_arm_driver" default="true"/>
+  <arg name="start_camera" default="true"/>
+  <arg name="relay_arm_joint_states" default="true"/>
+  <arg name="robot_ip" default="192.168.1.2"/>
+  <arg name="camera_serial_no" default=""/>
+  <arg name="camera_name" default="workspace_camera"/>
+  <arg name="image_topic" default="/$(arg camera_name)/color/image_raw"/>
+  <arg name="camera_info_topic" default="/$(arg camera_name)/color/camera_info"/>
+  <arg name="eye_on_hand" default="false"/>
+  <arg name="robot_base_frame" default="base_link"/>
+  <arg name="robot_effector_frame" default="tcp_link"/>
+  <arg name="tracking_base_frame" default="$(arg camera_name)_color_optical_frame"/>
+  <arg name="tracking_marker_frame" default="handeye_aruco_marker"/>
+  <arg name="marker_id" default="30"/>
+  <arg name="marker_size" default="0.1" doc="ArUco marker side length in metres"/>
+  <arg name="namespace_prefix" default="aubo_mobile_handeye"/>
+  <arg name="start_sampling_gui" default="true"/>
+  <arg name="start_rviz" default="false"/>
+  <arg name="robot_velocity_scaling" default="0.1"/>
+  <arg name="robot_acceleration_scaling" default="0.1"/>
+
+  <!-- The real hardware launch publishes /aubo_i5/joint_states in both modes.
+       Only moveit starts the position trajectory controller and accepts motion commands. -->
+  <include if="$(arg start_arm_driver)" file="$(find aubo_ros_control)/launch/aubo_control.launch">
+    <arg name="robot_ip" value="$(arg robot_ip)"/>
+    <arg name="load_robot_description" value="false"/>
+    <arg name="enable_motion_control" value="$(eval arg('motion_mode') == 'moveit')"/>
+  </include>
+  <node if="$(arg relay_arm_joint_states)" name="handeye_arm_joint_states"
+        pkg="topic_tools" type="relay" args="/aubo_i5/joint_states /joint_states"/>
+
+  <!-- Do not use eye_to_hand_camera_real.launch here: it publishes an existing
+       calibration TF, which would invalidate the measurements being collected. -->
+  <include if="$(arg start_camera)" file="$(find realsense2_camera)/launch/rs_camera.launch">
+    <arg name="serial_no" value="$(arg camera_serial_no)"/>
+    <arg name="camera" value="$(arg camera_name)"/>
+    <arg name="tf_prefix" value="$(arg camera_name)"/>
+    <arg name="enable_color" value="true"/>
+    <arg name="enable_depth" value="true"/>
+    <arg name="publish_tf" value="true"/>
+  </include>
+
+  <node name="handeye_aruco_tracker" pkg="aruco_ros" type="single" output="screen">
+    <remap from="/image" to="$(arg image_topic)"/>
+    <remap from="/camera_info" to="$(arg camera_info_topic)"/>
+    <param name="marker_id" value="$(arg marker_id)"/>
+    <param name="marker_size" value="$(arg marker_size)"/>
+    <param name="reference_frame" value="$(arg tracking_base_frame)"/>
+    <param name="camera_frame" value="$(arg tracking_base_frame)"/>
+    <param name="marker_frame" value="$(arg tracking_marker_frame)"/>
+  </node>
+  <!-- aruco_ros processes images only while its transform topic has a subscriber. -->
+  <node name="handeye_aruco_keepalive" pkg="topic_tools" type="relay"
+        args="/handeye_aruco_tracker/transform /handeye_aruco_tracker/transform_keepalive"/>
+
+  <include if="$(eval arg('motion_mode') == 'moveit')"
+           file="$(find aubo_mobile_moveit_config)/launch/move_group.launch">
+    <arg name="controller_backend" value="sdk"/>
+    <arg name="allow_trajectory_execution" value="true"/>
+    <arg name="fake_execution" value="false"/>
+    <arg name="load_robot_description" value="false"/>
+  </include>
+
+  <include file="$(find easy_handeye)/launch/calibrate.launch">
+    <arg name="namespace_prefix" value="$(arg namespace_prefix)"/>
+    <arg name="eye_on_hand" value="$(arg eye_on_hand)"/>
+    <arg name="freehand_robot_movement" value="$(eval arg('motion_mode') == 'teach')"/>
+    <arg name="move_group" value="aubo_i5"/>
+    <arg name="robot_base_frame" value="$(arg robot_base_frame)"/>
+    <arg name="robot_effector_frame" value="$(arg robot_effector_frame)"/>
+    <arg name="tracking_base_frame" value="$(arg tracking_base_frame)"/>
+    <arg name="tracking_marker_frame" value="$(arg tracking_marker_frame)"/>
+    <arg name="publish_dummy" value="false"/>
+    <arg name="start_sampling_gui" value="$(arg start_sampling_gui)"/>
+    <arg name="start_rviz" value="$(arg start_rviz)"/>
+    <arg name="robot_velocity_scaling" value="$(arg robot_velocity_scaling)"/>
+    <arg name="robot_acceleration_scaling" value="$(arg robot_acceleration_scaling)"/>
+  </include>
+</launch>

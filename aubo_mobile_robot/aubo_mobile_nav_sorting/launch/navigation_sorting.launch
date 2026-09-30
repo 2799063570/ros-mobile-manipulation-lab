@@ -14,6 +14,9 @@
   <arg name="auto_start" default="false"/>
   <arg name="start_rgbd_camera" default="true"/>
   <arg name="camera_serial_no" default=""/>
+  <arg name="calibration_file" doc="eye-on-base YAML saved by easy_handeye for this mobile camera"/>
+  <arg name="use_octomap" default="true"/>
+  <arg name="require_octomap" default="true"/>
   <arg name="perception_mode" default="yolo"/>
   <arg name="goal_x" default="2.15"/>
   <arg name="goal_y" default="0.0"/>
@@ -36,6 +39,7 @@
            file="$(find aubo_ros_control)/launch/eye_to_hand_camera_real.launch">
     <arg name="serial_no" value="$(arg camera_serial_no)"/>
     <arg name="parent_frame" value="base_link"/>
+    <arg name="calibration_file" value="$(arg calibration_file)"/>
   </include>
 
   <include file="$(find aubo_mobile_navigation)/launch/navigation.launch">
@@ -49,8 +53,8 @@
     <arg name="allow_trajectory_execution" value="true"/>
     <arg name="fake_execution" value="false"/>
     <arg name="load_robot_description" value="false"/>
-    <!-- Parameterized collision objects populate the PlanningScene directly. -->
-    <arg name="use_sensor_manager" value="false"/>
+    <!-- Populate the PlanningScene with collision objects and filtered RGB-D OctoMap. -->
+    <arg name="use_sensor_manager" value="$(arg use_octomap)"/>
   </include>
 
   <include file="$(find aubo_mobile_sorting)/launch/sorting.launch">
@@ -63,6 +67,8 @@
     <arg name="depth_save_directory" value="$(arg depth_save_directory)"/>
     <arg name="use_grasp_attachment" value="false"/>
     <arg name="perception_mode" value="$(arg perception_mode)"/>
+    <arg name="start_octomap_cloud_filter" value="$(arg use_octomap)"/>
+    <arg name="require_octomap" value="$(arg require_octomap)"/>
   </include>
 
   <include file="$(find aubo_mobile_nav_sorting)/launch/mission.launch">

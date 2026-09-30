@@ -11,15 +11,21 @@
 
   <exec_depend>actionlib</exec_depend>
   <exec_depend>actionlib_msgs</exec_depend>
+  <exec_depend>aruco_ros</exec_depend>
+  <exec_depend>aubo_ros_control</exec_depend>
   <exec_depend>aubo_mobile_moveit_config</exec_depend>
   <exec_depend>aubo_mobile_navigation</exec_depend>
   <exec_depend>aubo_mobile_robot</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>easy_handeye</exec_depend>
+  <exec_depend>rqt_easy_handeye</exec_depend>
   <exec_depend>move_base_msgs</exec_depend>
   <exec_depend>moveit_commander</exec_depend>
   <exec_depend>rospy</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>tf</exec_depend>
+  <exec_depend>topic_tools</exec_depend>
+  <exec_depend>realsense2_camera</exec_depend>
 
   <export/>
 </package>

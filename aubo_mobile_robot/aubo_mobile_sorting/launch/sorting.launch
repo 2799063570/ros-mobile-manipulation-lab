@@ -14,6 +14,7 @@
   <arg name="auto_start" default="false"/>
   <arg name="use_grasp_attachment" default="true"/>
   <arg name="start_octomap_cloud_filter" default="false"/>
+  <arg name="require_octomap" default="false"/>
   <arg name="color_detector_config" default="$(find aubo_mobile_perception)/config/colors.yaml"/>
 
   <include if="$(arg start_octomap_cloud_filter)"
@@ -41,6 +42,7 @@
     <param name="gripper_backend" value="$(arg gripper_backend)"/>
     <param name="auto_move_to_observation" value="$(arg auto_move_to_observation)"/>
     <param name="auto_start" value="$(arg auto_start)"/>
+    <param name="require_octomap" value="$(arg require_octomap)"/>
     <param name="use_grasp_attachment" value="$(arg use_grasp_attachment)"/>
   </node>
 

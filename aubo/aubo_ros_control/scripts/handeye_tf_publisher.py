@@ -31,6 +31,15 @@ def main():
     child_frame = rospy.get_param(
         "~child_frame", required(parameters, "tracking_base_frame", "parameters")
     )
+    saved_parent = required(parameters, default_parent_key, "parameters")
+    saved_child = required(parameters, "tracking_base_frame", "parameters")
+    if parent_frame != saved_parent or child_frame != saved_child:
+        raise ValueError(
+            "calibration frames {} -> {} do not match requested {} -> {}; "
+            "use the YAML measured with these exact robot and camera frames".format(
+                saved_parent, saved_child, parent_frame, child_frame
+            )
+        )
 
     quaternion = [
         float(required(transform, key, "transformation"))

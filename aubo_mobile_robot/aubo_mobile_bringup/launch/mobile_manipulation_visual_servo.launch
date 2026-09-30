@@ -4,6 +4,7 @@
        must already be running. The arm capabilities come from aubo. -->
   <arg name="robot_ip" default="192.168.1.2"/>
   <arg name="camera_serial_no" default=""/>
+  <arg name="calibration_file" doc="eye-on-base YAML saved by easy_handeye for this mobile camera"/>
   <arg name="start_camera" default="true"/>
   <arg name="start_yolo_adapter" default="true"/>
   <arg name="start_enabled" default="false"/>
@@ -12,6 +13,7 @@
            file="$(find aubo_ros_control)/launch/eye_to_hand_camera_real.launch">
     <arg name="serial_no" value="$(arg camera_serial_no)"/>
     <arg name="parent_frame" value="base_link"/>
+    <arg name="calibration_file" value="$(arg calibration_file)"/>
   </include>
   <include if="$(arg start_yolo_adapter)"
            file="$(find aubo_mobile_perception)/launch/yolo_rgbd_detector.launch"/>
