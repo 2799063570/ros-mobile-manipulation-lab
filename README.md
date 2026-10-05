@@ -374,8 +374,9 @@ rospack find rrt_exploration
 可进一步执行仓库现有测试和 launch 静态展开检查：
 
 ```bash
-catkin_make run_tests_robot_pose_ekf
-catkin_test_results build/test_results
+# 运行所有已注册的单元测试、节点测试和 rostest
+catkin_make run_tests
+catkin_test_results --verbose build/test_results
 
 roslaunch --nodes turn_on_wheeltec_robot robot_model_visualization.launch
 roslaunch --nodes aubo_mobile_navigation mapping_gazebo.launch

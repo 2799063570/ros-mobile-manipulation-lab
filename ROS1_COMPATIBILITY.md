@@ -68,18 +68,17 @@ sudo apt install /tmp/libprotobuf9v5_2.6.1-1.3_amd64.deb
 - `depthimage_to_laserscan-melodic-devel/`
 - `realsense-ros-development/`
 - `slam_karto/`
-- `ros_astra_camera/`
 - `ros_tensorflow/`
-- `bodyreader/`
-- `xf_mic_asr_offline/`、`xf_mic_asr_offline_circle/`、`tts_make/`
-- `qt_ros_test/`
 
 前五项由 rosdep/apt 提供对应发行版的软件包。RealSense D435i 是唯一支持的物理
 RGB-D 相机，`turn_on_wheeltec_robot/launch/wheeltec_camera.launch` 直接启动
 `realsense2_camera`。旧 Astra、USB 相机和语音/TensorFlow 示例不属于支持范围。
 
-这些目录目前只做可逆隔离，尚未物理删除。确认没有未提交资产后，可以在单独提交
-中删除，以便清楚审查第三方代码移除和仓库体积变化。
+上述六个目录仍保留源码快照和 `CATKIN_IGNORE`。2026-10-05 已将
+`qt_ros_test/`、`xf_mic_asr_offline/`、`xf_mic_asr_offline_circle/`、`bodyreader/`、
+`tts_make/` 和 `ros_astra_camera/` 完整归档至仓库外，校验后移出当前工作树。
+历史使用说明中可能仍有这些旧功能的命令；它们不属于当前支持的运行入口。
+归档和清理范围见 `docs/repository_cleanup_audit.md`，Git 历史未改写。
 
 ## Python 3 规则
 

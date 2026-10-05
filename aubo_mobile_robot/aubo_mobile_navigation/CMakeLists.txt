@@ -5,6 +5,10 @@ find_package(catkin REQUIRED)
 
 catkin_package()
 
+if(CATKIN_ENABLE_TESTING)
+  catkin_add_nosetests(test/test_steering_safety.py)
+endif()
+
 catkin_install_python(PROGRAMS
   scripts/dual_laser_merger.py
   scripts/laser_safety_filter.py

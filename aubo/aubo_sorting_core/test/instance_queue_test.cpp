@@ -1,9 +1,8 @@
 #include <aubo_sorting_core/instance_queue.hpp>
-#include <iostream>
+#include <gtest/gtest.h>
 #include <limits>
-#include <stdexcept>
 
-#define CHECK(condition) do { if (!(condition)) throw std::runtime_error(#condition); } while (false)
+#define CHECK(condition) ASSERT_TRUE(condition)
 using Queue = aubo_sorting_core::InstanceQueue<int>;
 Queue::Sample object(double x, std::string category = "red", int payload = 7)
 {
@@ -15,9 +14,8 @@ void confirm(Queue& queue, const std::vector<Queue::Sample>& samples, double sta
 {
   for (int i = 0; i < 5; ++i) queue.update(samples, start + .1*i);
 }
-int main()
+TEST(InstanceQueue, MaintainsTrackingAndReservationInvariants)
 {
-  try {
     { // Multiple same-class targets survive input reordering; reservations are unique.
       Queue q;
       for (int i=0; i<5; ++i)
@@ -114,7 +112,10 @@ int main()
       CHECK(q.tracks().size()==2); confirm(q,{object(.1)},2);
       q.update({object(.1)},4); Queue::Track t; CHECK(!q.reserve({"red"},4,t));
     }
-    std::cout << "15 instance queue scenarios passed\n";
-    return 0;
-  } catch(const std::exception& error) { std::cerr<<error.what()<<'\n'; return 1; }
+}
+
+int main(int argc, char** argv)
+{
+  testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
 }

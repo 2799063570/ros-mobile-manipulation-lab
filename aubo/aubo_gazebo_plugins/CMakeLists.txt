@@ -17,6 +17,10 @@ add_library(aubo_grasp_attach_plugin SHARED src/grasp_attach_world_plugin.cpp)
 add_dependencies(aubo_grasp_attach_plugin ${catkin_EXPORTED_TARGETS})
 target_link_libraries(aubo_grasp_attach_plugin ${catkin_LIBRARIES} ${GAZEBO_LIBRARIES})
 
+if(CATKIN_ENABLE_TESTING)
+  catkin_add_nosetests(test/test_gripper_clearance.py)
+endif()
+
 install(TARGETS aubo_grasp_attach_plugin
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 )

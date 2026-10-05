@@ -1,3 +1,0 @@
-int8 type
-vector2f depthPosition
-vector3f worldPosition

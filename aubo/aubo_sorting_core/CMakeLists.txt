@@ -102,8 +102,7 @@ install(FILES README.md
 )
 
 if(CATKIN_ENABLE_TESTING)
-  add_executable(instance_queue_test test/instance_queue_test.cpp)
-  add_test(NAME instance_queue_test COMMAND instance_queue_test)
+  catkin_add_gtest(instance_queue_test test/instance_queue_test.cpp)
   catkin_add_gtest(height_recovery_test test/height_recovery_test.cpp)
   catkin_add_gtest(observation_tf_test test/observation_tf_test.cpp)
   if(TARGET observation_tf_test)

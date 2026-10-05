@@ -1,13 +1,18 @@
 #include <aubo_mobile_nav_sorting/dock_control.h>
-#include <cassert>
+#include <gtest/gtest.h>
 #include <cmath>
-#include <iostream>
 using aubo_mobile_nav_sorting::dockCommand;
-int main() {
-  assert(dockCommand(.4, 0, -.04, .04, .12, .06).angular < 0);
-  assert(dockCommand(.4, .01, 0, .04, .12, .06).angular > 0);
-  assert(dockCommand(-.3, .01, 0, .04, .12, .06).angular < 0);
-  assert(std::abs(dockCommand(.005, 0, 0, .04, .12, .06).linear) < .005);
+
+TEST(DockControl, CommandsStayInsideExpectedDirectionsAndBounds)
+{
+  EXPECT_LT(dockCommand(.4, 0, -.04, .04, .12, .06).angular, 0);
+  EXPECT_GT(dockCommand(.4, .01, 0, .04, .12, .06).angular, 0);
+  EXPECT_LT(dockCommand(-.3, .01, 0, .04, .12, .06).angular, 0);
+  EXPECT_LT(std::abs(dockCommand(.005, 0, 0, .04, .12, .06).linear), .005);
+}
+
+TEST(DockControl, ConvergesForwardAndReverseUnderYawDisturbance)
+{
   for (double direction : {1., -1.}) {
     double x=0, y=.005, yaw=.01;
     bool reached=false;
@@ -18,9 +23,14 @@ int main() {
       x+=u.linear*std::cos(yaw)*.05;
       y+=u.linear*std::sin(yaw)*.05;
       yaw+=(u.angular+.008)*.05; // sustained drivetrain yaw disturbance
-      assert(std::abs(yaw)<.06);
+      ASSERT_LT(std::abs(yaw), .06);
     }
-    assert(reached);
+    EXPECT_TRUE(reached);
   }
-  std::cout << "Forward/reverse disturbed docking and command bounds passed\n";
+}
+
+int main(int argc, char** argv)
+{
+  testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
 }

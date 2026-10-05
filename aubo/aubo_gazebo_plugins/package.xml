@@ -13,5 +13,8 @@
   <exec_depend>gazebo_ros</exec_depend>
   <exec_depend>roscpp</exec_depend>
   <exec_depend>std_msgs</exec_depend>
+  <test_depend>python3-nose</test_depend>
+  <test_depend>python3-numpy</test_depend>
+  <test_depend>python3-yaml</test_depend>
   <export/>
 </package>

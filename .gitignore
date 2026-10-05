@@ -15,5 +15,13 @@ logs/
 aubo/aubo_sdk/logfiles/
 *.py[cod]
 __pycache__/
-*.avi
+*.o
+*.obj
+*.exe
+*.log
+.tmp_queue_test/
+xf_mic_asr_offline/tmp/*.pcm
+xf_mic_asr_offline/tmp/*.tar
+xf_mic_asr_offline_circle/tmp/*.pcm
+xf_mic_asr_offline_circle/tmp/*.tar
 *.avi
