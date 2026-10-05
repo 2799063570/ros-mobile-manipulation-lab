@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- 展示入口只组合现有仿真节点；默认颜色检测，无需 YOLO 权重或独立推理环境。 -->
+  <arg name="scenario" default="nav_sorting" doc="perception | sorting | nav_sorting"/>
+  <arg name="gui" default="true"/>
+  <arg name="rviz" default="true"/>
+  <arg name="paused" default="false"/>
+  <arg name="auto_start" default="false" doc="仅对 sorting/nav_sorting 生效"/>
+  <!-- 字典查找让未知场景在解析阶段失败，避免静默启动空场景。value 不允许绕过校验。 -->
+  <arg name="default_rviz_config" value="$(eval find('aubo_mobile_bringup') + '/rviz/' + {'perception': 'showcase_perception.rviz', 'sorting': 'showcase_sorting.rviz', 'nav_sorting': 'showcase_nav_sorting.rviz'}[arg('scenario')])"/>
+  <arg name="rviz_config" default="$(arg default_rviz_config)"/>
+
+  <group if="$(eval arg('scenario') == 'perception')">
+    <include file="$(find aubo_mobile_bringup)/launch/showcase_perception.launch">
+      <arg name="gui" value="$(arg gui)"/>
+      <arg name="paused" value="$(arg paused)"/>
+    </include>
+  </group>
+
+  <group if="$(eval arg('scenario') == 'sorting')">
+    <include file="$(find aubo_mobile_sorting)/launch/sorting_gazebo.launch">
+      <arg name="gui" value="$(arg gui)"/>
+      <arg name="paused" value="$(arg paused)"/>
+      <arg name="rviz" value="false"/>
+      <arg name="debug_view" value="false"/>
+      <arg name="perception_mode" value="color"/>
+      <!-- 开始前可讲解图像/规划。手动演示由分拣面板显式进入观察位。 -->
+      <arg name="auto_move_to_observation" value="$(arg auto_start)"/>
+      <arg name="auto_start" value="$(arg auto_start)"/>
+    </include>
+  </group>
+
+  <group if="$(eval arg('scenario') == 'nav_sorting')">
+    <include file="$(find aubo_mobile_nav_sorting)/launch/four_tables_gazebo.launch">
+      <arg name="gui" value="$(arg gui)"/>
+      <arg name="paused" value="$(arg paused)"/>
+      <arg name="rviz" value="false"/>
+      <arg name="debug_view" value="false"/>
+      <arg name="perception_mode" value="color"/>
+      <arg name="auto_start" value="$(arg auto_start)"/>
+    </include>
+  </group>
+
+  <!-- 下游 RViz 全部关闭，统一启动一个窗口，避免面板、视角和图像窗口重复。 -->
+  <node if="$(arg rviz)" pkg="rviz" type="rviz" name="showcase_rviz"
+        args="-d $(arg rviz_config)" output="screen"/>
+</launch>

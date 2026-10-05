@@ -1,5 +1,23 @@
 # AUBO 移动机器人统一启动入口
 
+## 面向演示的入口
+
+```bash
+roslaunch aubo_mobile_bringup showcase.launch scenario:=nav_sorting
+```
+
+`scenario` 支持 `perception`（俯视 RGB-D 感知）、`sorting`（工位分拣）和
+`nav_sorting`（四工位导航分拣）。每种模式只启动一个 RViz，加载本包 `rviz/` 下的
+固定展示视角、图像和对应控制面板；默认颜色检测、默认等待操作员触发任务。
+`perception` 不启动分拣、MoveIt 或导航任务。
+
+参数还包括 `gui`、`rviz`、`paused`、`auto_start` 和 `rviz_config`。
+分拣模式默认先点击面板的“进入观察位”，再开始分拣。重置演示时退出整个 launch 后
+重新启动，以同时恢复 Gazebo 物体与任务状态。详细操作、讲解顺序和测试命令见
+[演示指南](../../docs/SHOWCASE.md)。
+
+## 原有功能入口
+
 该包只负责组合启动，不包含模型、控制算法、地图或分拣参数。仿真统一使用：
 
 ```bash

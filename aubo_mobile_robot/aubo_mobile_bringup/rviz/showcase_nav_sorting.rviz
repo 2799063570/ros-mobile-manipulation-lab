@@ -1,0 +1,90 @@
+# 多工位演示：map 全局视角显示定位、激光和规划；只使用标准 RViz 与已有任务面板。
+# 不加载旧布局中的 RTAB-Map 插件；局部路径话题对应本场景默认的 TEB 规划器。
+Panels:
+  - Class: rviz/Displays
+    Name: Displays
+  - Class: rviz/Views
+    Name: Views
+  - Class: aubo_mobile_nav_sorting/NavSortingPanel
+    Name: Mission controls and workstation progress
+Preferences:
+  PromptSaveOnExit: false
+Visualization Manager:
+  Class: ""
+  Enabled: true
+  Global Options:
+    Fixed Frame: map
+    Background Color: 32; 36; 42
+    Frame Rate: 30
+  Displays:
+    - Class: rviz/Grid
+      Name: Ground grid
+      Enabled: true
+      Cell Size: 1
+      Plane Cell Count: 20
+      Reference Frame: <Fixed Frame>
+      Color: 85; 95; 105
+    - Class: rviz/Map
+      Name: Navigation map
+      Enabled: true
+      Topic: /map
+      Alpha: 0.65
+    - Class: rviz/RobotModel
+      Name: Mobile manipulator
+      Enabled: true
+      Robot Description: robot_description
+      Visual Enabled: true
+      Collision Enabled: false
+    - Class: rviz/LaserScan
+      Name: Merged laser
+      Enabled: true
+      Topic: /scan
+      Size (Pixels): 2
+      Style: Points
+      Color Transformer: FlatColor
+      Color: 90; 210; 240
+    - Class: rviz/Path
+      Name: Global path
+      Enabled: true
+      Topic: /move_base/NavfnROS/plan
+      Color: 90; 220; 130
+      Line Style: Lines
+      Line Width: 0.03
+    - Class: rviz/Path
+      Name: TEB local path
+      Enabled: true
+      Topic: /move_base/TebLocalPlannerROS/local_plan
+      Color: 255; 190; 80
+      Line Style: Lines
+      Line Width: 0.04
+    - Class: rviz/Image
+      Name: Hand camera RGB
+      Enabled: true
+      Image Topic: /hand_camera/image_raw
+      Transport Hint: raw
+      Queue Size: 2
+    - Class: rviz/Image
+      Name: Detection overlay
+      Enabled: true
+      Image Topic: /sorting/debug_image
+      Transport Hint: raw
+      Queue Size: 2
+  # 任务演示由面板控制；不放置直接向 move_base 发送目标的工具，避免干扰任务。
+  Tools:
+    - Class: rviz/MoveCamera
+    - Class: rviz/Select
+    - Class: rviz/FocusCamera
+  Views:
+    Current:
+      Class: rviz/Orbit
+      Distance: 14
+      Pitch: 1.05
+      Yaw: 0.85
+      Target Frame: <Fixed Frame>
+      Focal Point: {X: 1.0, Y: 0.0, Z: 0.0}
+    Saved: []
+Window Geometry:
+  Width: 1440
+  Height: 900
+  Hide Left Dock: false
+  Hide Right Dock: false

@@ -1,0 +1,59 @@
+# 感知演示：odom 固定坐标，俯视 RGB 输入与带标注结果；不加载运动操作面板。
+Panels:
+  - Class: rviz/Displays
+    Name: Displays
+  - Class: rviz/Views
+    Name: Views
+Preferences:
+  PromptSaveOnExit: false
+Visualization Manager:
+  Class: ""
+  Enabled: true
+  Global Options:
+    Fixed Frame: odom
+    Background Color: 32; 36; 42
+    Frame Rate: 30
+  Displays:
+    - Class: rviz/Grid
+      Name: Ground grid
+      Enabled: true
+      Cell Size: 0.5
+      Plane Cell Count: 20
+      Reference Frame: <Fixed Frame>
+      Color: 85; 95; 105
+    - Class: rviz/RobotModel
+      Name: Mobile manipulator
+      Enabled: true
+      Robot Description: robot_description
+      Visual Enabled: true
+      Collision Enabled: false
+    - Class: rviz/Image
+      Name: Camera RGB
+      Enabled: true
+      Image Topic: /workspace_camera/color/image_raw
+      Transport Hint: raw
+      Queue Size: 2
+    - Class: rviz/Image
+      Name: Detection overlay
+      Enabled: true
+      Image Topic: /sorting/debug_image
+      Transport Hint: raw
+      Queue Size: 2
+  Tools:
+    - Class: rviz/MoveCamera
+    - Class: rviz/Select
+    - Class: rviz/FocusCamera
+  Views:
+    Current:
+      Class: rviz/Orbit
+      Distance: 3.5
+      Pitch: 0.65
+      Yaw: 0.75
+      Target Frame: <Fixed Frame>
+      Focal Point: {X: 0.5, Y: 0.0, Z: 0.4}
+    Saved: []
+Window Geometry:
+  Width: 1440
+  Height: 900
+  Hide Left Dock: false
+  Hide Right Dock: false

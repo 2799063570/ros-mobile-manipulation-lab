@@ -13,5 +13,11 @@
   <exec_depend>aubo_mobile_robot</exec_depend>
   <exec_depend>aubo_mobile_sorting</exec_depend>
   <exec_depend>aubo_ros_control</exec_depend>
+  <exec_depend>aubo_description</exec_depend>
+  <exec_depend>rviz</exec_depend>
+  <exec_depend>moveit_ros_visualization</exec_depend>
+  <test_depend>python3-nose</test_depend>
+  <test_depend>python3-yaml</test_depend>
+  <test_depend>roslaunch</test_depend>
   <export/>
 </package>

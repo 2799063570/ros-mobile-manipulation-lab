@@ -17,6 +17,17 @@
 
 ## 项目演示
 
+完成下方安装、编译和环境加载后，一条命令启动四工位导航分拣展示：
+
+```bash
+roslaunch aubo_mobile_bringup showcase.launch scenario:=nav_sorting
+```
+
+也可选择 `scenario:=perception` 展示俯视 RGB-D 感知，或 `scenario:=sorting` 展示
+工位抓取分拣。三个模式均使用颜色检测，自动加载展示用 RViz 视角、图像与对应面板；
+默认等待操作员开始任务。操作步骤、停止/重置方法与故障排查见
+[演示操作指南](docs/SHOWCASE.md)。
+
 
 https://github.com/user-attachments/assets/b636e380-9148-4471-b0e5-202318e15bf4
 
@@ -608,6 +619,9 @@ map → odom → base_footprint → base_link → AUBO links → tcp_link
 
 ## 详细文档
 
+- [文档导航](docs/README.md)
+- [全部功能包的作用、运行入口与前置条件](docs/FUNCTION_PACKAGES.md)
+- [项目演示指南](docs/SHOWCASE.md)
 - [差速机器人模型与导航](simple_diff_robot_gazebo/README.md)
 - [AUBO 机械臂规划示例](aubo/aubo_planning/README.md)
 - [AUBO SDK 与真实机械臂控制](aubo/aubo_ros_control/README.md)

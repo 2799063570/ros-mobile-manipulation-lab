@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- 只读感知场景：启动机器人控制器以提供 joint/TF，但不启动 MoveIt 或分拣任务。 -->
+  <arg name="gui" default="true"/>
+  <arg name="paused" default="false"/>
+  <include file="$(find aubo_mobile_robot)/launch/gazebo.launch">
+    <arg name="world" value="$(find aubo_mobile_sorting)/worlds/sorting.world"/>
+    <arg name="gui" value="$(arg gui)"/>
+    <arg name="paused" value="$(arg paused)"/>
+  </include>
+  <!-- 固定场景的 odom 与 Gazebo world 重合；安装位姿须与 sorting.world 保持一致。 -->
+  <include file="$(find aubo_description)/launch/eye_to_hand_camera_tf.launch">
+    <arg name="parent_frame" value="odom"/>
+    <arg name="x" value="0.62"/>
+    <arg name="y" value="0.0"/>
+    <arg name="z" value="2.0"/>
+  </include>
+  <!-- 俯视相机无需机械臂进入观察姿态，便于第一段演示直接展示 RGB + 深度定位。 -->
+  <include file="$(find aubo_mobile_perception)/launch/color_detector.launch">
+    <arg name="image_topic" value="/workspace_camera/color/image_raw"/>
+    <arg name="camera_info_topic" value="/workspace_camera/color/camera_info"/>
+    <arg name="depth_topic" value="/workspace_camera/aligned_depth_to_color/image_raw"/>
+  </include>
+</launch>
