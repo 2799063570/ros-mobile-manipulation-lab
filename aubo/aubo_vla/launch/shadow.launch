@@ -1,0 +1,8 @@
+<launch>
+  <arg name="config" default="$(find aubo_vla)/config/shadow.yaml"/>
+  <arg name="diagnostics_topic" default="/openvla_observe/diagnostics"/>
+  <node pkg="aubo_vla" type="shadow_preview.py" name="vla_shadow" output="screen">
+    <rosparam command="load" file="$(arg config)"/>
+    <param name="diagnostics_topic" value="$(arg diagnostics_topic)"/>
+  </node>
+</launch>

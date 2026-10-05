@@ -1,0 +1,12 @@
+# Preview only. Set these after training/validating an AUBO checkpoint.
+expected_revision: ""
+expected_unnorm_key: ""
+expected_action_dt: 0.5
+base_frame: base_link
+tcp_frame: tcp_link
+max_age: 1.0
+max_translation: 0.01
+max_rotation: 0.05
+# Illustrative fixed-arm preview bounds. Verify against your scene before use.
+workspace_min: [0.30, -0.40, 0.12]
+workspace_max: [0.95, 0.40, 0.75]

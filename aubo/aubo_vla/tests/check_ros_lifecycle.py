@@ -12,15 +12,14 @@ from pathlib import Path
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 from observe_bridge import Bridge
+from aubo_vla.timing import ClockGuard
 
 rospy.init_node('openvla_lifecycle_check', anonymous=True)
 bridge = Bridge.__new__(Bridge)
 bridge.lock = threading.Lock()
 bridge.latest = None
 bridge.epoch = 0
-bridge.clock = None
-bridge.clock_wall = time.monotonic()
-bridge.pause_timeout = 2.0
+bridge.clock_guard = ClockGuard(True, 2.0)
 # Deterministic reset and old-frame invalidation using synthetic clock messages.
 bridge.on_clock(Clock(clock=rospy.Time.from_sec(100)))
 msg = Image()

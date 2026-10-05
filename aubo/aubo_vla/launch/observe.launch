@@ -3,10 +3,16 @@
   <arg name="image_topic" default="/workspace_camera/color/image_raw"/>
   <arg name="timeout" default="30.0"/>
   <arg name="max_age" default="30.0"/>
+  <arg name="pause_timeout" default="2.0"/>
+  <arg name="interval" default="1.0"/>
+  <arg name="url" default="http://127.0.0.1:8008/predict"/>
   <node pkg="aubo_vla" type="observe_bridge.py" name="openvla_observe" output="screen">
     <param name="instruction" value="$(arg instruction)"/>
     <param name="image_topic" value="$(arg image_topic)"/>
     <param name="timeout" value="$(arg timeout)"/>
     <param name="max_age" value="$(arg max_age)"/>
+    <param name="pause_timeout" value="$(arg pause_timeout)"/>
+    <param name="interval" value="$(arg interval)"/>
+    <param name="url" value="$(arg url)"/>
   </node>
 </launch>

@@ -1,12 +1,16 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>aubo_vla</name><version>0.1.0</version>
-  <description>Observation-only OpenVLA inference bridge for AUBO Gazebo.</description>
+  <name>aubo_vla</name><version>0.2.0</version>
+  <description>OpenVLA observation, AUBO demonstration recording and shadow previews.</description>
   <maintainer email="zlab@example.com">zlab</maintainer><license>MIT</license>
   <buildtool_depend>catkin</buildtool_depend>
   <exec_depend>rospy</exec_depend><exec_depend>sensor_msgs</exec_depend>
   <exec_depend>std_msgs</exec_depend><exec_depend>rosgraph_msgs</exec_depend>
   <exec_depend>cv_bridge</exec_depend><exec_depend>python3-opencv</exec_depend>
+  <exec_depend>tf2_ros</exec_depend><exec_depend>message_filters</exec_depend>
+  <exec_depend>std_srvs</exec_depend><exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>visualization_msgs</exec_depend>
+  <exec_depend>python3-pil</exec_depend>
   <test_depend>python3-nose</test_depend>
   <test_depend>python3-pil</test_depend>
 </package>

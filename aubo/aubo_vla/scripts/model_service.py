@@ -23,7 +23,15 @@ class Predictor:
     def __init__(self, args):
         self.args = args
         self.lock = threading.Lock()
-        self.metadata = dict(model=MODEL, revision=args.revision, unnorm_key=args.unnorm_key,
+        model_id = getattr(args, 'model', MODEL)
+        schema = getattr(args, 'action_schema', 'unspecified')
+        action_dt = getattr(args, 'action_dt', None)
+        if schema != 'unspecified' and args.unnorm_key == 'bridge_orig':
+            raise ValueError('bridge_orig is not an AUBO action calibration')
+        if schema != 'unspecified' and (action_dt is None or not math.isfinite(action_dt) or action_dt <= 0):
+            raise ValueError('AUBO schema requires a finite positive --action-dt')
+        self.metadata = dict(model=model_id, revision=args.revision, unnorm_key=args.unnorm_key,
+                             action_schema=schema, action_dt=action_dt,
                              mock=args.mock, observation_only=True, attention='eager',
                              quantization='nf4', compute_dtype='bfloat16')
         if args.mock:
@@ -32,10 +40,10 @@ class Predictor:
         from transformers import AutoModelForVision2Seq, AutoProcessor, BitsAndBytesConfig
         self.torch = torch
         torch.cuda.reset_peak_memory_stats()
-        self.processor = AutoProcessor.from_pretrained(MODEL, revision=args.revision,
+        self.processor = AutoProcessor.from_pretrained(model_id, revision=args.revision,
                                                        trust_remote_code=True)
         self.model = AutoModelForVision2Seq.from_pretrained(
-            MODEL, revision=args.revision, trust_remote_code=True,
+            model_id, revision=args.revision, trust_remote_code=True,
             attn_implementation='eager', torch_dtype=torch.bfloat16,
             low_cpu_mem_usage=True, device_map={'': 0},
             quantization_config=BitsAndBytesConfig(load_in_4bit=True,
@@ -53,8 +61,12 @@ class Predictor:
         from PIL import Image
         request_id = payload['request_id']
         stamp = payload['stamp']
-        if not isinstance(request_id, str) or not isinstance(stamp, (int, float)) or not math.isfinite(stamp):
+        if (not isinstance(request_id, str) or not request_id or len(request_id) > 128
+                or isinstance(stamp, bool) or not isinstance(stamp, (int, float))
+                or not math.isfinite(stamp) or stamp < 0):
             raise ValueError('Invalid request_id or stamp')
+        if not isinstance(payload.get('frame_id', ''), str):
+            raise ValueError('Invalid frame_id')
         instruction = payload['instruction']
         if not isinstance(instruction, str) or not instruction.strip() or len(instruction) > 1000:
             raise ValueError('Invalid instruction')
@@ -145,7 +157,11 @@ def handler_for(predictor):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--port', type=int, default=8008)
+    parser.add_argument('--model', default=MODEL, help='Verified merged checkpoint with processor and norm_stats')
     parser.add_argument('--revision', default=REVISION)
+    parser.add_argument('--action-schema', choices=['unspecified', 'aubo_delta_pose_v1'],
+                        default='unspecified', help='Declare only after validating AUBO action semantics')
+    parser.add_argument('--action-dt', type=float, help='Verified training action horizon in seconds')
     parser.add_argument('--unnorm-key', default='bridge_orig')
     parser.add_argument('--mock', action='store_true', help='Transport tests only; explicitly marked mock')
     args = parser.parse_args()

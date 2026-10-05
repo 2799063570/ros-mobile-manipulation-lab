@@ -1,0 +1,14 @@
+<launch>
+  <arg name="config" default="$(find aubo_vla)/config/record.yaml"/>
+  <arg name="output_root" default="/tmp/aubo_vla_episodes"/>
+  <arg name="image_topic" default="/workspace_camera/color/image_raw"/>
+  <arg name="camera_info_topic" default="/workspace_camera/color/camera_info"/>
+  <arg name="joint_states_topic" default="/aubo_i5/joint_states"/>
+  <node pkg="aubo_vla" type="record_episode.py" name="vla_recorder" output="screen">
+    <rosparam command="load" file="$(arg config)"/>
+    <param name="output_root" value="$(arg output_root)"/>
+    <param name="image_topic" value="$(arg image_topic)"/>
+    <param name="camera_info_topic" value="$(arg camera_info_topic)"/>
+    <param name="joint_states_topic" value="$(arg joint_states_topic)"/>
+  </node>
+</launch>

@@ -70,6 +70,23 @@ class ServiceTest(unittest.TestCase):
             self.post(dict(self.payload, stamp=float('nan')))
         self.assertEqual(e.exception.code, 400)
 
+    def test_health_marks_action_semantics_unspecified(self):
+        with self.opener.open(self.url+'/health', timeout=2) as response:
+            data = json.load(response)
+        self.assertEqual(data['action_schema'], 'unspecified')
+        self.assertIsNone(data['action_dt'])
+
+    def test_bridge_statistics_cannot_be_declared_aubo(self):
+        with self.assertRaises(ValueError):
+            Predictor(argparse.Namespace(mock=True, revision='test', unnorm_key='bridge_orig',
+                                         action_schema='aubo_delta_pose_v1', action_dt=0.5))
+
+    def test_invalid_metadata_rejected(self):
+        for change in (dict(stamp=True), dict(stamp=-1.), dict(request_id=''), dict(frame_id=[])):
+            with self.assertRaises(urllib.error.HTTPError) as error:
+                self.post(dict(self.payload, **change))
+            self.assertEqual(error.exception.code, 400)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,0 +1,17 @@
+image_topic: /workspace_camera/color/image_raw
+camera_info_topic: /workspace_camera/color/camera_info
+# Raw controller feedback; the /joint_states relay may repeat cached positions.
+joint_states_topic: /aubo_i5/joint_states
+base_frame: base_link
+tcp_frame: tcp_link
+sample_rate: 2.0
+sync_slop: 0.05
+max_age: 1.0
+pause_timeout: 2.0
+joint_names: [shoulder_joint, upperArm_joint, foreArm_joint, wrist1_joint, wrist2_joint, wrist3_joint]
+# Must occur in joint_states; use separate remapped/merged feedback if necessary.
+gripper_joint: joint1
+gripper_open: 0.0
+gripper_closed: 0.28
+instruction: pick up the red block and place it in the red area
+scene_id: fixed_eye_to_hand

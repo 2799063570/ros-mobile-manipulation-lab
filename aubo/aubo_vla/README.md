@@ -1,5 +1,17 @@
 # AUBO OpenVLA 观察模式
 
+## 0.2 新增：示范采集与影子预览
+
+- 真实相机模式：`/use_sim_time=false` 时无需 `/clock`；观察结果补充源帧龄。
+- 运行时指令：发布 `/openvla_observe/instruction`，旧指令在途结果会失效。
+- `record.launch`：图像/关节时间配对、严格时间戳 TF、相机标定、TCP 与夹爪反馈采集，人工标记结果。
+- `inspect_episode.py`：校验图片 SHA256、采样周期与完整性，导出实测相邻 TCP 动作差分。
+- `shadow.launch`：仅对匹配 AUBO schema/统计键/revision/周期的模型绘制过期自动清理的 RViz 候选。
+
+新增 Python 模块需构建一次 catkin 并 source devel/setup.bash。
+按 [目标环境调试说明](docs/DEBUGGING.md) 调试；数据语义见 [AUBO 动作规范](docs/ACTION_SCHEMA.md)。
+这次尚未进行新节点的 ROS/Gazebo/GPU 实机环境联调；下方 validation 是已有部署记录。
+
 本包只订阅相机并发布动作诊断，没有任何机器人运动发布器或执行服务调用。
 `bridge_orig` 是预训练数据的动作统计键，不能作为 AUBO 的动作标定。
 
@@ -47,7 +59,7 @@ roslaunch aubo_vla observe.launch
 rostopic echo /openvla_observe/diagnostics
 ```
 
-本包纯 Python，源码工作空间下已验证 `roslaunch` 可发现，无需重建全部 catkin。
+本包纯 Python；0.2 新增可安装 Python 模块，需要构建本包及其依赖，不必重建所有包。
 HTTP 只绑定 `127.0.0.1:8008`。`GET /health` 返回模型标识和 `mock`；
 `POST /predict` 接收 `request_id`、`stamp`（仿真秒）、`frame_id`、`instruction`、`image_png`（base64 PNG）。
 返回七维有限数值动作、原始请求元数据、模型 revision、统计键、延迟与 CUDA 显存统计。

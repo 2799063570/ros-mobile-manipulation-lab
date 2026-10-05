@@ -3,3 +3,5 @@ setup_ros.sh text eol=lf
 simple_diff_robot_gazebo/scripts/*.py text eol=lf
 wheeltec_multi/scripts/*.sh text eol=lf
 wheeltec_multi/scripts/*.py text eol=lf
+aubo/aubo_vla/*.py text eol=lf
+aubo/aubo_vla/**/*.py text eol=lf
