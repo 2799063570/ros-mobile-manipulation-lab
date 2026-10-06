@@ -41,15 +41,15 @@ https://github.com/user-attachments/assets/b636e380-9148-4471-b0e5-202318e15bf4
 
 所有视频均保存在 `aubo/video_or_img/`，点击下方路径可打开或下载：
 
-| 演示内容           | 视频路径                                                                             |
-| ------------------ | ------------------------------------------------------------------------------------ |
-| 分拣流程录像       | [aubo/video_or_img/sorting_process.mp4](aubo/video_or_img/sorting_process.mp4)       |
-| OpenCV 视觉分拣    | [aubo/video_or_img/opencv实现分拣.mp4](aubo/video_or_img/opencv实现分拣.mp4)         |
-| 导航分拣           | [aubo/video_or_img/导航分拣.mp4](aubo/video_or_img/导航分拣.mp4)                     |
-| 笛卡尔路径规划画圆 | [aubo/video_or_img/笛卡尔路径规划画圆.mp4](aubo/video_or_img/笛卡尔路径规划画圆.mp4) |
-| RRT探索建图        | [aubo/video_or_img/rrt探索建图2.mp4](aubo/video_or_img/rrt探索建图2.mp4)             |
-| 颜色跟踪           | [aubo/video_or_img/颜色跟踪.mp4](aubo/video_or_img/颜色跟踪.mp4)                     |
-| 导航实现           | [aubo/video_or_img/导航.mp4](aubo/video_or_img/导航.mp4)                             |
+| 演示内容           | 视频路径                                                                             | B站链接                                                      |
+| ------------------ | ------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| 分拣流程录像       | [aubo/video_or_img/sorting_process.mp4](aubo/video_or_img/sorting_process.mp4)       | 如上视频所示                                                 |
+| OpenCV 视觉分拣    | [aubo/video_or_img/opencv实现分拣.mp4](aubo/video_or_img/opencv实现分拣.mp4)         | [BV1S7pF6gE2j](https://www.bilibili.com/video/BV1S7pF6gE2j/) |
+| 导航分拣           | [aubo/video_or_img/导航分拣.mp4](aubo/video_or_img/导航分拣.mp4)                     | [BV1D7pF6gENt](https://www.bilibili.com/video/BV1D7pF6gENt/) |
+| 笛卡尔路径规划画圆 | [aubo/video_or_img/笛卡尔路径规划画圆.mp4](aubo/video_or_img/笛卡尔路径规划画圆.mp4) | [BV13LpF6kEwW](https://www.bilibili.com/video/BV13LpF6kEwW/) |
+| RRT探索建图        | [aubo/video_or_img/rrt探索建图2.mp4](aubo/video_or_img/rrt探索建图2.mp4)             | [BV1UEpF6zEfq](https://www.bilibili.com/video/BV1UEpF6zEfq/) |
+| 颜色跟踪           | [aubo/video_or_img/颜色跟踪.mp4](aubo/video_or_img/颜色跟踪.mp4)                     | [BV1Q5pF6GE4H](https://www.bilibili.com/video/BV1Q5pF6GE4H/) |
+| 导航实现           | [aubo/video_or_img/导航.mp4](aubo/video_or_img/导航.mp4)                             | [BV1Q5pF6GEsb](https://www.bilibili.com/video/BV1Q5pF6GEsb/) |
 
 ### 功能截图
 
