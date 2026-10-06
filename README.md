@@ -37,6 +37,17 @@ https://github.com/user-attachments/assets/b636e380-9148-4471-b0e5-202318e15bf4
 显示播放器，可点击链接打开或下载原视频。更多演示素材见
 [`aubo/video_or_img/`](aubo/video_or_img/README.md)。
 
+### 视频位置
+
+所有视频均保存在 `aubo/video_or_img/`，点击下方路径可打开或下载：
+
+| 演示内容 | 视频路径 |
+| --- | --- |
+| 分拣流程录像 | [aubo/video_or_img/sorting_process.mp4](aubo/video_or_img/sorting_process.mp4) |
+| OpenCV 视觉分拣 | [aubo/video_or_img/opencv实现分拣.mp4](aubo/video_or_img/opencv实现分拣.mp4) |
+| 导航分拣 | [aubo/video_or_img/导航分拣.mp4](aubo/video_or_img/导航分拣.mp4) |
+| 笛卡尔路径规划画圆 | [aubo/video_or_img/笛卡尔路径规划画圆.mp4](aubo/video_or_img/笛卡尔路径规划画圆.mp4) |
+
 ### 功能截图
 
 | 差速机器人 Gazebo 场景 | 建图、定位与导航 |
