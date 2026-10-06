@@ -41,33 +41,36 @@ https://github.com/user-attachments/assets/b636e380-9148-4471-b0e5-202318e15bf4
 
 所有视频均保存在 `aubo/video_or_img/`，点击下方路径可打开或下载：
 
-| 演示内容 | 视频路径 |
-| --- | --- |
-| 分拣流程录像 | [aubo/video_or_img/sorting_process.mp4](aubo/video_or_img/sorting_process.mp4) |
-| OpenCV 视觉分拣 | [aubo/video_or_img/opencv实现分拣.mp4](aubo/video_or_img/opencv实现分拣.mp4) |
-| 导航分拣 | [aubo/video_or_img/导航分拣.mp4](aubo/video_or_img/导航分拣.mp4) |
+| 演示内容           | 视频路径                                                                             |
+| ------------------ | ------------------------------------------------------------------------------------ |
+| 分拣流程录像       | [aubo/video_or_img/sorting_process.mp4](aubo/video_or_img/sorting_process.mp4)       |
+| OpenCV 视觉分拣    | [aubo/video_or_img/opencv实现分拣.mp4](aubo/video_or_img/opencv实现分拣.mp4)         |
+| 导航分拣           | [aubo/video_or_img/导航分拣.mp4](aubo/video_or_img/导航分拣.mp4)                     |
 | 笛卡尔路径规划画圆 | [aubo/video_or_img/笛卡尔路径规划画圆.mp4](aubo/video_or_img/笛卡尔路径规划画圆.mp4) |
+| RRT探索建图        | [aubo/video_or_img/rrt探索建图2.mp4](aubo/video_or_img/rrt探索建图2.mp4)             |
+| 颜色跟踪           | [aubo/video_or_img/颜色跟踪.mp4](aubo/video_or_img/颜色跟踪.mp4)                     |
+| 导航实现           | [aubo/video_or_img/导航.mp4](aubo/video_or_img/导航.mp4)                             |
 
 ### 功能截图
 
-| 差速机器人 Gazebo 场景 | 建图、定位与导航 |
-| --- | --- |
+| 差速机器人 Gazebo 场景                                                     | 建图、定位与导航                                              |
+| -------------------------------------------------------------------------- | ------------------------------------------------------------- |
 | ![差速机器人 Gazebo 场景](aubo/video_or_img/readme/simple_diff_gazebo.png) | ![机器人建图与导航](aubo/video_or_img/readme/mapping_nav.png) |
 
-| RRT 自主探索 | AUBO 视觉识别与三维定位 |
-| --- | --- |
+| RRT 自主探索                                                           | AUBO 视觉识别与三维定位                                               |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------------- |
 | ![RRT 自主探索轨迹](aubo/video_or_img/readme/rrt_exploration_view.png) | ![AUBO OpenCV 目标识别](aubo/video_or_img/readme/opencv_detector.png) |
 
-| YOLO OBB 目标检测 | MoveIt OctoMap 环境建模 |
-| --- | --- |
+| YOLO OBB 目标检测                                                            | MoveIt OctoMap 环境建模                                         |
+| ---------------------------------------------------------------------------- | --------------------------------------------------------------- |
 | ![YOLO OBB 目标检测和抓取参数](aubo/video_or_img/readme/object_detector.png) | ![MoveIt OctoMap 环境建模](aubo/video_or_img/readme/octmap.png) |
 
-| AUBO 复合机器人 Gazebo 分拣场景 | AUBO 复合机器人 RViz 分拣场景 |
-| --- | --- |
+| AUBO 复合机器人 Gazebo 分拣场景                                                 | AUBO 复合机器人 RViz 分拣场景                                               |
+| ------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
 | ![AUBO 复合机器人 Gazebo 分拣场景](aubo/video_or_img/readme/分拣场景gazebo.png) | ![AUBO 复合机器人 RViz 分拣场景](aubo/video_or_img/readme/分拣场景rviz.png) |
 
-| 颜色识别与目标跟踪 | RViz 分拣控制界面 |
-| --- | --- |
+| 颜色识别与目标跟踪                                                   | RViz 分拣控制界面                                                  |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------ |
 | ![颜色识别与目标跟踪效果](aubo/video_or_img/readme/颜色识别跟踪.png) | ![RViz 分拣控制界面](aubo/video_or_img/readme/sorting_control.png) |
 
 ## 项目演进路线
@@ -229,24 +232,24 @@ Gazebo 单关节位置控制器与 MoveIt 的机械臂轨迹控制器会占用�
 
 ### 默认运行频率
 
-| 子系统 | 数据或处理环节 | 默认频率 | 配置位置/说明 |
-| --- | --- | ---: | --- |
-| 激光雷达 | `/front/scan`、`/rear/scan` | 15 Hz | 移动机器人 URDF 中两个雷达的 `update_rate` |
-| 雷达融合 | `/scan` | 15 Hz | `scan_merger.launch` 的 `publish_rate` |
-| 差速底盘 | 控制更新、`/odom` 与里程计 TF | 50 Hz | Gazebo 差速驱动插件 `updateRate` |
-| GMapping | 激光处理 / `/map` 更新 | ≤15 Hz / 0.5 Hz | 扫描触发；`map_update_interval: 2.0` |
-| AMCL | 粒子滤波更新 / 可视化更新 | ≤15 Hz / 10 Hz | 扫描与运动阈值触发；`gui_publish_rate` 为 10 Hz |
-| move_base | 全局规划 / 局部控制 | 1 Hz / 10 Hz | `planner_frequency` / `controller_frequency` |
-| 代价地图 | 全局更新/发布；局部更新/发布 | 5/2 Hz；10/5 Hz | `global_costmap.yaml` / `local_costmap.yaml` |
-| 底盘安全层 | `/cmd_vel_raw` → `/cmd_vel` | 20 Hz | 激光急停、减速和命令超时检查 |
-| RGB-D 相机 | 移动复合场景 / 独立分拣与视觉伺服场景 | 15 Hz / 20 Hz | 对应 Gazebo world；真机频率由相机驱动决定 |
-| 目标感知 | YOLO 或 HSV RGB-D 检测 | 10 Hz | 位姿仅在彩色图和深度图同步且检测有效时发布 |
-| 三维避障 | 点云过滤 / MoveIt OctoMap 更新 | ≤相机帧率 / 最高 3 Hz | OctoMap 通过 `max_update_rate` 限频 |
-| 常规机械臂控制 | `/joint_states` / MoveIt 轨迹命令 | 50 Hz / 事件驱动 | 轨迹控制器按规划结果执行，不是周期性规划 |
-| 视觉伺服 | 误差闭环 / 轨迹插值与关节指令输出 | 50 Hz / 250 Hz | `control_rate` / `output_rate`；视觉反馈仍受相机帧率限制 |
-| 视觉伺服关节状态 | `/joint_states` | 50 Hz | 视觉伺服专用控制器配置；真机 SDK 状态轮询同为 50 Hz |
-| 机械臂 `ros_control` | 状态读取 / 控制器读写与指令入队 | 50 Hz / 250 Hz | 状态与控制解耦，250 Hz 层只做轨迹采样、整形和下发，不重复运行规划 |
-| 任务编排与分拣 | 导航、互锁、抓放状态机 | 事件驱动 | 由 action、service、检测消息和超时条件推进 |
+| 子系统               | 数据或处理环节                        |              默认频率 | 配置位置/说明                                                     |
+| -------------------- | ------------------------------------- | --------------------: | ----------------------------------------------------------------- |
+| 激光雷达             | `/front/scan`、`/rear/scan`           |                 15 Hz | 移动机器人 URDF 中两个雷达的 `update_rate`                        |
+| 雷达融合             | `/scan`                               |                 15 Hz | `scan_merger.launch` 的 `publish_rate`                            |
+| 差速底盘             | 控制更新、`/odom` 与里程计 TF         |                 50 Hz | Gazebo 差速驱动插件 `updateRate`                                  |
+| GMapping             | 激光处理 / `/map` 更新                |       ≤15 Hz / 0.5 Hz | 扫描触发；`map_update_interval: 2.0`                              |
+| AMCL                 | 粒子滤波更新 / 可视化更新             |        ≤15 Hz / 10 Hz | 扫描与运动阈值触发；`gui_publish_rate` 为 10 Hz                   |
+| move_base            | 全局规划 / 局部控制                   |          1 Hz / 10 Hz | `planner_frequency` / `controller_frequency`                      |
+| 代价地图             | 全局更新/发布；局部更新/发布          |       5/2 Hz；10/5 Hz | `global_costmap.yaml` / `local_costmap.yaml`                      |
+| 底盘安全层           | `/cmd_vel_raw` → `/cmd_vel`           |                 20 Hz | 激光急停、减速和命令超时检查                                      |
+| RGB-D 相机           | 移动复合场景 / 独立分拣与视觉伺服场景 |         15 Hz / 20 Hz | 对应 Gazebo world；真机频率由相机驱动决定                         |
+| 目标感知             | YOLO 或 HSV RGB-D 检测                |                 10 Hz | 位姿仅在彩色图和深度图同步且检测有效时发布                        |
+| 三维避障             | 点云过滤 / MoveIt OctoMap 更新        | ≤相机帧率 / 最高 3 Hz | OctoMap 通过 `max_update_rate` 限频                               |
+| 常规机械臂控制       | `/joint_states` / MoveIt 轨迹命令     |      50 Hz / 事件驱动 | 轨迹控制器按规划结果执行，不是周期性规划                          |
+| 视觉伺服             | 误差闭环 / 轨迹插值与关节指令输出     |        50 Hz / 250 Hz | `control_rate` / `output_rate`；视觉反馈仍受相机帧率限制          |
+| 视觉伺服关节状态     | `/joint_states`                       |                 50 Hz | 视觉伺服专用控制器配置；真机 SDK 状态轮询同为 50 Hz               |
+| 机械臂 `ros_control` | 状态读取 / 控制器读写与指令入队       |        50 Hz / 250 Hz | 状态与控制解耦，250 Hz 层只做轨迹采样、整形和下发，不重复运行规划 |
+| 任务编排与分拣       | 导航、互锁、抓放状态机                |              事件驱动 | 由 action、service、检测消息和超时条件推进                        |
 
 表中 `≤` 表示模块由上游消息触发，实际频率不会高于输入频率；`15/20 Hz` 分别对应
 移动复合场景和独立固定工位场景。GMapping 与 AMCL 是两种互斥工作模式：在线建图时
@@ -258,10 +261,10 @@ Gazebo 单关节位置控制器与 MoveIt 的机械臂轨迹控制器会占用�
 
 本仓库维护同一套 Python 3 源码，目标环境为：
 
-| 系统 | ROS | Python | 当前验证状态 |
-| --- | --- | --- | --- |
-| Ubuntu 18.04 | Melodic | Python 3 | 容器内 41 个活动包全量构建通过 |
-| Ubuntu 20.04 | Noetic | Python 3 | 实际工作空间全量构建通过，3 项测试无失败 |
+| 系统         | ROS     | Python   | 当前验证状态                             |
+| ------------ | ------- | -------- | ---------------------------------------- |
+| Ubuntu 18.04 | Melodic | Python 3 | 容器内 41 个活动包全量构建通过           |
+| Ubuntu 20.04 | Noetic  | Python 3 | 实际工作空间全量构建通过，3 项测试无失败 |
 
 OpenCV 3（Melodic）和 OpenCV 4（Noetic）均已通过编译。这里的“兼容”指源码、依赖、
 编译及无硬件启动检查通过；RealSense、雷达、WheelTec 控制器和 AUBO 真机仍需在
