@@ -1,0 +1,75 @@
+{
+  "passed": true,
+  "stage": "complete",
+  "episode": "/tmp/aubo-vla-full-launch-validation/episode_20261006_115030_65440b6f",
+  "initial_positions": {
+    "red_block": [
+      0.5400000023473301,
+      -0.11999958810947291,
+      0.11989359761604107
+    ],
+    "green_block": [
+      0.6400000023473301,
+      4.1189052701187495e-07,
+      0.11989359761604107
+    ],
+    "blue_block": [
+      0.5400000023473301,
+      0.12000041189052708,
+      0.11989359761604107
+    ]
+  },
+  "final_positions": {
+    "red_block": [
+      0.43755182539718523,
+      -0.2537902444640687,
+      0.1198431641074024
+    ],
+    "green_block": [
+      0.5791395594150154,
+      -0.25260404210375037,
+      0.11960766967254625
+    ],
+    "blue_block": [
+      0.43760796050843254,
+      0.24865063065193266,
+      0.11984314750642498
+    ]
+  },
+  "peak_heights": {
+    "red_block": 0.370726611312983,
+    "green_block": 0.3699705718030072,
+    "blue_block": 0.37078821196424566
+  },
+  "states": [
+    "INITIALIZING | waiting for Gazebo controllers",
+    "INITIALIZING | waiting for gripper action",
+    "IDLE | controllers ready",
+    "OBSERVING",
+    "READY | waiting for panel command",
+    "SORTING",
+    "DETECTING | building instance queue",
+    "PICKING | red #3",
+    "DETECTING | next cached instance",
+    "PICKING | green #2",
+    "DETECTING | next cached instance",
+    "PICKING | blue #1",
+    "DETECTING | next cached instance",
+    "OBSERVING | queue needs a fresh observation",
+    "DETECTING | confirming remaining instances",
+    "HOMING | down",
+    "READY | waiting for panel command"
+  ],
+  "inspection": {
+    "passed": true,
+    "samples": 184,
+    "valid_pairs": 183,
+    "errors": [],
+    "outcome": "success",
+    "action_schema": "aubo_delta_pose_v1",
+    "action_label": "measured_next_state_delta",
+    "nominal_dt": 0.5,
+    "rejected": 0
+  },
+  "export": "/tmp/aubo-vla-full-launch-validation/episode_20261006_115030_65440b6f/actions.jsonl"
+}

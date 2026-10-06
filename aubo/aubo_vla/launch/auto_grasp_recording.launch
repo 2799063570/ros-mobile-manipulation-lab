@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- 每次运行创建独立的 ROS/Gazebo 主服务和全新场景，避免旧模型及节点冲突。 -->
+  <arg name="output_root" default="$(env HOME)/aubo_vla_data"/>
+  <arg name="gui" default="true"/>
+  <arg name="rviz" default="true"/>
+  <arg name="timeout" default="300" doc="工作流每个等待阶段的墙钟超时，单位为秒"/>
+
+  <!-- 编排程序使用独立端口启动 grasp_recording_gazebo.launch，再执行观察、录制、
+       分拣和结果验收。成功后保留场景，按 Ctrl+C 仅关闭本次创建的进程。
+       外层采用匿名名称，支持在同一 ROS 主服务上启动多个独立实例。 -->
+  <node pkg="aubo_vla" type="run_grasp_demo.py"
+        name="$(anon auto_grasp_recording)" output="screen" respawn="false"
+        args="--output-root '$(arg output_root)' --gui $(arg gui) --rviz $(arg rviz) --timeout $(arg timeout) --keep-open"/>
+</launch>

@@ -10,7 +10,14 @@
 
 新增 Python 模块需构建一次 catkin 并 source devel/setup.bash。
 按 [目标环境调试说明](docs/DEBUGGING.md) 调试；数据语义见 [AUBO 动作规范](docs/ACTION_SCHEMA.md)。
-这次尚未进行新节点的 ROS/Gazebo/GPU 实机环境联调；下方 validation 是已有部署记录。
+2026-10-06 已完成新节点的 ROS Noetic/Gazebo/真实 GPU 观察、运动与完整三色抓放采集联调，
+详见 [本次调试报告](validation/target_debug_20261006.md)。AUBO 微调模型预览尚未验收。
+一键运行：`rosrun aubo_vla run_grasp_demo.py --keep-open`。
+完整 launch：`roslaunch aubo_vla auto_grasp_recording.launch`，启动后自动执行抓放和采集，
+结束后保留场景直到 Ctrl+C。
+节点启动、执行步骤和数据传递见 [自动抓放流程说明](docs/EXECUTION_FLOW.md)。
+分步仿真回归入口为 `grasp_recording_gazebo.launch` 与 `tests/check_grasp_recording.py`，
+使用方法见调试文档中的“Gazebo 完整抓放采集回归”。
 
 本包只订阅相机并发布动作诊断，没有任何机器人运动发布器或执行服务调用。
 `bridge_orig` 是预训练数据的动作统计键，不能作为 AUBO 的动作标定。

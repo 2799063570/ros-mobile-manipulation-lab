@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-"""Record synchronized expert observations; never invoke robot execution."""
+"""采集时间同步的专家示范观测；记录器只采集数据，不调用机器人执行接口。"""
 import json
 from pathlib import Path
 import threading
@@ -87,7 +87,7 @@ class Recorder:
             rospy.logwarn('Ignored invalid recorder instruction')
             return
         with self.lock:
-            self.instruction = msg.data.strip()  # Frozen in manifest by start().
+            self.instruction = msg.data.strip()  # start() 将该指令固定到本次 episode 的清单中。
 
     def on_clock(self, msg):
         with self.lock:
@@ -140,8 +140,8 @@ class Recorder:
             return TriggerResponse(True, outcome)
 
     def poses_at(self, image, received, writer):
-        # TF often arrives just after the matching image. Retry exact-time
-        # lookup briefly using wall time; never block on a paused ROS clock.
+        # TF 可能晚于对应图像到达，短暂使用墙钟等待并重试图像时刻的变换，
+        # 不使用最新变换替代，也不在暂停的 ROS 仿真时钟上阻塞。
         deadline = received+min(0.25, self.max_age)
         while True:
             with self.lock:

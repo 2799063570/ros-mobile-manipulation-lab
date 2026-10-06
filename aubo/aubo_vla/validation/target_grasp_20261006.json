@@ -1,0 +1,74 @@
+{
+  "passed": true,
+  "stage": "complete",
+  "episode": "/home/zlab/aubo_vla_data/episode_20261006_112916_24e5c77d",
+  "initial_positions": {
+    "red_block": [
+      0.5400000023473301,
+      -0.11999958810947291,
+      0.11989359761604107
+    ],
+    "green_block": [
+      0.6400000023473301,
+      4.1189052701187495e-07,
+      0.11989359761604107
+    ],
+    "blue_block": [
+      0.5400000023473301,
+      0.12000041189052708,
+      0.11989359761604107
+    ]
+  },
+  "final_positions": {
+    "red_block": [
+      0.4375526093916388,
+      -0.25373835494848423,
+      0.11982835902551418
+    ],
+    "green_block": [
+      0.5792190441873152,
+      -0.2524370915011129,
+      0.119597985235275
+    ],
+    "blue_block": [
+      0.43760758854806026,
+      0.24865052238291652,
+      0.11984346595555062
+    ]
+  },
+  "peak_heights": {
+    "red_block": 0.37072717050686144,
+    "green_block": 0.3699466361363679,
+    "blue_block": 0.3707738265042325
+  },
+  "states": [
+    "READY | waiting for panel command",
+    "OBSERVING",
+    "READY | waiting for panel command",
+    "SORTING",
+    "DETECTING | building instance queue",
+    "PICKING | green #5",
+    "DETECTING | next cached instance",
+    "PICKING | red #6",
+    "DETECTING | next cached instance",
+    "PICKING | blue #4",
+    "DETECTING | next cached instance",
+    "OBSERVING | queue needs a fresh observation",
+    "DETECTING | confirming remaining instances",
+    "HOMING | down",
+    "READY | waiting for panel command"
+  ],
+  "inspection": {
+    "passed": true,
+    "samples": 169,
+    "valid_pairs": 168,
+    "errors": [],
+    "outcome": "success",
+    "action_schema": "aubo_delta_pose_v1",
+    "action_label": "measured_next_state_delta",
+    "nominal_dt": 0.5,
+    "rejected": 0
+  },
+  "export": "/home/zlab/aubo_vla_data/episode_20261006_112916_24e5c77d/actions.jsonl",
+  "captured_episode": "/tmp/aubo-vla-grasp-20261006/episode_20261006_112916_24e5c77d"
+}

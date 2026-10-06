@@ -256,10 +256,13 @@ bool SortingTask::continuousSortingOperation()
     {
       std::lock_guard<std::mutex> lock(queue_mutex_);
       const auto now = ros::WallTime::now();
-      // A masked frame may prove the source is alive without being allowed to
-      // modify tracks.  reserve() separately enforces each track's max_age.
+      // A masked heartbeat does not validate the next pick. After retreat,
+      // wait for a fresh unmasked frame before reserving another instance.
+      // reserve() separately enforces each track's max_age.
       if (!queue_last_source_frame_.isZero() &&
-          (now-queue_last_source_frame_).toSec() <= queue_frame_max_age_)
+          (now-queue_last_source_frame_).toSec() <= queue_frame_max_age_ &&
+          !queue_last_frame_.isZero() &&
+          (now-queue_last_frame_).toSec() <= queue_frame_max_age_)
         reserved = instance_queue_.reserve(sort_classes_, now.toSec(), target);
       empty = observation_ready_.load() && !queue_empty_since_.isZero() &&
           (now-queue_empty_since_).toSec() >= queue_empty_confirmation_ &&

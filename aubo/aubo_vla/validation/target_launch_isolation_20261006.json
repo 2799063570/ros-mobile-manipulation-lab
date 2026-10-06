@@ -1,0 +1,75 @@
+{
+  "passed": true,
+  "stage": "complete",
+  "episode": "/tmp/aubo-vla-launch-isolation-validation/episode_20261006_140254_a8240efa",
+  "initial_positions": {
+    "red_block": [
+      0.5400000023473301,
+      -0.11999958810947291,
+      0.11989359761604107
+    ],
+    "green_block": [
+      0.6400000023473301,
+      4.1189052701187495e-07,
+      0.11989359761604107
+    ],
+    "blue_block": [
+      0.5400000023473301,
+      0.12000041189052708,
+      0.11989359761604107
+    ]
+  },
+  "final_positions": {
+    "red_block": [
+      0.4375518730612733,
+      -0.25379016434987056,
+      0.11984316898856831
+    ],
+    "green_block": [
+      0.5791322433105688,
+      -0.25267501899727446,
+      0.11962592286998865
+    ],
+    "blue_block": [
+      0.43751865242089516,
+      0.24865495064350346,
+      0.11978715371322125
+    ]
+  },
+  "peak_heights": {
+    "red_block": 0.3707420995047344,
+    "green_block": 0.3699168910944617,
+    "blue_block": 0.3707854619942028
+  },
+  "states": [
+    "INITIALIZING | waiting for Gazebo controllers",
+    "INITIALIZING | waiting for gripper action",
+    "IDLE | controllers ready",
+    "OBSERVING",
+    "READY | waiting for panel command",
+    "SORTING",
+    "DETECTING | building instance queue",
+    "PICKING | red #3",
+    "DETECTING | next cached instance",
+    "PICKING | green #2",
+    "DETECTING | next cached instance",
+    "PICKING | blue #1",
+    "DETECTING | next cached instance",
+    "OBSERVING | queue needs a fresh observation",
+    "DETECTING | confirming remaining instances",
+    "HOMING | down",
+    "READY | waiting for panel command"
+  ],
+  "inspection": {
+    "passed": true,
+    "samples": 185,
+    "valid_pairs": 184,
+    "errors": [],
+    "outcome": "success",
+    "action_schema": "aubo_delta_pose_v1",
+    "action_label": "measured_next_state_delta",
+    "nominal_dt": 0.5,
+    "rejected": 0
+  },
+  "export": "/tmp/aubo-vla-launch-isolation-validation/episode_20261006_140254_a8240efa/actions.jsonl"
+}

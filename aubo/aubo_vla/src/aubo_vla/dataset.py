@@ -1,8 +1,11 @@
 """Versioned RGB/TCP demonstrations and offline measured-motion export."""
 import hashlib
+import io
 import json
 import math
 from pathlib import Path
+
+from PIL import Image
 
 from .actions import SCHEMA, pose_delta, quaternion, vector
 from .timing import positive
@@ -44,6 +47,24 @@ def validate_sample(sample):
     quaternion(sample['camera_pose']['orientation'])
 
 
+def validate_png(png, camera):
+    """Verify encoded data and decode pixels before trusting an observation."""
+    if not png.startswith(b'\x89PNG\r\n\x1a\n'):
+        raise ValueError('Expected PNG bytes')
+    try:
+        with Image.open(io.BytesIO(png)) as image:
+            if image.format != 'PNG' or image.mode != 'RGB':
+                raise ValueError('Expected RGB PNG image')
+            if image.size != (camera['width'], camera['height']):
+                raise ValueError('PNG/CameraInfo dimensions mismatch')
+            image.verify()
+        # verify checks PNG structure/CRC; load also checks compressed pixels.
+        with Image.open(io.BytesIO(png)) as image:
+            image.load()
+    except (OSError, SyntaxError, ValueError, Image.DecompressionBombError) as exc:
+        raise ValueError('Invalid observation PNG: '+str(exc)) from exc
+
+
 class EpisodeWriter:
     """Caller serializes access. A crash leaves state=recording, never complete."""
     def __init__(self, directory, metadata):
@@ -66,8 +87,7 @@ class EpisodeWriter:
 
     def append(self, sample, png):
         validate_sample(sample)
-        if not png.startswith(b'\x89PNG\r\n\x1a\n'):
-            raise ValueError('Expected PNG bytes')
+        validate_png(png, sample['camera_info'])
         if self.last_stamp is not None and sample['stamp'] <= self.last_stamp:
             raise ValueError('Non-increasing image timestamp')
         if abs(sample['joint_stamp']-sample['stamp']) > self.metadata['sync_slop']:
@@ -130,6 +150,7 @@ def inspect_episode(directory, period_tolerance=0.20):
             png = path.read_bytes()
             if not png.startswith(b'\x89PNG\r\n\x1a\n') or hashlib.sha256(png).hexdigest() != sample['image_sha256']:
                 raise ValueError('Image missing, invalid or checksum mismatch')
+            validate_png(png, sample['camera_info'])
             valid.append(True)
         except (ValueError, KeyError, TypeError, OSError) as exc:
             errors.append('sample %d: %s' % (i, exc))

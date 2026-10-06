@@ -1,9 +1,11 @@
 <launch>
+  <!-- 输入话题和采样标定可分别配置；显式话题参数覆盖 YAML 中的同名项。 -->
   <arg name="config" default="$(find aubo_vla)/config/record.yaml"/>
   <arg name="output_root" default="/tmp/aubo_vla_episodes"/>
   <arg name="image_topic" default="/workspace_camera/color/image_raw"/>
   <arg name="camera_info_topic" default="/workspace_camera/color/camera_info"/>
   <arg name="joint_states_topic" default="/aubo_i5/joint_states"/>
+  <!-- 只启动采集节点；通过 /vla_recorder/start 等服务控制示范的开始和结束。 -->
   <node pkg="aubo_vla" type="record_episode.py" name="vla_recorder" output="screen">
     <rosparam command="load" file="$(arg config)"/>
     <param name="output_root" value="$(arg output_root)"/>

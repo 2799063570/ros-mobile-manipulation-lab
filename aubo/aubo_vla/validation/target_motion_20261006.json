@@ -1,0 +1,18 @@
+{
+  "episode": "/tmp/aubo-vla-motion-20261006/episode_20261006_110623_cc955f7b",
+  "report": {
+    "passed": true,
+    "samples": 22,
+    "valid_pairs": 21,
+    "errors": [],
+    "outcome": "failure",
+    "action_schema": "aubo_delta_pose_v1",
+    "action_label": "measured_next_state_delta",
+    "nominal_dt": 0.5,
+    "rejected": 0
+  },
+  "max_translation_m": 0.007367386234058761,
+  "max_rotation_rad": 0.021959245714734302,
+  "gripper_min": 0.0,
+  "gripper_max": 0.7142859615987642
+}

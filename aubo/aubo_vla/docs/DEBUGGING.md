@@ -107,6 +107,73 @@ roslaunch aubo_vla record.launch image_topic:=/camera/color/image_raw \
 
 ## 4. 离线检查与导出
 
+### Gazebo 完整抓放采集回归
+
+完整 launch 入口（启动后自动执行任务）：
+
+```bash
+roslaunch aubo_vla auto_grasp_recording.launch
+# 无界面运行或指定输出目录：
+roslaunch aubo_vla auto_grasp_recording.launch gui:=false rviz:=false \
+  output_root:=/home/zlab/aubo_vla_data timeout:=300
+```
+
+此 launch 包含仿真、控制器、MoveIt、颜色感知、分拣任务、记录器及自动工作流。
+无需再手动调用 start 服务。每次创建独立的 ROS/Gazebo master 和全新场景，
+避免旧场景的 `entity already exists`、Gazebo 端口占用和控制器重名冲突。
+每次生成唯一 `run_*/`，包含 `run.json`、`report.json` 和 `launch.log`；
+episode 内生成 `actions.jsonl`。成功后保留场景供检查，按 Ctrl+C 关闭本次实例。
+失败时保留数据和报告并关闭本次场景，不停止旧实例。
+手动诊断子场景时，从 `run.json` 读取对应 ROS_MASTER_URI 和 GAZEBO_MASTER_URI，
+设置到诊断终端后再使用 rostopic/rosservice。
+
+推荐使用一键自动化程序。在已构建的工作空间根目录执行：
+
+```bash
+source /opt/ros/noetic/setup.bash
+source devel/setup.bash
+rosrun aubo_vla run_grasp_demo.py --output-root /home/zlab/aubo_vla_data --keep-open
+```
+
+默认打开 Gazebo 和 RViz。程序自动启动独立 ROS/Gazebo 实例、等待控制器、
+进入观察位、冻结语言标签、录制三色抓放、检查抬升及放置结果、结束录制并导出。
+它调用的是既有分拣控制器，语言文本仍用于示范标签。
+`--keep-open` 在成功后保留窗口，按 Ctrl+C 关闭本次实例；不加则运行后自动关闭。
+无界面验证使用 `--headless`。`--timeout 300` 是每个工作流等待阶段的墙钟上限。
+
+每次生成唯一的 `run_<时间>_<编号>/` 目录，包含 `launch.log`、`report.json` 和
+`run.json`；episode 单独保存在 output-root 下，`actions.jsonl` 位于 episode 内。
+报告 `passed=true`、`stage=complete` 且程序退出码 0 表示通过。
+失败或 Ctrl+C 时先尝试停止分拣、中止录制，再关闭本次启动的进程；已有数据保留。
+程序使用独立端口，不停止其他终端启动的 ROS/Gazebo 实例。
+
+若希望分别启动场景和工作流，也可使用以下入口：
+
+以下命令会通过现有分拣服务执行运动，只用于新启动的固定平台测试仿真。
+不要与其他 ROS 场景同时运行。在工作空间根目录启动：
+
+```bash
+roslaunch aubo_vla grasp_recording_gazebo.launch output_root:=/home/zlab/aubo_vla_data
+```
+
+另一个已 source 的终端执行：
+
+```bash
+/usr/bin/python3 src/aubo/aubo_vla/tests/check_grasp_recording.py \
+  --output /tmp/grasp_recording_report.json --timeout 300
+```
+
+报告文件必须不存在。脚本等待场景就绪、进入观察位，冻结三个颜色方块的指令，
+开始录制并启动完整分拣。仅在任务返回 READY、每个方块至少抬升 5 cm、最终
+落在对应放置中心 5 cm 内且高度为 0.12±0.03 m 后标记 success。
+这是 Gazebo 世界状态验收，不能替代真实机器人上的人工确认。
+随后检查 episode 并生成其目录内的 `actions.jsonl`；报告 `passed=true` 且退出码 0
+才表示抓放和数据检查都通过。失败时尝试停止任务并中止录制，保留报告和样本。
+若任务成功但数据检查失败，episode 保留实际任务 success 标签，回归仍不通过。
+重新测试需要重启新场景；脚本拒绝方块已经位于放置区的场景。
+
+### 手动离线检查
+
 不启动 ROS 或机器人也可以运行：
 
 ```bash
@@ -115,7 +182,9 @@ roslaunch aubo_vla record.launch image_topic:=/camera/color/image_raw \
   --export /absolute/path/to/new_actions.jsonl
 ```
 
-检查结果 passed=true 且退出码 0 才通过。检查失败不导出，输出文件已存在也不覆盖。
+检查结果 passed=true 且退出码 0 才通过。除 SHA256 外还验证 PNG 完整解码、RGB 模式
+及标定尺寸，损坏或尺寸不符的图片拒收。检查失败不导出，输出文件已存在也不覆盖。
+failure episode 默认禁止导出；检查调试或失败样本时，需显式加 `--include-failure`。
 末帧不产生动作；每行 image 指向 t 时刻图像，action 对应 t→t+dt 的实测差分和
 t+dt 的夹爪位置。图像在 episode 的 images/ 下；动作中 episode 字段提供绝对路径。
 详见 [动作规范](ACTION_SCHEMA.md)。这一步是数据回放核对基础，不会执行轨迹，
@@ -154,6 +223,9 @@ rostopic echo /vla_shadow/candidates
 这两个脚本会暂停/恢复 Gazebo，仅用于测试仿真。真实模型环境再运行原有 check_gpu、
 validate_model 和 benchmark，旧 validation JSON 是之前部署的证据，不代表本次新节点
 已完成目标环境联调。
+
+2026-10-06 的目标环境回归已通过，具体范围、数据与限制见
+[本次调试报告](../validation/target_debug_20261006.md)。
 
 本阶段未实现：语言任务编排、训练/微调管线、完整离线轨迹执行回放、控制权仲裁、
 碰撞/IK 安全监督和 VLA 闭环执行。下一阶段应先根据采集结果确认动作监督方式，

@@ -1,0 +1,100 @@
+{
+  "run": {
+    "stage": "complete",
+    "passed": true,
+    "run": "/tmp/aubo-vla-automation-validation/run_20261006_114554_0490a360",
+    "ros_master": "http://127.0.0.1:34285",
+    "gazebo_master": "http://127.0.0.1:51467",
+    "episode": "/tmp/aubo-vla-automation-validation/episode_20261006_114608_efddd842",
+    "report": "/tmp/aubo-vla-automation-validation/run_20261006_114554_0490a360/report.json"
+  },
+  "report": {
+    "passed": true,
+    "stage": "complete",
+    "episode": "/tmp/aubo-vla-automation-validation/episode_20261006_114608_efddd842",
+    "initial_positions": {
+      "red_block": [
+        0.5400000023473301,
+        -0.11999958810947291,
+        0.11989359761604107
+      ],
+      "green_block": [
+        0.6400000023473301,
+        4.1189052701187495e-07,
+        0.11989359761604107
+      ],
+      "blue_block": [
+        0.5400000023473301,
+        0.12000041189052708,
+        0.11989359761604107
+      ]
+    },
+    "final_positions": {
+      "red_block": [
+        0.4375518187935026,
+        -0.25379025505103736,
+        0.11984316398291539
+      ],
+      "green_block": [
+        0.5792755517408608,
+        -0.2523799786182156,
+        0.11962274744832935
+      ],
+      "blue_block": [
+        0.43751128900986064,
+        0.24866953138549336,
+        0.1198756243903041
+      ]
+    },
+    "peak_heights": {
+      "red_block": 0.3707607844311102,
+      "green_block": 0.3699372053348439,
+      "blue_block": 0.3707635111864232
+    },
+    "states": [
+      "INITIALIZING | waiting for Gazebo controllers",
+      "INITIALIZING | waiting for gripper action",
+      "IDLE | controllers ready",
+      "OBSERVING",
+      "READY | waiting for panel command",
+      "SORTING",
+      "DETECTING | building instance queue",
+      "PICKING | red #3",
+      "DETECTING | next cached instance",
+      "PICKING | green #2",
+      "DETECTING | next cached instance",
+      "PICKING | blue #1",
+      "DETECTING | next cached instance",
+      "OBSERVING | queue needs a fresh observation",
+      "DETECTING | confirming remaining instances",
+      "HOMING | down",
+      "READY | waiting for panel command"
+    ],
+    "inspection": {
+      "passed": true,
+      "samples": 176,
+      "valid_pairs": 175,
+      "errors": [],
+      "outcome": "success",
+      "action_schema": "aubo_delta_pose_v1",
+      "action_label": "measured_next_state_delta",
+      "nominal_dt": 0.5,
+      "rejected": 0
+    },
+    "export": "/tmp/aubo-vla-automation-validation/episode_20261006_114608_efddd842/actions.jsonl"
+  },
+  "failed_attempts": [
+    {
+      "run": "run_20261006_114215_fe3c5f39",
+      "error": "Task failed: ERROR | operation failed"
+    },
+    {
+      "run": "run_20261006_114315_0388c2ec",
+      "error": "Task failed: ERROR | operation failed"
+    },
+    {
+      "run": "run_20261006_114400_7aeb09e9",
+      "error": "Task failed: ERROR | operation failed"
+    }
+  ]
+}

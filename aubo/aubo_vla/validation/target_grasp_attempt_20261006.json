@@ -1,0 +1,24 @@
+{
+  "passed": false,
+  "stage": "failed",
+  "episode": null,
+  "initial_positions": {
+    "red_block": [
+      0.5400000023473301,
+      -0.11999958810947291,
+      0.11989359761604107
+    ],
+    "green_block": [
+      0.6400000023473301,
+      4.1189052701187495e-07,
+      0.11989359761604107
+    ],
+    "blue_block": [
+      0.5400000023473301,
+      0.12000041189052708,
+      0.11989359761604107
+    ]
+  },
+  "failed_stage": "observation",
+  "error": "Timed out: /sorting/move_to_observation"
+}

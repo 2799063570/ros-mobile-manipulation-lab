@@ -1,0 +1,19 @@
+<launch>
+  <!-- 固定平台颜色分拣场景；任务默认等待服务命令，由自动工作流负责启动。 -->
+  <arg name="output_root" default="/tmp/aubo_vla_grasp_episodes"/>
+  <arg name="gui" default="false"/>
+  <arg name="rviz" default="false"/>
+  <!-- 启动 Gazebo、控制器、MoveIt、相机 TF、颜色感知与现有分拣任务。 -->
+  <include file="$(find aubo_sorting)/launch/sorting_gazebo.launch">
+    <arg name="camera_mount" value="eye_to_hand"/>
+    <arg name="detector" value="color"/>
+    <arg name="auto_move_to_observation" value="false"/>
+    <arg name="auto_start" value="false"/>
+    <arg name="gui" value="$(arg gui)"/>
+    <arg name="rviz" value="$(arg rviz)"/>
+  </include>
+  <!-- 记录器订阅图像、相机标定、原始关节反馈和 TF；它不发送运动指令。 -->
+  <include file="$(find aubo_vla)/launch/record.launch">
+    <arg name="output_root" value="$(arg output_root)"/>
+  </include>
+</launch>

@@ -1,4 +1,5 @@
 import copy
+import hashlib
 import io
 import json
 from pathlib import Path
@@ -110,3 +111,37 @@ class DatasetTest(unittest.TestCase):
     def test_existing_episode_directory_is_never_replaced(self):
         with self.assertRaises(FileExistsError):
             EpisodeWriter(self.directory, self.metadata)
+
+    def test_writer_rejects_corrupt_png_and_wrong_dimensions_or_mode(self):
+        invalid = [b'\x89PNG\r\n\x1a\nBROKEN', self.png[:-12]]
+        for mode, size in [('RGB', (9, 8)), ('L', (8, 8))]:
+            buffer = io.BytesIO()
+            Image.new(mode, size).save(buffer, 'PNG')
+            invalid.append(buffer.getvalue())
+        for png in invalid:
+            with self.subTest(png_size=len(png)):
+                with self.assertRaises(ValueError):
+                    self.writer.append(self.sample, png)
+                self.assertEqual(self.writer.metadata['samples'], 0)
+                self.assertEqual(list((self.directory/'images').iterdir()), [])
+
+    def test_inspector_rejects_invalid_images_with_matching_checksum(self):
+        self.append_pair()
+        self.writer.finish('success')
+        stream = self.directory/'samples.jsonl'
+        lines = stream.read_text(encoding='utf-8').splitlines()
+        sample = json.loads(lines[0])
+        invalid = [b'\x89PNG\r\n\x1a\nBROKEN', self.png[:-12]]
+        for mode, size in [('RGB', (9, 8)), ('L', (8, 8))]:
+            buffer = io.BytesIO()
+            Image.new(mode, size).save(buffer, 'PNG')
+            invalid.append(buffer.getvalue())
+        for png in invalid:
+            with self.subTest(png_size=len(png)):
+                (self.directory/sample['image']).write_bytes(png)
+                sample['image_sha256'] = hashlib.sha256(png).hexdigest()
+                lines[0] = json.dumps(sample)
+                stream.write_text('\n'.join(lines)+'\n', encoding='utf-8')
+                report, actions = inspect_episode(self.directory)
+                self.assertFalse(report['passed'], report)
+                self.assertEqual(actions, [])

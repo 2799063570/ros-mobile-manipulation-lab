@@ -13,4 +13,7 @@
   <exec_depend>python3-pil</exec_depend>
   <test_depend>python3-nose</test_depend>
   <test_depend>python3-pil</test_depend>
+  <exec_depend>gazebo_msgs</exec_depend>
+  <exec_depend>roslaunch</exec_depend>
+  <exec_depend>aubo_sorting</exec_depend>
 </package>
