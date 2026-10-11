@@ -1,0 +1,1 @@
+sample_id,frame_id,true_frame_id,true_class,pred_class,valid,pred_x,pred_y,pred_z,true_x,true_y,true_z,pred_yaw_rad,true_yaw_rad,pred_width_m,true_width_m

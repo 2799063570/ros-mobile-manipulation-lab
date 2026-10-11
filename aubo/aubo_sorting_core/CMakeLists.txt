@@ -11,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   dynamic_reconfigure
   geometry_msgs
   inspire_gripper
+  message_generation
   moveit_core
   moveit_msgs
   moveit_ros_planning_interface
@@ -26,6 +27,8 @@ find_package(catkin REQUIRED COMPONENTS
 )
 
 generate_dynamic_reconfigure_options(cfg/SortingTask.cfg)
+add_message_files(FILES ExperimentAudit.msg)
+generate_messages(DEPENDENCIES moveit_msgs std_msgs)
 
 catkin_package(
   INCLUDE_DIRS include
@@ -38,6 +41,7 @@ catkin_package(
     dynamic_reconfigure
     geometry_msgs
     inspire_gripper
+    message_runtime
     moveit_core
     moveit_msgs
     moveit_ros_planning_interface
@@ -67,8 +71,10 @@ add_library(color_sorting_task
   src/grasp_attachment.cpp
   src/pick_place.cpp
   src/task_utils.cpp
+  src/experiment_events.cpp
+  src/experiment_planning.cpp
 )
-add_dependencies(color_sorting_task ${PROJECT_NAME}_gencfg ${catkin_EXPORTED_TARGETS})
+add_dependencies(color_sorting_task ${PROJECT_NAME}_gencfg ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(color_sorting_task ${catkin_LIBRARIES})
 
 add_executable(sorting_task_cpp src/sorting_task_node.cpp)

@@ -149,6 +149,18 @@ namespace aubo_sorting_core
     private_nh_.param<std::string>("workspace_update_topic", workspace_update_topic_,
                                    "/sorting/workspace_update");
     private_nh_.param("planning_time", planning_time_, 12.0);
+    private_nh_.param<std::string>("planner_id", planner_id_, "");
+    private_nh_.param<std::string>("planning_service", planning_service_, "");
+    private_nh_.param("experiment_enabled", experiment_enabled_, false);
+    private_nh_.param("revalidate_trajectories", revalidate_trajectories_, false);
+    private_nh_.param("trajectory_audit_step", trajectory_audit_step_, 0.02);
+    private_nh_.param<std::string>("experiment_run_id", experiment_run_id_, "");
+    private_nh_.param<std::string>("experiment_condition", experiment_condition_, "");
+    private_nh_.param<std::string>("experiment_scene_id", experiment_scene_id_, "");
+    if (!std::isfinite(trajectory_audit_step_) || trajectory_audit_step_ <= 0.0 || trajectory_audit_step_ > 0.1)
+      throw std::runtime_error("trajectory_audit_step must be in (0, 0.1] rad");
+    if (experiment_enabled_ && (experiment_run_id_.empty() || experiment_scene_id_.empty()))
+      throw std::runtime_error("experiments require an explicit run_id and scene_id");
     private_nh_.param("pregrasp_wrist1_limit", pregrasp_wrist1_limit_, 0.0);
     if (!std::isfinite(pregrasp_wrist1_limit_) || pregrasp_wrist1_limit_ < 0.0 ||
         pregrasp_wrist1_limit_ > 3.04)

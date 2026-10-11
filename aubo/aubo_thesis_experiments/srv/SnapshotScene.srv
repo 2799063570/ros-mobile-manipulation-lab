@@ -1,0 +1,8 @@
+# Freeze one full scene and convert its geometry to conservative world AABBs.
+uint32 max_obstacles
+---
+bool success
+string reason
+string frame_id
+moveit_msgs/PlanningScene scene
+float64[] obs_flattened

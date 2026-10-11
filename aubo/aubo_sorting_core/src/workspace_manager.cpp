@@ -300,7 +300,7 @@ bool SortingTask::addTableCollision()
   return true;
 }
 
-bool SortingTask::refreshOctomap()
+bool SortingTask::refreshOctomapImpl()
 {
   // 更新八叉树地图
   // 首先等待点云数据 等待点云回调数据中的时间戳大于当前时间戳 且点云数据非空 说明有新的点云支持我们重新构建八叉树

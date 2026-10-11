@@ -1,0 +1,16 @@
+# Read-only audit. Uses one complete PlanningScene snapshot; never executes motion.
+moveit_msgs/RobotState start_state
+bool use_provided_scene
+moveit_msgs/PlanningScene scene
+moveit_msgs/RobotTrajectory trajectory
+string group_name
+moveit_msgs/Constraints path_constraints
+moveit_msgs/Constraints[] goal_constraints
+float64 max_joint_step
+---
+bool valid
+string reason
+uint32 samples_checked
+int32 invalid_segment
+float64 elapsed_wall_seconds
+string scene_name

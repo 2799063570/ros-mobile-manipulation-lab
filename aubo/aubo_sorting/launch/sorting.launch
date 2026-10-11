@@ -1,5 +1,14 @@
 <?xml version="1.0"?>
 <launch>
+  <arg name="planner_id" default=""/>
+  <arg name="planning_service" default=""/>
+  <arg name="experiment_enabled" default="false"/>
+  <arg name="experiment_run_id" default=""/>
+  <arg name="experiment_condition" default=""/>
+  <arg name="experiment_scene_id" default=""/>
+  <arg name="revalidate_trajectories" default="false"/>
+  <arg name="trajectory_audit_step" default="0.02"/>
+
   <!-- Robot controllers and move_group must already be running. -->
   <arg name="start_perception" default="true"/>
   <arg name="start_task" default="true"/>
@@ -56,6 +65,14 @@
     <param name="auto_start" value="$(arg auto_start)"/><!-- 自动开始任务 -->
     <param name="use_grasp_attachment" value="$(arg use_grasp_attachment)"/><!-- 是否使用抓取插件 -->
     <param name="gripper_backend" value="$(arg gripper_backend)"/>
+    <param name="planner_id" value="$(arg planner_id)"/>
+    <param name="planning_service" value="$(arg planning_service)"/>
+    <param name="experiment_enabled" value="$(arg experiment_enabled)"/>
+    <param name="experiment_run_id" value="$(arg experiment_run_id)"/>
+    <param name="experiment_condition" value="$(arg experiment_condition)"/>
+    <param name="experiment_scene_id" value="$(arg experiment_scene_id)"/>
+    <param name="revalidate_trajectories" value="$(arg revalidate_trajectories)"/>
+    <param name="trajectory_audit_step" value="$(arg trajectory_audit_step)"/>
   </node>
 
   <node if="$(arg debug_view)" pkg="image_view" type="image_view"

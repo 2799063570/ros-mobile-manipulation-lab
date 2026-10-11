@@ -11,6 +11,7 @@
 #include <moveit/move_group_interface/move_group_interface.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <moveit_msgs/PlanningScene.h>
+#include <moveit_msgs/DisplayTrajectory.h>
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <std_msgs/String.h>
@@ -90,6 +91,27 @@ private:
   };
 
   void loadParameters();
+  bool runExperimentStage(const std::string& stage, const std::string& description,
+                          const std::function<bool()>& operation);
+  void experimentEvent(const std::string& kind, const std::string& stage,
+                       const std::string& description, const std::string& status,
+                       double elapsed = 0.0, std::uint64_t span = 0, std::uint64_t parent = 0);
+  bool pickAndPlaceImpl(const aubo_perception::DetectedObject& detected);
+  bool planAndExecuteImpl(const std::string& description, double wrist1_limit);
+  bool cartesianToImpl(const geometry_msgs::PoseStamped& pose, const std::string& description, bool complete);
+  bool commandGripperImpl(double position);
+  bool refreshOctomapImpl();
+  bool waitForObjectImpl(const std::string& category, const ros::WallTime& not_before,
+                        aubo_perception::DetectedObject& detected);
+  bool externalPlan(const moveit_msgs::MotionPlanRequest& request,
+                    moveit::planning_interface::MoveGroupInterface::Plan& plan);
+  bool revalidatePlan(const moveit::planning_interface::MoveGroupInterface::Plan& plan,
+                      const moveit_msgs::MotionPlanRequest& request);
+  void recordPlan(const moveit::planning_interface::MoveGroupInterface::Plan& plan);
+  void recordAudit(const moveit_msgs::PlanningScene& scene, const moveit_msgs::RobotState& start,
+                   const moveit_msgs::RobotTrajectory& trajectory,
+                   const moveit_msgs::MotionPlanRequest& request, bool valid,
+                   const std::string& reason, unsigned int samples);
   void setupDynamicReconfigure();
   void reconfigureCallback(SortingTaskConfig& config, uint32_t level);
   bool verifyLoadedUpperArmLimit() const;
@@ -171,6 +193,12 @@ private:
   moveit::planning_interface::PlanningSceneInterface scene_;
   std::unique_ptr<GripperClient> gripper_client_;
 
+  ros::Publisher experiment_publisher_, experiment_trajectory_publisher_, experiment_audit_publisher_;
+  bool experiment_enabled_{false}, revalidate_trajectories_{false};
+  double trajectory_audit_step_{0.02};
+  std::string experiment_run_id_, experiment_condition_, experiment_scene_id_;
+  std::string planner_id_, planning_service_;
+  std::atomic<std::uint64_t> experiment_sequence_{0};
   ros::Publisher state_publisher_;
   ros::Publisher detection_summary_publisher_;
   ros::Publisher base_lock_publisher_;

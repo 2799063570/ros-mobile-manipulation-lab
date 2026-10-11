@@ -1,4 +1,5 @@
 #include <aubo_sorting_core/sorting_task.hpp>
+#include <aubo_sorting_core/ExperimentAudit.h>
 
 // Generic category-sorting task; the executable and ROS node retain their historical names.
 #include "task_utils.hpp"
@@ -31,6 +32,7 @@ SortingTask::SortingTask(ros::NodeHandle nh, ros::NodeHandle private_nh)
   arm_->setEndEffectorLink(end_effector_link_);
   arm_->setPoseReferenceFrame(target_frame_);
   arm_->setPlanningTime(planning_time_);
+  if (!planner_id_.empty()) arm_->setPlannerId(planner_id_);
   arm_->setNumPlanningAttempts(10);
   arm_->setMaxVelocityScalingFactor(velocity_scaling_);
   arm_->setMaxAccelerationScalingFactor(acceleration_scaling_);
@@ -45,6 +47,11 @@ SortingTask::SortingTask(ros::NodeHandle nh, ros::NodeHandle private_nh)
     inspire_stop_client_ = nh_.serviceClient<inspire_gripper::set_es>("/inspire_gripper/set_es");
   }
 
+  if (experiment_enabled_) {
+    experiment_publisher_ = nh_.advertise<std_msgs::String>("/sorting/experiment_events", 200);
+    experiment_trajectory_publisher_ = nh_.advertise<moveit_msgs::DisplayTrajectory>("/sorting/experiment_trajectory", 20);
+    experiment_audit_publisher_ = nh_.advertise<aubo_sorting_core::ExperimentAudit>("/sorting/experiment_audit", 5);
+  }
   state_publisher_ = nh_.advertise<std_msgs::String>("/sorting/state", 1, true);// 状态机
   detection_summary_publisher_ = nh_.advertise<std_msgs::String>("/sorting/detection_summary", 1, true);// 检测结果汇总 例如：红1,绿0,蓝1
   base_lock_publisher_ = nh_.advertise<std_msgs::Bool>(base_lock_topic_, 1, true);// 机械臂是否在执行任务 移动底盘是否需要被锁住
@@ -158,6 +165,7 @@ void SortingTask::setFailure(const std::string& category, const std::string& det
     last_failure_ = message.data;// 保存最近的失败信息  失败类型|失败详情
   }
   failure_publisher_.publish(message);
+  experimentEvent("failure", category, detail, "failure");
   ROS_ERROR_STREAM("Sorting failure: " << message.data);
 }
 
@@ -250,7 +258,7 @@ std::pair<bool, std::string> SortingTask::startOperation(
     publishState(state);
     try
     {
-      success = operation();
+      success = runExperimentStage("operation", stateName(state), operation);
     }
     catch (const std::exception& exception)
     {

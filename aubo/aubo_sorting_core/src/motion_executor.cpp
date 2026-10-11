@@ -10,6 +10,7 @@
 #include <moveit_msgs/Constraints.h>
 #include <moveit_msgs/JointConstraint.h>
 #include <moveit/robot_trajectory/robot_trajectory.h>
+#include <moveit/robot_state/conversions.h>
 #include <moveit/trajectory_processing/iterative_time_parameterization.h>
 #include <tf/transform_datatypes.h>
 #include <trajectory_msgs/JointTrajectoryPoint.h>
@@ -100,12 +101,18 @@ bool SortingTask::moveToPose(const geometry_msgs::PoseStamped& pose,
       !stop_requested_.load();
 }
 
-bool SortingTask::planAndExecute(const std::string& description, double wrist1_limit)
+bool SortingTask::planAndExecuteImpl(const std::string& description, double wrist1_limit)
 {
   arm_->setStartStateToCurrentState();
   moveit::planning_interface::MoveGroupInterface::Plan plan;
-  const auto planned = arm_->plan(plan);
-  if (planned != moveit::planning_interface::MoveItErrorCode::SUCCESS ||
+  moveit_msgs::MotionPlanRequest request;
+  arm_->constructMotionPlanRequest(request);
+  const bool planned = runExperimentStage("planning", description, [&]() {
+    if (planning_service_.empty())
+      return arm_->plan(plan) == moveit::planning_interface::MoveItErrorCode::SUCCESS;
+    return externalPlan(request, plan);
+  });
+  if (!planned ||
       plan.trajectory_.joint_trajectory.points.empty())
   {
     arm_->stop();
@@ -131,10 +138,17 @@ bool SortingTask::planAndExecute(const std::string& description, double wrist1_l
       return false;
     }
   }
-  const auto executed = arm_->execute(plan);
+  if ((revalidate_trajectories_ || !planning_service_.empty()) && !revalidatePlan(plan, request)) {
+    arm_->clearPoseTargets(); return false;
+  }
+  recordPlan(plan);
+  if (stop_requested_.load() || !ros::ok()) { arm_->clearPoseTargets(); return false; }
+  const bool executed = runExperimentStage("execution", description, [&]() {
+    return arm_->execute(plan) == moveit::planning_interface::MoveItErrorCode::SUCCESS;
+  });
   arm_->stop();
   arm_->clearPoseTargets();
-  const bool success = executed == moveit::planning_interface::MoveItErrorCode::SUCCESS;
+  const bool success = executed;
   if (!success)
     setFailure("EXECUTION_FAILED", description);
   return success;
@@ -185,7 +199,7 @@ bool SortingTask::moveNamed(const std::string& target)
   return planAndExecute("named target '" + target + "'") && !stop_requested_.load();
 }
 
-bool SortingTask::cartesianTo(const geometry_msgs::PoseStamped& target_pose,
+bool SortingTask::cartesianToImpl(const geometry_msgs::PoseStamped& target_pose,
                                    const std::string& description, bool require_complete)
 {
   if (stop_requested_.load())
@@ -238,9 +252,18 @@ bool SortingTask::cartesianTo(const geometry_msgs::PoseStamped& target_pose,
            velocity_scaling_);
   moveit::planning_interface::MoveGroupInterface::Plan plan;
   plan.trajectory_ = trajectory;
+  const auto start_state = arm_->getCurrentState(2.0);
+  if (!start_state) { setFailure("EXECUTION_FAILED", "current state unavailable"); return false; }
+  moveit::core::robotStateToRobotStateMsg(*start_state, plan.start_state_);
+  moveit_msgs::MotionPlanRequest audit_request;
+  audit_request.group_name = group_name_;
+  if ((revalidate_trajectories_ || !planning_service_.empty()) && !revalidatePlan(plan, audit_request)) return false;
+  recordPlan(plan);
   if (stop_requested_.load() || !ros::ok())
     return false;
-  const bool success = arm_->execute(plan) == moveit::planning_interface::MoveItErrorCode::SUCCESS;
+  const bool success = runExperimentStage("execution", description, [&]() {
+    return arm_->execute(plan) == moveit::planning_interface::MoveItErrorCode::SUCCESS;
+  });
   arm_->stop();
   if (!success)
     setFailure("EXECUTION_FAILED", "Cartesian path to " + description);
@@ -278,7 +301,7 @@ bool SortingTask::liftWithRecovery(double x, double y, const std::string& descri
   return result == HeightAttemptResult::Succeeded;
 }
 
-bool SortingTask::commandGripper(double position)
+bool SortingTask::commandGripperImpl(double position)
 {
   // 通过action通信请求夹爪的控制器执行目标位置
   if (stop_requested_.load())

@@ -1,5 +1,13 @@
 <?xml version="1.0"?>
 <launch>
+  <arg name="planner_id" default=""/>
+  <arg name="planning_service" default=""/>
+  <arg name="experiment_enabled" default="false"/>
+  <arg name="experiment_run_id" default=""/>
+  <arg name="experiment_condition" default=""/>
+  <arg name="experiment_scene_id" default=""/>
+  <arg name="revalidate_trajectories" default="false"/>
+  <arg name="trajectory_audit_step" default="0.02"/>
   <arg name="detector" default="color"/>
   <arg name="camera_mount" default="eye_in_hand" doc="eye_in_hand | eye_to_hand"/>
   <arg name="camera_namespace" default="$(eval {'eye_in_hand': '/camera', 'eye_to_hand': '/workspace_camera'}[arg('camera_mount')])"/>
@@ -73,6 +81,14 @@
   </include>
 
   <include file="$(find aubo_sorting)/launch/sorting.launch">
+    <arg name="planner_id" value="$(arg planner_id)"/>
+    <arg name="planning_service" value="$(arg planning_service)"/>
+    <arg name="experiment_enabled" value="$(arg experiment_enabled)"/>
+    <arg name="experiment_run_id" value="$(arg experiment_run_id)"/>
+    <arg name="experiment_condition" value="$(arg experiment_condition)"/>
+    <arg name="experiment_scene_id" value="$(arg experiment_scene_id)"/>
+    <arg name="revalidate_trajectories" value="$(arg revalidate_trajectories)"/>
+    <arg name="trajectory_audit_step" value="$(arg trajectory_audit_step)"/>
     <arg name="task_config" value="$(arg task_config)"/>
     <arg name="perception_config" value="$(arg perception_config)"/>
     <arg name="colors_config" value="$(arg colors_config)"/>

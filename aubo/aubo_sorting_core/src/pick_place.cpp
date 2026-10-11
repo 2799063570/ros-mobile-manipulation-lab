@@ -7,7 +7,7 @@ namespace aubo_sorting_core
 {
 using detail::wallSleep;
 
-bool SortingTask::pickAndPlace(const aubo_perception::DetectedObject& detected)
+bool SortingTask::pickAndPlaceImpl(const aubo_perception::DetectedObject& detected)
 {
   // Only a failed pick/place owns attachment cleanup. Other operations cannot release it.
   bool completed = false;

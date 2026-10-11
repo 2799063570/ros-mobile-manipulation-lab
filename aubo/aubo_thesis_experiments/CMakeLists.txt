@@ -1,0 +1,24 @@
+cmake_minimum_required(VERSION 3.0.2)
+project(aubo_thesis_experiments)
+add_compile_options(-std=c++11 -Wall -Wextra)
+find_package(catkin REQUIRED COMPONENTS
+  aubo_sorting_core aubo_perception moveit_core moveit_ros_planning
+  moveit_msgs roscpp rospy std_msgs control_msgs sensor_msgs trajectory_msgs geometric_shapes message_generation)
+find_package(octomap REQUIRED)
+catkin_python_setup()
+add_service_files(FILES AuditTrajectory.srv SnapshotScene.srv)
+generate_messages(DEPENDENCIES moveit_msgs)
+catkin_package(CATKIN_DEPENDS message_runtime moveit_msgs)
+include_directories(include ${catkin_INCLUDE_DIRS} ${OCTOMAP_INCLUDE_DIRS})
+add_executable(audit_trajectory_node src/audit_trajectory_node.cpp)
+add_dependencies(audit_trajectory_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(audit_trajectory_node ${catkin_LIBRARIES} ${OCTOMAP_LIBRARIES})
+catkin_install_python(PROGRAMS scripts/record_experiment.py scripts/evaluate_experiment.py
+  scripts/make_experiment_matrix.py scripts/audit_trajectory.py scripts/nsg_moveit_adapter.py
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+install(TARGETS audit_trajectory_node RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+install(DIRECTORY launch config DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
+install(FILES README.md VALIDATION.md DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
+if(CATKIN_ENABLE_TESTING)
+  catkin_add_nosetests(test)
+endif()

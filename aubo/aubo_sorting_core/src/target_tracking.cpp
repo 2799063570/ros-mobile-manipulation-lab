@@ -245,7 +245,7 @@ namespace aubo_sorting_core
     return true;
   }
 
-  bool SortingTask::waitForObject(const std::string &category, const ros::WallTime &not_before,
+  bool SortingTask::waitForObjectImpl(const std::string &category, const ros::WallTime &not_before,
                                        aubo_perception::DetectedObject &detected)
   {
     // |←── 新鲜检测优先 ──→|target_cache_fallback_delay_|←── 缓存开始兜底 ──→|detection_timeout_|←── 硬超时 ──→

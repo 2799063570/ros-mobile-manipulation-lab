@@ -1,5 +1,13 @@
 <?xml version="1.0"?>
 <launch>
+  <arg name="planner_id" default=""/>
+  <arg name="planning_service" default=""/>
+  <arg name="experiment_enabled" default="false"/>
+  <arg name="experiment_run_id" default=""/>
+  <arg name="experiment_condition" default=""/>
+  <arg name="experiment_scene_id" default=""/>
+  <arg name="revalidate_trajectories" default="false"/>
+  <arg name="trajectory_audit_step" default="0.02"/>
   <!-- 固定 AUBO i5 + RealSense D435i 实机分拣总入口；不会启动 Gazebo。 -->
   <arg name="robot_ip" default="192.168.1.2"/>
   <arg name="camera_serial_no" default=""/>
@@ -63,6 +71,14 @@
   </include>
 
   <include file="$(find aubo_sorting)/launch/sorting.launch">
+    <arg name="planner_id" value="$(arg planner_id)"/>
+    <arg name="planning_service" value="$(arg planning_service)"/>
+    <arg name="experiment_enabled" value="$(arg experiment_enabled)"/>
+    <arg name="experiment_run_id" value="$(arg experiment_run_id)"/>
+    <arg name="experiment_condition" value="$(arg experiment_condition)"/>
+    <arg name="experiment_scene_id" value="$(arg experiment_scene_id)"/>
+    <arg name="revalidate_trajectories" value="$(arg revalidate_trajectories)"/>
+    <arg name="trajectory_audit_step" value="$(arg trajectory_audit_step)"/>
     <arg name="detector" value="$(arg detector)"/>
     <arg name="camera_mount" value="$(arg camera_mount)"/>
     <arg name="camera_namespace" value="$(arg camera_namespace)"/>

@@ -1,0 +1,16 @@
+std_msgs/Header header
+uint64 record_id
+string run_id
+string condition
+string scene_id
+string attempt_id
+string group_name
+moveit_msgs/PlanningScene scene
+moveit_msgs/RobotState start_state
+moveit_msgs/RobotTrajectory trajectory
+moveit_msgs/Constraints path_constraints
+moveit_msgs/Constraints[] goal_constraints
+float64 max_joint_step
+bool valid
+string reason
+uint32 samples_checked
