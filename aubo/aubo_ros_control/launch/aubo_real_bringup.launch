@@ -9,6 +9,8 @@
   <arg name="use_sensor_manager" default="false"/>
   <arg name="publish_camera_stand" default="false"/>
   <arg name="camera_stand_config" default="$(find aubo_planning)/config/camera_stand_reference.yaml"/>
+  <arg name="publish_sorting_box" default="false"/>
+  <arg name="sorting_box_config" default="$(find aubo_planning)/config/sorting_box_reference.yaml"/>
   <arg name="control_frequency" default="200.0"/>
   <arg name="mac_buffer_target" default="120"/>
   <arg name="trajectory_preload_points" default="20"/>
@@ -55,6 +57,12 @@
   <include if="$(arg publish_camera_stand)"
            file="$(find aubo_planning)/launch/publish_camera_stand.launch">
     <arg name="config" value="$(arg camera_stand_config)"/>
+  </include>
+
+  <!-- Open-top receptacle on the table; only enable after measuring its geometry. -->
+  <include if="$(arg publish_sorting_box)"
+           file="$(find aubo_planning)/launch/publish_sorting_box.launch">
+    <arg name="config" value="$(arg sorting_box_config)"/>
   </include>
 
   <include if="$(arg use_rviz)"

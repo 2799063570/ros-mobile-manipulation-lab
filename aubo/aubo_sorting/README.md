@@ -313,6 +313,19 @@ roslaunch aubo_sorting eye_to_hand_yolo_sorting_real.launch \
 `/sorting/move_to_observation` 和 `/sorting/start`。默认速度与加速度比例均为 0.1，
 可通过 `velocity_scaling`、`acceleration_scaling` 覆盖。
 
+桌面上用于接收物体的开口盒可以作为 MoveIt 障碍物加入：
+
+```bash
+roslaunch aubo_sorting eye_to_hand_yolo_sorting_real.launch \
+  publish_sorting_box:=true sorting_box_config:=/实际路径/实测收纳盒.yaml \
+  task_config:=/实际路径/实测分拣参数.yaml
+```
+
+该开关默认关闭。盒子由底板和四面侧壁组成，位置、尺寸、壁厚及旋转角可配置。
+发布盒子不会自动修改放置点；需同步核对 `place_targets`、`place_clearance`、
+`preplace_height` 和携物横移高度。测量方法和高度关系见
+[`aubo_planning` 的桌面收纳盒说明](../aubo_planning/README.md#真机桌面收纳盒)。
+
 YOLO 须提供对应类别及放置点的 `task_config`。仓库中的 `config/sorting.yaml`
 和 `config/yolo_sorting.yaml` 是仿真尺寸与放置点示例。
 实机运动前必须用实际桌高、工作区、物体尺寸、放置点和相机外参校准

@@ -17,6 +17,18 @@ def resolve(name='sorting_real.launch', *args):
 
 
 class RealLaunchTest(unittest.TestCase):
+    def test_sorting_box_is_optional_and_passes_through_yolo_entry(self):
+        default = resolve('sorting_real.launch', 'rviz:=false')
+        self.assertFalse(any(node.type == 'publish_sorting_box.py' for node in default.nodes))
+        configured = resolve('eye_to_hand_yolo_sorting_real.launch', 'rviz:=false',
+                             'publish_sorting_box:=true')
+        self.assertTrue(any(node.package == 'aubo_planning' and node.type == 'publish_sorting_box.py'
+                            for node in configured.nodes))
+        params = {key: value.value for key, value in configured.params.items()}
+        self.assertEqual(params['/publish_sorting_box/object_id'], 'sorting_box')
+        self.assertEqual(params['/publish_sorting_box/outer_size'], [.30, .24, .12])
+        self.assertFalse(params['/color_sorting_task/auto_start'])
+
     def test_default_is_real_and_waits_for_explicit_motion(self):
         config = resolve()
         nodes = {(node.package, node.type) for node in config.nodes}

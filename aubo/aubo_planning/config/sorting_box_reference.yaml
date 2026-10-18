@@ -1,0 +1,14 @@
+# Reference only: measure the real box and pose before enabling publication.
+# Lengths: m. yaw: rad around frame_id +Z. The top stays open.
+frame_id: base_link
+object_id: sorting_box
+
+# Outside dimensions [length along local X, width along local Y, total height].
+outer_size: [0.30, 0.24, 0.12]
+wall_thickness: 0.010
+bottom_thickness: 0.008
+
+# Center of the outside bottom face, NOT the volume center.
+# z is the physical tabletop height when the box sits directly on the table.
+bottom_center: [0.60, -0.30, 0.10]
+yaw: 0.0

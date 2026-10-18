@@ -17,6 +17,8 @@
   <arg name="gripper_port" default="/dev/ttyUSB0"/>
   <arg name="rviz" default="true"/>
   <arg name="rviz_config" default="$(find aubo_sorting)/config/sorting.rviz"/>
+  <arg name="publish_sorting_box" default="false"/>
+  <arg name="sorting_box_config" default="$(find aubo_planning)/config/sorting_box_reference.yaml"/>
 
   <arg name="detector" default="color" doc="color | yolo"/>
   <arg name="camera_mount" default="eye_in_hand" doc="eye_in_hand | eye_to_hand"/>
@@ -49,6 +51,8 @@
     <arg name="rviz_config" value="$(arg rviz_config)"/>
     <arg name="robot_xacro" value="$(arg robot_xacro)"/>
     <arg name="robot_srdf" value="$(arg robot_srdf)"/>
+    <arg name="publish_sorting_box" value="$(arg publish_sorting_box)"/>
+    <arg name="sorting_box_config" value="$(arg sorting_box_config)"/>
   </include>
 
   <!-- D435i 的 RGB + 对齐深度话题供两种检测器共用；IMU 不参与分拣。 -->

@@ -33,6 +33,7 @@ catkin_package(
 include_directories(${catkin_INCLUDE_DIRS})
 
 catkin_install_python(PROGRAMS scripts/publish_camera_stand.py
+  scripts/publish_sorting_box.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
@@ -67,3 +68,7 @@ install(DIRECTORY worlds
 install(FILES README.md
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
+
+if(CATKIN_ENABLE_TESTING)
+  catkin_add_nosetests(test)
+endif()

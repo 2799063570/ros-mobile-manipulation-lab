@@ -7,6 +7,80 @@
 - `octomap_planning_demo`：等待深度点云生成非空 OctoMap，再进行带环境碰撞检测的机械臂规划。
 - `cartesian_path_demo`：以当前 TCP 位姿为起点，规划直线或圆形笛卡尔路径。
 - `publish_camera_stand.py`：把相机支架与相机本体加入 MoveIt 碰撞场景。
+- `publish_sorting_box.py`：把桌面收纳盒的底板和四面侧壁加入 MoveIt，保留上方和内部开口。
+
+## 真机桌面收纳盒
+
+`config/sorting_box_reference.yaml` 是待测量的示例，默认所有真机入口均不发布盒子。
+量好后复制并修改该 YAML：`outer_size` 为外长、外宽、总高；`wall_thickness` 和
+`bottom_thickness` 为壁厚、底板厚度；所有长度单位 m。
+`bottom_center` 是**盒子外底面的中心**，不是盒体的体积中心。直接放桌上时，
+其 Z 应为所选 `frame_id` 下的桌面高度。`yaw` 为绕该坐标系 +Z 的旋转角，单位 rad。
+
+已有 MoveIt 时单独添加：
+
+```bash
+roslaunch aubo_planning publish_sorting_box.launch \
+  config:=/absolute/path/to/measured_sorting_box.yaml
+```
+
+像相机支架一样，通过真机 bringup 加载：
+
+```bash
+roslaunch aubo_ros_control aubo_real_bringup.launch \
+  publish_sorting_box:=true \
+  sorting_box_config:=/absolute/path/to/measured_sorting_box.yaml
+```
+
+固定机械臂实机分拣的 `sorting_real.launch` 和四个 `eye_*_*_sorting_real.launch`
+也透传这两个参数：
+
+```bash
+roslaunch aubo_sorting eye_to_hand_yolo_sorting_real.launch \
+  publish_sorting_box:=true \
+  sorting_box_config:=/absolute/path/to/measured_sorting_box.yaml \
+  task_config:=/absolute/path/to/measured_sorting_task.yaml
+```
+
+盒子使用一个 `sorting_box` 世界碰撞物体，包含五个 BOX primitive；内部不是实心障碍物。
+节点通过 `/apply_planning_scene` 发布，并查询 `/get_planning_scene` 确认五个部分均存在，
+之后 `/publish_sorting_box/ready` 才变为 true。先在 RViz 的 PlanningScene 中核对实物位置，
+再启动分拣。此节点不产生 Gazebo 实体，也不发布机械臂运动命令。
+
+**盒子碰撞模型与分拣放置点分别配置**，不会自动修改 `place_targets` 或放置高度。
+在正在使用的完整 `task_config` 中按实际盒内位置调整，例如下列片段对应参考盒中心：
+
+```yaml
+place_targets:
+  can: [0.60, -0.30]
+place_clearance: 0.03
+preplace_height: 0.30
+lift_min_height: 0.24
+```
+
+此片段不能代替完整任务配置，类别键也须与模型一致。放置 XY 应落在盒内，
+并为张开夹爪和物体预留空间；旋转盒要按 `yaw` 将盒内点换算到 `place_frame`。
+若 `place_frame` 不同于盒子坐标系，还须通过有效 TF 换算。
+
+当前分拣核心使用：
+
+```text
+盒内底面 Z = bottom_center.z + bottom_thickness
+盒沿 Z     = bottom_center.z + outer_size.z
+放置 TCP Z = table_z + object_height/2 + grasp_height_offset + place_clearance
+放置前 Z   = table_z + preplace_height
+```
+
+`table_z` 仍是实际桌面高度，不能为了盒内放置而改成盒内底高，否则会影响抓取与感知。
+在理想抓取偏移保持不变时，物体底面释放高度约为 `table_z + place_clearance`，
+因此它应高于盒内底面并留出释放间隙。横移前的 `lift_min_height`、盒上方的
+`preplace_height` 还要保证所携带物体的底面及夹爪越过盒沿。
+上面的数值只是对应参考尺寸的示例，实际应按物高、夹爪、TCP 和盒子测量值设置。
+无法进入开口时应调整几何/放置姿态，不要把盒壁从碰撞检测中排除。
+
+节点退出不会自动清除已发布的碰撞物体。移动盒子后，用新参数重新发布同一个
+`object_id` 会替换旧模型；MoveIt 重启后须重新启动发布节点。
+关闭发布开关只是不再添加物体，不会删除已存在的对象。
 
 ## 真机相机支架碰撞物体
 

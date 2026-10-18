@@ -276,6 +276,10 @@ ROS Melodic 环境若缺少依赖，请安装 `ros-control`、`ros-controllers`�
 
 ## 运动前验证
 
+真机桌面收纳盒可通过 `publish_sorting_box:=true sorting_box_config:=/实测配置.yaml`
+加入 MoveIt；默认关闭，测量方式见
+[`aubo_planning`](../aubo_planning/README.md#真机桌面收纳盒)。
+
 眼在手外标定的只读 TF 验证和 YOLO 低速移动验证已独立放入
 [`aubo_handeye_validation`](../aubo_handeye_validation/README.md)。
 
