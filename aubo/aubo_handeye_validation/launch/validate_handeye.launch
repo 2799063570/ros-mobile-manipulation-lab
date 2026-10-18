@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Only a read-only sampler: robot state/TF and marker detector must already run. -->
+  <arg name="calibration_file" default="$(find aubo_ros_control)/config/aubo_realsense_handeye_eye_on_base.yaml"/>
+  <arg name="output_dir" default="$(env HOME)/handeye_validation_$(anon run)"/>
+  <arg name="window" default="2.0"/>
+  <arg name="min_samples" default="10"/>
+  <arg name="max_age" default="0.5"/>
+  <arg name="stationary_mm" default="2.0"/>
+  <arg name="stationary_deg" default="1.0"/>
+  <arg name="tf_topic" default="/tf"/>
+  <node name="handeye_validation" pkg="aubo_handeye_validation" type="validate_handeye.py"
+        output="screen" required="true"
+        args="collect --calibration '$(arg calibration_file)' --output '$(arg output_dir)' --window $(arg window) --min-samples $(arg min_samples) --max-age $(arg max_age) --stationary-mm $(arg stationary_mm) --stationary-deg $(arg stationary_deg) --tf-topic $(arg tf_topic)"/>
+</launch>

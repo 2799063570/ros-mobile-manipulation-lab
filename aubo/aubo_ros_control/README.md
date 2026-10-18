@@ -276,6 +276,9 @@ ROS Melodic 环境若缺少依赖，请安装 `ros-control`、`ros-controllers`�
 
 ## 运动前验证
 
+眼在手外标定的只读 TF 验证和 YOLO 低速移动验证已独立放入
+[`aubo_handeye_validation`](../aubo_handeye_validation/README.md)。
+
 先进行 SDK 只读连接测试，该操作不会启动或移动机械臂：
 
 ```bash

@@ -30,6 +30,7 @@
 
 固定机械臂应用
 ├── aubo_planning            # 抓放、夹爪及深度相机 OctoMap 避障示例
+├── aubo_handeye_validation  # ArUco 标定一致性及 YOLO 低速移动验证
 └── aubo_sorting             # 固定机械臂颜色 / YOLO 分拣场景
 
 移动机械臂分拣应用（位于 ../aubo_mobile_robot/ 下）
@@ -40,6 +41,9 @@
 依赖只能由场景层指向通用层。例如 `aubo_sorting` 和
 `aubo_mobile_sorting` 都依赖 `aubo_sorting_core`，通用核心不能反向依赖任一平台
 场景。两套 MoveIt 配置对应不同机器人模型，应继续独立维护。
+
+手眼标定结果验证集中在 [`aubo_handeye_validation`](aubo_handeye_validation/README.md)，
+直接复用驱动、MoveIt 和感知模块，不依赖分拣应用或分拣状态机。
 
 ## 源码阅读入口
 

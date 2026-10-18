@@ -1,5 +1,9 @@
 # AUBO 固定机械臂颜色 / YOLO 抓取分拣
 
+使用 YOLO 与已有眼在手外标定，让夹爪低速朝下移动到物体上方进行对齐验证，见
+[`aubo_handeye_validation`](../aubo_handeye_validation/README.md)。该入口独立于分拣循环，提供规划预览、
+单次移动与停止服务，默认停在目标顶面上方 10 cm。
+
 正式包名为 `aubo_sorting`，同时支持颜色和 YOLO。旧 `aubo_color_sorting` 包已移除，
 自定义 launch 和脚本请改用 `aubo_sorting`。
 

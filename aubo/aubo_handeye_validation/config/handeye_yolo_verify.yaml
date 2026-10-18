@@ -1,0 +1,45 @@
+# One-shot eye-on-base verification. All distances m; joint quantities rad.
+planning_group: aubo_i5
+# The full launch fills this with the exact YAML also used by the camera TF publisher.
+calibration_file: ""
+end_effector_link: tcp_link
+target_frame: base_link
+detections_topic: /sorting/detections
+joint_states_topic: /aubo_i5/joint_states
+target_class: can
+min_confidence: 0.6
+height_mode: depth
+table_z: 0.10
+height_tolerance: 0.02
+workspace: {min_x: 0.38, max_x: 0.82, min_y: -0.20, max_y: 0.20}
+
+# Gather new observations after each request; reject multiple same-class targets.
+min_samples: 5
+sample_window: 0.25
+sample_timeout: 8.0
+target_max_age: 0.8
+target_jitter: 0.005
+target_recheck_distance: 0.010
+state_max_age: 0.5
+
+# TCP +Z downward, fixed yaw. Do not apply YOLO yaw or grasp compensation.
+downward_yaw: 1.5707963267948966
+hover_clearance: 0.10
+travel_clearance: 0.20
+minimum_tcp_table_clearance: 0.05
+max_tcp_z: 0.80
+orientation_tolerance: 0.035
+eef_step: 0.005
+max_joint_step: 0.12
+max_start_error: 0.01
+final_position_tolerance: 0.005
+planning_time: 10.0
+execution_timeout: 180.0
+
+# Explicitly retime Cartesian trajectories, then stretch time further if needed.
+velocity_scaling: 0.03
+acceleration_scaling: 0.02
+max_joint_speed: 0.05
+max_joint_acceleration: 0.08
+max_tcp_speed: 0.02
+output_directory: ~/handeye_yolo_verify
