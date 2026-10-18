@@ -1,0 +1,13 @@
+<launch>
+  <!-- 只启动输入/反馈桥，不启动机械臂、MoveIt或任何运动输出。 -->
+  <arg name="port" default="/dev/ttyUSB0"/>
+  <arg name="baud" default="115200"/>
+  <arg name="joint_states_topic" default="/aubo_i5/joint_states"/>
+  <arg name="enable_commands" default="false"/>
+  <node pkg="aubo_remote_bridge" type="serial_bridge_node" name="aubo_remote_bridge" output="screen">
+    <param name="port" value="$(arg port)"/>
+    <param name="baud" value="$(arg baud)"/>
+    <param name="joint_states_topic" value="$(arg joint_states_topic)"/>
+    <param name="enable_commands" value="$(arg enable_commands)"/>
+  </node>
+</launch>

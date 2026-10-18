@@ -1,0 +1,47 @@
+<launch>
+  <!-- 独立Gazebo验证场景：不包含aubo_control/aubo_real_bringup或任何SDK节点。 -->
+  <arg name="serial" default="true"/>
+  <arg name="port" default="/dev/ttyUSB0"/>
+  <arg name="gui" default="true"/>
+  <arg name="rviz" default="true"/>
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="world_name" value="$(find aubo_remote_bridge)/worlds/named_pose_validation.world"/>
+    <arg name="gui" value="$(arg gui)"/>
+    <arg name="paused" value="false"/>
+    <arg name="use_sim_time" value="true"/>
+  </include>
+  <group ns="remote_validation">
+    <remap from="joint_states" to="/remote_validation/aubo_i5/joint_states"/>
+    <!-- 模型/控制器/MoveIt一并隔离；复用已存在的home和zero，不覆盖原SRDF。 -->
+    <param name="robot_description"
+      command="$(find xacro)/xacro --inorder '$(find aubo_description)/urdf/aubo_i5.xacro' robot_namespace:=/remote_validation/aubo_i5"/>
+    <group ns="aubo_i5">
+      <rosparam file="$(find aubo_gazebo)/config/controllers.yaml"/>
+      <node pkg="controller_manager" type="spawner" name="controller_spawner"
+        args="joint_state_controller aubo_i5_controller gripper_controller" output="screen"/>
+    </group>
+    <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher">
+      <remap from="joint_states" to="/remote_validation/aubo_i5/joint_states"/>
+    </node>
+    <include file="$(find aubo_moveit_config)/launch/move_group.launch">
+      <arg name="load_robot_description" value="false"/>
+      <arg name="robot_xacro" value="aubo_i5.xacro"/>
+      <arg name="robot_srdf" value="aubo_i5.srdf"/>
+      <arg name="allow_trajectory_execution" value="true"/>
+      <arg name="fake_execution" value="false"/>
+      <arg name="use_sensor_manager" value="false"/>
+    </include>
+    <!-- 明确覆盖为绝对的仿真控制器路径，避免控制器插件把相对名字解析到原入口。 -->
+    <rosparam ns="move_group" file="$(find aubo_remote_bridge)/config/sim_moveit_controllers.yaml"/>
+    <node if="$(arg rviz)" pkg="rviz" type="rviz" name="rviz" output="screen"
+      args="-d $(find aubo_remote_bridge)/config/validation.rviz"/>
+  </group>
+  <node pkg="gazebo_ros" type="spawn_model" name="spawn_remote_validation"
+    args="-urdf -param /remote_validation/robot_description -model aubo_remote_validation -J shoulder_joint 0 -J upperArm_joint 0 -J foreArm_joint 0 -J wrist1_joint 0 -J wrist2_joint 0 -J wrist3_joint 0" output="screen"/>
+  <node pkg="aubo_remote_bridge" type="named_pose_server" name="aubo_remote_named_pose" output="screen" required="true"/>
+  <include if="$(arg serial)" file="$(find aubo_remote_bridge)/launch/serial_bridge.launch">
+    <arg name="port" value="$(arg port)"/>
+    <arg name="joint_states_topic" value="/remote_validation/aubo_i5/joint_states"/>
+    <arg name="enable_commands" value="true"/>
+  </include>
+</launch>

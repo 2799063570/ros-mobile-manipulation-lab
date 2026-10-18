@@ -1,0 +1,27 @@
+Panels:
+  - Class: rviz/Displays
+    Name: Displays
+Visualization Manager:
+  Class: ""
+  Global Options:
+    Fixed Frame: world
+    Background Color: 36; 40; 48
+  Displays:
+    - Class: rviz/Grid
+      Name: Grid
+      Enabled: true
+      Cell Size: 0.2
+    - Class: rviz/RobotModel
+      Name: GazeboActualRobot
+      Enabled: true
+      Robot Description: /remote_validation/robot_description
+    - Class: rviz/TF
+      Name: TF
+      Enabled: false
+  Views:
+    Current:
+      Class: rviz/Orbit
+      Distance: 2.8
+      Pitch: 0.5
+      Yaw: 0.8
+      Focal Point: {X: 0, Y: 0, Z: 0.4}

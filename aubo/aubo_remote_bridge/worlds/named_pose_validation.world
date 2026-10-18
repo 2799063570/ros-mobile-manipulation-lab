@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<sdf version="1.6">
+  <world name="remote_named_pose_validation">
+    <include><uri>model://sun</uri></include>
+    <include><uri>model://ground_plane</uri></include>
+    <physics type="ode"><max_step_size>0.001</max_step_size><real_time_update_rate>1000</real_time_update_rate></physics>
+    <scene><ambient>0.65 0.65 0.65 1</ambient><background>0.12 0.15 0.2 1</background></scene>
+    <!-- 两侧低围挡对应MoveIt规划场景；位于最大伸展范围外，不挡住home/zero验证。 -->
+    <model name="validation_fence_left">
+      <static>true</static><pose>0 1.6 0.1 0 0 0</pose>
+      <link name="body">
+        <collision name="collision"><geometry><box><size>3.2 0.08 0.2</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>3.2 0.08 0.2</size></box></geometry><material><ambient>0.8 0.55 0.1 1</ambient><diffuse>0.8 0.55 0.1 1</diffuse></material></visual>
+      </link>
+    </model>
+    <model name="validation_fence_right">
+      <static>true</static><pose>0 -1.6 0.1 0 0 0</pose>
+      <link name="body">
+        <collision name="collision"><geometry><box><size>3.2 0.08 0.2</size></box></geometry></collision>
+        <visual name="visual"><geometry><box><size>3.2 0.08 0.2</size></box></geometry><material><ambient>0.2 0.55 0.8 1</ambient><diffuse>0.2 0.55 0.8 1</diffuse></material></visual>
+      </link>
+    </model>
+    <!-- 彩色参考块用于观察方向，不代表命名位置的末端目标点。 -->
+    <model name="green_reference"><static>true</static><pose>1.15 0.9 0.05 0 0 0</pose><link name="body"><visual name="visual"><geometry><box><size>0.2 0.2 0.1</size></box></geometry><material><ambient>0.1 0.8 0.3 1</ambient><diffuse>0.1 0.8 0.3 1</diffuse></material></visual></link></model>
+    <model name="blue_reference"><static>true</static><pose>1.15 -0.9 0.05 0 0 0</pose><link name="body"><visual name="visual"><geometry><box><size>0.2 0.2 0.1</size></box></geometry><material><ambient>0.1 0.4 0.9 1</ambient><diffuse>0.1 0.4 0.9 1</diffuse></material></visual></link></model>
+    <gui><camera name="validation_camera"><pose>2.4 -2.4 1.8 0 0.4 2.35</pose></camera></gui>
+  </world>
+</sdf>

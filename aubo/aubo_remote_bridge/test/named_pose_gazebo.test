@@ -1,0 +1,9 @@
+<launch>
+  <!-- 显式运行本rostest才会执行仿真动作；不需要STM32或USB串口。 -->
+  <include file="$(find aubo_remote_bridge)/launch/named_pose_gazebo.launch">
+    <arg name="serial" value="false"/>
+    <arg name="gui" value="false"/>
+    <arg name="rviz" value="false"/>
+  </include>
+  <test pkg="aubo_remote_bridge" type="named_pose_gazebo_test" test-name="named_pose_gazebo" time-limit="240"/>
+</launch>

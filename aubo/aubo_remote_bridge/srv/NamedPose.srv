@@ -1,0 +1,7 @@
+# Gazebo验证接口；target仅允许home、zero、cancel。重试同一请求必须复用编号。
+string target
+uint32 session
+uint16 request_id
+---
+bool accepted
+string message
