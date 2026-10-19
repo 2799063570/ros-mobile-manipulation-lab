@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- 专用真机入口。不要同时启动 aubo_real_bringup 或视觉伺服 SDK 节点。 -->
+  <arg name="robot_ip" default="192.168.1.2"/>
+  <arg name="panel" default="true"/>
+  <arg name="config" default="$(find aubo_ros_control)/config/cartesian_jog.yaml"/>
+  <arg name="robot_xacro" default="aubo_i5_with_camera.xacro"/>
+  <arg name="robot_srdf" default="aubo_i5_with_camera.srdf"/>
+  <include file="$(find aubo_moveit_config)/launch/planning_context.launch">
+    <arg name="load_robot_description" value="true"/>
+    <arg name="robot_xacro" value="$(arg robot_xacro)"/>
+    <arg name="robot_srdf" value="$(arg robot_srdf)"/>
+  </include>
+  <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher"/>
+  <include file="$(find aubo_ros_control)/launch/cartesian_jog.launch">
+    <arg name="backend" value="sdk"/>
+    <arg name="robot_ip" value="$(arg robot_ip)"/>
+    <arg name="panel" value="$(arg panel)"/>
+    <arg name="config" value="$(arg config)"/>
+  </include>
+</launch>

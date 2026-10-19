@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- 通用入口：调用方提供 robot_description、SRDF、关节反馈/执行后端。 -->
+  <arg name="backend" default="gazebo"/>
+  <arg name="robot_ip" default="192.168.1.2"/>
+  <arg name="joint_states_topic" default="/joint_states"/>
+  <arg name="panel" default="true"/>
+  <arg name="config" default="$(find aubo_ros_control)/config/cartesian_jog.yaml"/>
+  <node pkg="aubo_ros_control" type="aubo_cartesian_jog_node" name="aubo_cartesian_jog"
+        output="screen" required="true">
+    <rosparam file="$(arg config)" command="load"/>
+    <param name="backend" value="$(arg backend)"/>
+    <param name="robot_ip" value="$(arg robot_ip)"/>
+    <param name="joint_states_topic" value="$(arg joint_states_topic)"/>
+  </node>
+  <node if="$(arg panel)" pkg="aubo_ros_control" type="aubo_cartesian_jog_panel"
+        name="aubo_cartesian_jog_panel" output="screen"/>
+</launch>

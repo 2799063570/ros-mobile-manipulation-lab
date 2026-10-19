@@ -1,0 +1,45 @@
+# 末端 XYZ 连续点动；线速度 m/s，关节速度 rad/s，时间 s。
+base_link: base_link
+tool_link: tcp_link
+group_name: aubo_i5
+max_linear_velocity: 0.02
+command_timeout: 0.15
+feedback_timeout: 0.15
+max_following_error: 0.12
+joint_limit_margin: 0.08
+dls_lambda: 0.02
+singularity_stop: 0.008
+singularity_slow: 0.06
+# 减速尾段碰撞采样的最大关节增量，单位 rad；不是笛卡尔安全距离。
+collision_resolution: 0.002
+# 默认由外部往这些话题发布障碍物；不自动将 Gazebo 模型转换为碰撞物体。
+planning_scene_topic: /planning_scene
+# 如复用已有 MoveIt 场景，设为 /get_planning_scene，并将上面话题改为
+# /move_group/monitored_planning_scene。获取完整场景失败时拒绝启动。
+initial_scene_service: ""
+
+joint_names: [shoulder_joint, upperArm_joint, foreArm_joint,
+              wrist1_joint, wrist2_joint, wrist3_joint]
+joint_lower_limits: [-3.04, -1.0471976, -3.04, -3.04, -3.04, -3.04]
+joint_upper_limits: [ 3.04,  1.0471976,  3.04,  3.04,  3.04,  3.04]
+joint_velocity_limits: [0.25, 0.25, 0.25, 0.35, 0.35, 0.35]
+joint_acceleration_limits: [0.60, 0.60, 0.60, 0.80, 0.80, 0.80]
+joint_jerk_limits: [8.0, 8.0, 8.0, 12.0, 12.0, 12.0]
+
+# SDK 消费周期固定为 5 ms；36 个关节标量 = 6 个六轴点，约 30 ms。
+# 只是名义缓冲时长，实际松手停止还包括输入心跳、网络和减速尾段。
+sdk_mac_buffer_target: 36
+robot_ip: 192.168.1.2
+server_port: 8899
+username: aubo
+password: "123456"
+collision_class: 6
+require_real_robot: true
+
+gazebo_command_topics:
+  - /aubo_i5/shoulder_position_controller/command
+  - /aubo_i5/upper_arm_position_controller/command
+  - /aubo_i5/fore_arm_position_controller/command
+  - /aubo_i5/wrist1_position_controller/command
+  - /aubo_i5/wrist2_position_controller/command
+  - /aubo_i5/wrist3_position_controller/command

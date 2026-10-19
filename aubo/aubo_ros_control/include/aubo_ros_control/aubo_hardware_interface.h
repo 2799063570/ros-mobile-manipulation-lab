@@ -19,6 +19,8 @@
 
 #pragma once
 
+#include <aubo_ros_control/motion_lease.h>
+
 #include <string>
 #include <vector>
 #include <array>
@@ -147,6 +149,7 @@ public:
     bool isConnected() const { return controller_connected_flag_.load(); }
 
 private:
+    MotionLease motion_lease_;
     // -------------------------------------------------------------------------
     // 内部辅助
     // -------------------------------------------------------------------------

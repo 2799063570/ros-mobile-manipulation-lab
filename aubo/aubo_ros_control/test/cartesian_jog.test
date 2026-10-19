@@ -1,0 +1,13 @@
+<launch>
+  <!-- 满秩的 XYZ + RPY 合成链；无需 Gazebo、SDK 或真机即可测控制器生命周期。 -->
+  <param name="robot_description" textfile="$(find aubo_ros_control)/test/jog_test.urdf"/>
+  <param name="robot_description_semantic" value="&lt;robot name='jog_test'&gt;&lt;group name='aubo_i5'&gt;&lt;chain base_link='base_link' tip_link='tcp_link'/&gt;&lt;/group&gt;&lt;/robot&gt;"/>
+  <node pkg="aubo_ros_control" type="aubo_cartesian_jog_node" name="aubo_cartesian_jog" required="true">
+    <rosparam file="$(find aubo_ros_control)/config/cartesian_jog.yaml"/>
+    <param name="backend" value="gazebo"/>
+    <rosparam param="joint_lower_limits">[-2.5, -2.5, -2.5, -2.5, -2.5, -2.5]</rosparam>
+    <rosparam param="joint_upper_limits">[2.5, 2.5, 2.5, 2.5, 2.5, 2.5]</rosparam>
+    <rosparam param="gazebo_command_topics">[/jog_test/q0, /jog_test/q1, /jog_test/q2, /jog_test/q3, /jog_test/q4, /jog_test/q5]</rosparam>
+  </node>
+  <test test-name="cartesian_jog_integration" pkg="aubo_ros_control" type="cartesian_jog_integration_test" time-limit="60"/>
+</launch>

@@ -387,6 +387,7 @@ void AuboHardwareInterface::shutdown()
     robot_mac_service_.robotServiceLogout();
     controller_connected_flag_.store(false);
     ROS_INFO("[AuboHW] SDK 已安全退出。");
+    motion_lease_.release();
 }
 
 // =============================================================================
@@ -397,6 +398,11 @@ void AuboHardwareInterface::shutdown()
 
 bool AuboHardwareInterface::connectToRobotController()
 {
+    if (enable_motion_control_ && !motion_lease_.acquire())
+    {
+        ROS_ERROR("[AuboHW] 无法取得运动写入锁，请先停止点动/视觉伺服控制节点");
+        return false;
+    }
     // 从 ROS 参数服务器读取 IP（与 aubo_driver.cpp ros::param::get 一致）
     std::string s;
     if (ros::param::get("/aubo_driver/server_host", s) && !s.empty())

@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<robot name="jog_test">
+  <link name="base_link"/>
+  <link name="x"/>
+  <joint name="shoulder_joint" type="prismatic">
+    <parent link="base_link"/><child link="x"/><axis xyz="1 0 0"/>
+    <limit lower="-3" upper="3" effort="10" velocity="1"/>
+  </joint>
+  <link name="y"/>
+  <joint name="upperArm_joint" type="prismatic">
+    <parent link="x"/><child link="y"/><axis xyz="0 1 0"/>
+    <limit lower="-3" upper="3" effort="10" velocity="1"/>
+  </joint>
+  <link name="z"/>
+  <joint name="foreArm_joint" type="prismatic">
+    <parent link="y"/><child link="z"/><axis xyz="0 0 1"/>
+    <limit lower="-3" upper="3" effort="10" velocity="1"/>
+  </joint>
+  <link name="roll"/>
+  <joint name="wrist1_joint" type="revolute">
+    <parent link="z"/><child link="roll"/><axis xyz="1 0 0"/>
+    <limit lower="-3" upper="3" effort="10" velocity="1"/>
+  </joint>
+  <link name="pitch"/>
+  <joint name="wrist2_joint" type="revolute">
+    <parent link="roll"/><child link="pitch"/><axis xyz="0 1 0"/>
+    <limit lower="-3" upper="3" effort="10" velocity="1"/>
+  </joint>
+  <link name="tcp_link"/>
+  <joint name="wrist3_joint" type="revolute">
+    <parent link="pitch"/><child link="tcp_link"/><axis xyz="0 0 1"/>
+    <limit lower="-3" upper="3" effort="10" velocity="1"/>
+  </joint>
+</robot>

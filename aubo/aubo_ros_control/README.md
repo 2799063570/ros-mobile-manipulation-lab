@@ -1,5 +1,9 @@
 # aubo_ros_control
 
+末端 XYZ 连续点动入口为 `cartesian_jog_gazebo.launch` / `cartesian_jog_real.launch`，
+附带中文 C++/Qt 操作窗口、基/工具坐标系切换和速度/加速度/jerk 平滑。
+接口、参数、停止行为和验证限制见 [CARTESIAN_JOG.md](CARTESIAN_JOG.md)。
+
 独立视觉伺服及兼容入口位于本包的 `launch` 目录；分拣应用的 hybrid 组合入口
 位于 `aubo_sorting/launch`。`visual_servo_core.launch` 是被各 `eye_...` 入口包含的
 共用底层入口，通常不单独启动。

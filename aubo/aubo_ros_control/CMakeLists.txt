@@ -11,6 +11,8 @@ find_package(catkin REQUIRED COMPONENTS
   hardware_interface
   kdl_parser
   moveit_msgs
+  moveit_core
+  moveit_ros_planning
   shape_msgs
   pluginlib
   roscpp
@@ -69,7 +71,7 @@ catkin_package(
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME} aubo_visual_servo_panel
   CATKIN_DEPENDS aubo_sdk controller_manager dynamic_reconfigure geometry_msgs hardware_interface
-    kdl_parser moveit_msgs shape_msgs pluginlib roscpp rospy roslib rviz sensor_msgs
+    kdl_parser moveit_msgs moveit_core moveit_ros_planning shape_msgs pluginlib roscpp rospy roslib rviz sensor_msgs
     std_msgs std_srvs tf2_geometry_msgs tf2_ros
   DEPENDS orocos_kdl
 )
@@ -125,8 +127,38 @@ set_target_properties(aubo_visual_servo_node PROPERTIES
   INSTALL_RPATH "${AUBO_SDK_NODE_INSTALL_RPATH}"
   LINK_FLAGS "-Wl,--disable-new-dtags")
 
+# 点动复用 SDK 连接管理，通过按需生成器供点，不经过视觉伺服的软件队列。
+add_executable(aubo_cartesian_jog_node
+  src/cartesian_jog.cpp src/direct_sdk_backend.cpp src/visual_servo_common.cpp)
+target_compile_features(aubo_cartesian_jog_node PRIVATE cxx_std_14)
+target_include_directories(aubo_cartesian_jog_node PRIVATE
+  include ${catkin_INCLUDE_DIRS} ${orocos_kdl_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIR})
+target_link_libraries(aubo_cartesian_jog_node
+  ${catkin_LIBRARIES} ${orocos_kdl_LIBRARIES} ${AUBO_SDK_LIB} Threads::Threads)
+set_target_properties(aubo_cartesian_jog_node PROPERTIES
+  BUILD_RPATH "${AUBO_SDK_RUNTIME_DIRS}"
+  INSTALL_RPATH "${AUBO_SDK_NODE_INSTALL_RPATH}"
+  LINK_FLAGS "-Wl,--disable-new-dtags")
+
+add_executable(aubo_cartesian_jog_panel src/cartesian_jog_panel.cpp)
+target_compile_features(aubo_cartesian_jog_panel PRIVATE cxx_std_14)
+target_include_directories(aubo_cartesian_jog_panel PRIVATE ${catkin_INCLUDE_DIRS})
+target_link_libraries(aubo_cartesian_jog_panel ${catkin_LIBRARIES} Qt5::Widgets)
+
 if(CATKIN_ENABLE_TESTING)
+  add_executable(cartesian_jog_common_test test/cartesian_jog_common_test.cpp)
+  target_compile_features(cartesian_jog_common_test PRIVATE cxx_std_14)
+  target_include_directories(cartesian_jog_common_test PRIVATE include)
+  add_test(NAME cartesian_jog_common_test COMMAND cartesian_jog_common_test)
   find_package(rostest REQUIRED)
+  add_rostest_gtest(cartesian_jog_integration_test
+    test/cartesian_jog.test test/cartesian_jog_integration_test.cpp)
+  if(TARGET cartesian_jog_integration_test)
+    target_compile_features(cartesian_jog_integration_test PRIVATE cxx_std_14)
+    target_include_directories(cartesian_jog_integration_test PRIVATE ${catkin_INCLUDE_DIRS})
+    target_link_libraries(cartesian_jog_integration_test ${catkin_LIBRARIES})
+    add_dependencies(cartesian_jog_integration_test aubo_cartesian_jog_node)
+  endif()
   catkin_install_python(PROGRAMS test/hybrid_control_test.py
     DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
   add_rostest(test/hybrid_control.test)
@@ -152,6 +184,7 @@ target_link_libraries(aubo_visual_servo_panel
   Qt5::Widgets)
 
 install(TARGETS ${PROJECT_NAME} aubo_hw_node aubo_visual_servo_node
+                aubo_cartesian_jog_node aubo_cartesian_jog_panel
                 aubo_visual_servo_panel
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
@@ -160,5 +193,5 @@ install(DIRECTORY include/${PROJECT_NAME}/
   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION})
 install(DIRECTORY cfg config launch worlds
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
-install(FILES VISUAL_SERVO.md HYBRID_CONTROL.md plugin_description.xml
+install(FILES VISUAL_SERVO.md HYBRID_CONTROL.md CARTESIAN_JOG.md plugin_description.xml
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})

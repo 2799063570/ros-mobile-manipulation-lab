@@ -2,6 +2,7 @@
 #define AUBO_ROS_CONTROL_DIRECT_SDK_BACKEND_H
 
 #include <aubo_ros_control/visual_servo_common.h>
+#include <aubo_ros_control/motion_lease.h>
 
 #include <ros/ros.h>
 
@@ -9,6 +10,7 @@
 #include <aubo_driver/serviceinterface.h>
 
 #include <atomic>
+#include <functional>
 #include <string>
 #include <thread>
 
@@ -28,6 +30,9 @@ public:
   ~DirectSdkBackend();
 
   bool connect(ros::NodeHandle& nh);
+  // 点动专用：在 connect 前设置。控制柜需要补点时才调用，避免软件队列积压。
+  // 回调只由输出线程串行执行；false 表示当前尚未准备好，不生成新点。
+  void setPointGenerator(std::function<bool(JointPoint&)> generator);
   bool readState(JointPoint& position);
   bool healthy() const;
   void shutdown();
@@ -49,6 +54,8 @@ private:
   bool in_stream_mode_{false}, have_last_position_{false};
   std::thread output_thread_;
   JointPoint last_position_, last_velocity_;
+  std::function<bool(JointPoint&)> point_generator_;
+  MotionLease motion_lease_;
 };
 
 }  // namespace visual_servo_internal

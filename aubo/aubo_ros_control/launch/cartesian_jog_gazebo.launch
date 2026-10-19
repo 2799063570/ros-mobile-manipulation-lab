@@ -1,0 +1,32 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="gui" default="true"/>
+  <arg name="panel" default="true"/>
+  <arg name="config" default="$(find aubo_ros_control)/config/cartesian_jog.yaml"/>
+  <!-- 空场景，从非零关节姿态启动，避免零位的伸直奇异位形。 -->
+  <include file="$(find gazebo_ros)/launch/empty_world.launch">
+    <arg name="gui" value="$(arg gui)"/>
+  </include>
+  <include file="$(find aubo_moveit_config)/launch/planning_context.launch">
+    <arg name="load_robot_description" value="true"/>
+    <arg name="robot_xacro" value="aubo_i5.xacro"/>
+    <arg name="robot_srdf" value="aubo_i5.srdf"/>
+  </include>
+  <node pkg="gazebo_ros" type="spawn_model" name="spawn_jog_robot"
+        args="-urdf -model aubo_i5 -param robot_description -J shoulder_joint 0 -J upperArm_joint 0 -J foreArm_joint 1.6292 -J wrist1_joint 0 -J wrist2_joint 1.6628 -J wrist3_joint 0"/>
+  <group ns="aubo_i5">
+    <rosparam file="$(find aubo_ros_control)/config/visual_servo_controllers.yaml"/>
+    <node name="jog_controller_spawner" pkg="controller_manager" type="spawner" output="screen"
+          args="joint_state_controller shoulder_position_controller upper_arm_position_controller fore_arm_position_controller wrist1_position_controller wrist2_position_controller wrist3_position_controller"/>
+  </group>
+  <node name="jog_joint_state_relay" pkg="joint_state_publisher" type="joint_state_publisher">
+    <rosparam param="source_list">[/aubo_i5/joint_states]</rosparam>
+  </node>
+  <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher"/>
+  <include file="$(find aubo_ros_control)/launch/cartesian_jog.launch">
+    <arg name="backend" value="gazebo"/>
+    <arg name="joint_states_topic" value="/aubo_i5/joint_states"/>
+    <arg name="panel" value="$(arg panel)"/>
+    <arg name="config" value="$(arg config)"/>
+  </include>
+</launch>
