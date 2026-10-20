@@ -1,0 +1,11 @@
+<launch>
+  <!-- 只接入已经运行的cartesian_jog；不启动SDK和机械臂。 -->
+  <arg name="port" default="/dev/ttyUSB0"/>
+  <arg name="joint_states_topic" default="/joint_states"/>
+  <arg name="max_speed_mm_s" default="100.0"/>
+  <node pkg="aubo_remote_bridge" type="cartesian_serial_bridge" name="cartesian_serial_bridge" output="screen">
+    <param name="port" value="$(arg port)"/>
+    <param name="joint_states_topic" value="$(arg joint_states_topic)"/>
+    <param name="max_speed_mm_s" value="$(arg max_speed_mm_s)"/>
+  </node>
+</launch>

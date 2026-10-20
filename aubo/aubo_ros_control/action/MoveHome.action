@@ -1,0 +1,9 @@
+# Empty goal: move to the configured home_joint_positions, only on explicit request.
+---
+bool success
+string message
+---
+float64[] current_joint_positions
+float64[] target_joint_positions
+float64 max_joint_error
+bool stopping

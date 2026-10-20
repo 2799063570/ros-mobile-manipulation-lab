@@ -1,4 +1,7 @@
 #include <ros/ros.h>
+#include <aubo_ros_control/MoveHomeAction.h>
+#include <actionlib/client/simple_action_client.h>
+#include <sensor_msgs/JointState.h>
 #include <geometry_msgs/TwistStamped.h>
 #include <std_msgs/String.h>
 #include <std_srvs/SetBool.h>
@@ -12,12 +15,16 @@
 #include <QEvent>
 #include <QGridLayout>
 #include <QLabel>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QTimer>
 #include <QVBoxLayout>
 #include <QWidget>
 #include <array>
 #include <algorithm>
+#include <cmath>
+#include <memory>
+#include <vector>
 
 // 独立 Qt 窗口，不依赖 RViz 面板；ROS 回调通过 GUI 定时器处理。
 // 窗口失焦、按键释放、关闭或状态心跳消失，都先发布零速度。
@@ -78,6 +85,13 @@ public:
     layout->addWidget(enable);
     layout->addWidget(stop);
     layout->addWidget(reset);
+    auto* home = new QPushButton(QString::fromUtf8("移动到 home（关节运动）"));
+    auto* cancel_home = new QPushButton(QString::fromUtf8("取消回 home 并减速停止"));
+    layout->addWidget(home);
+    layout->addWidget(cancel_home);
+    joints_label_ = new QLabel(QString::fromUtf8("等待当前关节位置……"));
+    joints_label_->setWordWrap(true);
+    layout->addWidget(joints_label_);
     status_ = new QLabel(QString::fromUtf8("等待控制器状态……"));
     status_->setWordWrap(true);
     layout->addWidget(status_);
@@ -92,6 +106,7 @@ public:
     subscriber_ = nh_.subscribe<std_msgs::String>("/cartesian_jog/state", 1,
         [this](const std_msgs::String::ConstPtr& message) {
           last_state_.restart();
+          controller_state_ = message->data;
           ready_ = message->data == "ENABLED_IDLE" || message->data == "JOGGING";
           status_->setText(QString::fromUtf8("控制器：") + QString::fromStdString(message->data));
           if (!ready_)
@@ -99,6 +114,36 @@ public:
         });
     enable_client_ = nh_.serviceClient<std_srvs::SetBool>("/cartesian_jog/set_enabled");
     reset_client_ = nh_.serviceClient<std_srvs::Trigger>("/cartesian_jog/reset");
+    home_client_.reset(new HomeClient("/cartesian_jog/move_home", false));
+    std::string backend, joint_topic;
+    nh_.param<std::string>("/aubo_cartesian_jog/backend", backend, "gazebo");
+    prompt_home_ = backend == "sdk";
+    nh_.param<std::string>("/aubo_cartesian_jog/joint_states_topic", joint_topic, "/joint_states");
+    nh_.getParam("/aubo_cartesian_jog/joint_names", joint_names_);
+    nh_.getParam("/aubo_cartesian_jog/home_joint_positions", home_position_);
+    joints_subscriber_ = nh_.subscribe<sensor_msgs::JointState>(joint_topic, 1,
+        [this](const sensor_msgs::JointState::ConstPtr& message) {
+          if (joint_names_.size() != 6 || home_position_.size() != 6)
+            return;
+          QStringList positions;
+          double error = 0.0;
+          for (std::size_t i = 0; i < 6; ++i)
+          {
+            const auto found = std::find(message->name.begin(), message->name.end(), joint_names_[i]);
+            const auto index = static_cast<std::size_t>(found - message->name.begin());
+            if (found == message->name.end() || index >= message->position.size() ||
+                !std::isfinite(message->position[index]))
+              return;
+            positions << QString::number(message->position[index], 'f', 3);
+            error = std::max(error, std::abs(message->position[index] - home_position_[i]));
+          }
+          home_error_ = error;
+          have_joints_ = true;
+          joints_label_->setText(QString::fromUtf8("当前关节 [rad]：") + positions.join(", ") +
+              QString::fromUtf8("\n距 home 最大关节误差：") + QString::number(error, 'f', 3) + " rad");
+        });
+    connect(home, &QPushButton::clicked, this, [this]() { moveHome(); });
+    connect(cancel_home, &QPushButton::clicked, this, [this]() { home_client_->cancelGoal(); });
     connect(enable, &QPushButton::clicked, this, [this]() { setEnabled(true); });
     connect(stop, &QPushButton::clicked, this, [this]() { setEnabled(false); });
     connect(reset, &QPushButton::clicked, this, [this]() {
@@ -115,7 +160,7 @@ public:
     connect(frame_, static_cast<void (QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
             this, [this](int) { release(); });
     auto* timer = new QTimer(this);
-    connect(timer, &QTimer::timeout, this, [this]() {
+    connect(timer, &QTimer::timeout, this, [this, home, cancel_home]() {
       ros::spinOnce();
       if (!ros::ok())
       {
@@ -130,6 +175,26 @@ public:
       }
       for (auto* button : buttons_)
         button->setEnabled(ready_);
+      home->setEnabled(!ready_ && !home_requested_ && have_joints_ && home_client_->isServerConnected());
+      cancel_home->setEnabled(home_requested_);
+      if (prompt_home_ && have_joints_ && last_state_.isValid() && last_state_.elapsed() < 500 &&
+          controller_state_ == "DISABLED" && home_client_->isServerConnected())
+      {
+        prompt_home_ = false;
+        if (home_error_ > 0.005)
+        {
+          auto* question = new QMessageBox(QMessageBox::Question, QString::fromUtf8("实机初始姿态"),
+              joints_label_->text() + QString::fromUtf8("\n是否移动到 home？选择“否”保持当前位置。\n"
+                  "回 home 使用关节空间运动，请确认运动空间；运动中可随时取消。"),
+              QMessageBox::Yes | QMessageBox::No, this);
+          question->setDefaultButton(QMessageBox::No);
+          question->setAttribute(Qt::WA_DeleteOnClose);
+          connect(question, &QMessageBox::finished, this, [this](int answer) {
+            if (answer == QMessageBox::Yes) moveHome();
+          });
+          question->open();  // 非阻塞：保持 ROS 回调与取消按钮响应。
+        }
+      }
       publishCommand();
     });
     timer->start(33);  // 约 30 Hz 输入心跳；200 Hz 路点由控制器独立生成。
@@ -147,11 +212,34 @@ protected:
   void closeEvent(QCloseEvent* event) override
   {
     release();
+    if (home_client_) home_client_->cancelGoal();
     // 不依赖服务完成才能关窗；若零指令丢包，控制器仍会在输入超时后减速。
     event->accept();
   }
 
 private:
+  using HomeClient = actionlib::SimpleActionClient<aubo_ros_control::MoveHomeAction>;
+
+  void moveHome()
+  {
+    release();
+    if (home_requested_ || !home_client_->isServerConnected())
+      return;
+    home_requested_ = true;
+    home_client_->sendGoal(aubo_ros_control::MoveHomeGoal(),
+        [this](const actionlib::SimpleClientGoalState& state,
+               const aubo_ros_control::MoveHomeResultConstPtr& result) {
+          home_requested_ = false;
+          result_->setText(QString::fromStdString(state.toString() + ": " +
+              (result ? result->message : "No result; check controller")));
+        }, HomeClient::SimpleActiveCallback(),
+        [this](const aubo_ros_control::MoveHomeFeedbackConstPtr& feedback) {
+          result_->setText((feedback->stopping ? QString::fromUtf8("回 home 减速停止中，等待停稳……")
+                                               : QString::fromUtf8("回 home 运动中，可随时取消。")) +
+              QString::fromUtf8(" 最大关节误差：") + QString::number(feedback->max_joint_error, 'f', 3) + " rad");
+        });
+  }
+
   void publishCommand()
   {
     if (!publisher_)
@@ -181,6 +269,7 @@ private:
   void setEnabled(bool value)
   {
     release();  // 服务调用可能阻塞，必须先发布零指令。
+    if (!value && home_client_) home_client_->cancelGoal();
     std_srvs::SetBool service;
     service.request.data = value;
     const bool ok = enable_client_.exists() && enable_client_.call(service);
@@ -190,13 +279,20 @@ private:
 
   ros::NodeHandle nh_;
   ros::Publisher publisher_;
-  ros::Subscriber subscriber_;
+  ros::Subscriber subscriber_, joints_subscriber_;
   ros::ServiceClient enable_client_, reset_client_;
   std::string base_, tool_;
   QComboBox* frame_{nullptr};
   QDoubleSpinBox* speed_{nullptr};
   QLabel* status_{nullptr};
   QLabel* result_{nullptr};
+  QLabel* joints_label_{nullptr};
+  std::unique_ptr<HomeClient> home_client_;
+  std::vector<std::string> joint_names_;
+  std::vector<double> home_position_;
+  std::string controller_state_;
+  double home_error_{0.0};
+  bool have_joints_{false}, prompt_home_{false}, home_requested_{false};
   std::array<QPushButton*, 6> buttons_;
   QElapsedTimer last_state_;
   int active_button_{-1};

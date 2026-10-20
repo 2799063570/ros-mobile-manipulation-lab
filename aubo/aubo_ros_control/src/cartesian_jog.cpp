@@ -1,5 +1,7 @@
 #include <aubo_ros_control/cartesian_jog_common.h>
 #include <aubo_ros_control/direct_sdk_backend.h>
+#include <aubo_ros_control/MoveHomeAction.h>
+#include <actionlib/server/action_server.h>
 
 #include <geometry_msgs/TwistStamped.h>
 #include <sensor_msgs/JointState.h>
@@ -42,6 +44,8 @@ void requestShutdown(int) { stop_requested = 1; }
 
 class CartesianJog
 {
+  using HomeServer = actionlib::ActionServer<MoveHomeAction>;
+  using HomeHandle = HomeServer::GoalHandle;
 public:
   CartesianJog() : private_nh_("~"), io_("/cartesian_jog"), unused_queue_(2)
   {
@@ -74,11 +78,21 @@ public:
       output_timer_ = nh_.createTimer(ros::Duration(kPeriod), &CartesianJog::gazeboOutput, this);
     }
     status_timer_ = nh_.createWallTimer(ros::WallDuration(0.1), &CartesianJog::publishStatus, this);
+    home_server_.reset(new HomeServer(io_, "move_home",
+        [this](HomeHandle goal) { startHome(goal); },
+        [this](HomeHandle goal) { cancelHome(goal); }, false));
+    home_server_->start();
     ROS_INFO("[cartesian_jog] %s 后端已启动，默认禁用；先发送零指令，再按住点动", backend_.c_str());
   }
 
   ~CartesianJog()
   {
+    if (home_goal_)
+    {
+      MoveHomeResult result;
+      result.message = "controller_exiting; stop not confirmed";
+      home_goal_->setAborted(result);
+    }
     // 正常退出在 main 中先请求减速；SDK 故障退出不承诺平滑停车。
     if (sdk_)
       sdk_->shutdown();
@@ -96,6 +110,7 @@ public:
     enabled_ = false;
     shutting_down_ = true;
     requested_.setZero();
+    stopHome();
   }
 
   bool stopped()
@@ -123,12 +138,15 @@ private:
     private_nh_.param("singularity_stop", singular_stop_, 0.008);
     private_nh_.param("singularity_slow", singular_slow_, 0.06);
     private_nh_.param("collision_resolution", collision_resolution_, 0.002);
+    private_nh_.param("home_joint_velocity", home_velocity_, 0.10);
+    private_nh_.param("home_timeout", home_timeout_, 90.0);
     if ((backend_ != "sdk" && backend_ != "gazebo") || base_ == tool_ ||
         !positive(max_linear_) || max_linear_ > 0.10 || !positive(command_timeout_) ||
         command_timeout_ > 0.5 || !positive(feedback_timeout_) || feedback_timeout_ > 0.5 ||
         !positive(following_error_) || !positive(limit_margin_) || !positive(damping_) ||
         !positive(singular_stop_) || !positive(singular_slow_) || singular_slow_ <= singular_stop_ ||
-        !positive(collision_resolution_) || collision_resolution_ > 0.01)
+        !positive(collision_resolution_) || collision_resolution_ > 0.01 ||
+        !positive(home_velocity_) || home_velocity_ > 0.25 || !positive(home_timeout_))
       throw std::runtime_error("Invalid Cartesian jog parameters");
 
     if (!private_nh_.getParam("joint_names", names_) || names_.size() != kDof)
@@ -138,10 +156,14 @@ private:
     readArray("joint_velocity_limits", velocity_limits_, true);
     readArray("joint_acceleration_limits", acceleration_limits_, true);
     readArray("joint_jerk_limits", jerk_limits_, true);
+    readArray("home_joint_positions", home_position_, false);
     for (std::size_t i = 0; i < kDof; ++i)
     {
       if (lower_[i] + 2 * limit_margin_ >= upper_[i])
         throw std::runtime_error("Joint limit margin leaves no working range");
+      if (home_position_[i] < lower_[i] + limit_margin_ ||
+          home_position_[i] > upper_[i] - limit_margin_)
+        throw std::runtime_error("Home position exceeds joint limits");
       filters_.emplace_back(velocity_limits_[i], acceleration_limits_[i], jerk_limits_[i], kPeriod);
     }
   }
@@ -226,6 +248,124 @@ private:
     }
     enabled_ = false;
     requested_.setZero();
+    if (home_goal_)
+      home_stopping_ = true;
+  }
+
+  void startHome(HomeHandle goal)
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    MoveHomeResult result;
+    if (goal.getGoalStatus().status == actionlib_msgs::GoalStatus::RECALLING)
+    {
+      result.message = "Cancelled before motion";
+      goal.setCanceled(result);
+      return;
+    }
+    if (home_goal_ || enabled_ || shutting_down_ || !initialized_ || !fault_.empty() ||
+        !settled() || elapsed(Clock::now(), last_feedback_) > feedback_timeout_ ||
+        (sdk_ && !sdk_->healthy()) || !safeStop(position_, filters_))
+    {
+      result.message = "Disable jog first; feedback, stopped state and collision check must be healthy";
+      goal.setRejected(result);
+      return;
+    }
+    for (std::size_t i = 0; i < kDof; ++i)
+      if (std::abs(position_[i] - feedback_[i]) > 0.01)
+      {
+        result.message = "Robot has not reached the held joint position";
+        goal.setRejected(result);
+        return;
+      }
+    // 不接管其他执行器，不调用阻塞式 SDK moveJoint；沿现有 5 ms 流生成点。
+    home_goal_.reset(new HomeHandle(goal));
+    home_stopping_ = false;
+    home_cancelled_ = false;
+    home_started_ = Clock::now();
+    home_goal_->setAccepted("Moving to home with joint-space collision and braking checks");
+  }
+
+  void stopHome()
+  {
+    if (home_goal_)
+    {
+      home_cancelled_ = true;
+      home_stopping_ = true;
+    }
+  }
+
+  void cancelHome(HomeHandle goal)
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (home_goal_ && goal == *home_goal_)
+      stopHome();
+  }
+
+  Eigen::Matrix<double, 6, 1> homeVelocity()
+  {
+    Eigen::Matrix<double, 6, 1> velocity = Eigen::Matrix<double, 6, 1>::Zero();
+    if (elapsed(Clock::now(), home_started_) > home_timeout_)
+      fault("home_timeout");
+    double error = 0.0;
+    for (std::size_t i = 0; i < kDof; ++i)
+      error = std::max(error, std::abs(home_position_[i] - position_[i]));
+    if (error < 0.001)
+      home_stopping_ = true;
+    if (home_stopping_)
+      return velocity;
+    // 同比例关节误差回授，接近目标时降速；继续经过相同的 A/J 平滑与制动检查。
+    double scale = 1.0;
+    for (std::size_t i = 0; i < kDof; ++i)
+    {
+      velocity(i) = 0.8 * (home_position_[i] - position_[i]);
+      if (std::abs(velocity(i)) > 0)
+        scale = std::min(scale, std::min(home_velocity_, velocity_limits_[i]) / std::abs(velocity(i)));
+    }
+    return velocity * scale;
+  }
+
+  void updateHome()
+  {
+    if (!home_goal_)
+      return;
+    MoveHomeFeedback feedback;
+    feedback.current_joint_positions.assign(feedback_.begin(), feedback_.end());
+    feedback.target_joint_positions.assign(home_position_.begin(), home_position_.end());
+    feedback.stopping = home_stopping_;
+    double following = 0.0;
+    for (std::size_t i = 0; i < kDof; ++i)
+    {
+      feedback.max_joint_error = std::max(feedback.max_joint_error, std::abs(home_position_[i] - feedback_[i]));
+      following = std::max(following, std::abs(position_[i] - feedback_[i]));
+    }
+    home_goal_->publishFeedback(feedback);
+    // 结果在平滑器停稳、反馈新鲜且实机反馈速度也接近零后才返回。
+    if (!home_stopping_ || !settled() || following > 0.01 || feedback_speed_ > 0.01 ||
+        elapsed(Clock::now(), last_feedback_) > feedback_timeout_)
+      return;
+    MoveHomeResult result;
+    if (!fault_.empty())
+    {
+      result.message = fault_;
+      home_goal_->setAborted(result);
+    }
+    else if (home_cancelled_)
+    {
+      result.message = "Cancelled and stopped; jog remains disabled";
+      home_goal_->setCanceled(result);
+    }
+    else if (feedback.max_joint_error <= 0.005)
+    {
+      result.success = true;
+      result.message = "Home reached; jog remains disabled";
+      home_goal_->setSucceeded(result);
+    }
+    else
+    {
+      result.message = "Stopped outside home tolerance; jog remains disabled";
+      home_goal_->setAborted(result);
+    }
+    home_goal_.reset();
   }
 
   void command(const geometry_msgs::TwistStamped::ConstPtr& message)
@@ -269,6 +409,7 @@ private:
     {
       enabled_ = false;
       requested_.setZero();
+      stopHome();
       response.message = "已请求平滑停止；控制柜已有点仍需执行";
       return true;
     }
@@ -277,7 +418,7 @@ private:
       response.message = "已使能";
       return true;
     }
-    if (shutting_down_ || !initialized_ || !fault_.empty() || !settled() ||
+    if (home_goal_ || shutting_down_ || !initialized_ || !fault_.empty() || !settled() ||
         elapsed(Clock::now(), last_feedback_) > feedback_timeout_ ||
         (sdk_ && !sdk_->healthy()) || !safeStop(position_, filters_))
     {
@@ -298,7 +439,7 @@ private:
   bool reset(std_srvs::Trigger::Request&, std_srvs::Trigger::Response& response)
   {
     std::lock_guard<std::mutex> lock(mutex_);
-    response.success = initialized_ && !enabled_ && !fatal_ && settled() &&
+    response.success = initialized_ && !enabled_ && !home_goal_ && !fatal_ && settled() &&
                        elapsed(Clock::now(), last_feedback_) <= feedback_timeout_ &&
                        (!sdk_ || sdk_->healthy()) && safeStop(position_, filters_);
     for (std::size_t i = 0; i < kDof; ++i)
@@ -317,6 +458,12 @@ private:
       fault("invalid_feedback");
       return;
     }
+    const Time now = Clock::now();
+    const double dt = elapsed(now, last_feedback_);
+    feedback_speed_ = 0.0;
+    if (have_feedback_ && dt > 1e-6)
+      for (std::size_t i = 0; i < kDof; ++i)
+        feedback_speed_ = std::max(feedback_speed_, std::abs(point[i] - feedback_[i]) / dt);
     feedback_ = point;
     have_feedback_ = true;
     last_feedback_ = Clock::now();
@@ -474,7 +621,7 @@ private:
       if (std::abs(position_[i] - feedback_[i]) > following_error_)
         fault("following_error");
 
-    const auto desired = desiredVelocity();
+    const auto desired = home_goal_ ? homeVelocity() : desiredVelocity();
     auto next_filters = filters_;
     JointPoint next = position_;
     for (std::size_t i = 0; i < kDof; ++i)
@@ -524,9 +671,12 @@ private:
   void publishStatus(const ros::WallTimerEvent&)
   {
     std::lock_guard<std::mutex> lock(mutex_);
+    updateHome();
     std_msgs::String message;
     if (!fault_.empty())
       message.data = "FAULT: " + fault_ + (settled() ? " | STOPPED" : " | STOPPING");
+    else if (home_goal_)
+      message.data = home_stopping_ ? "HOME_STOPPING" : "HOME_MOVING";
     else if (!initialized_)
       message.data = "WAITING_FOR_FEEDBACK";
     else if (!enabled_)
@@ -567,6 +717,12 @@ private:
   Time last_feedback_{}, last_command_{}, last_generated_{};
   ros::Time last_stamp_;
   std::string fault_;
+  std::unique_ptr<HomeServer> home_server_;
+  std::unique_ptr<HomeHandle> home_goal_;
+  JointPoint home_position_{};
+  double home_velocity_, home_timeout_, feedback_speed_{0.0};
+  bool home_stopping_{false}, home_cancelled_{false};
+  Time home_started_{};
   // 放在最后：构造抛异常时也先销毁 SDK 输出线程，再释放它引用的其他成员。
   std::unique_ptr<visual_servo_internal::DirectSdkBackend> sdk_;
 };

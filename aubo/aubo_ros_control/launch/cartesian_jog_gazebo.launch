@@ -3,9 +3,17 @@
   <arg name="gui" default="true"/>
   <arg name="panel" default="true"/>
   <arg name="config" default="$(find aubo_ros_control)/config/cartesian_jog.yaml"/>
+  <arg name="initial_shoulder" default="0"/>
+  <arg name="initial_upper_arm" default="0"/>
+  <arg name="initial_fore_arm" default="1.6292"/>
+  <arg name="initial_wrist1" default="0"/>
+  <arg name="initial_wrist2" default="1.6628"/>
+  <arg name="initial_wrist3" default="0"/>
   <!-- 空场景，从非零关节姿态启动，避免零位的伸直奇异位形。 -->
   <include file="$(find gazebo_ros)/launch/empty_world.launch">
     <arg name="gui" value="$(arg gui)"/>
+    <!-- 先设置 -J 初始关节值再运行物理，避免点动节点锁定生成模型时的零位。 -->
+    <arg name="paused" value="true"/>
   </include>
   <include file="$(find aubo_moveit_config)/launch/planning_context.launch">
     <arg name="load_robot_description" value="true"/>
@@ -13,7 +21,7 @@
     <arg name="robot_srdf" value="aubo_i5.srdf"/>
   </include>
   <node pkg="gazebo_ros" type="spawn_model" name="spawn_jog_robot"
-        args="-urdf -model aubo_i5 -param robot_description -J shoulder_joint 0 -J upperArm_joint 0 -J foreArm_joint 1.6292 -J wrist1_joint 0 -J wrist2_joint 1.6628 -J wrist3_joint 0"/>
+        args="-urdf -model aubo_i5 -param robot_description -unpause -J shoulder_joint $(arg initial_shoulder) -J upperArm_joint $(arg initial_upper_arm) -J foreArm_joint $(arg initial_fore_arm) -J wrist1_joint $(arg initial_wrist1) -J wrist2_joint $(arg initial_wrist2) -J wrist3_joint $(arg initial_wrist3)"/>
   <group ns="aubo_i5">
     <rosparam file="$(find aubo_ros_control)/config/visual_servo_controllers.yaml"/>
     <node name="jog_controller_spawner" pkg="controller_manager" type="spawner" output="screen"

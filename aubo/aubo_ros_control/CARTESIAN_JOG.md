@@ -6,7 +6,7 @@
 核心、中文 Qt 窗口和平滑器测试均使用 C++14。
 
 本实现使用 ROS 1 / MoveIt 1 的接口；完整 ROS 构建和运行需要 Linux ROS 工作空间。
-本次开发环境只有 Windows/MSVC，已验证独立平滑器，尚未验证完整 ROS 编译、Gazebo 或真机。
+Gazebo 入口已在 Linux / ROS Noetic 下完成无界面点动验证；真机仍需单独验证。
 
 ## 编译与启动
 
@@ -23,7 +23,18 @@ roslaunch aubo_ros_control cartesian_jog_gazebo.launch
 roslaunch aubo_ros_control cartesian_jog_gazebo.launch gui:=false panel:=false
 ```
 
-Gazebo 入口从非零 home 姿态开始，并加载六个独立关节位置控制器。不得在同一模型上
+Gazebo 入口从非零 home 姿态 `[0, 0, 1.6292, 0, 1.6628, 0]` rad 开始，
+顺序为肩、上臂、前臂、腕 1、腕 2、腕 3，并加载六个独立关节位置控制器。
+该姿态的 TCP 雅可比最小奇异值约为 `0.213`，高于默认减速阈值 `0.06`；
+全零姿态约为 `2.1e-7`，会触发 `singularity_stop`。
+
+启动时先暂停 Gazebo 物理，由 `spawn_model -J ... -unpause` 设置完关节值后再恢复。
+如果在物理运行时生成模型，控制器可能先读到零位并保持零位，或在初始值跳变时触发
+`following_error`。修改启动文件后需要退出旧仿真，再重新启动。
+可通过 `initial_shoulder`、`initial_upper_arm`、`initial_fore_arm`、`initial_wrist1`、
+`initial_wrist2`、`initial_wrist3` 六个 launch 参数覆盖初始值，单位 rad。
+
+不得在同一模型上
 同时运行 MoveIt 的关节轨迹控制器、视觉伺服或其他关节指令发布者。
 
 真机使用专用入口：
@@ -37,8 +48,47 @@ roslaunch aubo_ros_control cartesian_jog_real.launch robot_ip:=192.168.1.2
 `aubo_real_bringup.launch` 或视觉伺服真机入口。启动文件默认使用带腕部相机的模型；
 如果实际没有相机，传入 `robot_xacro:=aubo_i5.xacro robot_srdf:=aubo_i5.srdf`。
 
+### 实机初始姿态与可取消回 home
+
+实机不会自动回 home。窗口收到当前关节反馈、控制器就绪后显示当前六轴位置与 home
+的最大关节误差；如果误差超过 0.005 rad，会询问是否移动到 home。选择“否”保持当前位置，
+之后可手动使能点动；如果当前位置接近奇异位形，笛卡尔运动仍会被奇异保护停止。
+已经位于 home 附近时不弹出询问。无界面运行也不会自行回 home。
+
+“移动到 home（关节运动）”通过 `/cartesian_jog/move_home` action
+（`aubo_ros_control/MoveHomeAction`，空 goal）发起。该按钮在仿真中也可用于验证。
+home 目标由 `home_joint_positions` 配置，默认与仿真初始 home 一致；
+`home_joint_velocity` 默认 0.10 rad/s，并同时受各关节速度、加速度、jerk 限制。
+回 home 使用现有 SDK 透传流中的关节空间误差控制，可以从无碰撞且限位内的奇异位形出发。
+运动期间检查候选点及其制动尾段；遇到已知碰撞或限位会停止，不提供全局绕障规划。
+
+必须先禁用点动且停稳，再请求回 home；运动中拒绝点动使能和第二个 home 目标。
+action 以 10 Hz 反馈当前位置、目标位置、最大关节误差和减速状态。
+点击“取消回 home 并减速停止”，或由客户端发送 cancel，可以随时请求减速；
+“停止并禁用”和正常关闭窗口也会请求取消。取消不是瞬时停止，也不能撤回控制柜已有点。
+只有指令平滑器停稳、反馈新鲜、跟随误差不超过 0.01 rad、反馈关节速度不超过 0.01 rad/s
+时，才返回 `PREEMPTED`；到达目标且最大反馈误差不超过 0.005 rad 时返回 `SUCCEEDED`。
+故障返回 `ABORTED`，未就绪或忙碌时返回 `REJECTED`。
+成功、取消后均保持禁用，需要手动重新使能点动。
+
+`home_timeout` 默认 90 秒，超时触发故障并减速。反馈丢失时不能确认停稳，action 会等待反馈恢复；
+控制器退出时会返回未确认停止的失败结果。客户端进程崩溃或网络断开本身不会自动发送 cancel，
+可由其他客户端取消目标或调用“停止并禁用”。不要使用 action 取消代替硬件急停。
+
+```python
+import actionlib
+from aubo_ros_control.msg import MoveHomeAction, MoveHomeGoal
+
+client = actionlib.SimpleActionClient('/cartesian_jog/move_home', MoveHomeAction)
+client.wait_for_server()
+client.send_goal(MoveHomeGoal())  # 用户确认后才调用
+# 需要取消时调用 client.cancel_goal()；等待结果确认停稳。
+```
+
 窗口中先点击“使能点动”，选择基坐标系或工具坐标系，再按住 `X± / Y± / Z±`。
-默认速度 10 mm/s，默认上限 20 mm/s；界面 mm/s 自动转换为消息中的 m/s。
+默认速度 10 mm/s，可调范围 0.1–100 mm/s；界面 mm/s 自动转换为消息中的 m/s。
+范围上限由 `max_linear_velocity: 0.10` 控制，仿真与真机入口共用此配置。
+实际速度仍受关节速度、加速度、jerk、奇异位形及限位约束，可能低于设定值。
 松手、窗口失焦/隐藏或关闭时发布零指令；控制器没有收到新指令时也会超时减速。
 “停止并禁用”使用同一减速路径。GUI 服务调用阻塞时，控制器自身的超时机制仍生效。
 
@@ -50,6 +100,7 @@ roslaunch aubo_ros_control cartesian_jog_real.launch robot_ip:=192.168.1.2
 | `/cartesian_jog/set_enabled` | `std_srvs/SetBool` | 使能或减速禁用 |
 | `/cartesian_jog/reset` | `std_srvs/Trigger` | 停稳、反馈正常且停止位姿安全时清除故障；不自动使能 |
 | `/cartesian_jog/state` | `std_msgs/String` | 10 Hz 状态心跳，含故障原因 |
+| `/cartesian_jog/move_home` | `aubo_ros_control/MoveHomeAction` | 显式请求回 home，可取消；不自动使能点动 |
 
 `header.frame_id` 仅接受配置中的 `base_link` 或 `tool_link`，默认分别为
 `base_link`、`tcp_link`。工具坐标系方向按当前指令位姿旋转到基坐标系。
@@ -73,6 +124,7 @@ rostopic echo /cartesian_jog/state
 ```
 
 `DISABLED` 表示已禁用并停稳；`ENABLED_IDLE` 表示已使能、无运动；
+`HOME_MOVING` / `HOME_STOPPING` 表示回 home 运动 / 减速停止中；
 `JOGGING` 表示运动或仍在减速；`STOPPING` 表示禁用后的减速阶段；
 `FAULT: 原因 | STOPPING/STOPPED` 表示锁存故障。故障不会自动重启运动。
 仿真暂停/恢复可能触发调度间隙或陈旧时间戳故障，恢复后需检查状态并复位。
@@ -163,7 +215,14 @@ rostest aubo_ros_control cartesian_jog.test
 停止距离上界、停稳和参数拒绝。ROS 集成测试使用满秩 XYZ+RPY 合成模型及模拟反馈，
 覆盖禁用不运动、使能前零指令、基/工具坐标系、输入/反馈超时、过期时间戳、
 非法坐标系/角速度/NaN 和故障复位，无需连接机械臂。
+同一集成测试还覆盖 home action：点动使能时拒绝目标、回 home 时拒绝点动使能和重复目标、
+取消后停稳、反馈中断后等待恢复并返回失败，以及重新回 home 成功后保持禁用。
 
-当前只运行通过了独立数值测试。ROS 集成测试、Gazebo/SDK 完整编译运行以及真机
-按下/松手延迟、低速匀速性、反向平滑性、TCP 偏差和停止距离仍需在目标环境验证。
+2026-10-20 在 ROS Noetic 下复现并修复了 Gazebo 启动姿态竞争：修复后反馈保持 home，
+初始状态为 `DISABLED`。使用已有编译产物，在基坐标系和工具坐标系分别验证 XYZ 正负方向，
+每次以 10 mm/s 点动 1 秒后发送零速度至停稳，检查 TCP 位移方向、姿态保持和无故障停止。
+这不代表已验证 SDK 后端或真机。真机的按下/松手延迟、低速匀速性、反向平滑性、
+TCP 偏差和停止距离仍需在目标环境验证。
+新增 home action 后已重新编译节点和 Qt 窗口，并在 AUBO Gazebo 模型上验证从零位出发、
+途中取消后返回 `PREEMPTED`、再次执行到达 home 后返回 `SUCCEEDED` 且保持 `DISABLED`。
 不要把 200 Hz 配置值当作硬实时或真机平滑性的证明。

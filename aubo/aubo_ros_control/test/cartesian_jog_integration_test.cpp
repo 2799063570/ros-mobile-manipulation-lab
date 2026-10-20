@@ -1,4 +1,6 @@
 #include <gtest/gtest.h>
+#include <aubo_ros_control/MoveHomeAction.h>
+#include <actionlib/client/simple_action_client.h>
 #include <ros/ros.h>
 #include <geometry_msgs/TwistStamped.h>
 #include <sensor_msgs/JointState.h>
@@ -111,6 +113,7 @@ protected:
     speed(0);
     ASSERT_TRUE(set(true));
     ros::WallDuration(0.08).sleep();  // 等待使能后的零指令到达。
+    ASSERT_TRUE(wait([this]() { return state() == "ENABLED_IDLE"; }));
   }
 
   void waitFault(const std::string& reason)
@@ -201,6 +204,51 @@ TEST_F(JogIntegration, FramesNeutralTimeoutAndFaultLatch)
   EXPECT_FALSE(reset());
   { std::lock_guard<std::mutex> lock(mutex_); send_feedback_ = true; }
   ASSERT_TRUE(wait([this]() { return reset(); }));
+
+  // Home shares the same writer: enabled jog and concurrent home requests are rejected.
+  using HomeClient = actionlib::SimpleActionClient<aubo_ros_control::MoveHomeAction>;
+  HomeClient home("/cartesian_jog/move_home", true), other("/cartesian_jog/move_home", true);
+  ASSERT_TRUE(home.waitForServer(ros::Duration(5)));
+  ASSERT_TRUE(other.waitForServer(ros::Duration(5)));
+  ready();
+  home.sendGoal(aubo_ros_control::MoveHomeGoal());
+  ASSERT_TRUE(home.waitForResult(ros::Duration(2)));
+  EXPECT_EQ(home.getState(), actionlib::SimpleClientGoalState::REJECTED);
+  ASSERT_TRUE(set(false));
+  ASSERT_TRUE(wait([this]() { return state() == "DISABLED"; }));
+  const auto before_home = position();
+  home.sendGoal(aubo_ros_control::MoveHomeGoal());
+  ASSERT_TRUE(wait([this, &before_home]() { return position()[0] > before_home[0] + 0.005; }));
+  EXPECT_FALSE(set(true));
+  other.sendGoal(aubo_ros_control::MoveHomeGoal());
+  ASSERT_TRUE(other.waitForResult(ros::Duration(2)));
+  EXPECT_EQ(other.getState(), actionlib::SimpleClientGoalState::REJECTED);
+  home.cancelGoal();
+  ASSERT_TRUE(home.waitForResult(ros::Duration(4)));
+  EXPECT_EQ(home.getState(), actionlib::SimpleClientGoalState::PREEMPTED);
+  EXPECT_FALSE(home.getResult()->success);
+  ASSERT_TRUE(wait([this]() { return state() == "DISABLED"; }));
+  const auto cancelled = position();
+  ros::WallDuration(0.2).sleep();
+  EXPECT_NEAR(position()[0], cancelled[0], 1e-6);
+
+  // Missing feedback must abort a home goal, and must not claim a confirmed stop until restored.
+  home.sendGoal(aubo_ros_control::MoveHomeGoal());
+  ASSERT_TRUE(wait([this, &cancelled]() { return position()[0] > cancelled[0] + 0.003; }));
+  { std::lock_guard<std::mutex> lock(mutex_); send_feedback_ = false; }
+  waitFault("feedback_timeout");
+  EXPECT_FALSE(home.getState().isDone());
+  { std::lock_guard<std::mutex> lock(mutex_); send_feedback_ = true; }
+  ASSERT_TRUE(home.waitForResult(ros::Duration(4)));
+  EXPECT_EQ(home.getState(), actionlib::SimpleClientGoalState::ABORTED);
+  ASSERT_TRUE(wait([this]() { return reset(); }));
+
+  home.sendGoal(aubo_ros_control::MoveHomeGoal());
+  ASSERT_TRUE(home.waitForResult(ros::Duration(15)));
+  EXPECT_EQ(home.getState(), actionlib::SimpleClientGoalState::SUCCEEDED);
+  EXPECT_TRUE(home.getResult()->success);
+  EXPECT_NEAR(position()[0], 0.12, 0.005);
+  EXPECT_TRUE(wait([this]() { return state() == "DISABLED"; }));
 }
 
 int main(int argc, char** argv)

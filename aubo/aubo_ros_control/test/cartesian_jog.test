@@ -5,6 +5,7 @@
   <node pkg="aubo_ros_control" type="aubo_cartesian_jog_node" name="aubo_cartesian_jog" required="true">
     <rosparam file="$(find aubo_ros_control)/config/cartesian_jog.yaml"/>
     <param name="backend" value="gazebo"/>
+    <rosparam param="home_joint_positions">[0.12, 0, 0, 0, 0, 1]</rosparam>
     <rosparam param="joint_lower_limits">[-2.5, -2.5, -2.5, -2.5, -2.5, -2.5]</rosparam>
     <rosparam param="joint_upper_limits">[2.5, 2.5, 2.5, 2.5, 2.5, 2.5]</rosparam>
     <rosparam param="gazebo_command_topics">[/jog_test/q0, /jog_test/q1, /jog_test/q2, /jog_test/q3, /jog_test/q4, /jog_test/q5]</rosparam>

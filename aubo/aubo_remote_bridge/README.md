@@ -1,4 +1,21 @@
-# AUBO ROS Noetic：C++串口桥与Gazebo命名位置验证
+# AUBO ROS Noetic：串口遥控与命名位置验证
+
+## 笛卡尔点动遥控（新增）
+
+`cartesian_serial_bridge` 对接 `aubo_ros_control`，提供 XYZ 点动、基/工具坐标系、
+0.1–100 mm/s速度设置、显式使能/停止、home action及取消、故障复位和六轴状态回传。
+支持“摇杆XY + Z按键”或“XYZ六方向键”，要求按住独立允许运动键才点动。
+串口丢帧或输入失效会停止、禁用并取消回home；重新连接不会自动恢复运动。
+
+```bash
+roslaunch aubo_remote_bridge cartesian_remote_gazebo.launch port:=/dev/ttyUSB0
+# 实机入口会启动SDK，可能上电/松刹车，运动需显式请求
+roslaunch aubo_remote_bridge cartesian_remote_real.launch port:=/dev/ttyUSB0 robot_ip:=192.168.1.2
+```
+
+STM32应依据[笛卡尔串口协议](CARTESIAN_SERIAL_PROTOCOL.md)实现 `0x11/0x12/0x13` 报文；
+其中包含逐字节格式、状态表、开机/使能/回home/取消流程及可复用C代码。
+此入口使用独立报文类型；下述原HOME/ZERO验证入口及其固件协议继续单独使用。
 
 ROS节点已改为 **C++14 / roscpp**。Python仅保留无ROS串口monitor和离线协议对照工具。新增代码以中文注释说明协议、线程/回调归属、请求去重、取消和到位核对。
 
@@ -6,7 +23,7 @@ ROS节点已改为 **C++14 / roscpp**。Python仅保留无ROS串口monitor和离
 
 `serial_bridge_node` 负责串口与ROS数据转换，`named_pose_server` 负责Gazebo命名位置请求；两者为独立C++进程，规划期间串口仍正常收发。默认 `serial_bridge.launch` 不转发运动命令；`named_pose_gazebo.launch` 才启动专用Gazebo、MoveIt和请求节点。
 
-**必须同时更新第九项v2固件和电脑程序。** v1固件/旧Python ROS桥不兼容；原serial_bridge_node.py已删除。没有真机遥控入口或AUBO SDK节点。
+以下为原HOME/ZERO验证入口说明。**必须同时更新第九项v2固件和电脑程序。** v1固件/旧Python ROS桥不兼容；原serial_bridge_node.py已删除。此命名位置验证入口只运行Gazebo，不连接AUBO SDK。
 
 ## 构建
 
@@ -22,11 +39,22 @@ source devel/setup.bash
 
 ROS串口使用Linux termios。仅运行Python串口monitor时需要pyserial。
 
+若提示找不到 `named_pose_server`，请检查 `devel/lib/aubo_remote_bridge/named_pose_server`
+是否已生成，并重新 `source devel/setup.bash`。这是C++编译产物，无需给源码执行 `chmod +x`。
+若工作空间设置了 `CATKIN_WHITELIST_PACKAGES`，须在原白名单中加入 `aubo_remote_bridge`
+后再编译；单独使用 `catkin_make --pkg aubo_remote_bridge` 不会将该包加入配置白名单。
+
 ## 无硬件，先验证Gazebo
 
 ```bash
 roslaunch aubo_remote_bridge named_pose_gazebo.launch serial:=false
 ```
+
+若出现 `Could not find parameter robot_description`，随后机械臂/夹爪控制器加载失败，
+请确认 `/remote_validation/aubo_i5/robot_description` 存在；轨迹控制器直接读取该命名空间，
+不会使用父级 `/remote_validation/robot_description`。本launch已在两个命名空间加载相同URDF。
+修改launch后重启即可，无需重新编译。`No p gain specified for pid` 在当前PositionJointInterface
+仿真配置下不阻止控制器启动；判断启动结果应检查controller_manager中三个控制器均为`running`。
 
 场景包含固定AUBO i5、地面、工作区外两侧围挡和方向参考色块；初始为零关节角。home/zero直接取现有aubo_i5.srdf，不另写目标角度。色块不代表末端目标点。RViz显示实际机器人，Gazebo显示物理运动。
 
@@ -93,7 +121,13 @@ OLED第3行是最新请求应答，第4行是当前动作；新请求REJECT时�
 
 运动模型、MoveIt和控制器均在/remote_validation下，控制器绝对路径为/remote_validation/aubo_i5/aubo_i5_controller。节点同时检查/use_sim_time、特定Gazebo模型、前进的/clock、近期完整关节反馈及专用MoveGroup Action。建议独立ROS master运行，避免与其他机器人同名TF混用。
 
-速度/加速度缩放0.15，规划5秒、3次尝试，单任务墙上时间上限60秒。保留MoveIt碰撞检查；失败不退回直接发关节角。规划地面顶部在固定基座下5cm，避免固定安装接触误报；围挡与SDF一致。
+仿真速度/加速度缩放默认0.6（原为0.15），相对于MoveIt关节限制生效。可在启动时调整，范围均为(0, 1]；例如：
+
+```bash
+roslaunch aubo_remote_bridge named_pose_gazebo.launch serial:=false velocity_scaling:=0.8 acceleration_scaling:=0.8
+```
+
+规划5秒、3次尝试，单任务墙上时间上限60秒。保留MoveIt碰撞检查；失败不退回直接发关节角。规划地面顶部在固定基座下5cm，避免固定安装接触误报；围挡与SDF一致。
 
 ## 自动验证
 
@@ -109,4 +143,6 @@ rostest无需串口，自动检查home实际到位、同编号不增加Action go
 
 ## 验证边界
 
-本机已运行C/C++14/Python协议回归和Keil构建。Windows仅有停止的docker-desktop WSL，没有可用Noetic/Gazebo，**ROS节点目标编译及Gazebo动态rostest尚未实跑**。XML/配置检查和离线核心测试不替代运行时联调；未执行真机动作。
+此前已运行C/C++14/Python协议回归和Keil构建。2026-10-20在Linux/ROS Noetic环境完成两个ROS节点编译，
+并以默认速度/加速度缩放0.6通过Gazebo动态rostest：home/zero实际到位、重复请求去重、非法目标拒绝及执行中取消。
+测试无需串口；未执行真机动作。

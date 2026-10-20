@@ -4,6 +4,9 @@ project(aubo_ros_control)
 set(CMAKE_AUTOMOC ON)
 
 find_package(catkin REQUIRED COMPONENTS
+  actionlib
+  actionlib_msgs
+  message_generation
   aubo_sdk
   controller_manager
   dynamic_reconfigure
@@ -29,6 +32,9 @@ find_package(Threads REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(orocos_kdl REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Widgets)
+
+add_action_files(FILES MoveHome.action)
+generate_messages(DEPENDENCIES actionlib_msgs std_msgs)
 
 generate_dynamic_reconfigure_options(
   cfg/VisualServo.cfg
@@ -70,7 +76,7 @@ endif()
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME} aubo_visual_servo_panel
-  CATKIN_DEPENDS aubo_sdk controller_manager dynamic_reconfigure geometry_msgs hardware_interface
+  CATKIN_DEPENDS actionlib actionlib_msgs message_runtime aubo_sdk controller_manager dynamic_reconfigure geometry_msgs hardware_interface
     kdl_parser moveit_msgs moveit_core moveit_ros_planning shape_msgs pluginlib roscpp rospy roslib rviz sensor_msgs
     std_msgs std_srvs tf2_geometry_msgs tf2_ros
   DEPENDS orocos_kdl
@@ -130,6 +136,7 @@ set_target_properties(aubo_visual_servo_node PROPERTIES
 # 点动复用 SDK 连接管理，通过按需生成器供点，不经过视觉伺服的软件队列。
 add_executable(aubo_cartesian_jog_node
   src/cartesian_jog.cpp src/direct_sdk_backend.cpp src/visual_servo_common.cpp)
+add_dependencies(aubo_cartesian_jog_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_compile_features(aubo_cartesian_jog_node PRIVATE cxx_std_14)
 target_include_directories(aubo_cartesian_jog_node PRIVATE
   include ${catkin_INCLUDE_DIRS} ${orocos_kdl_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIR})
@@ -141,6 +148,7 @@ set_target_properties(aubo_cartesian_jog_node PROPERTIES
   LINK_FLAGS "-Wl,--disable-new-dtags")
 
 add_executable(aubo_cartesian_jog_panel src/cartesian_jog_panel.cpp)
+add_dependencies(aubo_cartesian_jog_panel ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_compile_features(aubo_cartesian_jog_panel PRIVATE cxx_std_14)
 target_include_directories(aubo_cartesian_jog_panel PRIVATE ${catkin_INCLUDE_DIRS})
 target_link_libraries(aubo_cartesian_jog_panel ${catkin_LIBRARIES} Qt5::Widgets)
@@ -191,7 +199,7 @@ install(TARGETS ${PROJECT_NAME} aubo_hw_node aubo_visual_servo_node
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 install(DIRECTORY include/${PROJECT_NAME}/
   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION})
-install(DIRECTORY cfg config launch worlds
+install(DIRECTORY action cfg config launch worlds
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
 install(FILES VISUAL_SERVO.md HYBRID_CONTROL.md CARTESIAN_JOG.md plugin_description.xml
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})

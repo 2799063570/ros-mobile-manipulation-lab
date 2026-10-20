@@ -1,0 +1,19 @@
+<launch>
+  <!-- 该入口会启动实机SDK，上电/松刹车行为同cartesian_jog_real；运动仍需串口显式使能。 -->
+  <arg name="port" default="/dev/ttyUSB0"/>
+  <arg name="robot_ip" default="192.168.1.2"/>
+  <arg name="robot_xacro" default="aubo_i5_with_camera.xacro"/>
+  <arg name="robot_srdf" default="aubo_i5_with_camera.srdf"/>
+  <arg name="max_speed_mm_s" default="100.0"/>
+  <include file="$(find aubo_ros_control)/launch/cartesian_jog_real.launch">
+    <arg name="robot_ip" value="$(arg robot_ip)"/>
+    <arg name="robot_xacro" value="$(arg robot_xacro)"/>
+    <arg name="robot_srdf" value="$(arg robot_srdf)"/>
+    <arg name="panel" value="false"/>
+  </include>
+  <include file="$(find aubo_remote_bridge)/launch/cartesian_serial_bridge.launch">
+    <arg name="port" value="$(arg port)"/>
+    <arg name="joint_states_topic" value="/joint_states"/>
+    <arg name="max_speed_mm_s" value="$(arg max_speed_mm_s)"/>
+  </include>
+</launch>

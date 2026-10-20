@@ -1,0 +1,14 @@
+<launch>
+  <arg name="port" default="/dev/ttyUSB0"/>
+  <arg name="gui" default="true"/>
+  <arg name="max_speed_mm_s" default="100.0"/>
+  <include file="$(find aubo_ros_control)/launch/cartesian_jog_gazebo.launch">
+    <arg name="gui" value="$(arg gui)"/>
+    <arg name="panel" value="false"/>
+  </include>
+  <include file="$(find aubo_remote_bridge)/launch/cartesian_serial_bridge.launch">
+    <arg name="port" value="$(arg port)"/>
+    <arg name="joint_states_topic" value="/aubo_i5/joint_states"/>
+    <arg name="max_speed_mm_s" value="$(arg max_speed_mm_s)"/>
+  </include>
+</launch>

@@ -30,6 +30,15 @@ class NamedPoseServer {
   NamedPoseServer() : action_("/remote_validation/move_group", false),
       loader_("/remote_validation/robot_description"), model_(loader_.getModel()) {
     // 本节点只为指定Gazebo场景服务，接口名称刻意固定在独立命名空间。
+    ros::NodeHandle private_nh("~");
+    private_nh.param("velocity_scaling", velocity_scaling_, .6);
+    private_nh.param("acceleration_scaling", acceleration_scaling_, .6);
+    // MoveIt对无效缩放值可能回退到全速，启动时明确拒绝，避免意外提速。
+    for (const double scaling : {velocity_scaling_, acceleration_scaling_}) {
+      if (!std::isfinite(scaling) || scaling <= 0. || scaling > 1.)
+        throw std::runtime_error("速度和加速度缩放必须在(0, 1]范围内");
+    }
+    ROS_INFO("Gazebo运动缩放：速度=%.2f，加速度=%.2f", velocity_scaling_, acceleration_scaling_);
     if (!model_ || !(group_ = model_->getJointModelGroup("aubo_i5"))) throw std::runtime_error("仿真机器人模型或aubo_i5规划组不可用");
     for (const auto& name : {std::string("home"), std::string("zero")}) {
       moveit::core::RobotState target(model_); target.setToDefaultValues();
@@ -92,7 +101,8 @@ class NamedPoseServer {
     publishReply({request, REMOTE_ACCEPTED, "请求已接收，开始规划"});
     moveit_msgs::MoveGroupGoal goal;
     goal.request.group_name = "aubo_i5"; goal.request.allowed_planning_time = 5.; goal.request.num_planning_attempts = 3;
-    goal.request.max_velocity_scaling_factor = .15; goal.request.max_acceleration_scaling_factor = .15;
+    goal.request.max_velocity_scaling_factor = velocity_scaling_;
+    goal.request.max_acceleration_scaling_factor = acceleration_scaling_;
     goal.request.start_state.is_diff = true;
     moveit_msgs::Constraints constraints;
     for (std::size_t i = 0; i < abr::jointNames().size(); ++i) {
@@ -222,6 +232,7 @@ class NamedPoseServer {
   bool model_present_ = false, link_ = false, valid_ = false;
   double model_time_ = -1e9, clock_time_ = -1e9, joint_time_ = -1e9, joy_time_ = -1e9;
   double started_ = 0, cancel_started_ = 0, verify_started_ = 0, verified_since_ = -1;
+  double velocity_scaling_ = .6, acceleration_scaling_ = .6;
   double verify_last_sample_ = -1; uint64_t joint_count_ = 0, verify_count_ = 0;
   uint8_t state_ = REMOTE_IDLE; std::string detail_ = "等待Gazebo和MoveIt就绪";
 };
