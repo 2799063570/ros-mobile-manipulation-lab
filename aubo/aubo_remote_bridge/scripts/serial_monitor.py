@@ -21,16 +21,26 @@ def main():
     transport = SerialTransport(args.port, args.baud)
     core = BridgeCore()
     printed, was_online = 0.0, False
+    diagnostic_at = time.monotonic() + 2
+    accepted = 0
+    warned_protocol = False
+    print(f'OPEN {args.port}, {args.baud} 8N1; HOME/ZERO v2 protocol (0x01/0x02/0x03). '
+          'Diagnostic only; no robot control. Waiting for INPUT replies...', flush=True)
     try:
         while True:
             request = core.request(time.monotonic())
             if request is not None:
                 transport.write(request)
             for frame in transport.read():
+                if frame.kind in (0x11, 0x12, 0x13) and not warned_protocol:
+                    warned_protocol = True
+                    print('PROTOCOL MISMATCH: Cartesian firmware requires cartesian_serial_bridge; '
+                          'this monitor uses HOME/ZERO protocol.', flush=True)
                 now = time.monotonic()
                 state = core.receive(frame, now)
                 if state is None:
                     continue
+                accepted += 1
                 source = SOURCE_DEMO if args.demo_feedback else SOURCE_NONE
                 joints = (state.x, state.y, 0, 0, 0, 0) if args.demo_feedback else (0,) * 6
                 transport.write(feedback_frame(core.session, frame.sequence, source, 63 if args.demo_feedback else 0, joints))
@@ -39,6 +49,11 @@ def main():
                           f'VALID={state.valid} PAGE={state.page} FEEDBACK={"DEMO" if args.demo_feedback else "NONE"}', flush=True)
                     printed = now
             online = core.online(time.monotonic())
+            if time.monotonic() >= diagnostic_at:
+                diagnostic_at = time.monotonic() + 2
+                print(f'RX bytes={transport.received_bytes} frames={transport.received_frames} '
+                      f'errors={transport.parser.errors} accepted={accepted} online={online}; '
+                      'requires binary INPUT v2, matching session/sequence within 100ms (not ASCII keys)', flush=True)
             if online != was_online:
                 print('LINK OK' if online else 'LINK TIMEOUT', flush=True)
                 was_online = online

@@ -1,8 +1,10 @@
 /** 串口仅调用/cartesian_jog接口；不连接SDK、不加载第二个运动执行器。
  * ROS回调与串口均在主线程；服务调用放在异步任务，确保取消和链路看门狗不被阻塞。
  */
+#include <clocale>
 #include "aubo_remote_bridge/jog_remote_core.hpp"
 #include "aubo_remote_bridge/posix_serial.hpp"
+#include "aubo_remote_bridge/serial_diagnostics.hpp"
 #include <aubo_ros_control/MoveHomeAction.h>
 #include <actionlib/client/simple_action_client.h>
 #include <geometry_msgs/TwistStamped.h>
@@ -78,6 +80,7 @@ class CartesianSerialBridge {
     double reopen = 0;
     std::unique_ptr<abr::PosixSerial> serial;
     std::unique_ptr<abr::JogPoller> poller;
+    abr::SerialDiagnostics diagnostics;
     while (ros::ok() && !stopping) {
       ros::spinOnce();
       tick();
@@ -85,6 +88,7 @@ class CartesianSerialBridge {
         if (!serial && abr::monotonicNow() >= reopen) {
           serial.reset(new abr::PosixSerial(port_, baud_));
           poller.reset(new abr::JogPoller(std::random_device{}()));
+          diagnostics = abr::SerialDiagnostics{};
           ROS_INFO("Cartesian remote serial %s, 115200 8N1, types 0x11/0x12/0x13", port_.c_str());
         }
         if (serial) {
@@ -93,12 +97,18 @@ class CartesianSerialBridge {
           for (const auto& frame : serial->read()) {
             RemoteJog_Input input{};
             if (!poller->receive(frame, abr::monotonicNow(), input)) continue;
+            diagnostics.accepted();
             receive(input);
             tick();
             abr::Frame reply{};
             RemoteJog_EncodeFeedback(feedback(), frame.Sequence, &reply);
             serial->write(reply);
           }
+          diagnostics.report(*serial, poller->online(abr::monotonicNow()),
+            "expected=0x12 controller=" + (fresh() ? state_ : "UNKNOWN") +
+            " input_valid=" + std::to_string(valid(input_)) +
+            " deadman=" + std::to_string(bool(input_.flags & REMOTE_JOG_DEADMAN)) +
+            " armed=" + std::to_string(armed_) + " ack=" + std::to_string(ack_.state) + " " + ack_.message);
         } else ros::WallDuration(.005).sleep();
       } catch (const std::exception& error) {
         ROS_WARN_THROTTLE(2., "Cartesian serial: %s", error.what());
@@ -328,6 +338,8 @@ class CartesianSerialBridge {
 };
 int main(int argc, char** argv) {
   ros::init(argc, argv, "cartesian_serial_bridge", ros::init_options::NoSigintHandler);
+  // 仅设置字符编码；保留ROS数值解析使用的C locale。
+  std::setlocale(LC_CTYPE, "");
   std::signal(SIGINT, stopSignal); std::signal(SIGTERM, stopSignal);
   try { CartesianSerialBridge node; node.run(); }
   catch (const std::exception& error) { ROS_FATAL("Cartesian serial bridge: %s", error.what()); return 1; }

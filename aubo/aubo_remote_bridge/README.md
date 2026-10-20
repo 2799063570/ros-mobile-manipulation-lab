@@ -21,6 +21,37 @@ ROS节点已改为 **C++14 / roscpp**。Python仅保留无ROS串口monitor和离
 
 ## 实现与版本
 
+### 串口无响应和中文日志排查
+
+`cartesian_jog` 启动日志只说明点动控制器启动，不代表串口连接成功。
+已有仿真点动场景时，另一个终端运行：
+
+```bash
+source ~/aubo/ros_mobile_manipulation_lab/src/setup_ros.sh
+roslaunch aubo_remote_bridge cartesian_serial_bridge.launch port:=/dev/ttyUSB0 joint_states_topic:=/aubo_i5/joint_states
+rostopic echo /remote/cartesian_status
+```
+
+上面的 `roslaunch` 持续运行，`rostopic echo` 需放在第三个终端。
+从零启动仿真及串口则使用 `cartesian_remote_gazebo.launch`。
+不要再启动一套占用相同串口的 monitor 或桥节点。
+
+桥节点打开串口后每2秒输出 `[serial_rx]`：
+
+- `bytes`：实际接收字节数；`NO_RX` 表示本统计周期没有新字节，检查端口、交叉TX/RX、共地和固件是否响应轮询。
+- `frames`：通过外层版本、长度和CRC验证的帧数；有字节但 `NO_FRAME` 时检查115200 8N1及二进制协议。
+- `accepted`：通过输入类型、字段、session、sequence及100ms时限验证的累计输入数；`INPUT_REJECTED` 时检查这些字段。
+- 笛卡尔入口要求 `expected=0x12`，旧HOME/ZERO要求 `0x02`。两套协议不能混用；ASCII字母（例如 `s`）不是有效控制帧，也没有终端键盘控制入口。
+- `INPUT_OK` 只代表链路收到输入；运动还要求 `input_valid=1`、控制器在线、回中松开允许运动键后显式使能（`armed=1`），再按住允许运动键（`deadman=1`）给方向。请求拒绝原因见 `ack` 后文字或 `/remote/cartesian_status`。
+
+`serial_bridge.launch` 默认 `enable_commands=false`，只验证输入与反馈；
+`serial_monitor.py` 也只诊断旧HOME/ZERO协议，不控制机械臂。
+Monitor现在会立即打印端口信息，并周期打印接收统计，即使没有有效输入也有输出。
+
+若中文日志显示 `????`，需重新编译更新后的节点并重启；节点已初始化 `LC_CTYPE`，
+保留ROS数字解析所需的C区域设置。运行终端应使用UTF-8，例如启动前 `export LANG=C.UTF-8 LC_CTYPE=C.UTF-8`；
+若设置了 `LC_ALL`，它也必须是UTF-8。之前已经变成问号的历史日志无法恢复。
+
 `serial_bridge_node` 负责串口与ROS数据转换，`named_pose_server` 负责Gazebo命名位置请求；两者为独立C++进程，规划期间串口仍正常收发。默认 `serial_bridge.launch` 不转发运动命令；`named_pose_gazebo.launch` 才启动专用Gazebo、MoveIt和请求节点。
 
 以下为原HOME/ZERO验证入口说明。**必须同时更新第九项v2固件和电脑程序。** v1固件/旧Python ROS桥不兼容；原serial_bridge_node.py已删除。此命名位置验证入口只运行Gazebo，不连接AUBO SDK。

@@ -16,10 +16,16 @@ class SerialTransport:
             self.port.close()
             raise
         self.parser = Parser()
+        self.received_bytes = 0
+        self.received_frames = 0
 
     def read(self):
         count = max(1, min(256, self.port.in_waiting))
-        return self.parser.feed(self.port.read(count))
+        data = self.port.read(count)
+        self.received_bytes += len(data)
+        frames = self.parser.feed(data)
+        self.received_frames += len(frames)
+        return frames
 
     def write(self, frame):
         data = frame.encode()

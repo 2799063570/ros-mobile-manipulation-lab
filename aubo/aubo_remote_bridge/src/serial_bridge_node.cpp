@@ -4,7 +4,9 @@
  * 线程：主循环调用spinOnce，订阅回调与串口处理串行执行，无共享数据竞争。
  * 时钟：报文截止使用steady_clock；ROS时间只用于消息时间戳和关节消息时间检查。
  */
+#include <clocale>
 #include "aubo_remote_bridge/posix_serial.hpp"
+#include "aubo_remote_bridge/serial_diagnostics.hpp"
 #include <aubo_remote_bridge/CommandStatus.h>
 #include <aubo_remote_bridge/RemoteCommand.h>
 #include <ros/ros.h>
@@ -42,6 +44,7 @@ class SerialBridge {
       try {
         abr::PosixSerial serial(port_, baud_);
         abr::Poller core(std::random_device{}());
+        abr::SerialDiagnostics diagnostics;
         ack_ = abr::Reply{}; last_request_ = abr::Request{};
         bool was_online = false;
         text("WAITING_INPUT_V2");
@@ -54,6 +57,7 @@ class SerialBridge {
             abr::Input input;
             const double now = abr::monotonicNow();
             if (!core.receive(frame, now, input)) continue;
+            diagnostics.accepted();
             publishInput(input);
             abr::Request request;
             if (core.command(input, request)) {
@@ -77,6 +81,7 @@ class SerialBridge {
                                       mask, joints_, ack_, state, motion_target_));
           }
           const bool online = core.online(abr::monotonicNow());
+          diagnostics.report(serial, online, commands_ ? "expected=0x02 commands=ON" : "expected=0x02 commands=OFF (input/feedback only)");
           if (was_online != online) {
             was_online = online; setConnected(online);
             if (!online) { publishNeutral(); text("INPUT_TIMEOUT"); }
@@ -135,6 +140,8 @@ class SerialBridge {
 };
 int main(int argc, char** argv) {
   ros::init(argc, argv, "aubo_remote_bridge");
+  // 仅设置字符编码；保留ROS数值解析使用的C locale。
+  std::setlocale(LC_CTYPE, "");
   try { SerialBridge bridge; bridge.run(); }
   catch (const std::exception& error) { ROS_FATAL("串口节点启动失败：%s", error.what()); return 1; }
   return 0;

@@ -1,3 +1,4 @@
+#include <clocale>
 #include <aubo_ros_control/cartesian_jog_common.h>
 #include <aubo_ros_control/direct_sdk_backend.h>
 #include <aubo_ros_control/MoveHomeAction.h>
@@ -732,6 +733,8 @@ int main(int argc, char** argv)
 {
   // 保留 spinner 直到平滑停车完成；SIGINT 默认 ros::shutdown 会直接结束 SDK 喂点。
   ros::init(argc, argv, "aubo_cartesian_jog", ros::init_options::NoSigintHandler);
+  // 仅设置字符编码；保留ROS数值解析使用的C locale。
+  std::setlocale(LC_CTYPE, "");
   std::signal(SIGINT, aubo_ros_control::requestShutdown);
   std::signal(SIGTERM, aubo_ros_control::requestShutdown);
   try

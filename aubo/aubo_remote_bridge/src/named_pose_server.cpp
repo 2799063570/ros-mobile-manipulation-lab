@@ -5,6 +5,7 @@
  * 关键：一次只有一个活动任务；服务立即返回应答，真正完成需要Action和实际关节共同确认。
  * 取消：cancelGoal只针对本节点的当前目标，终止未确认之前保持占用，拒绝新运动。
  */
+#include <clocale>
 #include "aubo_remote_bridge/posix_serial.hpp"
 #include <aubo_remote_bridge/CommandStatus.h>
 #include <aubo_remote_bridge/NamedPose.h>
@@ -238,6 +239,8 @@ class NamedPoseServer {
 };
 int main(int argc, char** argv) {
   ros::init(argc, argv, "aubo_remote_named_pose");
+  // 仅设置字符编码；保留ROS数值解析使用的C locale。
+  std::setlocale(LC_CTYPE, "");
   try { NamedPoseServer server; ros::spin(); }
   catch (const std::exception& error) { ROS_FATAL("仿真请求节点启动失败：%s", error.what()); return 1; }
   return 0;

@@ -37,6 +37,10 @@ class PosixSerial {
   ~PosixSerial() { if (fd_ >= 0) ::close(fd_); }
   PosixSerial(const PosixSerial&) = delete;
   PosixSerial& operator=(const PosixSerial&) = delete;
+  uint64_t receivedBytes() const { return received_bytes_; }
+  uint64_t receivedFrames() const { return received_frames_; }
+  uint32_t parserErrors() const { return parser_.Errors; }
+  unsigned lastType() const { return last_type_; }
   std::vector<Frame> read() {
     pollfd descriptor{fd_, POLLIN, 0};
     const int ready = ::poll(&descriptor, 1, 10);  // 至多等待10ms，ROS回调不被永久阻塞
@@ -47,9 +51,12 @@ class PosixSerial {
     const auto size = ::read(fd_, buffer, sizeof(buffer));
     if (size < 0) { if (errno == EAGAIN || errno == EINTR) return {}; fail("读取串口"); }
     std::vector<Frame> output;
+    received_bytes_ += static_cast<uint64_t>(size);
     for (ssize_t i = 0; i < size; ++i) {
       Frame frame{};
-      if (Remote_ParseByte(&parser_, buffer[i], &frame)) output.push_back(frame);
+      if (Remote_ParseByte(&parser_, buffer[i], &frame)) {
+        ++received_frames_; last_type_ = frame.Type; output.push_back(frame);
+      }
     }
     return output;
   }
@@ -71,5 +78,7 @@ class PosixSerial {
   [[noreturn]] static void fail(const char* operation) { throw std::runtime_error(std::string(operation) + ": " + std::strerror(errno)); }
   int fd_ = -1;
   Remote_ParserTypeDef parser_{};
+  uint64_t received_bytes_ = 0, received_frames_ = 0;
+  unsigned last_type_ = 0;
 };
 }  // namespace aubo_remote_bridge
