@@ -132,6 +132,8 @@ class CartesianSerialTest(unittest.TestCase):
             request(8, 1)
             ack(8, 4)
             self.assertTrue(feedback['flags'] & 2)
+            self.assertEqual(feedback['state'], 3)  # DONE必须与ENABLED_IDLE同帧出现。
+            self.assertFalse(feedback['flags'] & 8)
             with lock:
                 command[2] = 7
                 command[4] = 1000  # 100 mm/s
@@ -226,6 +228,27 @@ class CartesianSerialTest(unittest.TestCase):
             time.sleep(.2)
             self.assertFalse(feedback['flags'] & 2)
             self.assertEqual(motion[0], 'DISABLED')
+
+            # MCU快速复位仍持续回复POLL，不能靠100ms串口超时才能恢复编号。
+            old_session = feedback['session']
+            with lock:
+                command[:] = [0, 0, 0, 0, 100, 0, 0, 0]
+            wait(lambda: feedback.get('session') != old_session)
+            time.sleep(.16)  # 校准期间无效INPUT持续正常回复。
+            reset_session = feedback['session']
+            time.sleep(.08)
+            self.assertEqual(feedback['session'], reset_session)
+            with lock:
+                command[2] = 3
+            wait(lambda: feedback.get('state') == 2 and not (feedback.get('flags', 8) & 8))
+            self.assertFalse(feedback['flags'] & 2)
+            request(1, 1)
+            ack(1, 4)
+            self.assertEqual(feedback['state'], 3)
+            self.assertTrue(feedback['flags'] & 2)
+            request(2, 2)
+            ack(2, 4)
+            wait(lambda: motion[0] == 'DISABLED')
         finally:
             proc.send_signal(signal.SIGINT)
             try:

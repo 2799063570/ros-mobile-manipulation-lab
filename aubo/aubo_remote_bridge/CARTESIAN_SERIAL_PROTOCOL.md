@@ -73,6 +73,8 @@ PC 每约 20 ms 发一个 POLL，同一时间只等待一个 INPUT，最长等�
 STM32 收到有效 POLL 后应立即读取当前输入并回复一个 INPUT，不定时主动重发旧帧。
 PC 只接收当前 session、当前 sequence、100 ms 内的有效响应；重复帧不会刷新看门狗。
 丢失响应超时后换新 session；sequence 到达 65535 后同样换新 session，不能把旧响应用于新会话。
+输入从有效退化为未校准/无效时，PC也会在下一次POLL换新session，以覆盖MCU快速复位但仍持续回复的情况。
+校准期间不会每帧反复换session；恢复后首帧仅重建请求基线，旧请求不自动执行。
 PC 收到有效 INPUT 后发送相同 sequence 的 FEEDBACK。
 
 ### POLL：类型 0x11，payload 4 字节
@@ -129,6 +131,9 @@ command非0与request_id非0必须成对出现。请求发出后可以持续保�
 ENABLE/HOME/RESET需要新的请求编号，并等待上一操作完成；BUSY或失败的请求不会自动重试。
 应在用户再次确认后分配新编号。未发生变化的请求编号重发只回放原结果。
 ENABLE成功前必须保持回中和松开允许运动键，否则该使能结果作废并请求禁用。
+ENABLE服务成功后PC先保持ACCEPTED和flags bit3=1，继续发送零速度；
+等到服务返回后新收到的控制器ENABLED_IDLE状态，才同时反馈DONE和flags bit1=1，清除bit3。
+确认最多等待1秒；输入改变、断链、控制器状态失效/故障、STOP/CANCEL或确认超时都会撤销使能并请求禁用。
 
 ### FEEDBACK：类型 0x13，payload 28 字节
 

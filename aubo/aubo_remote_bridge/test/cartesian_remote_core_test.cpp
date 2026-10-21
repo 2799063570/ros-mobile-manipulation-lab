@@ -50,6 +50,55 @@ TEST(JogProtocol, PollFreshnessAndSessionRotation) {
   frame.Type = REMOTE_INPUT; frame.Length = 18;
   EXPECT_FALSE(RemoteJog_DecodeInput(&frame, &output));
 }
+TEST(JogProtocol, RecalibrationRotatesSessionWithoutSerialTimeout) {
+  abr::JogPoller poller(100); abr::Frame poll{}, frame{}; RemoteJog_Input input{}, output{};
+  ASSERT_TRUE(poller.poll(1, poll)); input.session = 100; input.flags = 3;
+  input.request_id = 5; input.command = REMOTE_JOG_ENABLE;
+  ASSERT_TRUE(RemoteJog_EncodeInput(&input, poll.Sequence, &frame));
+  ASSERT_TRUE(poller.receive(frame, 1.001, output));
+  ASSERT_TRUE(poller.poll(1.03, poll));
+  input.flags = 0; input.request_id = 0; input.command = 0;
+  ASSERT_TRUE(RemoteJog_EncodeInput(&input, poll.Sequence, &frame));
+  ASSERT_TRUE(poller.receive(frame, 1.031, output));
+  EXPECT_EQ(poller.session(), 100u);  // 先回复本次无效输入，再于下一次POLL换会话。
+  ASSERT_TRUE(poller.poll(1.06, poll));
+  EXPECT_EQ(poller.session(), 101u); EXPECT_EQ(poll.Sequence, 1);
+  EXPECT_FALSE(poller.receive(frame, 1.061, output));  // 旧会话反馈不能混入新会话。
+  input.session = 101;
+  ASSERT_TRUE(RemoteJog_EncodeInput(&input, poll.Sequence, &frame));
+  ASSERT_TRUE(poller.receive(frame, 1.062, output));
+  ASSERT_TRUE(poller.poll(1.09, poll));
+  EXPECT_EQ(poller.session(), 101u);  // 校准未完成时不反复换会话。
+  input.flags = 3;
+  ASSERT_TRUE(RemoteJog_EncodeInput(&input, poll.Sequence, &frame));
+  ASSERT_TRUE(poller.receive(frame, 1.091, output));
+  ASSERT_TRUE(poller.poll(1.12, poll));
+  input.request_id = 1; input.command = REMOTE_JOG_ENABLE;
+  ASSERT_TRUE(RemoteJog_EncodeInput(&input, poll.Sequence, &frame));
+  ASSERT_TRUE(poller.receive(frame, 1.121, output));
+  EXPECT_EQ(output.request_id, 1); EXPECT_EQ(output.session, 101u);
+}
+TEST(JogEnable, RequiresNewIdleStateAfterServiceReturns) {
+  abr::JogEnableConfirmation enable;
+  enable.begin(10, 1.0);
+  EXPECT_EQ(enable.update(1.01, 10, true, true), abr::JogEnableConfirmation::Waiting);
+  EXPECT_EQ(enable.update(1.03, 11, false, true), abr::JogEnableConfirmation::Waiting);
+  EXPECT_TRUE(enable.pending());
+  EXPECT_EQ(enable.update(1.10, 12, true, true), abr::JogEnableConfirmation::Confirmed);
+  EXPECT_FALSE(enable.pending());
+}
+TEST(JogEnable, InputLossTimeoutAndCancellationCannotRearm) {
+  abr::JogEnableConfirmation enable;
+  enable.begin(10, 1.0);
+  EXPECT_EQ(enable.update(1.01, 11, true, false), abr::JogEnableConfirmation::Failed);
+  EXPECT_EQ(enable.update(1.02, 12, true, true), abr::JogEnableConfirmation::Waiting);
+  EXPECT_FALSE(enable.pending());
+  enable.begin(20, 2.0);
+  EXPECT_EQ(enable.update(3.0, 21, true, true), abr::JogEnableConfirmation::Failed);
+  enable.begin(30, 4.0); enable.cancel();
+  EXPECT_EQ(enable.update(4.1, 31, true, true), abr::JogEnableConfirmation::Waiting);
+  EXPECT_FALSE(enable.pending());
+}
 int main(int argc, char** argv) {
   testing::InitGoogleTest(&argc, argv);
   return RUN_ALL_TESTS();

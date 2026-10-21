@@ -4,7 +4,8 @@
 
 `cartesian_serial_bridge` 对接 `aubo_ros_control`，提供 XYZ 点动、基/工具坐标系、
 0.1–100 mm/s速度设置、显式使能/停止、home action及取消、故障复位和六轴状态回传。
-支持“摇杆XY + Z按键”或“XYZ六方向键”，要求按住独立允许运动键才点动。
+支持“摇杆XY + Z按键”、“XYZ六方向键”或STM32第11项的单摇杆XY/Z模式切换；
+点动要求按住允许运动键，第11项可复用摇杆自带SW。
 串口丢帧或输入失效会停止、禁用并取消回home；重新连接不会自动恢复运动。
 
 ```bash
@@ -20,6 +21,27 @@ STM32应依据[笛卡尔串口协议](CARTESIAN_SERIAL_PROTOCOL.md)实现 `0x11/
 ROS节点已改为 **C++14 / roscpp**。Python仅保留无ROS串口monitor和离线协议对照工具。新增代码以中文注释说明协议、线程/回调归属、请求去重、取消和到位核对。
 
 ## 实现与版本
+
+### 2026-10-21：使能确认与MCU快速复位恢复
+
+- ENABLE服务成功后继续保持未授权和零速度，等待服务返回后新收到的ENABLED_IDLE状态，
+  再将同一请求回复DONE、设置armed。确认窗口最多1秒；输入改变、断链、状态失效、故障或STOP/CANCEL会撤销确认并禁用。
+- 输入从有效退化为未校准/无效时，下一次POLL自动换session，即使串口一直有回复也重建请求编号基线；
+  持续校准期间不反复换session，恢复后仍须新的显式ENABLE，不重放旧请求。
+- 新增核心回归和ROS PTY回归场景。Windows端已用真实MCU业务与PC核心验证延迟状态、
+  取消/超时和快速复位；Linux ROS编译与动态rostest尚待运行，不能把离线通过视为Gazebo已通过。
+
+更新Linux工作空间后重新编译并重启串口桥；STM32串口协议及现有固件无需因本修复更换：
+
+```bash
+catkin_make
+source devel/setup.bash
+catkin_make tests
+rostest aubo_remote_bridge cartesian_serial.test
+catkin_test_results
+```
+
+上述rostest使用合成模型和PTY，应在没有其他同名点动控制器的测试ROS环境中运行。
 
 ### 串口无响应和中文日志排查
 

@@ -67,7 +67,9 @@ class CartesianSerialBridge {
     twist_pub_ = nh_.advertise<geometry_msgs::TwistStamped>("/cartesian_jog/command", 1);
     status_pub_ = nh_.advertise<std_msgs::String>("/remote/cartesian_status", 1, true);
     state_sub_ = nh_.subscribe<std_msgs::String>("/cartesian_jog/state", 1,
-      [this](const std_msgs::String::ConstPtr& msg) { state_ = msg->data; state_time_ = abr::monotonicNow(); });
+      [this](const std_msgs::String::ConstPtr& msg) {
+        state_ = msg->data; state_time_ = abr::monotonicNow(); ++state_revision_;
+      });
     joint_sub_ = nh_.subscribe(joint_topic, 1, &CartesianSerialBridge::joints, this);
     enable_ = nh_.serviceClient<std_srvs::SetBool>("/cartesian_jog/set_enabled");
     reset_ = nh_.serviceClient<std_srvs::Trigger>("/cartesian_jog/reset");
@@ -134,9 +136,13 @@ class CartesianSerialBridge {
         request.command == ack_.request.command) ack_ = item;
   }
   void halt() {
-    const bool needs_disable = armed_ || home_running_ || !fresh() || state_ != "DISABLED" ||
+    const bool needs_disable = armed_ || home_running_ || enable_confirmation_.pending() || !fresh() || state_ != "DISABLED" ||
       (service_.valid() && job_request_.command == REMOTE_JOG_ENABLE);
     ++generation_; armed_ = false; neutral_seen_ = false;
+    if (enable_confirmation_.pending()) {
+      enable_confirmation_.cancel();
+      reply(enable_request_, REMOTE_FAILED, "使能确认已撤销，请回中松键后重新使能");
+    }
     if (home_running_) { home_state_ = 6; home_.cancelGoal(); }
     disable_pending_ = disable_pending_ || needs_disable;
     publishTwist(false);
@@ -180,7 +186,7 @@ class CartesianSerialBridge {
     if (!fresh() || !linked() || !neutral_seen_ || !neutral(input)) {
       reply(request, REMOTE_REJECTED, "请回中、松开允许运动键，并等待控制器就绪"); return;
     }
-    if (service_.valid() || disable_pending_ || home_running_ || have_stop_request_) {
+    if (service_.valid() || enable_confirmation_.pending() || disable_pending_ || home_running_ || have_stop_request_) {
       reply(request, REMOTE_REJECTED, "BUSY"); return;
     }
     if (input.command == REMOTE_JOG_ENABLE) {
@@ -239,19 +245,40 @@ class CartesianSerialBridge {
   }
   void tick() {
     const double now = abr::monotonicNow();
-    if ((!linked() || !fresh()) && (armed_ || home_running_ ||
-        (service_.valid() && job_request_.command == REMOTE_JOG_ENABLE && job_generation_ == generation_))) halt();
-    if (fresh() && state_.find("FAULT:") == 0 && armed_) halt();
+    const bool enabling = enable_confirmation_.pending() ||
+      (service_.valid() && job_request_.command == REMOTE_JOG_ENABLE && job_generation_ == generation_);
+    if ((!linked() || !fresh() || (enabling && !neutral(input_))) &&
+        (armed_ || home_running_ || enabling)) halt();
+    if (fresh() && state_.find("FAULT:") == 0 && (armed_ || enabling)) halt();
     if (service_.valid() && service_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
       const auto result = service_.get();
       if (job_request_.command == REMOTE_JOG_ENABLE) {
-        const bool accept = result.success && job_generation_ == generation_ && linked() && fresh() && neutral(input_);
-        armed_ = accept;
-        reply(job_request_, accept ? REMOTE_SUCCEEDED : REMOTE_FAILED, accept ? result.message : "使能失败或输入条件已变化");
-        if (!accept) disable_pending_ = true;
+        const bool accept = result.success && job_generation_ == generation_ && linked() && fresh() &&
+          neutral(input_) && !disable_pending_ && state_.find("FAULT:") != 0;
+        armed_ = false;
+        if (accept) {
+          enable_request_ = job_request_;
+          enable_confirmation_.begin(state_revision_, now);
+          reply(enable_request_, REMOTE_ACCEPTED, "使能服务成功，等待控制器ENABLED_IDLE确认");
+        } else {
+          reply(job_request_, REMOTE_FAILED, "使能失败或输入条件已变化");
+          disable_pending_ = true;
+        }
       } else if (job_request_.id) reply(job_request_, result.success ? REMOTE_SUCCEEDED : REMOTE_FAILED, result.message);
       if (job_request_.command == REMOTE_JOG_STOP && !result.success) {
         disable_pending_ = true; next_disable_ = now + .25;
+      }
+    }
+    if (enable_confirmation_.pending()) {
+      const auto result = enable_confirmation_.update(now, state_revision_, state_ == "ENABLED_IDLE",
+        linked() && fresh() && neutral(input_) && !disable_pending_ && state_.find("FAULT:") != 0);
+      if (result == abr::JogEnableConfirmation::Confirmed) {
+        armed_ = true;
+        reply(enable_request_, REMOTE_SUCCEEDED, "控制器已确认使能，可以按住SW点动");
+      } else if (result == abr::JogEnableConfirmation::Failed) {
+        reply(enable_request_, REMOTE_FAILED, "使能状态确认超时或输入条件已变化");
+        disable_pending_ = true;
+        halt();
       }
     }
     if (disable_pending_ && !service_.valid() && now >= next_disable_) {
@@ -309,7 +336,7 @@ class CartesianSerialBridge {
     output_.controller_state = fresh() ? controllerCode(state_) : REMOTE_JOG_UNKNOWN;
     output_.home_state = home_state_; output_.home_error = home_error_;
     output_.flags = (linked() ? 1 : 0) | (armed_ ? 2 : 0) | (fresh() ? 4 : 0) |
-      ((service_.valid() || disable_pending_ || have_stop_request_) ? 8 : 0);
+      ((service_.valid() || enable_confirmation_.pending() || disable_pending_ || have_stop_request_) ? 8 : 0);
     output_.joint_mask = abr::monotonicNow() - joint_time_ <= .5 ? joint_mask_ : 0;
     for (std::size_t i = 0; i < 6; ++i) output_.joints[i] = (output_.joint_mask & (1 << i)) ? joints_[i] : 0;
     output_.fault = fresh() ? faultCode(state_) : 1;
@@ -321,13 +348,15 @@ class CartesianSerialBridge {
   ros::Subscriber state_sub_, joint_sub_;
   ros::ServiceClient enable_, reset_;
   std::future<ServiceResult> service_;
-  abr::Request job_request_, home_request_, stop_request_;
+  abr::Request job_request_, home_request_, stop_request_, enable_request_;
+  abr::JogEnableConfirmation enable_confirmation_;
   abr::Ledger ledger_; abr::Reply ack_;
   RemoteJog_Input input_{}; RemoteJog_Feedback output_{};
   std::string port_, base_, tool_, state_;
   int baud_ = 115200; double max_speed_ = 100;
   uint32_t session_ = 0, generation_ = 0, job_generation_ = 0;
   uint32_t home_generation_ = 0;
+  uint64_t state_revision_ = 0;
   uint16_t last_id_ = 0, home_error_ = 65535;
   uint8_t last_command_ = 0, home_state_ = 255, joint_mask_ = 0;
   std::array<int16_t, 6> joints_{};
