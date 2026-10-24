@@ -9,6 +9,20 @@ namespace aubo_ros_control
 namespace jog
 {
 
+// The SDK point period and the slower target-update period must cover the
+// same elapsed time. Reject rates that would truncate a partial point interval.
+inline unsigned interpolationSteps(double control_frequency, double point_period)
+{
+  if (!std::isfinite(control_frequency) || control_frequency <= 0.0 ||
+      !std::isfinite(point_period) || point_period <= 0.0)
+    throw std::invalid_argument("Invalid jog control/point period");
+  const double steps = 1.0 / (control_frequency * point_period);
+  const double rounded = std::round(steps);
+  if (rounded < 1.0 || rounded > 10.0 || std::abs(steps - rounded) > 1e-6)
+    throw std::invalid_argument("Jog control period must contain 1..10 complete point intervals");
+  return static_cast<unsigned>(rounded);
+}
+
 // 点动平滑器只依赖标准库，便于脱离 ROS 对启停、反向和离散导数做测试。
 // 第一层限制速度变化率，第二层用一阶滤波限制加速度变化率。
 // 固定周期 h 下：|v|<=V，|Δv/h|<=A，|Δ²v/h²|<=J。

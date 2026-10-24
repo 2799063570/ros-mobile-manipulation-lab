@@ -1,0 +1,5 @@
+<launch>
+  <!-- Constructs a hardware object with a fake diagnosis RPC; never calls init/login/startup. -->
+  <test test-name="aubo_hardware_feedback" pkg="aubo_ros_control"
+        type="aubo_hardware_feedback_test" time-limit="20"/>
+</launch>

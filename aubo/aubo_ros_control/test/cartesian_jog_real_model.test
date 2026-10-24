@@ -1,0 +1,25 @@
+<launch>
+  <!-- Full AUBO camera model with a delayed fake plant; no hardware/SDK node. -->
+  <include file="$(find aubo_moveit_config)/launch/planning_context.launch">
+    <arg name="load_robot_description" value="true"/>
+    <arg name="robot_xacro" value="aubo_i5_with_camera.xacro"/>
+    <arg name="robot_srdf" value="aubo_i5_with_camera.srdf"/>
+  </include>
+  <param name="/jog_ros_control_test/real_model" value="true"/>
+  <param name="/jog_ros_control_test/scene_relay" value="true"/>
+  <rosparam param="/jog_ros_control_test/initial_positions">[0, 0, 1.6292, 0, 1.6628, 0]</rosparam>
+  <node pkg="aubo_ros_control" type="aubo_cartesian_jog_node" name="aubo_cartesian_jog" required="true">
+    <rosparam file="$(find aubo_ros_control)/config/cartesian_jog.yaml"/>
+    <param name="backend" value="ros_control"/>
+    <param name="controller_command_topic" value="/jog_ros_control/command"/>
+    <param name="joint_states_topic" value="/jog_ros_control/raw_joint_states"/>
+    <param name="scene_joint_states_topic" value="/joint_states"/>
+  </node>
+  <node name="aubo_joint_state_relay" pkg="joint_state_publisher" type="joint_state_publisher">
+    <rosparam param="source_list">[/jog_ros_control/cached_joint_states]</rosparam>
+    <rosparam param="zeros">{joint1: 0.0, joint2: 0.0}</rosparam>
+  </node>
+  <test test-name="cartesian_jog_real_model" pkg="aubo_ros_control"
+        type="cartesian_jog_ros_control_integration_test" time-limit="45"
+        args="--gtest_filter=RosControlJogIntegration.RealModelXYZ"/>
+</launch>

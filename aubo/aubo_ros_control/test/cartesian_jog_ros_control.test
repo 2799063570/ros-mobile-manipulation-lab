@@ -1,0 +1,20 @@
+<launch>
+  <!-- A delayed six-joint plant; never starts hardware, the SDK or Gazebo. -->
+  <param name="robot_description" textfile="$(find aubo_ros_control)/test/jog_test.urdf"/>
+  <param name="robot_description_semantic" value="&lt;robot name='jog_test'&gt;&lt;group name='aubo_i5'&gt;&lt;chain base_link='base_link' tip_link='tcp_link'/&gt;&lt;/group&gt;&lt;/robot&gt;"/>
+  <node pkg="aubo_ros_control" type="aubo_cartesian_jog_node" name="aubo_cartesian_jog" required="true">
+    <rosparam file="$(find aubo_ros_control)/config/cartesian_jog.yaml"/>
+    <param name="backend" value="ros_control"/>
+    <param name="controller_command_topic" value="/jog_ros_control/command"/>
+    <param name="controller_manager_service" value="/aubo_i5/controller_manager/list_controllers"/>
+    <param name="controller_name" value="aubo_i5_controller"/>
+    <param name="joint_states_topic" value="/jog_ros_control/raw_joint_states"/>
+    <param name="max_following_error" value="0.02"/>
+    <rosparam param="home_joint_positions">[0.08, 0, 0, 0, 0, 1]</rosparam>
+    <rosparam param="joint_lower_limits">[-2.5, -2.5, -2.5, -2.5, -2.5, -2.5]</rosparam>
+    <rosparam param="joint_upper_limits">[2.5, 2.5, 2.5, 2.5, 2.5, 2.5]</rosparam>
+  </node>
+  <test test-name="cartesian_jog_ros_control_integration" pkg="aubo_ros_control"
+        type="cartesian_jog_ros_control_integration_test" time-limit="75"
+        args="--gtest_filter=RosControlJogIntegration.DelayedPlantHomeAndFaultLifecycle"/>
+</launch>

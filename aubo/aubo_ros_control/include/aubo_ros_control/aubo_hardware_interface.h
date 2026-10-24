@@ -14,7 +14,7 @@
  *     MaxVelc / MaxAcc 来自 aubo_driver.cpp，周期与 control_frequency 一致。
  *  5. 点位去重阈值 THRESHHOLD = 0.000001 rad。
  *  6. 首次连接最多重试 5 次；运动中断线后保持停止并要求人工重启。
- *  7. timerCallback 方式读取当前路点（与 aubo_driver.cpp 一致）。
+ *  7. 可选择 SDK 实时路点推送，避免同步诊断阻塞反馈。
  */
 
 #pragma once
@@ -26,6 +26,9 @@
 #include <array>
 #include <atomic>
 #include <mutex>
+#include <condition_variable>
+#include <chrono>
+#include <cstdint>
 #include <thread>
 #include <queue>
 #include <cmath>
@@ -149,6 +152,7 @@ public:
     bool isConnected() const { return controller_connected_flag_.load(); }
 
 private:
+    friend struct AuboHardwareFeedbackTestAccess;
     MotionLease motion_lease_;
     // -------------------------------------------------------------------------
     // 内部辅助
@@ -189,6 +193,14 @@ private:
      *        （对应 aubo_driver.cpp timerCallback，50Hz）
      */
     void timerCallback(const ros::TimerEvent& e);
+    virtual int readSafetyDiagnosis(aubo_robot_namespace::RobotDiagnosis& diagnosis);
+    virtual int readFeedbackSnapshot(aubo_robot_namespace::wayPoint_S& waypoint);
+    void pollFeedback();
+    static void receiveWaypoint(const aubo_robot_namespace::wayPoint_S* waypoint, void* context);
+    void updateFeedback(const aubo_robot_namespace::wayPoint_S& waypoint);
+    void updateFeedbackAt(const aubo_robot_namespace::wayPoint_S& waypoint,
+                          const ros::Time& stamp, std::chrono::steady_clock::time_point sampled,
+                          bool pushed);
 
     /** 比较两个关节位置数组是否存在足够差异（> THRESHHOLD） */
     bool roadPointCompare(const double* p1, const double* p2) const;
@@ -197,6 +209,21 @@ private:
     // ROS 参数
     // -------------------------------------------------------------------------
     ros::NodeHandle nh_;
+    // Only new successful SDK reads are published here; ros_control's regular
+    // joint_state_controller can republish its cached state with newer stamps.
+    ros::Publisher raw_joint_state_pub_;
+    bool use_realtime_feedback_{false}, feedback_callback_registered_{false};
+    std::atomic<bool> accept_feedback_callbacks_{false};
+    std::mutex feedback_mutex_;
+    std::condition_variable feedback_ready_;
+    bool have_feedback_sample_{false};
+    // The extra read-only socket is used only when pushed samples fall behind.
+    bool feedback_poll_connected_{false};
+    std::atomic<bool> feedback_poll_running_{false};
+    std::thread feedback_poll_thread_;
+    std::mutex feedback_publish_mutex_;
+    std::chrono::steady_clock::time_point last_feedback_sample_{}, last_push_sample_{};
+    std::uint64_t feedback_sample_count_{0};
 
     std::string server_host_;    ///< 机械臂 IP
     int         server_port_;    ///< 机械臂端口（默认 8899）
@@ -235,6 +262,7 @@ private:
     ServiceInterface robot_send_service_;      ///< 发送指令
     ServiceInterface robot_receive_service_;   ///< 读取状态
     ServiceInterface robot_mac_service_;       ///< 监控 MAC 缓冲区 + 发点
+    ServiceInterface feedback_poll_service_;   ///< 独立只读路点查询，不共享诊断/发点连接
 
     // -------------------------------------------------------------------------
     // 无锁运动队列（对应 aubo_driver.cpp ros_motion_queue_）

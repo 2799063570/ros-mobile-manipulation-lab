@@ -1,4 +1,16 @@
-# 验证状态（2026-10-11）
+# 验证状态（2026-10-24）
+
+## Linux ROS Noetic 调试
+
+- 在当前工作空间的 devel 依赖之上，使用 `/tmp/aubo_thesis_debug_build` 独立构建成功：两个服务生成成功，`audit_trajectory_node` 编译和链接成功。未改动原工作空间的 build/devel。
+- 9 项 Python 统计测试及 2 项新增 C++ 测试通过。C++ 测试使用最小机器人模型，覆盖旋转盒子的世界 AABB、障碍数量上限、有效轨迹、越界、缺失起始关节，以及端点无碰撞但插值路径碰撞。
+- S1、S4 的 `roslaunch --dump-params` 解析通过；这仅验证参数展开，不代表节点启动成功。Python AST、launch/package.xml 解析通过。
+- 修复 NSG 请求日志缺少顶层复核输入的问题；新日志可直接交给 `audit_trajectory.py`。记录器现在明确拒绝数组、标量等非对象 JSON 事件。
+- 补齐启动依赖 `aubo_sorting`；提高包自身 CMake 最低版本至 3.5。当前机器安装的 CMake 4 仍需 `-DCMAKE_POLICY_VERSION_MINIMUM=3.5` 兼容旧版 catkin/OctoMap 依赖，并指定 `-DPYTHON_EXECUTABLE=/usr/bin/python3`。
+
+当前 ROS 环境找不到 `motion_planning` 包，尚未验证真实 NSG 服务。未启动整套分拣、Gazebo或实物，也未验证实际机器人模型的审计服务调用；仍须完成下面的部署机验收。
+
+## 先前离线验证（2026-10-11）
 
 本次在Windows上完成以下离线验证：
 

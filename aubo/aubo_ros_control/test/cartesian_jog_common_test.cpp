@@ -57,6 +57,17 @@ int main()
 {
   try
   {
+    using aubo_ros_control::jog::interpolationSteps;
+    require(interpolationSteps(50.0, 0.005) == 4, "50Hz must cover four 5ms points");
+    require(interpolationSteps(100.0, 0.005) == 2, "100Hz must cover two 5ms points");
+    require(interpolationSteps(200.0, 0.005) == 1, "200Hz must cover one 5ms point");
+    for (double rate : {0.0, -1.0, 60.0, 201.0, 10.0, std::numeric_limits<double>::quiet_NaN()})
+    {
+      bool rejected_rate = false;
+      try { interpolationSteps(rate, 0.005); }
+      catch (const std::invalid_argument&) { rejected_rate = true; }
+      require(rejected_rate, "Nonintegral/invalid control rate was accepted");
+    }
     derivatives(0.25, 0.60, 8.0);
     derivatives(0.35, 0.80, 12.0);
     derivatives(0.05, 0.10, 100.0);  // alpha=1 分支。

@@ -4,6 +4,9 @@ tool_link: tcp_link
 group_name: aubo_i5
 # 面板范围 0.1–100 mm/s，默认选择仍为 10 mm/s。
 max_linear_velocity: 0.10
+# 上层SDK/Gazebo目标更新50Hz；下层按5ms平滑积分并由SDK按需取点。
+# 控制周期必须是5ms的整数倍（1..10点），不随单次SDK调用耗时改变。
+control_frequency: 50.0
 command_timeout: 0.15
 feedback_timeout: 0.15
 max_following_error: 0.12
@@ -15,6 +18,10 @@ singularity_slow: 0.06
 home_joint_positions: [0.0, 0.0, 1.6292, 0.0, 1.6628, 0.0]
 home_joint_velocity: 0.10
 home_timeout: 90.0
+# 以下仅供显式选择的历史ros_control路径使用；默认SDK路径不读取这些控制器配置。
+controller_command_topic: /aubo_i5/aubo_i5_controller/command
+controller_manager_service: /aubo_i5/controller_manager/list_controllers
+controller_name: aubo_i5_controller
 # 减速尾段碰撞采样的最大关节增量，单位 rad；不是笛卡尔安全距离。
 collision_resolution: 0.002
 # 默认由外部往这些话题发布障碍物；不自动将 Gazebo 模型转换为碰撞物体。
@@ -31,9 +38,17 @@ joint_velocity_limits: [0.25, 0.25, 0.25, 0.35, 0.35, 0.35]
 joint_acceleration_limits: [0.60, 0.60, 0.60, 0.80, 0.80, 0.80]
 joint_jerk_limits: [8.0, 8.0, 8.0, 12.0, 12.0, 12.0]
 
-# SDK 消费周期固定为 5 ms；36 个关节标量 = 6 个六轴点，约 30 ms。
-# 只是名义缓冲时长，实际松手停止还包括输入心跳、网络和减速尾段。
-sdk_mac_buffer_target: 36
+# SDK 消费周期固定 5 ms；300 标量 = 50 个六轴点 / 250 ms 名义前瞻。
+# 同一SDK连接查询/发送；缺口至少4点（20ms）才补，且生产额度按200点/s积累。
+# 该额度只限制生成速率，不作为控制柜已消费的证据；仍必须满足MAC实测限额。
+# 单次 SDK 发送预算仍为 100 ms，反馈和诊断看门狗仍为 150 ms。
+# 松手/取消不能撤回已提交点，停止还包括前瞻、输入心跳和减速尾段。
+sdk_mac_buffer_target: 300
+# MAC实测与本批预留限额仍为360标量=60点；不按时间虚构消费。
+# SDK诊断无硬件采样时间戳，此限额不认证任意时刻的真实物理排队上界。
+sdk_mac_buffer_limit: 360
+# 单次诊断阻塞或连续无响应达到此时间，停止供点；不撤销已在途/已入柜的点。
+sdk_diagnosis_timeout: 0.15
 robot_ip: 192.168.1.2
 server_port: 8899
 username: aubo

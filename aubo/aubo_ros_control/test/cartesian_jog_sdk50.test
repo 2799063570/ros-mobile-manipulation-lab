@@ -1,0 +1,40 @@
+<launch>
+  <arg name="send_delay_ms" default="60"/>
+  <arg name="diagnosis_delay_ms" default="20"/>
+  <arg name="accept_late" default="false"/>
+  <arg name="cache_lag_ms" default="20"/>
+  <arg name="speed_mm_s" default="5"/>
+  <arg name="timing_trace_path" default=""/>
+  <!-- Actual SDK-facing frontend, with the SDK boundary replaced at link time.
+       No hardware node, JTC, SDK login/startup or controller connection. -->
+  <include file="$(find aubo_moveit_config)/launch/planning_context.launch">
+    <arg name="load_robot_description" value="true"/>
+    <arg name="robot_xacro" value="aubo_i5_with_camera.xacro"/>
+    <arg name="robot_srdf" value="aubo_i5_with_camera.srdf"/>
+  </include>
+  <param name="/jog_ros_control_test/real_model" value="true"/>
+  <param name="/jog_ros_control_test/scene_relay" value="true"/>
+  <param name="/jog_ros_control_test/sdk_points" value="true"/>
+  <param name="/jog_ros_control_test/linear_speed" value="$(eval float(arg('speed_mm_s')) * 0.001)"/>
+  <rosparam param="/jog_ros_control_test/initial_positions">[0, 0, 1.6292, 0, 1.6628, 0]</rosparam>
+  <node pkg="aubo_ros_control" type="aubo_cartesian_jog_fake_sdk_node" name="aubo_cartesian_jog" required="true">
+    <rosparam file="$(find aubo_ros_control)/config/cartesian_jog.yaml"/>
+    <param name="backend" value="sdk"/>
+    <param name="control_frequency" value="50.0"/>
+    <param name="timing_trace_path" value="$(arg timing_trace_path)"/>
+    <param name="fake_send_delay_ms" value="$(arg send_delay_ms)"/>
+    <param name="fake_diagnosis_delay_ms" value="$(arg diagnosis_delay_ms)"/>
+    <param name="fake_accept_late" value="$(arg accept_late)"/>
+    <param name="fake_mac_cache_lag_ms" value="$(arg cache_lag_ms)"/>
+    <param name="joint_states_topic" value="/cartesian_jog/sdk_joint_states"/>
+    <param name="scene_joint_states_topic" value="/joint_states"/>
+    <rosparam param="home_joint_positions">[0.03, 0, 1.6292, 0, 1.6628, 0]</rosparam>
+  </node>
+  <node name="aubo_joint_state_relay" pkg="joint_state_publisher" type="joint_state_publisher">
+    <rosparam param="source_list">[/cartesian_jog/sdk_joint_states]</rosparam>
+    <rosparam param="zeros">{joint1: 0.0, joint2: 0.0}</rosparam>
+  </node>
+  <test test-name="cartesian_jog_sdk50" pkg="aubo_ros_control"
+        type="cartesian_jog_ros_control_integration_test" time-limit="50"
+        args="--gtest_filter=RosControlJogIntegration.RealModelXYZ"/>
+</launch>

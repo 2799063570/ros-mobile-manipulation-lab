@@ -3,6 +3,7 @@
 #include <aubo_ros_control/direct_sdk_backend.h>
 #include <aubo_ros_control/MoveHomeAction.h>
 #include <actionlib/server/action_server.h>
+#include <controller_manager_msgs/ListControllers.h>
 
 #include <geometry_msgs/TwistStamped.h>
 #include <sensor_msgs/JointState.h>
@@ -10,6 +11,8 @@
 #include <std_msgs/String.h>
 #include <std_srvs/SetBool.h>
 #include <std_srvs/Trigger.h>
+#include <trajectory_msgs/JointTrajectory.h>
+#include <ros/callback_queue.h>
 #include <kdl/chainfksolverpos_recursive.hpp>
 #include <kdl/chainjnttojacsolver.hpp>
 #include <kdl_parser/kdl_parser.hpp>
@@ -19,12 +22,16 @@
 
 #include <chrono>
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <csignal>
+#include <cstdint>
+#include <condition_variable>
 #include <memory>
 #include <mutex>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 #include <utility>
 
@@ -32,6 +39,8 @@ namespace aubo_ros_control
 {
 using visual_servo_internal::JointPoint;
 using visual_servo_internal::kDof;
+using visual_servo_internal::MotionTimingTrace;
+using visual_servo_internal::PointTiming;
 using Clock = std::chrono::steady_clock;
 using Time = Clock::time_point;
 
@@ -47,10 +56,23 @@ class CartesianJog
 {
   using HomeServer = actionlib::ActionServer<MoveHomeAction>;
   using HomeHandle = HomeServer::GoalHandle;
+  using JointVelocity = Eigen::Matrix<double, 6, 1>;
 public:
   CartesianJog() : private_nh_("~"), io_("/cartesian_jog"), unused_queue_(2)
   {
     parameters();
+    std::string trace_path;
+    private_nh_.param<std::string>("timing_trace_path", trace_path, "");
+    if (!trace_path.empty())
+    {
+      int capacity = 200000;
+      private_nh_.param("timing_trace_capacity", capacity, capacity);
+      if (backend_ != "sdk" || capacity <= 0)
+        throw std::invalid_argument("Timing trace requires SDK backend and positive capacity");
+      timing_trace_.reset(new MotionTimingTrace(trace_path, capacity));
+      ROS_INFO("[cartesian_jog/trace] 内存采集已启用，退出后写入 %s；容量 %d 条事件",
+               trace_path.c_str(), capacity);
+    }
     initializeModel();
     state_pub_ = io_.advertise<std_msgs::String>("state", 1, true);
     command_sub_ = io_.subscribe("command", 1, &CartesianJog::command, this,
@@ -63,19 +85,33 @@ public:
       joint_pub_ = nh_.advertise<sensor_msgs::JointState>(joint_topic_, 1);
       sdk_.reset(new visual_servo_internal::DirectSdkBackend(unused_queue_, velocity_limits_,
                                                             acceleration_limits_, 200.0));
-      sdk_->setPointGenerator([this](JointPoint& point) { return generate(point); });
+      sdk_->setTimingTrace(timing_trace_);
+      sdk_->setPointGenerator([this](JointPoint& point, PointTiming* timing) { return generate(point, timing); });
       if (!sdk_->connect(private_nh_))
         throw std::runtime_error("SDK connection failed");
       feedback_timer_ = nh_.createWallTimer(ros::WallDuration(0.02), &CartesianJog::readSdk, this);
     }
     else
     {
-      std::vector<std::string> topics;
-      if (!private_nh_.getParam("gazebo_command_topics", topics) || topics.size() != kDof)
-        throw std::runtime_error("Expected six Gazebo command topics");
-      for (const auto& topic : topics)
-        joint_commands_.push_back(nh_.advertise<std_msgs::Float64>(topic, 1));
-      feedback_sub_ = nh_.subscribe(joint_topic_, 1, &CartesianJog::readGazebo, this);
+      if (backend_ == "ros_control")
+      {
+        // Feedback must not queue behind scene updates, IK/output timers or
+        // synchronous readiness service calls on the default callback queue.
+        feedback_nh_.setCallbackQueue(&feedback_queue_);
+        trajectory_pub_ = nh_.advertise<trajectory_msgs::JointTrajectory>(controller_command_topic_, 1);
+        controller_list_client_ = nh_.serviceClient<controller_manager_msgs::ListControllers>(
+            controller_manager_service_);
+      }
+      else
+      {
+        std::vector<std::string> topics;
+        if (!private_nh_.getParam("gazebo_command_topics", topics) || topics.size() != kDof)
+          throw std::runtime_error("Expected six Gazebo command topics");
+        for (const auto& topic : topics)
+          joint_commands_.push_back(nh_.advertise<std_msgs::Float64>(topic, 1));
+      }
+      feedback_sub_ = feedback_nh_.subscribe(joint_topic_, 1, &CartesianJog::readGazebo, this,
+                                    ros::TransportHints().tcpNoDelay());
       output_timer_ = nh_.createTimer(ros::Duration(kPeriod), &CartesianJog::gazeboOutput, this);
     }
     status_timer_ = nh_.createWallTimer(ros::WallDuration(0.1), &CartesianJog::publishStatus, this);
@@ -83,11 +119,30 @@ public:
         [this](HomeHandle goal) { startHome(goal); },
         [this](HomeHandle goal) { cancelHome(goal); }, false));
     home_server_->start();
+    if (backend_ == "ros_control")
+    {
+      feedback_spinner_.reset(new ros::AsyncSpinner(1, &feedback_queue_));
+      feedback_spinner_->start();
+    }
     ROS_INFO("[cartesian_jog] %s 后端已启动，默认禁用；先发送零指令，再按住点动", backend_.c_str());
+    if (backend_ != "ros_control")
+    {
+      ROS_INFO("[cartesian_jog] 目标更新 %.1f Hz，按 5 ms 周期平滑插补；SDK 按需取点，不经过 JTC",
+               1.0 / control_period_);
+      control_running_.store(true);
+      control_thread_ = std::thread(&CartesianJog::controlLoop, this);
+    }
   }
 
   ~CartesianJog()
   {
+    control_running_.store(false);
+    control_wakeup_.notify_all();
+    if (control_thread_.joinable())
+      control_thread_.join();
+    feedback_sub_.shutdown();
+    if (feedback_spinner_)
+      feedback_spinner_->stop();
     if (home_goal_)
     {
       MoveHomeResult result;
@@ -97,6 +152,16 @@ public:
     // 正常退出在 main 中先请求减速；SDK 故障退出不承诺平滑停车。
     if (sdk_)
       sdk_->shutdown();
+    // main has already stopped the spinner; the control and SDK writers are
+    // now joined. Never serialize this buffer on a motion/callback thread.
+    if (timing_trace_)
+    {
+      if (!timing_trace_->dumpAfterJoin())
+        ROS_ERROR("[cartesian_jog/trace] 写入采集文件失败");
+      else
+        ROS_INFO("[cartesian_jog/trace] 已保存；容量外丢弃 %zu 条事件",
+                 timing_trace_->droppedAfterJoin());
+    }
   }
 
   bool healthy()
@@ -107,10 +172,12 @@ public:
 
   void requestStop()
   {
+    ++stop_epoch_;
     std::lock_guard<std::mutex> lock(mutex_);
     enabled_ = false;
     shutting_down_ = true;
     requested_.setZero();
+    invalidateControlTarget();
     stopHome();
   }
 
@@ -128,6 +195,12 @@ private:
     private_nh_.param<std::string>("tool_link", tool_, "tcp_link");
     private_nh_.param<std::string>("group_name", group_, "aubo_i5");
     private_nh_.param<std::string>("joint_states_topic", joint_topic_, "/joint_states");
+    private_nh_.param<std::string>("scene_joint_states_topic", scene_joint_topic_, joint_topic_);
+    private_nh_.param<std::string>("controller_command_topic", controller_command_topic_,
+                                  "/aubo_i5/aubo_i5_controller/command");
+    private_nh_.param<std::string>("controller_manager_service", controller_manager_service_,
+                                  "/aubo_i5/controller_manager/list_controllers");
+    private_nh_.param<std::string>("controller_name", controller_name_, "aubo_i5_controller");
     private_nh_.param<std::string>("planning_scene_topic", scene_topic_, "/planning_scene");
     private_nh_.param<std::string>("initial_scene_service", initial_scene_service_, "");
     private_nh_.param("max_linear_velocity", max_linear_, 0.02);
@@ -141,7 +214,14 @@ private:
     private_nh_.param("collision_resolution", collision_resolution_, 0.002);
     private_nh_.param("home_joint_velocity", home_velocity_, 0.10);
     private_nh_.param("home_timeout", home_timeout_, 90.0);
-    if ((backend_ != "sdk" && backend_ != "gazebo") || base_ == tool_ ||
+    double control_frequency = 50.0;
+    private_nh_.param("control_frequency", control_frequency, 50.0);
+    control_steps_ = jog::interpolationSteps(control_frequency, kPeriod);
+    control_period_ = control_steps_ * kPeriod;
+    if ((backend_ != "sdk" && backend_ != "gazebo" && backend_ != "ros_control") ||
+        (backend_ == "ros_control" && (controller_command_topic_.empty() || joint_topic_.empty() ||
+         controller_command_topic_ == joint_topic_ || controller_manager_service_.empty() ||
+         controller_name_.empty())) || base_ == tool_ ||
         !positive(max_linear_) || max_linear_ > 0.10 || !positive(command_timeout_) ||
         command_timeout_ > 0.5 || !positive(feedback_timeout_) || feedback_timeout_ > 0.5 ||
         !positive(following_error_) || !positive(limit_margin_) || !positive(damping_) ||
@@ -224,7 +304,9 @@ private:
     scene_->startSceneMonitor(scene_topic_);
     // 场景通过 planning_scene/world/collision_object 输入；不在点动节点里启动点云建图。
     scene_->startWorldGeometryMonitor("/collision_object", "/planning_scene_world", false);
-    scene_->startStateMonitor(joint_topic_);
+    // The scene may include explicitly fixed gripper joints in a merged topic.
+    // Control freshness is still checked only against joint_topic_ raw samples.
+    scene_->startStateMonitor(scene_joint_topic_);
     scene_->setStateUpdateFrequency(50.0);
     // 与已有规划场景连接时显式要求完整快照，不能假定之前发布的 diff 仍在话题里。
     if (!initial_scene_service_.empty() &&
@@ -240,21 +322,59 @@ private:
     return true;
   }
 
+  bool sdkFeedbackHealthy()
+  {
+    if (!sdk_)
+      return true;
+    JointPoint point;
+    // readState checks the age of the actual SDK callback, not the last ROS
+    // timer that copied it. It reads a short cache lock; it performs no RPC.
+    return sdk_->healthy() && sdk_->readState(point);
+  }
+
   void fault(const std::string& reason)
   {
     if (fault_.empty())
     {
       fault_ = reason;
-      ROS_ERROR("[cartesian_jog] %s；锁存故障并减速，需 reset 后重新使能", reason.c_str());
+      if (reason.compare(0, 18, "sdk_backend_failed") == 0)
+        ROS_ERROR("[cartesian_jog] %s；后端已停流，无法继续生成减速点，需重启节点", reason.c_str());
+      else
+        ROS_ERROR("[cartesian_jog] %s；锁存故障并减速，需 reset 后重新使能", reason.c_str());
     }
     enabled_ = false;
     requested_.setZero();
+    invalidateControlTarget();
     if (home_goal_)
       home_stopping_ = true;
   }
 
+  bool controllerRunning(std::string& reason)
+  {
+    if (backend_ != "ros_control")
+      return true;
+    // The controller may subscribe while stopped. Ask its manager rather than
+    // treating a connected topic subscriber as permission to start motion.
+    // Callers must do this before locking mutex_: an unavailable ROS service
+    // must not block the generator, disable or cancellation callbacks.
+    controller_manager_msgs::ListControllers service;
+    if (!controller_list_client_.call(service))
+    {
+      reason = "无法查询控制器状态：" + controller_manager_service_;
+      return false;
+    }
+    for (const auto& controller : service.response.controller)
+      if (controller.name == controller_name_ && controller.state == "running")
+        return true;
+    reason = "控制器未处于 running 状态：" + controller_name_;
+    return false;
+  }
+
   void startHome(HomeHandle goal)
   {
+    const auto stop_epoch = stop_epoch_.load();
+    std::string controller_error;
+    const bool controller_ready = controllerRunning(controller_error);
     std::lock_guard<std::mutex> lock(mutex_);
     MoveHomeResult result;
     if (goal.getGoalStatus().status == actionlib_msgs::GoalStatus::RECALLING)
@@ -263,9 +383,21 @@ private:
       goal.setCanceled(result);
       return;
     }
+    if (!controller_ready)
+    {
+      result.message = controller_error;
+      goal.setRejected(result);
+      return;
+    }
+    if (stop_epoch != stop_epoch_.load())
+    {
+      result.message = "查询控制器期间已收到停止请求，请重新请求 home";
+      goal.setRejected(result);
+      return;
+    }
     if (home_goal_ || enabled_ || shutting_down_ || !initialized_ || !fault_.empty() ||
         !settled() || elapsed(Clock::now(), last_feedback_) > feedback_timeout_ ||
-        (sdk_ && !sdk_->healthy()) || !safeStop(position_, filters_))
+        !sdkFeedbackHealthy() || !safeStop(position_, filters_))
     {
       result.message = "Disable jog first; feedback, stopped state and collision check must be healthy";
       goal.setRejected(result);
@@ -279,6 +411,7 @@ private:
         return;
       }
     // 不接管其他执行器，不调用阻塞式 SDK moveJoint；沿现有 5 ms 流生成点。
+    invalidateControlTarget();
     home_goal_.reset(new HomeHandle(goal));
     home_stopping_ = false;
     home_cancelled_ = false;
@@ -290,6 +423,7 @@ private:
   {
     if (home_goal_)
     {
+      invalidateControlTarget();
       home_cancelled_ = true;
       home_stopping_ = true;
     }
@@ -371,7 +505,9 @@ private:
 
   void command(const geometry_msgs::TwistStamped::ConstPtr& message)
   {
+    const auto received = timing_trace_ ? MotionTimingTrace::ns() : 0;
     std::lock_guard<std::mutex> lock(mutex_);
+    const auto locked = timing_trace_ ? MotionTimingTrace::ns() : 0;
     if (!enabled_)
       return;
     const auto& t = message->twist;
@@ -400,18 +536,51 @@ private:
     tool_frame_ = message->header.frame_id == tool_;
     last_command_ = Clock::now();
     last_stamp_ = message->header.stamp;
+    if (timing_trace_)
+    {
+      MotionTimingTrace::Event event;
+      event.kind = MotionTimingTrace::Command;
+      event.command_id = ++trace_command_id_;
+      event.begin_ns = received;
+      event.locked_ns = locked;
+      event.end_ns = MotionTimingTrace::ns(last_command_);
+      event.source_ros_ns = message->header.stamp.toNSec();
+      event.result = tool_frame_ ? 1 : 0;  // 0=base, 1=tool
+      for (int i = 0; i < 3; ++i) event.desired[i] = requested_(i);
+      timing_trace_->append(event);
+    }
   }
 
   bool enable(std_srvs::SetBool::Request& request, std_srvs::SetBool::Response& response)
   {
+    const auto stop_epoch = stop_epoch_.load();
+    if (!request.data)
+      ++stop_epoch_;
+    std::string controller_error;
+    const bool controller_ready = !request.data || controllerRunning(controller_error);
     std::lock_guard<std::mutex> lock(mutex_);
     response.success = true;
     if (!request.data)
     {
       enabled_ = false;
+      invalidateControlTarget();
       requested_.setZero();
       stopHome();
       response.message = "已请求平滑停止；控制柜已有点仍需执行";
+      return true;
+    }
+    if (!controller_ready)
+    {
+      if (enabled_)
+        fault("ros_control_controller_not_running");
+      response.success = false;
+      response.message = controller_error;
+      return true;
+    }
+    if (stop_epoch != stop_epoch_.load())
+    {
+      response.success = false;
+      response.message = "查询控制器期间已收到停止请求，请重新使能";
       return true;
     }
     if (enabled_)
@@ -421,13 +590,14 @@ private:
     }
     if (home_goal_ || shutting_down_ || !initialized_ || !fault_.empty() || !settled() ||
         elapsed(Clock::now(), last_feedback_) > feedback_timeout_ ||
-        (sdk_ && !sdk_->healthy()) || !safeStop(position_, filters_))
+        !sdkFeedbackHealthy() || !safeStop(position_, filters_))
     {
       response.success = false;
       response.message = "未就绪、尚未停稳、位姿不安全或故障未复位：" + fault_;
       return true;
     }
     enabled_ = true;
+    invalidateControlTarget();
     neutral_seen_ = false;
     capture_orientation_ = true;
     requested_.setZero();
@@ -442,7 +612,7 @@ private:
     std::lock_guard<std::mutex> lock(mutex_);
     response.success = initialized_ && !enabled_ && !home_goal_ && !fatal_ && settled() &&
                        elapsed(Clock::now(), last_feedback_) <= feedback_timeout_ &&
-                       (!sdk_ || sdk_->healthy()) && safeStop(position_, filters_);
+                       sdkFeedbackHealthy() && safeStop(position_, filters_);
     for (std::size_t i = 0; i < kDof; ++i)
       response.success = response.success && std::abs(position_[i] - feedback_[i]) < following_error_;
     if (response.success)
@@ -451,23 +621,29 @@ private:
     return true;
   }
 
-  void feedback(const JointPoint& point)
+  void feedback(const JointPoint& point, Time sampled = Clock::now(), double transport_age = 0.0)
   {
+    const auto received = Clock::now();
     std::lock_guard<std::mutex> lock(mutex_);
     if (!visual_servo_internal::finitePoint(point))
     {
       fault("invalid_feedback");
       return;
     }
-    const Time now = Clock::now();
-    const double dt = elapsed(now, last_feedback_);
+    const double dt = elapsed(sampled, last_feedback_);
     feedback_speed_ = 0.0;
     if (have_feedback_ && dt > 1e-6)
       for (std::size_t i = 0; i < kDof; ++i)
         feedback_speed_ = std::max(feedback_speed_, std::abs(point[i] - feedback_[i]) / dt);
     feedback_ = point;
+    if (have_feedback_)
+      max_feedback_gap_ = std::max(max_feedback_gap_, elapsed(received, last_feedback_received_));
+    ++feedback_samples_;
+    last_feedback_received_ = received;
+    feedback_transport_age_ = transport_age;
+    feedback_lock_wait_ = elapsed(Clock::now(), received);
     have_feedback_ = true;
-    last_feedback_ = Clock::now();
+    last_feedback_ = sampled;
   }
 
   void readSdk(const ros::WallTimerEvent&)
@@ -475,8 +651,9 @@ private:
     JointPoint point;
     if (!sdk_->readState(point))
     {
+      const auto backend_failure = sdk_->failureReason();
       std::lock_guard<std::mutex> lock(mutex_);
-      fault("sdk_feedback_failed");
+      fault(backend_failure.empty() ? "sdk_feedback_failed" : "sdk_backend_failed: " + backend_failure);
       return;
     }
     feedback(point);
@@ -489,6 +666,26 @@ private:
 
   void readGazebo(const sensor_msgs::JointState::ConstPtr& message)
   {
+    Time sampled = Clock::now();
+    double age = 0.0;
+    if (backend_ == "ros_control")
+    {
+      // This topic must contain original hardware samples, not a relay that
+      // republishes cached positions with a new stamp. Delayed samples must
+      // not refresh the physical-feedback watchdog on receipt.
+      age = (ros::Time::now() - message->header.stamp).toSec();
+      if (message->header.stamp.isZero() || age > feedback_timeout_ || age < -0.05 ||
+          message->name.size() != message->position.size())
+      {
+        ROS_ERROR_THROTTLE(1.0, "[cartesian_jog/feedback] 原始反馈无效或过期：消息年龄 %.2f ms，seq=%u",
+                           age * 1000.0, message->header.seq);
+        std::lock_guard<std::mutex> lock(mutex_);
+        fault("invalid_or_stale_feedback");
+        return;
+      }
+      sampled -= std::chrono::duration_cast<Clock::duration>(
+          std::chrono::duration<double>(std::max(0.0, age)));
+    }
     JointPoint point;
     for (std::size_t i = 0; i < kDof; ++i)
     {
@@ -498,7 +695,7 @@ private:
         return;
       point[i] = message->position[index];
     }
-    feedback(point);
+    feedback(point, sampled, age);
   }
 
   Eigen::Matrix<double, 6, 1> desiredVelocity()
@@ -598,22 +795,38 @@ private:
     return false;  // 配置过于缓慢，3 秒内无法停稳时也拒绝运动。
   }
 
-  bool generate(JointPoint& output)
+  // Caller holds mutex_. Guards operate on wall/steady time; the interpolator
+  // always advances by the fixed point period, never by RPC or timer jitter.
+  bool prepareGeneration(Time started)
   {
-    const Time started = Clock::now();
-    std::lock_guard<std::mutex> lock(mutex_);
     if (!have_feedback_ || fatal_)
       return false;
     if (!initialized_)
     {
       // SDK 传入上一个实际下发点；不要用稍晚读取的反馈来重置轨迹起点。
-      position_ = backend_ == "sdk" ? output : feedback_;
+      // The SDK caller seeds position_ separately from its last actual point.
+      if (backend_ != "sdk")
+        position_ = feedback_;
       initialized_ = true;
       last_generated_ = started;
     }
     if (elapsed(started, last_feedback_) > feedback_timeout_)
+    {
+      if (fault_.empty())
+        ROS_ERROR("[cartesian_jog/feedback] 采样年龄 %.2f ms，接收间隔最大 %.2f ms，"
+                  "上帧传输/回调排队 %.2f ms，上帧锁等待 %.2f ms，已收 %llu 帧",
+                  elapsed(started, last_feedback_) * 1000.0, max_feedback_gap_ * 1000.0,
+                  feedback_transport_age_ * 1000.0, feedback_lock_wait_ * 1000.0,
+                  static_cast<unsigned long long>(feedback_samples_));
       fault("feedback_timeout");
-    if (elapsed(started, last_generated_) > 0.08)
+    }
+    // 尚未发起过运动的禁用等待阶段没有轨迹流，不能将空闲查询间隔
+    // 当成运动断流。使能/home 或首个非零关节增量之后仍严格检查。
+    // SDK calls on demand while MAC already contains a buffered trajectory.
+    // Its own diagnosis/send watchdogs detect stalled output; a full cabinet
+    // legitimately needs no new generated point for longer than a timer period.
+    if (backend_ != "sdk" && elapsed(started, last_generated_) > 0.08 &&
+        (motion_started_ || enabled_ || home_goal_))
       fault("stream_schedule_gap");
     last_generated_ = started;
     if (enabled_ && elapsed(started, last_command_) > command_timeout_)
@@ -622,7 +835,14 @@ private:
       if (std::abs(position_[i] - feedback_[i]) > following_error_)
         fault("following_error");
 
-    const auto desired = home_goal_ ? homeVelocity() : desiredVelocity();
+    return true;
+  }
+
+  bool interpolatePoint(JointPoint& output, const JointVelocity& desired, PointTiming* timing = nullptr)
+  {
+    if (timing)
+      for (std::size_t i = 0; i < kDof; ++i)
+        timing->desired[i] = desired(i);
     auto next_filters = filters_;
     JointPoint next = position_;
     for (std::size_t i = 0; i < kDof; ++i)
@@ -632,6 +852,8 @@ private:
       fault("collision_or_stopping_limit");
       next_filters = filters_;
       next = position_;
+      if (timing)
+        timing->desired.fill(0.0);  // Record the braking input actually used below.
       // 上周期已经验证过这一减速尾段。故障时保持衔接，不清空轨迹或跳回反馈。
       for (std::size_t i = 0; i < kDof; ++i)
         next[i] += next_filters[i].step(0.0) * kPeriod;
@@ -643,11 +865,42 @@ private:
         fatal_ = true;
         return false;
       }
+    motion_started_ = motion_started_ || next != position_;
     position_ = next;
     filters_ = std::move(next_filters);
     output = position_;
+    return true;
+  }
+
+  bool generate(JointPoint& output, PointTiming* timing = nullptr)
+  {
+    const Time started = Clock::now();
+    std::lock_guard<std::mutex> lock(mutex_);
+    const Time locked = Clock::now();
+    if (!initialized_ && backend_ == "sdk")
+      position_ = output;
+    if (!prepareGeneration(started))
+      return false;
+    const auto desired = pointTarget(started);
+    if (!interpolatePoint(output, desired, timing))
+      return false;
+    if (timing)
+    {
+      timing->begin_ns = MotionTimingTrace::ns(started);
+      timing->locked_ns = MotionTimingTrace::ns(locked);
+      timing->end_ns = MotionTimingTrace::ns();
+      timing->target_id = trace_target_id_;
+      timing->command_id = home_goal_ ? 0 : trace_command_id_;
+      for (std::size_t i = 0; i < kDof; ++i)
+      {
+        timing->velocity[i] = filters_[i].velocity();
+      }
+    }
     if (elapsed(Clock::now(), started) > 0.02)
     {
+      ROS_ERROR("[cartesian_jog] 供点超时：总耗时 %.2f ms，锁等待 %.2f ms，计算 %.2f ms",
+                elapsed(Clock::now(), started) * 1000.0,
+                elapsed(locked, started) * 1000.0, elapsed(Clock::now(), locked) * 1000.0);
       fault("control_computation_overrun");
       // 已经超出供点预算时不再发送本次新点，禁止停顿后恢复成一次突发补点。
       fatal_ = true;
@@ -656,11 +909,110 @@ private:
     return true;
   }
 
+  void controlLoop()
+  {
+    while (control_running_.load() && ros::ok())
+    {
+      const auto started = Clock::now();
+      try
+      {
+        updateControlTarget(started);
+      }
+      catch (const std::exception& error)
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+        ROS_ERROR("[cartesian_jog] 控制线程异常：%s", error.what());
+        fault("control_exception");
+        fatal_ = true;
+      }
+      // Schedule from this actual cycle start. A delayed cycle is never
+      // followed by a burst of catch-up trajectories.
+      std::unique_lock<std::mutex> lock(control_wait_mutex_);
+      control_wakeup_.wait_until(lock, started + std::chrono::duration_cast<Clock::duration>(
+          std::chrono::duration<double>(control_period_)),
+          [this] { return !control_running_.load(); });
+    }
+  }
+
+  void updateControlTarget(Time started)
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    const auto locked = timing_trace_ ? MotionTimingTrace::ns() : 0;
+    if (!initialized_ || !have_feedback_ || fatal_)
+      return;
+    if (elapsed(started, last_feedback_) > feedback_timeout_)
+      fault("feedback_timeout");
+    if (enabled_ && elapsed(started, last_command_) > command_timeout_)
+      fault("command_timeout");
+    JointVelocity target = JointVelocity::Zero();
+    if (!shutting_down_ && fault_.empty())
+      target = home_goal_ ? homeVelocity() : desiredVelocity();
+    if (elapsed(Clock::now(), started) >= control_period_)
+    {
+      fault("control_computation_overrun");
+      fatal_ = true;
+      return;
+    }
+    control_target_ = target;
+    last_control_update_ = started;
+    control_target_ready_ = true;
+    if (timing_trace_)
+    {
+      MotionTimingTrace::Event event;
+      event.kind = MotionTimingTrace::Target;
+      event.target_id = ++trace_target_sequence_;
+      trace_target_id_ = event.target_id;
+      event.command_id = home_goal_ ? 0 : trace_command_id_;
+      event.begin_ns = MotionTimingTrace::ns(started);
+      event.locked_ns = locked;
+      event.end_ns = MotionTimingTrace::ns();
+      event.result = home_goal_ ? 1 : 0;
+      for (std::size_t i = 0; i < kDof; ++i) event.desired[i] = target(i);
+      timing_trace_->append(event);
+    }
+  }
+
+  void invalidateControlTarget()
+  {
+    control_target_.setZero();
+    control_target_ready_ = false;
+    trace_target_id_ = 0;
+    last_control_update_ = Clock::now();
+  }
+
+  JointVelocity pointTarget(Time now)
+  {
+    if (backend_ == "ros_control")  // Legacy optional path, not the real default.
+      return home_goal_ ? homeVelocity() : desiredVelocity();
+    if (shutting_down_ || !fault_.empty() ||
+        (home_goal_ && home_stopping_) ||
+        (!home_goal_ && (!enabled_ || !neutral_seen_ || requested_.norm() < 1e-12)))
+      return JointVelocity::Zero();
+    if (elapsed(now, last_control_update_) > 2.0 * control_period_)
+    {
+      fault("control_target_timeout");
+      return JointVelocity::Zero();
+    }
+    return control_target_ready_ ? control_target_ : JointVelocity::Zero();
+  }
+
   void gazeboOutput(const ros::TimerEvent&)
   {
     JointPoint point{};
     if (!generate(point))
       return;
+    if (backend_ == "ros_control")
+    {
+      trajectory_msgs::JointTrajectory message;
+      message.header.stamp = ros::Time(0);
+      message.joint_names = names_;
+      trajectory_msgs::JointTrajectoryPoint waypoint;
+      waypoint.positions.assign(point.begin(), point.end());
+      waypoint.time_from_start = ros::Duration(2.0 * kPeriod);
+      message.points.push_back(std::move(waypoint));
+      trajectory_pub_.publish(message);
+      return;
+    }
     for (std::size_t i = 0; i < kDof; ++i)
     {
       std_msgs::Float64 message;
@@ -687,14 +1039,26 @@ private:
     state_pub_.publish(message);
   }
 
-  ros::NodeHandle nh_, private_nh_, io_;
-  ros::Publisher state_pub_, joint_pub_;
+  ros::CallbackQueue feedback_queue_;
+  ros::NodeHandle nh_, private_nh_, io_, feedback_nh_;
+  ros::Publisher state_pub_, joint_pub_, trajectory_pub_;
   ros::Subscriber command_sub_, feedback_sub_;
   ros::ServiceServer enable_service_, reset_service_;
+  ros::ServiceClient controller_list_client_;
   ros::Timer output_timer_;
   ros::WallTimer feedback_timer_, status_timer_;
+  std::atomic<bool> control_running_{false};
+  std::thread control_thread_;
+  std::mutex control_wait_mutex_;
+  std::condition_variable control_wakeup_;
+  double control_period_{0.02};
+  unsigned control_steps_{4};
+  JointVelocity control_target_{JointVelocity::Zero()};
+  Time last_control_update_{Clock::now()};
+  bool control_target_ready_{false};
   std::vector<ros::Publisher> joint_commands_;
-  std::string backend_, base_, tool_, group_, joint_topic_;
+  std::string backend_, base_, tool_, group_, joint_topic_, scene_joint_topic_, controller_command_topic_;
+  std::string controller_manager_service_, controller_name_;
   std::string scene_topic_, initial_scene_service_;
   std::vector<std::string> names_;
   double max_linear_, command_timeout_, feedback_timeout_, following_error_, limit_margin_;
@@ -708,14 +1072,21 @@ private:
   std::unique_ptr<tf2_ros::TransformListener> tf_listener_;
   planning_scene_monitor::PlanningSceneMonitorPtr scene_;
   visual_servo_internal::CommandQueue unused_queue_;
+  std::shared_ptr<MotionTimingTrace> timing_trace_;
+  std::uint64_t trace_command_id_{0}, trace_target_id_{0}, trace_target_sequence_{0};
   std::vector<jog::VelocitySmoother> filters_;
   std::mutex mutex_;
+  // A late controller-status response must not undo a newer stop request.
+  std::atomic<std::uint64_t> stop_epoch_{0};
   bool enabled_{false}, neutral_seen_{false}, initialized_{false}, have_feedback_{false};
   bool tool_frame_{false}, capture_orientation_{true}, fatal_{false};
-  bool shutting_down_{false};
+  bool shutting_down_{false}, motion_started_{false};
   Eigen::Vector3d requested_{Eigen::Vector3d::Zero()};
   KDL::Rotation hold_rotation_;
   Time last_feedback_{}, last_command_{}, last_generated_{};
+  Time last_feedback_received_{};
+  double max_feedback_gap_{0.0}, feedback_transport_age_{0.0}, feedback_lock_wait_{0.0};
+  std::uint64_t feedback_samples_{0};
   ros::Time last_stamp_;
   std::string fault_;
   std::unique_ptr<HomeServer> home_server_;
@@ -724,6 +1095,7 @@ private:
   double home_velocity_, home_timeout_, feedback_speed_{0.0};
   bool home_stopping_{false}, home_cancelled_{false};
   Time home_started_{};
+  std::unique_ptr<ros::AsyncSpinner> feedback_spinner_;
   // 放在最后：构造抛异常时也先销毁 SDK 输出线程，再释放它引用的其他成员。
   std::unique_ptr<visual_servo_internal::DirectSdkBackend> sdk_;
 };
@@ -749,9 +1121,9 @@ int main(int argc, char** argv)
     const auto deadline = aubo_ros_control::Clock::now() + std::chrono::seconds(3);
     while (ros::ok() && jog.healthy() && !jog.stopped() && aubo_ros_control::Clock::now() < deadline)
       rate.sleep();
-    // 给名义 30 ms 的控制柜缓冲留出排空时间；异常断线无法执行此平滑退出保证。
+    // 给名义柜内前瞻留出排空余量；MAC 无硬件时间戳，不能保证实际排空或异常时平滑退出。
     if (ros::ok() && jog.healthy())
-      ros::WallDuration(0.10).sleep();
+      ros::WallDuration(0.40).sleep();
     const bool normal = jog.healthy();
     spinner.stop();
     return normal ? 0 : 1;

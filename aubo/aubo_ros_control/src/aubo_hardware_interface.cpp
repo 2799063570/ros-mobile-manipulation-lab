@@ -12,10 +12,12 @@
  */
 
 #include "aubo_ros_control/aubo_hardware_interface.h"
+#include <sensor_msgs/JointState.h>
 
 #include <cstring>
 #include <cmath>
 #include <algorithm>
+#include <chrono>
 #include <unistd.h>   // usleep
 
 using namespace aubo_robot_namespace;
@@ -105,6 +107,7 @@ bool AuboHardwareInterface::init()
     nh_.param<int>        ("collision_class", collision_class_, 6);
     nh_.param<bool>       ("enable_motion_control", enable_motion_control_, true);
     nh_.param<bool>       ("require_real_robot", require_real_robot_, true);
+    nh_.param<bool>       ("use_realtime_feedback", use_realtime_feedback_, false);
     // JointTrajectoryController 已按轨迹时间做三次样条插值。再次低通和
     // 大死区会造成相位滞后与台阶命令，从而导致抖动和跟踪超差。
     nh_.param<bool>       ("enable_command_smoothing", enable_command_smoothing_, false);
@@ -145,6 +148,8 @@ bool AuboHardwareInterface::init()
             return false;
         }
     }
+
+    raw_joint_state_pub_ = nh_.advertise<sensor_msgs::JointState>("raw_joint_states", 1);
 
     // ------------------------------------------------------------------
     // 2. 连接机械臂（带重试，来自 aubo_driver.cpp connectToRobotController）
@@ -235,15 +240,56 @@ bool AuboHardwareInterface::init()
     registerInterface(&position_joint_interface_);
 
     // ------------------------------------------------------------------
-    // 7. 启动状态读取定时器（来自 aubo_driver.cpp TIMER_SPAN_ = 50 Hz）
+    // 7. 点动入口用接收线程推送关节反馈；同步诊断只由下方定时器执行。
+    //    初始位置已在上面读取；收到真实的新推送之前不启动控制器/喂点。
     // ------------------------------------------------------------------
+    if (use_realtime_feedback_)
+    {
+        accept_feedback_callbacks_.store(true);
+        // This connection is idle after startup/EnterTcp2Canbus. Keep pushed
+        // feedback off both the diagnosis connection and the MAC send socket.
+        const int callback_ret = robot_send_service_.robotServiceRegisterRealTimeRoadPointCallback(
+            &AuboHardwareInterface::receiveWaypoint, this);
+        feedback_callback_registered_ = callback_ret == InterfaceCallSuccCode;
+        if (!feedback_callback_registered_)
+        {
+            accept_feedback_callbacks_.store(false);
+            ROS_ERROR("[AuboHW] 注册实时路点推送失败，错误码: %d", callback_ret);
+            shutdown();
+            return false;
+        }
+        std::unique_lock<std::mutex> lock(feedback_mutex_);
+        if (!feedback_ready_.wait_for(lock, std::chrono::seconds(2),
+                                     [this] { return have_feedback_sample_; }))
+        {
+            lock.unlock();
+            ROS_ERROR("[AuboHW] 2 秒内未收到实时关节推送，拒绝启动控制器");
+            shutdown();
+            return false;
+        }
+        // Start all command buffers from the confirmed pushed position too.
+        for (int i = 0; i < NUM_JOINTS; ++i)
+        {
+            const double position = joint_position_rt_[i].load(std::memory_order_relaxed);
+            joint_position_[i] = joint_position_cmd_[i] = position;
+            last_cmd_sent_[i] = filtered_cmd_[i] = joint_filter_[i] = position;
+        }
+        lock.unlock();
+        ROS_INFO("[AuboHW] 实时关节推送已就绪；诊断查询不阻塞反馈发布");
+        feedback_poll_running_.store(true);
+        feedback_poll_thread_ = std::thread(&AuboHardwareInterface::pollFeedback, this);
+        ROS_INFO("[AuboHW] 独立反馈查询已启动：推送间隔达 60 ms 时查询真实路点，保留请求时间戳");
+    }
+
+    // 状态定时器：默认读取路点和诊断；推送模式下只读取诊断。
     const int state_frequency_hz = enable_motion_control_ ? TIMER_SPAN_HZ : 1;
     state_timer_ = nh_.createTimer(
         ros::Duration(1.0 / state_frequency_hz),
         &AuboHardwareInterface::timerCallback,
         this);
     state_timer_.start();
-    ROS_INFO("[AuboHW] 状态读取定时器已启动（%d Hz）", state_frequency_hz);
+    ROS_INFO("[AuboHW] %s定时器已启动（%d Hz）",
+             use_realtime_feedback_ ? "安全诊断（关节反馈使用推送）" : "状态读取", state_frequency_hz);
 
     // ------------------------------------------------------------------
     // 8. 启动喂点线程（仅在启用上层运动控制时才需要）
@@ -267,7 +313,8 @@ bool AuboHardwareInterface::init()
 void AuboHardwareInterface::read(const ros::Time& /*time*/,
                                  const ros::Duration& /*period*/)
 {
-    // 从 lock-free 原子前台缓冲区安全读取硬件状态
+    // Copy a coherent six-axis sample. This lock never covers SDK/ROS I/O.
+    std::lock_guard<std::mutex> lock(feedback_mutex_);
     for (int i = 0; i < NUM_JOINTS; ++i)
     {
         joint_position_[i] = joint_position_rt_[i].load(std::memory_order_relaxed);
@@ -360,6 +407,13 @@ void AuboHardwareInterface::shutdown()
 {
     if (shutdown_started_.exchange(true))
         return;
+    accept_feedback_callbacks_.store(false);
+    feedback_poll_running_.store(false);
+    feed_thread_running_.store(false);
+    feedback_ready_.notify_all();
+    state_timer_.stop();
+    if (feedback_poll_thread_.joinable())
+        feedback_poll_thread_.join();
 
     // 停止喂点线程
     feed_thread_running_.store(false);
@@ -371,8 +425,11 @@ void AuboHardwareInterface::shutdown()
         feed_thread_ = nullptr;
     }
 
-    // 停止定时器
-    state_timer_.stop();
+    if (feedback_callback_registered_)
+    {
+        robot_send_service_.robotServiceRegisterRealTimeRoadPointCallback(nullptr, nullptr);
+        feedback_callback_registered_ = false;
+    }
 
     // 离开 TCP2CANBUS 模式（来自 aubo_driver.cpp 析构）
     if (enable_motion_control_ && in_tcp2canbus_mode_)
@@ -381,10 +438,15 @@ void AuboHardwareInterface::shutdown()
         in_tcp2canbus_mode_ = false;
     }
 
-    // 注销三个 SDK 连接（来自 aubo_driver.cpp 析构）
+    // 注销 SDK 连接（独立反馈查询连接仅在实时反馈模式下登录）。
     robot_send_service_.robotServiceLogout();
     robot_receive_service_.robotServiceLogout();
     robot_mac_service_.robotServiceLogout();
+    if (feedback_poll_connected_)
+    {
+        feedback_poll_service_.robotServiceLogout();
+        feedback_poll_connected_ = false;
+    }
     controller_connected_flag_.store(false);
     ROS_INFO("[AuboHW] SDK 已安全退出。");
     motion_lease_.release();
@@ -452,6 +514,19 @@ bool AuboHardwareInterface::connectToRobotController()
         robot_send_service_.robotServiceLogout();
         robot_receive_service_.robotServiceLogout();
         return false;
+    }
+
+    if (use_realtime_feedback_)
+    {
+        const int feedback_ret = feedback_poll_service_.robotServiceLogin(
+            server_host_.c_str(), server_port_, username_.c_str(), password_.c_str());
+        if (feedback_ret != InterfaceCallSuccCode)
+        {
+            ROS_ERROR("[AuboHW] 独立反馈查询连接失败，错误码: %d", feedback_ret);
+            shutdown();
+            return false;
+        }
+        feedback_poll_connected_ = true;
     }
 
     controller_connected_flag_.store(true);
@@ -596,6 +671,111 @@ bool AuboHardwareInterface::leaveTcp2CanbusMode()
 }
 
 // =============================================================================
+// 反馈接收：推送模式只从 SDK 接收线程进入，不等待同步诊断请求。
+// =============================================================================
+
+void AuboHardwareInterface::receiveWaypoint(const wayPoint_S* waypoint, void* context)
+{
+    if (!waypoint || !context)
+        return;
+    auto* hardware = static_cast<AuboHardwareInterface*>(context);
+    if (hardware->accept_feedback_callbacks_.load())
+        hardware->updateFeedback(*waypoint);
+}
+
+void AuboHardwareInterface::updateFeedback(const wayPoint_S& waypoint)
+{
+    updateFeedbackAt(waypoint, ros::Time::now(), std::chrono::steady_clock::now(),
+                     use_realtime_feedback_);
+}
+
+void AuboHardwareInterface::updateFeedbackAt(const wayPoint_S& waypoint,
+                                            const ros::Time& stamp,
+                                            std::chrono::steady_clock::time_point sampled,
+                                            bool pushed)
+{
+    for (int i = 0; i < NUM_JOINTS; ++i)
+        if (!std::isfinite(waypoint.jointpos[i]))
+            return;
+    sensor_msgs::JointState sample;
+    sample.header.stamp = stamp;
+    sample.name = joint_names_;
+    sample.position.assign(waypoint.jointpos, waypoint.jointpos + NUM_JOINTS);
+    // Two independent sources may finish out of order. Serialize acceptance
+    // and publication without holding the short six-axis read() mutex for IO.
+    std::lock_guard<std::mutex> publish_lock(feedback_publish_mutex_);
+    double push_gap = 0.0;
+    std::uint64_t count = 0;
+    {
+        std::lock_guard<std::mutex> lock(feedback_mutex_);
+        if (shutdown_started_.load() || !controller_connected_flag_.load())
+            return;
+        if (have_feedback_sample_ && sampled <= last_feedback_sample_)
+            return;
+        const double dt = have_feedback_sample_
+            ? std::chrono::duration<double>(sampled - last_feedback_sample_).count() : 0.0;
+        if (pushed)
+        {
+            if (last_push_sample_ != std::chrono::steady_clock::time_point{})
+                push_gap = std::chrono::duration<double>(sampled - last_push_sample_).count();
+            last_push_sample_ = sampled;
+        }
+        for (int i = 0; i < NUM_JOINTS; ++i)
+        {
+            const double velocity = dt > 1e-6 ? (waypoint.jointpos[i] - last_state_position_[i]) / dt : 0.0;
+            joint_position_rt_[i].store(waypoint.jointpos[i], std::memory_order_relaxed);
+            joint_velocity_rt_[i].store(velocity, std::memory_order_relaxed);
+            last_state_position_[i] = waypoint.jointpos[i];
+            sample.velocity.push_back(velocity);
+        }
+        last_state_wall_time_ = ros::WallTime::now();
+        last_feedback_sample_ = sampled;
+        count = ++feedback_sample_count_;
+        have_feedback_sample_ = true;
+    }
+    raw_joint_state_pub_.publish(sample);
+    feedback_ready_.notify_all();
+    if (push_gap > 0.08)
+        ROS_WARN_THROTTLE(1.0, "[AuboHW/feedback] SDK 推送间隔 %.2f ms，独立查询仍可补充真实采样；累计 %llu 帧",
+                          push_gap * 1000.0, static_cast<unsigned long long>(count));
+}
+
+void AuboHardwareInterface::pollFeedback()
+{
+    using Clock = std::chrono::steady_clock;
+    while (feedback_poll_running_.load())
+    {
+        {
+            std::unique_lock<std::mutex> lock(feedback_mutex_);
+            feedback_ready_.wait_for(lock, std::chrono::milliseconds(5),
+                                     [this] { return !feedback_poll_running_.load(); });
+            if (!feedback_poll_running_.load())
+                break;
+            if (have_feedback_sample_ && Clock::now() - last_feedback_sample_ < std::chrono::milliseconds(60))
+                continue;
+        }
+        const auto requested = Clock::now();
+        const ros::Time stamp = ros::Time::now();
+        wayPoint_S point{};
+        const int ret = readFeedbackSnapshot(point);
+        if (ret == InterfaceCallSuccCode)
+            // The controller may have sampled at any point during this RPC.
+            // Use the request time conservatively; never freshen a late reply.
+            updateFeedbackAt(point, stamp, requested, false);
+        else
+            ROS_WARN_THROTTLE(1.0, "[AuboHW/feedback] 独立路点查询失败 %d；不刷新反馈时间", ret);
+        const double duration_ms = std::chrono::duration<double, std::milli>(Clock::now() - requested).count();
+        if (duration_ms > 60.0)
+            ROS_WARN_THROTTLE(1.0, "[AuboHW/feedback] 独立路点查询耗时 %.2f ms，仍使用请求时间戳", duration_ms);
+    }
+}
+
+int AuboHardwareInterface::readFeedbackSnapshot(wayPoint_S& point)
+{
+    return feedback_poll_service_.robotServiceGetCurrentWaypointInfo(point);
+}
+
+// =============================================================================
 // timerCallback (50 Hz)
 // 来自 aubo_driver.cpp timerCallback()
 // 负责：① 读取关节角  ② 读取诊断信息  ③ 断线重连
@@ -606,41 +786,19 @@ void AuboHardwareInterface::timerCallback(const ros::TimerEvent& /*e*/)
     if (!controller_connected_flag_.load())
         return;
 
-    // --- 读取当前路点（来自 aubo_driver.cpp timerCallback GetCurrentWaypointInfo） ---
-    int ret = robot_receive_service_.robotServiceGetCurrentWaypointInfo(current_waypoint_);
-
-    if (ret == InterfaceCallSuccCode)
+    int ret = InterfaceCallSuccCode;
+    if (!use_realtime_feedback_)
     {
-        const ros::WallTime now = ros::WallTime::now();
-        const double dt = last_state_wall_time_.isZero()
-            ? 0.0 : (now - last_state_wall_time_).toSec();
-        for (int i = 0; i < NUM_JOINTS; ++i)
+        ret = robot_receive_service_.robotServiceGetCurrentWaypointInfo(current_waypoint_);
+        if (ret == InterfaceCallSuccCode)
+            updateFeedback(current_waypoint_);
+        else
         {
-            joint_position_rt_[i].store(current_waypoint_.jointpos[i], std::memory_order_relaxed);
-            if (dt > 1e-6)
-            {
-                const double velocity =
-                    (current_waypoint_.jointpos[i] - last_state_position_[i]) / dt;
-                joint_velocity_rt_[i].store(velocity, std::memory_order_relaxed);
-            }
-            last_state_position_[i] = current_waypoint_.jointpos[i];
+            ROS_ERROR("[AuboHW] 读取路点失败，错误码: %d；已锁定停止", ret);
+            controller_connected_flag_.store(false);
+            feed_thread_running_.store(false);
+            return;
         }
-        last_state_wall_time_ = now;
-    }
-    else if (ret == ErrCode_SocketDisconnect)
-    {
-        // 运动过程中自动重连可能恢复到未知控制模式；故障后要求人工检查并重启。
-        ROS_ERROR("[AuboHW] SDK 连接断开，已停止发送。检查机械臂后重启节点。");
-        controller_connected_flag_.store(false);
-        feed_thread_running_.store(false);
-        return;
-    }
-    else
-    {
-        ROS_ERROR("[AuboHW] 读取路点失败，错误码: %d；已锁定停止", ret);
-        controller_connected_flag_.store(false);
-        feed_thread_running_.store(false);
-        return;
     }
 
     // 示教器模式下只做关节位姿轮询，避免高频诊断查询放大底层 SDK 噪声。
@@ -648,7 +806,7 @@ void AuboHardwareInterface::timerCallback(const ros::TimerEvent& /*e*/)
         return;
 
     // --- 读取诊断信息，更新急停/保护停止标志（来自 aubo_driver.cpp timerCallback） ---
-    ret = robot_receive_service_.robotServiceGetRobotDiagnosisInfo(robot_diagnosis_info_);
+    ret = readSafetyDiagnosis(robot_diagnosis_info_);
     if (ret == InterfaceCallSuccCode && real_robot_exist_)
     {
         // 安全 IO 急停检测（来自 aubo_driver.cpp publishIOMsg digitalIn[0/8]）
@@ -669,6 +827,11 @@ void AuboHardwareInterface::timerCallback(const ros::TimerEvent& /*e*/)
         controller_connected_flag_.store(false);
         feed_thread_running_.store(false);
     }
+}
+
+int AuboHardwareInterface::readSafetyDiagnosis(RobotDiagnosis& diagnosis)
+{
+    return robot_receive_service_.robotServiceGetRobotDiagnosisInfo(diagnosis);
 }
 
 // =============================================================================

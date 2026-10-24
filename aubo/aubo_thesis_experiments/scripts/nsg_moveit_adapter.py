@@ -116,6 +116,9 @@ class Adapter:
             audit_req.group_name = req.group_name
             audit_req.path_constraints = req.path_constraints; audit_req.goal_constraints = req.goal_constraints
             audit_req.max_joint_step = rospy.get_param('~max_joint_step',.02)
+            # Keep the complete audit input at the top level so this file can
+            # be replayed by audit_trajectory.py without reconstructing state.
+            record.update(to_dict(audit_req))
             audited = self.auditor(audit_req)
             record['audit'] = to_dict(audited); record['trajectory'] = to_dict(audit_req.trajectory)
             if not audited.valid: raise ValueError('full MoveIt audit rejected candidate: '+audited.reason)

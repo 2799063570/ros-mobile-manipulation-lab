@@ -1,21 +1,48 @@
 <?xml version="1.0"?>
 <launch>
-  <!-- 专用真机入口。不要同时启动 aubo_real_bringup 或视觉伺服 SDK 节点。 -->
+  <!-- 专用真机入口：与视觉伺服复用直接SDK后端，不启动控制器管理器/JTC。 -->
+  <arg name="backend" default="sdk"/>
   <arg name="robot_ip" default="192.168.1.2"/>
   <arg name="panel" default="true"/>
+  <arg name="node_launch_prefix" default=""/>
+  <arg name="timing_trace_path" default=""/>
   <arg name="config" default="$(find aubo_ros_control)/config/cartesian_jog.yaml"/>
   <arg name="robot_xacro" default="aubo_i5_with_camera.xacro"/>
   <arg name="robot_srdf" default="aubo_i5_with_camera.srdf"/>
+  <arg name="joint_states_topic"
+       default="$(eval '/aubo_i5/aubo_hw_node/raw_joint_states' if arg('backend') == 'ros_control' else '/cartesian_jog/sdk_joint_states')"/>
+  <arg name="scene_joint_states_topic" default="/joint_states"/>
   <include file="$(find aubo_moveit_config)/launch/planning_context.launch">
     <arg name="load_robot_description" value="true"/>
     <arg name="robot_xacro" value="$(arg robot_xacro)"/>
     <arg name="robot_srdf" value="$(arg robot_srdf)"/>
   </include>
+  <include if="$(eval arg('backend') == 'ros_control')"
+           file="$(find aubo_ros_control)/launch/aubo_control.launch">
+    <arg name="robot_ip" value="$(arg robot_ip)"/>
+    <arg name="load_robot_description" value="false"/>
+    <arg name="require_real_robot" value="true"/>
+    <arg name="enable_motion_control" value="true"/>
+    <arg name="use_realtime_feedback" value="true"/>
+    <arg name="control_frequency" value="200.0"/>
+    <arg name="mac_buffer_target" value="120"/>
+    <arg name="trajectory_preload_points" value="20"/>
+  </include>
+  <node name="aubo_joint_state_relay"
+        pkg="joint_state_publisher" type="joint_state_publisher" output="screen">
+    <rosparam param="source_list" subst_value="true">[$(arg joint_states_topic)]</rosparam>
+    <!-- 实机夹爪不读反馈，模型采用 SRDF open 姿态的两个固定值。 -->
+    <rosparam param="zeros">{joint1: 0.0, joint2: 0.0}</rosparam>
+  </node>
   <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher"/>
   <include file="$(find aubo_ros_control)/launch/cartesian_jog.launch">
-    <arg name="backend" value="sdk"/>
+    <arg name="backend" value="$(arg backend)"/>
     <arg name="robot_ip" value="$(arg robot_ip)"/>
     <arg name="panel" value="$(arg panel)"/>
+    <arg name="node_launch_prefix" value="$(arg node_launch_prefix)"/>
+    <arg name="timing_trace_path" value="$(arg timing_trace_path)"/>
     <arg name="config" value="$(arg config)"/>
+    <arg name="joint_states_topic" value="$(arg joint_states_topic)"/>
+    <arg name="scene_joint_states_topic" value="$(arg scene_joint_states_topic)"/>
   </include>
 </launch>

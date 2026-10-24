@@ -68,7 +68,11 @@ class Recorder:
                 f.write(json.dumps(record, ensure_ascii=False, allow_nan=False)+'\n'); f.flush()
 
     def event(self, msg):
-        try: self.write(json.loads(msg.data))
+        try:
+            record = json.loads(msg.data)
+            if not isinstance(record, dict):
+                raise ValueError('experiment event must be a JSON object')
+            self.write(record)
         except (ValueError, TypeError) as error: rospy.logerr('Invalid experiment event: %s', error)
 
     def trajectory(self, msg):

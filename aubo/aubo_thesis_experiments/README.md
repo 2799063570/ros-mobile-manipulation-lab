@@ -26,7 +26,7 @@ python3 -m unittest discover -s src/wheeltec_robot/aubo/aubo_thesis_experiments/
 
 `motion_planning/scripts/ros_planner_node.py` 的配套修改默认启用严格运行：权重不兼容/缺失、碰撞引擎初始化失败或实际机器人限位缺失时停止启动；通过 `/compute_neural_path/metadata` 公布实际权重SHA256、限位、完整配置JSON、PyTorch/NumPy版本及关键源码/碰撞资源哈希。不要用实验性C++插件替代Python NSG：原插件存在退回均匀采样/普通RRT-Connect的路径，尚不能直接当作论文NSG。
 
-当前新增ROS/C++部分需要在实际ROS工作空间编译和联调；Windows离线检查只确认Python语法、XML和统计逻辑。工具按Python 3.8+使用。
+ROS/C++部分已在Linux ROS Noetic环境独立编译，并通过最小模型几何测试；完整服务联调和真实NSG仍待验证。工具按Python 3.8+使用。
 
 已完成检查与部署机验收步骤见 [VALIDATION.md](VALIDATION.md)。
 
