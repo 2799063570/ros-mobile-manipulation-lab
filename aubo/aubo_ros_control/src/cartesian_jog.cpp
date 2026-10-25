@@ -411,6 +411,12 @@ private:
         return;
       }
     // 不接管其他执行器，不调用阻塞式 SDK moveJoint；沿现有 5 ms 流生成点。
+    if (sdk_ && !sdk_->armMotion())
+    {
+      result.message = "SDK diagnosis not ready; wait for fresh empty MAC observations and request home again";
+      goal.setRejected(result);
+      return;
+    }
     invalidateControlTarget();
     home_goal_.reset(new HomeHandle(goal));
     home_stopping_ = false;
@@ -594,6 +600,12 @@ private:
     {
       response.success = false;
       response.message = "未就绪、尚未停稳、位姿不安全或故障未复位：" + fault_;
+      return true;
+    }
+    if (sdk_ && !sdk_->armMotion())
+    {
+      response.success = false;
+      response.message = "SDK诊断尚未就绪；等待连续有效空MAC诊断后重新使能";
       return true;
     }
     enabled_ = true;
@@ -1030,6 +1042,8 @@ private:
       message.data = "FAULT: " + fault_ + (settled() ? " | STOPPED" : " | STOPPING");
     else if (home_goal_)
       message.data = home_stopping_ ? "HOME_STOPPING" : "HOME_MOVING";
+    else if (sdk_ && !sdk_->motionReady())
+      message.data = "WAITING_FOR_SDK";
     else if (!initialized_)
       message.data = "WAITING_FOR_FEEDBACK";
     else if (!enabled_)

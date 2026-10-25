@@ -28,6 +28,70 @@ void initialize(SdkFlowControl& flow, std::size_t raw_scalars = 0)
   require(flow.acceptReply(query, raw_scalars, at(0)), "Initial diagnosis rejected");
 }
 
+void startupReadiness()
+{
+  const auto policy = SdkFlowControl::Policy::SequentialMac;
+  SdkFlowControl flow(60, .15, at(0), policy, true);
+  // Replay the observed 5/17/28/157ms startup pattern. There is no trajectory
+  // to underrun, but a late response must revoke all readiness to move.
+  const int starts[] = {0, 10, 32, 65};
+  const int finishes[] = {5, 27, 60, 222};
+  for (int i = 0; i < 4; ++i)
+  {
+    const auto token = flow.beginQuery(at(starts[i]));
+    require(static_cast<bool>(token), "Startup query was rejected");
+    if (i == 3)
+    {
+      require(flow.healthy(at(210)), "Unarmed slow startup killed connection");
+      require(!flow.motionReady(at(210)) && !flow.armMotion(at(210)),
+              "Stale startup authorized an enable request");
+    }
+    require(flow.acceptReply(token, 0, at(finishes[i])), "Startup observation rejected");
+    require(flow.motionReady(at(finishes[i])) == (i == 2), "Startup readiness count is wrong");
+    require(!flow.reserve(1, at(finishes[i])) && flow.inFlight() == 0 && flow.upperBound() == 0,
+            "Unarmed startup submitted a point");
+  }
+  require(flow.fault() == Fault::None, "Slow startup latched motion failure");
+  for (int i = 0; i < 3; ++i)
+  {
+    const auto token = flow.beginQuery(at(230 + i*10));
+    require(flow.acceptReply(token, 0, at(235 + i*10)), "Fresh startup recovery reply rejected");
+    require(flow.motionReady(at(235 + i*10)) == (i == 2), "Recovery did not need three new replies");
+  }
+  require(flow.armMotion(at(255)), "Explicit arm after readiness rejected");
+  require(flow.reserve(50, at(255)) && flow.completeSend(50), "Armed first send rejected");
+  const auto moving_query = flow.beginQuery(at(260));
+  require(flow.healthy(at(404)) && !flow.healthy(at(405)), "Armed receive watchdog changed");
+  require(!flow.acceptReply(moving_query, 0, at(417)) && !flow.armMotion(at(417)) &&
+          !flow.reserve(1, at(417)), "Late reply revived motion after a fault");
+
+  // Arming is already enough to enable strict watchdogs, even with no points
+  // yet sent. The transition and pending-query check use the same flow mutex.
+  SdkFlowControl armed(60, .15, at(0), policy, true);
+  for (int i = 0; i < 3; ++i)
+    require(armed.acceptReply(armed.beginQuery(at(i*10)), 0, at(i*10+1)), "Arm setup failed");
+  const auto pending = armed.beginQuery(at(30));
+  require(armed.armMotion(at(31)), "Arm during a fresh pending query failed");
+  require(!armed.acceptReply(pending, 0, at(187)) && armed.fault() == Fault::DiagnosisTimeout,
+          "Armed-before-first-send slow query was tolerated");
+
+  SdkFlowControl idle(60, .15, at(0), policy, true);
+  for (int i = 0; i < 3; ++i)
+    require(idle.acceptReply(idle.beginQuery(at(i*10)), 0, at(i*10+1)), "Idle setup failed");
+  require(idle.healthy(at(1000)) && !idle.armMotion(at(1000)), "Old readiness survived a poll gap");
+  require(idle.acceptReply(idle.beginQuery(at(1000)), 0, at(1001)) && !idle.motionReady(at(1001)),
+          "Poll gap did not reset consecutive-good replies");
+  idle.diagnosisFailed();
+  require(!idle.healthy(at(1002)), "Startup ignored a real RPC failure");
+
+  SdkFlowControl nonempty(60, .15, at(0), policy, true);
+  require(!nonempty.acceptReply(nonempty.beginQuery(at(0)), 6, at(157)) &&
+          nonempty.fault() == Fault::StartupNotEmpty,
+          "Startup ignored an unexpected nonempty cabinet");
+  std::cout << "PASS: unarmed 157ms startup, three fresh replies, no pre-arm sends, "
+               "explicit one-way arming, unchanged moving watchdog, nonempty/failure rejection\n";
+}
+
 // Model real buffer consumption, a single diagnostic connection, and a paced
 // sender (by default two points per ten milliseconds). Every slow reply reports the
 // EARLIEST possible snapshot (at request start), not a convenient fresh count.
@@ -91,6 +155,7 @@ int main()
 {
   try
   {
+    startupReadiness();
     // A slow diagnosis cannot return credit merely because time passed.
     SdkFlowControl no_clock_credit(60, 0.15, at(0));
     require(!no_clock_credit.reserve(1, at(0)), "Uninitialized stream allowed sends");

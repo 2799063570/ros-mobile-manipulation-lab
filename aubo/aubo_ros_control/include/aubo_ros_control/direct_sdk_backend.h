@@ -47,6 +47,16 @@ public:
   void setTimingTrace(const std::shared_ptr<MotionTimingTrace>& trace) { timing_trace_ = trace; }
   bool readState(JointPoint& position);
   bool healthy();
+  bool motionReady() const
+  {
+    return connected_.load() && running_.load() &&
+           (!flow_ || flow_->motionReady(std::chrono::steady_clock::now()));
+  }
+  bool armMotion()
+  {
+    return connected_.load() && running_.load() &&
+           (!flow_ || flow_->armMotion(std::chrono::steady_clock::now()));
+  }
   // 首个传输故障原因；不把停流后的断开误报成实时反馈超时。
   std::string failureReason() const;
   void shutdown();

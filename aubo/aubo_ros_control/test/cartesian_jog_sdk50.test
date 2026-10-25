@@ -5,6 +5,8 @@
   <arg name="cache_lag_ms" default="20"/>
   <arg name="speed_mm_s" default="5"/>
   <arg name="timing_trace_path" default=""/>
+  <arg name="startup_slow_query_ms" default="0"/>
+  <arg name="startup_probe" default="false"/>
   <!-- Actual SDK-facing frontend, with the SDK boundary replaced at link time.
        No hardware node, JTC, SDK login/startup or controller connection. -->
   <include file="$(find aubo_moveit_config)/launch/planning_context.launch">
@@ -15,6 +17,7 @@
   <param name="/jog_ros_control_test/real_model" value="true"/>
   <param name="/jog_ros_control_test/scene_relay" value="true"/>
   <param name="/jog_ros_control_test/sdk_points" value="true"/>
+  <param name="/jog_ros_control_test/startup_probe" value="$(arg startup_probe)"/>
   <param name="/jog_ros_control_test/linear_speed" value="$(eval float(arg('speed_mm_s')) * 0.001)"/>
   <rosparam param="/jog_ros_control_test/initial_positions">[0, 0, 1.6292, 0, 1.6628, 0]</rosparam>
   <node pkg="aubo_ros_control" type="aubo_cartesian_jog_fake_sdk_node" name="aubo_cartesian_jog" required="true">
@@ -24,6 +27,7 @@
     <param name="timing_trace_path" value="$(arg timing_trace_path)"/>
     <param name="fake_send_delay_ms" value="$(arg send_delay_ms)"/>
     <param name="fake_diagnosis_delay_ms" value="$(arg diagnosis_delay_ms)"/>
+    <param name="fake_startup_slow_query_ms" value="$(arg startup_slow_query_ms)"/>
     <param name="fake_accept_late" value="$(arg accept_late)"/>
     <param name="fake_mac_cache_lag_ms" value="$(arg cache_lag_ms)"/>
     <param name="joint_states_topic" value="/cartesian_jog/sdk_joint_states"/>

@@ -28,7 +28,7 @@ bool neutral(const RemoteJog_Input& in) {
   return !(in.flags & REMOTE_JOG_DEADMAN) && !in.axis[0] && !in.axis[1] && !in.axis[2];
 }
 uint8_t controllerCode(const std::string& state) {
-  if (state == "WAITING_FOR_FEEDBACK") return REMOTE_JOG_WAITING;
+  if (state == "WAITING_FOR_FEEDBACK" || state == "WAITING_FOR_SDK") return REMOTE_JOG_WAITING;
   if (state == "DISABLED") return REMOTE_JOG_DISABLED;
   if (state == "ENABLED_IDLE") return REMOTE_JOG_IDLE;
   if (state == "JOGGING") return REMOTE_JOG_MOVING;

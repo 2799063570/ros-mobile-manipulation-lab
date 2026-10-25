@@ -23,6 +23,7 @@ struct Transport
   ros::Publisher batches;
   ros::Subscriber feedback;
   int send_delay_ms{60}, diagnosis_delay_ms{20}, cache_lag_ms{20};
+  int startup_slow_query_ms{0};
   bool accept_late{false};
 };
 std::unique_ptr<Transport> transport;
@@ -48,6 +49,7 @@ bool DirectSdkBackend::connect(ros::NodeHandle& nh)
   nh.param("sdk_mac_buffer_target", mac_buffer_target_, 300);
   nh.param("fake_send_delay_ms", transport->send_delay_ms, 60);
   nh.param("fake_diagnosis_delay_ms", transport->diagnosis_delay_ms, 20);
+  nh.param("fake_startup_slow_query_ms", transport->startup_slow_query_ms, 0);
   nh.param("fake_mac_cache_lag_ms", transport->cache_lag_ms, 20);
   nh.param("fake_accept_late", transport->accept_late, false);
   nh.param("sdk_mac_buffer_limit", mac_buffer_limit_, 360);
@@ -80,7 +82,7 @@ bool DirectSdkBackend::connect(ros::NodeHandle& nh)
     have_pushed_position_ = true;
   }
   flow_.reset(new SdkFlowControl(mac_buffer_limit_ / 6, 0.15, Clock::now(),
-                                SdkFlowControl::Policy::SequentialMac));
+                                SdkFlowControl::Policy::SequentialMac, true));
   connected_.store(true);
   running_.store(true);
   output_thread_ = std::thread(&DirectSdkBackend::outputLoop, this);
@@ -160,7 +162,11 @@ void DirectSdkBackend::outputLoop()
       query_event.begin_ns = MotionTimingTrace::ns(query_started);
       timing_trace_->append(query_event);
     }
-    std::this_thread::sleep_for(std::chrono::milliseconds(transport->diagnosis_delay_ms));
+    // Inject before any first readiness; deterministic replay of the fourth
+    // query from the real log is covered by sdk_flow_control_test separately.
+    const int query_delay = token.sequence == 1 && transport->startup_slow_query_ms > 0
+        ? transport->startup_slow_query_ms : transport->diagnosis_delay_ms;
+    std::this_thread::sleep_for(std::chrono::milliseconds(query_delay));
     if (timing_trace_)
     {
       query_event.kind = MotionTimingTrace::QueryEnd;
@@ -170,6 +176,7 @@ void DirectSdkBackend::outputLoop()
     }
     if (!flow_->acceptReply(token, observed * kDof, Clock::now()))
     { fail("simulated MAC admission failed"); break; }
+    if (!flow_->motionReady(Clock::now())) continue;
     if (started && observed > 0) mac_confirmed_.store(true);
     if (started && !mac_confirmed_.load())
     {

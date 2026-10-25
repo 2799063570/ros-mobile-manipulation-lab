@@ -215,7 +215,7 @@ bool DirectSdkBackend::connect(ros::NodeHandle& nh)
   in_stream_mode_ = true;
   if (point_generator_)
     flow_.reset(new SdkFlowControl(static_cast<std::size_t>(mac_buffer_limit_ / 6),
-        diagnosis_timeout_, Clock::now(), SdkFlowControl::Policy::SequentialMac));
+        diagnosis_timeout_, Clock::now(), SdkFlowControl::Policy::SequentialMac, true));
   running_.store(true);
   output_thread_ = std::thread(&DirectSdkBackend::outputLoop, this);
   ROS_INFO("[visual_servo/sdk] 已连接 %s:%d，启动直接 SDK 队列下发",
@@ -533,6 +533,17 @@ bool DirectSdkBackend::queryDiagnosis(std::size_t& mac_scalars)
               before_query, mac_buffer_limit_ / 6);
     return false;
   }
+  if (!flow_->initialized())
+  {
+    // Only the unarmed startup phase can observe a reply without becoming
+    // initialized. No point generation/submission is allowed until readiness.
+    if (received - token.started >= std::chrono::duration<double>(diagnosis_timeout_))
+      ROS_WARN_THROTTLE(1.0, "[sdk/startup] 未使能且未发点，诊断 %.2f ms 超过 %.1f ms；"
+                        "保持未就绪，等待连续3次及时、空MAC的诊断；本次响应不授权运动",
+                        milliseconds(received - token.started), diagnosis_timeout_ * 1000.0);
+    mac_scalars = diagnosis.macTargetPosDataSize;
+    return true;
+  }
   const auto observed_points = flow_->upperBound();
   if (observed_points > static_cast<std::size_t>(mac_buffer_target_ / 6))
     ROS_WARN_THROTTLE(1.0, "[sdk/diagnosis] MAC观测=%zu 点（%u 标量），高于目标 %d 点；"
@@ -581,6 +592,11 @@ void DirectSdkBackend::jogOutputLoop()
     std::size_t mac_scalars = 0;
     if (!queryDiagnosis(mac_scalars))
       return;
+    if (!flow_->motionReady(Clock::now()))
+    {
+      std::this_thread::sleep_for(std::chrono::milliseconds(5));
+      continue;
+    }
     if (started && !mac_confirmed_.load())
     {
       // The SDK call may return before its points appear in a cached MAC

@@ -72,7 +72,31 @@ protected:
     feedback_timer_ = nh_.createWallTimer(ros::WallDuration(0.02),
         &RosControlJogIntegration::publishInputs, this);
     ASSERT_TRUE(enable_.waitForExistence(ros::Duration(15)));
+    bool startup_probe = false;
+    nh_.param("/jog_ros_control_test/startup_probe", startup_probe, false);
+    if (startup_probe)
+    {
+      ASSERT_TRUE(sdk_points_);
+      ASSERT_TRUE(wait([this] { return state() == "WAITING_FOR_SDK"; }));
+      EXPECT_FALSE(set(true)) << "Enable was accepted during the initial slow diagnosis";
+      using HomeClient = actionlib::SimpleActionClient<aubo_ros_control::MoveHomeAction>;
+      HomeClient home("/cartesian_jog/move_home", true);
+      ASSERT_TRUE(home.waitForServer(ros::Duration(2)));
+      home.sendGoal(aubo_ros_control::MoveHomeGoal());
+      ASSERT_TRUE(home.waitForResult(ros::Duration(2)));
+      EXPECT_EQ(home.getState(), actionlib::SimpleClientGoalState::REJECTED);
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+        EXPECT_EQ(setpoint_count_, 0u) << "Startup wait submitted motion points";
+      }
+    }
     ASSERT_TRUE(wait([this] { return state() == "DISABLED"; }));
+    if (startup_probe)
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      EXPECT_EQ(setpoint_count_, 0u) << "Readiness recovery replayed a rejected request";
+      ROS_INFO("[startup_test] Slow diagnosis rejected enable/home, then returned DISABLED with zero submitted points");
+    }
   }
 
   void TearDown() override
