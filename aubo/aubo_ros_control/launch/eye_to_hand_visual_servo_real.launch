@@ -10,6 +10,8 @@
   <arg name="start_perception" default="true"/>
   <arg name="target_label" default="red"/>
   <arg name="auto_start" default="false"/>
+  <arg name="rviz" default="false"/>
+  <arg name="visualization" default="true"/>
   <arg name="on_demand_output" default="true"/>
   <arg name="timing_trace_path" default=""/>
   <arg name="hybrid_enabled" default="false"/>
@@ -50,6 +52,7 @@
     <arg name="mode_config"
          value="$(find aubo_ros_control)/config/visual_servo_eye_to_hand.yaml"/>
     <arg name="backend" value="sdk"/>
+    <arg name="visualization" value="$(arg visualization)"/>
     <arg name="on_demand_output" value="$(arg on_demand_output)"/>
     <arg name="timing_trace_path" value="$(arg timing_trace_path)"/>
     <arg name="sdk_mac_buffer_target" value="$(arg sdk_mac_buffer_target)"/>
@@ -60,6 +63,7 @@
     <arg name="hybrid_config" value="$(arg hybrid_config)"/>
   </include>
   <!-- Hybrid mode uses MoveIt for planning only; the servo owns all output. -->
+  <include if="$(arg rviz)" file="$(find aubo_ros_control)/launch/visual_servo_view.launch"/>
   <include if="$(arg hybrid_enabled)" file="$(find aubo_moveit_config)/launch/move_group.launch">
     <arg name="load_robot_description" value="false"/>
     <arg name="robot_xacro" value="aubo_i5.xacro"/>

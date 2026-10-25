@@ -2,6 +2,7 @@
 #define AUBO_ROS_CONTROL_VISUAL_SERVO_PANEL_H
 
 #include <geometry_msgs/PoseStamped.h>
+#include <aubo_ros_control/VisualServoStatus.h>
 #include <dynamic_reconfigure/Config.h>
 #include <ros/ros.h>
 #include <rviz/panel.h>
@@ -9,6 +10,7 @@
 #include <std_msgs/String.h>
 
 #include <QString>
+#include <QMetaType>
 #include <atomic>
 
 class QComboBox;
@@ -19,6 +21,7 @@ class QTimer;
 
 namespace aubo_ros_control
 {
+class VisualServoErrorPlot;
 
 class VisualServoPanel : public rviz::Panel
 {
@@ -32,6 +35,7 @@ Q_SIGNALS:
   void perceptionStateReceived(const QString& text);
   void targetPoseReceived(const QString& text);
   void parametersChanged();
+  void telemetryReceived(const aubo_ros_control::VisualServoStatus& status, quint64 received_ns);
 
 private Q_SLOTS:
   void startServo();
@@ -44,8 +48,12 @@ private Q_SLOTS:
   void updateReadiness();
   void applyParameters();
   void refreshParameters();
+  void showTelemetry(const aubo_ros_control::VisualServoStatus& status, quint64 received_ns);
+  void checkTelemetryFreshness();
 
 private:
+  friend struct VisualServoPanelTestAccess;
+  void telemetryCallback(const aubo_ros_control::VisualServoStatus::ConstPtr& message);
   bool setEnabled(ros::ServiceClient& client, bool enabled, QString* response);
   bool callReset(ros::ServiceClient& client, QString* response);
   void servoStateCallback(const std_msgs::String::ConstPtr& message);
@@ -67,6 +75,14 @@ private:
   ros::Subscriber target_pose_subscriber_;
   ros::Subscriber planning_scene_ready_subscriber_;
   ros::Subscriber parameter_subscriber_;
+  ros::Subscriber telemetry_subscriber_;
+  QLabel* monitor_label_;
+  QLabel* tcp_label_;
+  QLabel* goal_label_;
+  QLabel* error_label_;
+  VisualServoErrorPlot* error_plot_;
+  quint64 telemetry_received_ns_{0};
+  bool telemetry_stale_{true};
 
   QLabel* title_label_;
   QLabel* flow_label_;
@@ -95,5 +111,7 @@ private:
 };
 
 }  // namespace aubo_ros_control
+
+Q_DECLARE_METATYPE(aubo_ros_control::VisualServoStatus)
 
 #endif  // AUBO_ROS_CONTROL_VISUAL_SERVO_PANEL_H

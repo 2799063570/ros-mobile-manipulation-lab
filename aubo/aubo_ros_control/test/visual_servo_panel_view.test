@@ -1,0 +1,10 @@
+<launch>
+  <!-- No controller, SDK or camera is started. The widget uses fixture values. -->
+  <rosparam ns="aubo_visual_servo" file="$(find aubo_ros_control)/config/visual_servo_common.yaml"/>
+  <param name="aubo_visual_servo/hybrid_enabled" value="false"/>
+  <param name="aubo_visual_servo/servo_mode" value="eye_to_hand"/>
+  <test test-name="visual_servo_panel_view" pkg="aubo_ros_control"
+        type="visual_servo_panel_view_test" time-limit="20">
+    <env name="QT_QPA_PLATFORM" value="offscreen"/>
+  </test>
+</launch>

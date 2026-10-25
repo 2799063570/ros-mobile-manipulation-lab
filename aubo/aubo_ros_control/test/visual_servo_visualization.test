@@ -1,0 +1,20 @@
+<launch>
+  <arg name="mode" default="eye_to_hand"/>
+  <param name="robot_description" command="$(find xacro)/xacro '$(find aubo_ros_control)/test/visualization_test.urdf.xacro'"/>
+  <rosparam ns="view_fixture" file="$(find aubo_ros_control)/config/visual_servo_common.yaml"/>
+  <param name="view_fixture/servo_mode" value="$(arg mode)"/>
+  <param name="view_fixture/control_link" value="view_tcp"/>
+  <param name="view_fixture/joint_states_topic" value="/view_test/joints"/>
+  <param name="view_fixture/target_topic" value="/view_test/target"/>
+  <param name="view_fixture/state_topic" value="/view_test/state"/>
+  <rosparam param="view_fixture/desired_target_position">[0.05, 0.0, 0.10]</rosparam>
+  <rosparam param="view_fixture/target_offset">[0.01, -0.02, 0.03]</rosparam>
+  <node pkg="aubo_ros_control" type="aubo_visual_servo_visualization_node"
+        name="visualization_test_observer" output="screen" required="true">
+    <param name="controller_ns" value="/view_fixture"/>
+  </node>
+  <test test-name="visual_servo_visualization" pkg="aubo_ros_control"
+        type="visual_servo_visualization_test.py" time-limit="25">
+    <param name="mode" value="$(arg mode)"/>
+  </test>
+</launch>

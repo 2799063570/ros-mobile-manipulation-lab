@@ -4,6 +4,7 @@
   <!-- 默认丢失策略为 stop，且 auto_start=false，便于先检查固定相机外参。 -->
   <arg name="gui" default="true"/>
   <arg name="rviz" default="true"/>
+  <arg name="visualization" default="true"/>
   <arg name="debug_view" default="false"/>
   <arg name="paused" default="false"/>
   <arg name="auto_start" default="false"/>
@@ -46,6 +47,7 @@
     <arg name="mode_config"
          value="$(find aubo_ros_control)/config/visual_servo_eye_to_hand.yaml"/>
     <arg name="backend" value="gazebo"/>
+    <arg name="visualization" value="$(arg visualization)"/>
     <arg name="target_topic" value="$(arg target_topic)"/>
     <arg name="joint_states_topic" value="/aubo_i5/joint_states"/>
     <arg name="loss_strategy" value="$(arg loss_strategy)"/>

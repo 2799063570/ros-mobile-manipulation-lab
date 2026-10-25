@@ -1,0 +1,8 @@
+<launch>
+  <!-- Passive subscriber only; no SDK connection or motion interfaces. -->
+  <arg name="controller_ns" default="/aubo_visual_servo"/>
+  <node name="visual_servo_visualization" pkg="aubo_ros_control"
+        type="aubo_visual_servo_visualization_node" output="screen">
+    <param name="controller_ns" value="$(arg controller_ns)"/>
+  </node>
+</launch>

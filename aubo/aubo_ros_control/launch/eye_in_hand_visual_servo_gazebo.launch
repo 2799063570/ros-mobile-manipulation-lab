@@ -11,6 +11,7 @@
   <arg name="hybrid_config" default="$(find aubo_ros_control)/config/hybrid_control.yaml"/>
   <arg name="start_perception" default="true"/>
   <arg name="rviz" default="true"/>
+  <arg name="visualization" default="true"/>
   <arg name="debug_view" default="false"/>
   <arg name="paused" default="false"/>
   <arg name="world" default="$(find aubo_sorting)/worlds/sorting.world"/>
@@ -50,6 +51,7 @@
     <arg name="mode_config"
          value="$(find aubo_ros_control)/config/visual_servo_eye_in_hand.yaml"/>
     <arg name="backend" value="gazebo"/>
+    <arg name="visualization" value="$(arg visualization)"/>
     <arg name="target_topic" value="$(arg target_topic)"/>
     <arg name="joint_states_topic" value="/aubo_i5/joint_states"/>
     <arg name="loss_strategy" value="$(arg loss_strategy)"/>

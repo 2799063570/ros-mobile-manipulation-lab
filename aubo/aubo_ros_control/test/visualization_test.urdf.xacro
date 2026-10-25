@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<robot name="visualization_fixture" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <xacro:include filename="$(find aubo_ros_control)/test/hybrid_test.urdf"/>
+  <link name="view_tcp"/>
+  <joint name="rotated_view_tcp" type="fixed">
+    <parent link="tcp_link"/><child link="view_tcp"/>
+    <origin xyz="0 0 0" rpy="0 0 1.5707963267948966"/>
+  </joint>
+</robot>

@@ -28,6 +28,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_geometry_msgs
   tf2_ros
   trajectory_msgs
+  visualization_msgs
   rviz
 )
 find_package(Threads REQUIRED)
@@ -36,7 +37,8 @@ find_package(orocos_kdl REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Widgets)
 
 add_action_files(FILES MoveHome.action)
-generate_messages(DEPENDENCIES actionlib_msgs std_msgs)
+add_message_files(FILES VisualServoStatus.msg)
+generate_messages(DEPENDENCIES actionlib_msgs std_msgs geometry_msgs)
 
 generate_dynamic_reconfigure_options(
   cfg/VisualServo.cfg
@@ -83,7 +85,7 @@ catkin_package(
   LIBRARIES ${PROJECT_NAME} aubo_visual_servo_panel
   CATKIN_DEPENDS actionlib actionlib_msgs message_runtime aubo_sdk controller_manager dynamic_reconfigure geometry_msgs hardware_interface
     kdl_parser moveit_msgs moveit_core moveit_ros_planning shape_msgs pluginlib roscpp rospy roslib rviz sensor_msgs
-    std_msgs std_srvs tf2_geometry_msgs tf2_ros
+    std_msgs std_srvs tf2_geometry_msgs tf2_ros visualization_msgs
   DEPENDS orocos_kdl
 )
 
@@ -157,6 +159,12 @@ add_dependencies(aubo_cartesian_jog_panel ${${PROJECT_NAME}_EXPORTED_TARGETS} ${
 target_compile_features(aubo_cartesian_jog_panel PRIVATE cxx_std_14)
 target_include_directories(aubo_cartesian_jog_panel PRIVATE ${catkin_INCLUDE_DIRS})
 target_link_libraries(aubo_cartesian_jog_panel ${catkin_LIBRARIES} Qt5::Widgets)
+
+add_executable(aubo_visual_servo_visualization_node src/visual_servo_visualization.cpp)
+add_dependencies(aubo_visual_servo_visualization_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_compile_features(aubo_visual_servo_visualization_node PRIVATE cxx_std_14)
+target_include_directories(aubo_visual_servo_visualization_node PRIVATE include ${catkin_INCLUDE_DIRS} ${orocos_kdl_INCLUDE_DIRS})
+target_link_libraries(aubo_visual_servo_visualization_node ${catkin_LIBRARIES} ${orocos_kdl_LIBRARIES})
 
 if(CATKIN_ENABLE_TESTING)
   catkin_add_gtest(visual_servo_stream_test test/visual_servo_stream_test.cpp)
@@ -255,9 +263,11 @@ if(CATKIN_ENABLE_TESTING)
     aubo_cartesian_jog_fake_sdk_node cartesian_jog_ros_control_integration_test)
   catkin_install_python(PROGRAMS test/hybrid_control_test.py
     test/visual_servo_stream_test.py
+    test/visual_servo_visualization_test.py
     DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
   add_rostest(test/hybrid_control.test)
   add_rostest(test/visual_servo_stream.test DEPENDENCIES aubo_visual_servo_fake_sdk_node)
+  add_rostest(test/visual_servo_visualization.test DEPENDENCIES aubo_visual_servo_visualization_node)
   add_rostest(test/initial_observation.test)
   catkin_add_gtest(visual_servo_common_test
     test/visual_servo_common_test.cpp
@@ -271,6 +281,7 @@ endif()
 add_library(aubo_visual_servo_panel
   include/aubo_ros_control/visual_servo_panel.h
   src/visual_servo_panel.cpp)
+add_dependencies(aubo_visual_servo_panel ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_compile_features(aubo_visual_servo_panel PRIVATE cxx_std_14)
 target_include_directories(aubo_visual_servo_panel PRIVATE
   include
@@ -279,15 +290,26 @@ target_link_libraries(aubo_visual_servo_panel
   ${catkin_LIBRARIES}
   Qt5::Widgets)
 
+if(CATKIN_ENABLE_TESTING)
+  add_rostest_gtest(visual_servo_panel_view_test test/visual_servo_panel_view.test test/visual_servo_panel_view_test.cpp)
+  if(TARGET visual_servo_panel_view_test)
+    add_dependencies(visual_servo_panel_view_test ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+    target_compile_features(visual_servo_panel_view_test PRIVATE cxx_std_14)
+    target_include_directories(visual_servo_panel_view_test PRIVATE include ${catkin_INCLUDE_DIRS})
+    target_link_libraries(visual_servo_panel_view_test aubo_visual_servo_panel ${catkin_LIBRARIES} Qt5::Widgets)
+  endif()
+endif()
+
 install(TARGETS ${PROJECT_NAME} aubo_hw_node aubo_visual_servo_node
                 aubo_cartesian_jog_node aubo_cartesian_jog_panel
                 aubo_visual_servo_panel
+                aubo_visual_servo_visualization_node
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
 install(DIRECTORY include/${PROJECT_NAME}/
   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION})
-install(DIRECTORY action cfg config launch worlds
+install(DIRECTORY action msg cfg config launch worlds
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
 install(FILES VISUAL_SERVO.md HYBRID_CONTROL.md CARTESIAN_JOG.md plugin_description.xml
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})

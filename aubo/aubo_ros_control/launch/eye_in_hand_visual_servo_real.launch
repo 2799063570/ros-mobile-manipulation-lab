@@ -11,6 +11,8 @@
   <arg name="start_perception" default="true"/>
   <arg name="target_label" default="red"/>
   <arg name="auto_start" default="false"/>
+  <arg name="rviz" default="false"/>
+  <arg name="visualization" default="true"/>
   <arg name="on_demand_output" default="true"/>
   <arg name="timing_trace_path" default=""/>
   <arg name="hybrid_enabled" default="false"/>
@@ -44,6 +46,7 @@
     <arg name="mode_config"
          value="$(find aubo_ros_control)/config/visual_servo_eye_in_hand.yaml"/>
     <arg name="backend" value="sdk"/>
+    <arg name="visualization" value="$(arg visualization)"/>
     <arg name="on_demand_output" value="$(arg on_demand_output)"/>
     <arg name="timing_trace_path" value="$(arg timing_trace_path)"/>
     <arg name="sdk_mac_buffer_target" value="$(arg sdk_mac_buffer_target)"/>
@@ -56,7 +59,8 @@
     <arg name="hybrid_config" value="$(arg hybrid_config)"/>
   </include>
 
-  <!-- 感知与控制默认同步保持禁用，由 auto_start 或服务显式开启。 -->
+  <include if="$(arg rviz)" file="$(find aubo_ros_control)/launch/visual_servo_view.launch"/>
+  <!-- 按需SDK控制始终等待显式使能；auto_start只可自动开启感知。 -->
   <node if="$(arg start_perception)" name="rgbd_visual_target"
         pkg="aubo_perception" type="rgbd_visual_target_node.py" output="screen">
     <rosparam file="$(find aubo_perception)/config/rgbd_target_eye_in_hand.yaml"

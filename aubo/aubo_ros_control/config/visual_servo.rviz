@@ -6,7 +6,7 @@ Panels:
       Splitter Ratio: 0.5
     Tree Height: 430
   - Class: aubo_ros_control/VisualServoPanel
-    Name: 两阶段流程控制
+    Name: 视觉位置伺服
   - Class: rviz/Views
     Name: Views
 Visualization Manager:
@@ -55,6 +55,13 @@ Visualization Manager:
       Queue Size: 2
       Transport Hint: raw
       Unreliable: false
+      Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /visual_servo/markers
+      Name: 目标、期望TCP与实际轨迹
+      Namespaces: {}
+      Queue Size: 2
       Value: true
   Enabled: true
   Global Options:

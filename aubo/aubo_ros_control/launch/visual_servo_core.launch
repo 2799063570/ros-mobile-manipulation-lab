@@ -11,6 +11,7 @@
   <arg name="start_enabled" default="false"/>
   <arg name="on_demand_output" default="true"/>
   <arg name="timing_trace_path" default=""/>
+  <arg name="visualization" default="true"/>
   <arg name="hybrid_enabled" default="false"/>
   <arg name="hybrid_lock_pregrasp_path" default="false"/>
   <arg name="hybrid_config" default="$(find aubo_ros_control)/config/hybrid_control.yaml"/>
@@ -50,4 +51,5 @@
        /aubo_i5/wrist3_position_controller/command]
     </rosparam>
   </node>
+  <include if="$(arg visualization)" file="$(find aubo_ros_control)/launch/visual_servo_monitor.launch"/>
 </launch>

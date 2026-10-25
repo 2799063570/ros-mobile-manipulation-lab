@@ -1,0 +1,10 @@
+<launch>
+  <!-- Opens the existing data view; does not start the robot/controller. -->
+  <arg name="start_monitor" default="false"/>
+  <arg name="controller_ns" default="/aubo_visual_servo"/>
+  <include if="$(arg start_monitor)" file="$(find aubo_ros_control)/launch/visual_servo_monitor.launch">
+    <arg name="controller_ns" value="$(arg controller_ns)"/>
+  </include>
+  <node name="visual_servo_rviz" pkg="rviz" type="rviz"
+        args="-d $(find aubo_ros_control)/config/visual_servo.rviz" output="screen"/>
+</launch>
