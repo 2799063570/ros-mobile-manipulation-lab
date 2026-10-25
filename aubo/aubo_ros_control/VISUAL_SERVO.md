@@ -1,5 +1,9 @@
 # AUBO 统一视觉位置伺服
 
+2026-10-25：独立PBVS默认采用最新速度目标、固定5 ms V/A/J平滑、SDK按需供点，
+不经过位置FIFO；hybrid保留规划回放路径。改动、启停语义与离线验证范围见
+[视觉位置伺服按需供点改进](../../docs/视觉位置伺服按需供点改进.md)。
+
 独立视觉伺服与兼容入口位于 `aubo_ros_control/launch`；分拣应用的 hybrid 组合入口
 位于 `aubo_sorting/launch`。`visual_servo_core.launch` 由各 `eye_...` 入口包含，
 通常不单独启动。
@@ -12,9 +16,9 @@
 ```text
 aubo_perception: RGB-D/YOLO -> /visual_servo/target_pose
                                |
-aubo_ros_control: 坐标误差 -> 雅可比逆解 -> 限速/限加速度 -> 有界队列
+aubo_ros_control: 坐标误差 -> 雅可比逆解 -> 最新速度目标 -> 5ms V/A/J平滑积分
                                |
-                         Gazebo 控制器 或 AUBO SDK
+                         Gazebo 控制器 或 AUBO SDK按需补点
 ```
 
 `servo_mode` 只改变坐标误差的计算：
@@ -24,6 +28,8 @@ aubo_ros_control: 坐标误差 -> 雅可比逆解 -> 限速/限加速度 -> 有�
 
 感知接口、状态机、关节限制、Gazebo/真机执行链完全共用。不要同时启动两个视觉
 伺服实例，它们使用相同服务和机械臂命令通道。
+
+以下旧队列相关描述适用于 `on_demand_output=false` 或hybrid路径。
 
 ## 启动入口
 

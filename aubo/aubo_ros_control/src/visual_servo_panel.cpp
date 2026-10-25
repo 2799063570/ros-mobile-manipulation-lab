@@ -354,7 +354,7 @@ void VisualServoPanel::stopServo()
   const bool perception_ok =
       setEnabled(perception_enable_client_, false, &perception_response);
   command_label_->setText(
-      (servo_ok && perception_ok) ? tr("已停止：机械臂保持，识别输出已关闭")
+      (servo_ok && perception_ok) ? tr("已请求停止：机械臂减速，识别输出已关闭")
                                   : tr("停止未完全执行：") + servo_response + " / " + perception_response);
 }
 
@@ -411,6 +411,14 @@ void VisualServoPanel::showServoState(const QString& text)
   if (text == "DISABLED") {
     translated = tr("已停用 / 保持当前位置");
     phase = tr("未启动");
+  } else if (text == "STOPPING") {
+    translated = tr("已禁用，正在连续减速；柜内轨迹仍可能执行");
+    phase = tr("减速停止中");
+    color = "#b07d18";
+  } else if (text == "WAITING_FOR_SDK") {
+    translated = tr("等待控制柜连续有效诊断，暂不可使能");
+    phase = tr("等待通信就绪");
+    color = "#b07d18";
   } else if (text == "WAITING") {
     translated = tr("等待有效目标和稳定关节反馈");
     phase = tr("准备阶段");
@@ -444,7 +452,7 @@ void VisualServoPanel::showServoState(const QString& text)
     phase = tr("恢复阶段");
     color = "#b07d18";
   } else if (text == "HOLD") {
-    translated = tr("故障或超时，机械臂保持；排查后点击复位");
+    translated = tr("目标丢失或保护触发；保护故障需停用并确认停稳后复位");
     phase = tr("安全保持 / 需要复位");
     color = "#b33a3a";
   }
@@ -454,7 +462,7 @@ void VisualServoPanel::showServoState(const QString& text)
       QString("font-weight: bold; padding: 8px; border-radius: 3px; "
               "background-color: %1; color: white;").arg(color));
   flow_active_ = text != "DISABLED" && text != "HOLD";
-  start_button_->setEnabled(!flow_active_);
+  start_button_->setEnabled(!flow_active_ && text != "WAITING_FOR_SDK");
 }
 
 void VisualServoPanel::showPerceptionState(const QString& text)

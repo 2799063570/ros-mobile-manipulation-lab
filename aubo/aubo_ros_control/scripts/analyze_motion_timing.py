@@ -156,11 +156,11 @@ def analyze(path, output):
             previous_v = previous_a = None
         previous = point["id"], q
     summary = dict(metadata=metadata, trace_dropped_events=int(metadata.rsplit("dropped=", 1)[-1]),
-        scope="on-demand jog; CommandQueue is bypassed",
+        scope="on-demand position streaming; CommandQueue is bypassed",
         cautions=["SDK return is not physical execution; MAC has no hardware sample timestamp",
                   "MAC statistics are sample-weighted, NOT time occupancy",
                   "variable batch intervals are not fixed-period scheduling jitter",
-                  "point command_id is latest received; target event gives target provenance",
+                  "point command_id is frontend-supplied; target event gives target provenance",
                   "stop guards may override the target; point.desired records the actual input to smoothing"],
         counts={k: len(kind(k)) for k in sorted({r["kind"] for r in rows})},
         unfinished_sends=len(begins)-len(sends),

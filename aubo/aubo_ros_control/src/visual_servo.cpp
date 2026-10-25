@@ -97,6 +97,10 @@ const char *VisualServo::stateName(ServoState state) {
   switch (state) {
   case ServoState::DISABLED:
     return "DISABLED";
+  case ServoState::STOPPING:
+    return "STOPPING";
+  case ServoState::WAITING_FOR_SDK:
+    return "WAITING_FOR_SDK";
   case ServoState::WAITING:
     return "WAITING";
   case ServoState::PLANNING:
@@ -125,6 +129,54 @@ VisualServo::VisualServo()
   valid_ = loadParameters() && initializeKinematics() && loadHybridParameters();
   if (!valid_)
     return;
+  bool requested_stream = true;
+  private_nh_.param("on_demand_output", requested_stream, true);
+  on_demand_output_ = requested_stream && !hybrid_enabled_;
+  if (hybrid_enabled_ && requested_stream)
+    ROS_INFO("[visual_servo] hybrid保留规划轨迹回放路径；独立PBVS使用按需平滑输出");
+  if (on_demand_output_) {
+    private_nh_.param("feedback_timeout", stream_feedback_timeout_, 0.15);
+    private_nh_.param("control_target_timeout", stream_target_timeout_, 2.0/control_rate_);
+    private_nh_.param("max_following_error", stream_max_following_error_, 0.12);
+    if (std::abs(output_rate_ - 200.0) > 1e-9 ||
+        !std::isfinite(stream_feedback_timeout_) || stream_feedback_timeout_ <= 0 ||
+        !std::isfinite(stream_target_timeout_) || stream_target_timeout_ < 1.0/control_rate_ ||
+        !std::isfinite(stream_max_following_error_) || stream_max_following_error_ <= 0) {
+      ROS_ERROR("[visual_servo] 按需输出要求200 Hz点周期及有效的反馈/目标时限和跟随误差限制");
+      valid_ = false;
+      return;
+    }
+    jerk_limits_ = {{8,8,8,12,12,12}};
+    if (private_nh_.hasParam("joint_jerk_limits") &&
+        !getSixValues(private_nh_, "joint_jerk_limits", jerk_limits_)) {
+      valid_ = false;
+      return;
+    }
+    JointPoint low, high;
+    for (std::size_t i = 0; i < kDof; ++i) {
+      low[i] = lower_limits_[i] + joint_limit_margin_;
+      high[i] = upper_limits_[i] - joint_limit_margin_;
+    }
+    try {
+      stream_.reset(new visual_servo_internal::VisualServoStream(
+          velocity_limits_, acceleration_limits_, jerk_limits_, low, high));
+      private_nh_.param<std::string>("timing_trace_path", timing_trace_path_, "");
+      if (!timing_trace_path_.empty()) {
+        int capacity = 200000;
+        private_nh_.param("timing_trace_capacity", capacity, 200000);
+        timing_trace_.reset(new TimingTrace(timing_trace_path_, capacity));
+      }
+      updateStreamTarget(JointPoint{});
+    } catch (const std::exception& error) {
+      ROS_ERROR("[visual_servo] 无效输出/采集配置：%s", error.what());
+      valid_ = false;
+      return;
+    }
+    if (backend_ == "sdk" && enabled_) {
+      ROS_WARN("[visual_servo] SDK按需输出启动保持禁用，等待显式使能和新视觉目标");
+      enabled_ = false;
+    }
+  }
   state_ = enabled_ ? ServoState::WAITING : ServoState::DISABLED;
 
   state_pub_ = nh_.advertise<std_msgs::String>(state_topic_, 1, true);
@@ -150,6 +202,12 @@ VisualServo::VisualServo()
     // 对于sdk实机模式 直接通过SDK下发关节位置 缓冲队列+限速限加速度+向控制柜发送的频率
     sdk_.reset(new DirectSdkBackend(queue_, velocity_limits_,
                                     acceleration_limits_, output_rate_));
+    if (on_demand_output_) {
+      sdk_->setPointGenerator([this](JointPoint& point, PointTiming* timing) {
+        return generateStreamPoint(point, timing);
+      });
+      sdk_->setTimingTrace(timing_trace_);
+    }
     if (!sdk_->connect(private_nh_)) {
       valid_ = false;
       return;
@@ -185,6 +243,18 @@ VisualServo::VisualServo()
            "feedback/control/output=%.1f/%.1f/%.1f Hz",
            servo_mode_.c_str(), backend_.c_str(), base_link_.c_str(),
            control_link_.c_str(), feedback_rate_, control_rate_, output_rate_);
+  if (on_demand_output_)
+    ROS_INFO("[visual_servo] 最新速度目标覆盖，固定5 ms V/A/J平滑；不使用位置FIFO和反馈混合，SDK按需批量取点");
+}
+
+VisualServo::~VisualServo() {
+  control_timer_.stop();
+  output_timer_.stop();
+  sdk_state_timer_.stop();
+  hybrid_plan_timer_.stop();
+  if (sdk_) sdk_->shutdown();  // Join the callback before destroying its state.
+  if (timing_trace_ && !timing_trace_->dumpAfterJoin())
+    ROS_ERROR("[visual_servo] 无法导出时序采集：%s", timing_trace_path_.c_str());
 }
 
 void VisualServo::planningSceneReadyCallback(
@@ -451,6 +521,7 @@ void VisualServo::reconfigureCallback(VisualServoConfig &config,
   // 丢弃按照旧参数计算、但还没有输出的关节点，让新参数从下一周期开始生效。
   resetHybrid();
   queue_.clear();
+  if (on_demand_output_) updateStreamTarget(JointPoint{});
   last_tracking_velocity_.setZero();
   ROS_INFO_THROTTLE(1.0, "[visual_servo] 动态参数已更新");
 }
@@ -491,6 +562,7 @@ bool VisualServo::setupGazeboPublishers() {
 
 void VisualServo::targetCallback(
     const geometry_msgs::PoseStamped::ConstPtr &message) {
+  const auto received_ns = TimingTrace::ns();
   // 根据message的frame_id和servo_mode_，将目标位姿变换到控制坐标系下，并进行有效性检查。
   geometry_msgs::PoseStamped source_target = *message;
   geometry_msgs::PoseStamped control_target;
@@ -563,15 +635,59 @@ void VisualServo::targetCallback(
   if (measurement_time > now)
     measurement_time = now;
   std::lock_guard<std::mutex> lock(target_mutex_);// 上锁 存入target位置、timestamp、have_target_标志
+  if (on_demand_output_ && have_target_ && measurement_time <= last_target_time_)
+    return;
   target_pose_ = control_target.pose;
   last_target_time_ = measurement_time;
+  last_target_received_ = Clock::now();
+  ++target_input_id_;
   have_target_ = true;
+  if (timing_trace_) {
+    TimingTrace::Event event;
+    event.kind = TimingTrace::Command;
+    event.id = event.command_id = target_input_id_;
+    event.begin_ns = received_ns;
+    event.locked_ns = event.end_ns = TimingTrace::ns();
+    event.source_ros_ns = measurement_time.toNSec();
+    timing_trace_->append(event);
+  }
 }
 
 bool VisualServo::setEnabled(std_srvs::SetBool::Request &request,
                              std_srvs::SetBool::Response &response) {
   // 接收rviz端发送的服务请求
   std::lock_guard<std::mutex> control_lock(control_mutex_);
+  if (on_demand_output_) {
+    JointPoint feedback;
+    bool caught_up = streamFeedback(feedback) && stream_->initialized() && stream_->settled();
+    if (caught_up)
+      for (std::size_t i=0; i<kDof; ++i)
+        caught_up &= std::abs(feedback[i] - stream_->position()[i]) <= 0.01;
+    if (request.data && (safety_stop_.load() || !caught_up ||
+                        (sdk_ && (!sdk_->healthy() || !sdk_->armMotion())))) {
+      response.success = false;
+      response.message = "not ready: require fresh feedback, settled output, reset fault and SDK readiness";
+      return true;
+    }
+    enabled_ = request.data;
+    if (enabled_) stream_armed_ = true;
+    resetHybrid();
+    observation_complete_ = false;
+    updateStreamTarget(JointPoint{});
+    last_tracking_velocity_.setZero();
+    alignment_candidate_ = aligned_latched_ = false;
+    search_reacquire_pending_ = reacquire_candidate_ = false;
+    {
+      std::lock_guard<std::mutex> target_lock(target_mutex_);
+      have_target_ = have_ever_tracked_ = false;
+    }
+    transitionTo(enabled_ ? ServoState::WAITING :
+                 (stream_->settled() ? ServoState::DISABLED : ServoState::STOPPING));
+    response.success = true;
+    response.message = enabled_ ? "enabled; waiting for a new visual target" :
+                                 "disabled; decelerating submitted stream (cabinet points cannot be withdrawn)";
+    return true;
+  }
   enabled_ = request.data;
   resetHybrid();
   observation_complete_ = false;
@@ -602,9 +718,22 @@ bool VisualServo::setEnabled(std_srvs::SetBool::Request &request,
 bool VisualServo::reset(std_srvs::Trigger::Request &,
                         std_srvs::Trigger::Response &response) {
   std::lock_guard<std::mutex> control_lock(control_mutex_);
+  if (on_demand_output_) {
+    JointPoint feedback;
+    bool ready = !enabled_ && streamFeedback(feedback) && stream_->initialized() && stream_->settled();
+    if (ready)
+      for (std::size_t i=0; i<kDof; ++i)
+        ready &= std::abs(feedback[i] - stream_->position()[i]) <= 0.01;
+    if (!ready || (sdk_ && !sdk_->healthy())) {
+      response.success = false;
+      response.message = "disable and wait for fresh, settled feedback; SDK transport faults require restart";
+      return true;
+    }
+    updateStreamTarget(JointPoint{});
+  }
   resetHybrid();
   observation_complete_ = false;
-  integrator_initialized_ = false;
+  if (!on_demand_output_) integrator_initialized_ = false;
   {
     std::lock_guard<std::mutex> target_lock(target_mutex_);
     have_target_ = false;
@@ -646,6 +775,7 @@ void VisualServo::setJointFeedback(const JointPoint &position) {
   feedback_position_ = position;
   have_joint_state_ = true;
   last_joint_time_ = ros::Time::now();
+  last_joint_received_ = Clock::now();
 }
 
 void VisualServo::sdkStateUpdate(const ros::TimerEvent &) {
@@ -666,8 +796,10 @@ void VisualServo::sdkStateUpdate(const ros::TimerEvent &) {
 
 VisualServo::ServoState VisualServo::selectState(bool fresh_target,
                                                  double target_age) {
+  if (on_demand_output_ && !enabled_ && !safety_stop_.load() && sdk_ && !sdk_->motionReady())
+    return ServoState::WAITING_FOR_SDK;
   if (!enabled_)
-    return ServoState::DISABLED;
+    return on_demand_output_ && !stream_->settled() ? ServoState::STOPPING : ServoState::DISABLED;
   if (safety_stop_.load())
     return ServoState::HOLD;
   if (servo_mode_ == "eye_in_hand" && initial_search_enabled_ &&
@@ -846,9 +978,18 @@ void VisualServo::publishState() {
 }
 
 void VisualServo::controlLoop(const ros::TimerEvent &event) {
+  const auto begin_ns = TimingTrace::ns();
   std::lock_guard<std::mutex> control_lock(control_mutex_);
+  const auto locked_ns = TimingTrace::ns();
   JointPoint feedback{};
-  {
+  if (on_demand_output_) {
+    if (!streamFeedback(feedback)) {
+      if (stream_->initialized()) safety_stop_.store(true);
+      updateStreamTarget(JointPoint{}, 0, begin_ns, locked_ns);
+      transitionTo(ServoState::HOLD);
+      return;
+    }
+  } else {
     std::lock_guard<std::mutex> lock(joint_mutex_);
     if (!have_joint_state_ ||
         (ros::Time::now() - last_joint_time_).toSec() > 0.5) {
@@ -874,11 +1015,15 @@ void VisualServo::controlLoop(const ros::TimerEvent &event) {
   geometry_msgs::Pose target;
   bool fresh_target = false;
   double target_age = 1e9;
+  std::uint64_t input_id = 0;
   {
     std::lock_guard<std::mutex> lock(target_mutex_);
     if (have_target_) {
       target = target_pose_;
       target_age = (ros::Time::now() - last_target_time_).toSec();// 距离上次获取到目标之间的时间间隔
+      if (on_demand_output_)
+        target_age = std::max(target_age, std::chrono::duration<double>(Clock::now() - last_target_received_).count());
+      input_id = target_input_id_;
       fresh_target = target_age >= 0.0 && target_age <= target_timeout_;// 如果目标年龄小于超时时间，认为目标新鲜
     }
   }
@@ -969,8 +1114,12 @@ void VisualServo::controlLoop(const ros::TimerEvent &event) {
         }
         if ((now - alignment_candidate_since_).toSec() >=
             alignment_hold_time_) {
-          aligned_latched_ = true;
-          next = ServoState::ALIGNED;
+          bool stopped = !on_demand_output_ || stream_->settled();
+          if (on_demand_output_)
+            for (std::size_t i=0; i<kDof; ++i)
+              stopped &= std::abs(stream_->position()[i] - feedback[i]) <= 0.005;
+          aligned_latched_ = stopped;
+          next = stopped ? ServoState::ALIGNED : ServoState::TRACKING;
         } else {
           next = ServoState::TRACKING;
         }
@@ -988,7 +1137,8 @@ void VisualServo::controlLoop(const ros::TimerEvent &event) {
       // depth/centroid noise. Filtering joint velocity at the 50 Hz control
       // rate prevents every image update from becoming a visible step while
       // holdFeedback still bypasses it for immediate safety stops.
-      requested = tracking_velocity_filter_alpha_ * tracking_request +
+      requested = on_demand_output_ ? tracking_request :
+          tracking_velocity_filter_alpha_ * tracking_request +
           (1.0 - tracking_velocity_filter_alpha_) * last_tracking_velocity_;
     }
     last_tracking_velocity_ = requested;
@@ -1001,7 +1151,7 @@ void VisualServo::controlLoop(const ros::TimerEvent &event) {
   const bool entering_aligned =
       next == ServoState::ALIGNED && state_ != ServoState::ALIGNED;
   transitionTo(next);
-  if (entering_aligned || entering_reacquire_hold) {
+  if (!on_demand_output_ && (entering_aligned || entering_reacquire_hold)) {
     // 到达后立即以实际反馈位置作为保持点，清除积分和
     // Gazebo 输出端的残留速度；重捕获确认阶段也立即停止搜索运动。
     queue_.clear();
@@ -1012,6 +1162,14 @@ void VisualServo::controlLoop(const ros::TimerEvent &event) {
   }
   if (!requested.allFinite())
     requested.setZero();
+
+  if (on_demand_output_) {
+    JointPoint target_velocity{};
+    for (std::size_t i=0; i<kDof; ++i) target_velocity[i] = requested(i);
+    if (!enabled_ || safety_stop_.load()) target_velocity.fill(0.0);
+    updateStreamTarget(target_velocity, input_id, begin_ns, locked_ns);
+    return;
+  }
 
   // 将开环积分位置缓慢拉回反馈位置，避免引入突跳；两种后端共用此状态。
   for (std::size_t i = 0; i < kDof; ++i)
@@ -1046,6 +1204,21 @@ void VisualServo::controlLoop(const ros::TimerEvent &event) {
 
 void VisualServo::gazeboOutput(const ros::TimerEvent &) {
   std::lock_guard<std::mutex> control_lock(control_mutex_);
+  if (on_demand_output_) {
+    try {
+      if (!generateStreamPointLocked(last_output_, nullptr)) return;
+    } catch (const std::exception& error) {
+      safety_stop_.store(true);
+      ROS_ERROR_THROTTLE(1.0, "[visual_servo] 输出失败：%s", error.what());
+      return;
+    }
+    for (std::size_t i=0; i<kDof; ++i) {
+      std_msgs::Float64 message;
+      message.data = last_output_[i];
+      gazebo_publishers_[i].publish(message);
+    }
+    return;
+  }
   JointPoint requested{};
   if (queue_.pop(requested)) {
     // 在消费端再次限速限加速度，即使队列丢弃过期点也能保持指令连续。
@@ -1072,6 +1245,86 @@ void VisualServo::gazeboOutput(const ros::TimerEvent &) {
   }
 }
 
+bool VisualServo::streamFeedback(JointPoint& feedback) {
+  // Also poll transport watchdogs from the 50Hz frontend while an SDK RPC is
+  // blocked; do not rely only on main()'s slower process-health monitor.
+  if (sdk_) return sdk_->healthy() && sdk_->readState(feedback);
+  std::lock_guard<std::mutex> lock(joint_mutex_);
+  if (!have_joint_state_ || std::chrono::duration<double>(Clock::now()-last_joint_received_).count() > stream_feedback_timeout_)
+    return false;
+  feedback = feedback_position_;
+  return true;
+}
+
+void VisualServo::updateStreamTarget(const JointPoint& velocity, std::uint64_t command_id,
+                                     std::int64_t begin_ns, std::int64_t locked_ns) {
+  stream_target_ = velocity;
+  stream_target_received_ = Clock::now();
+  stream_command_id_ = command_id;
+  ++stream_target_id_;
+  if (timing_trace_) {
+    TimingTrace::Event event;
+    event.kind = TimingTrace::Target;
+    event.id = event.target_id = stream_target_id_;
+    event.command_id = command_id;
+    event.begin_ns = begin_ns ? begin_ns : TimingTrace::ns();
+    event.locked_ns = locked_ns ? locked_ns : event.begin_ns;
+    event.end_ns = TimingTrace::ns();
+    event.desired = velocity;
+    timing_trace_->append(event);
+  }
+}
+
+bool VisualServo::generateStreamPoint(JointPoint& point, PointTiming* timing) {
+  const auto begin_ns = TimingTrace::ns();
+  std::lock_guard<std::mutex> lock(control_mutex_);
+  if (timing) {
+    timing->begin_ns = begin_ns;
+    timing->locked_ns = TimingTrace::ns();
+  }
+  return generateStreamPointLocked(point, timing);
+}
+
+bool VisualServo::generateStreamPointLocked(JointPoint& point, PointTiming* timing) {
+  JointPoint feedback{};
+  const bool fresh = streamFeedback(feedback);
+  if (!stream_->initialized()) {
+    if (!fresh) return false;
+    // The SDK supplies its held initial reference in point. Seeding from a
+    // later push can turn encoder drift into an unintended pre-enable point
+    // or a discontinuity in the first submitted sequence.
+    stream_->initialize(sdk_ ? point : feedback);
+  }
+  // Readiness probes may initialize the sequence, but may never submit a
+  // holding/moving point before the explicit arm handshake. After first arm,
+  // keep providing a continuous zero-target tail through disable/reset.
+  if (sdk_ && !stream_armed_) return false;
+  const bool target_stale = stream_target_received_ == Clock::time_point{} ||
+      std::chrono::duration<double>(Clock::now()-stream_target_received_).count() > stream_target_timeout_;
+  bool following_error = false;
+  if (fresh)
+    for (std::size_t i=0; i<kDof; ++i)
+      following_error |= std::abs(stream_->position()[i] - feedback[i]) > stream_max_following_error_;
+  if ((!fresh || following_error || (target_stale && enabled_)) && !safety_stop_.exchange(true))
+    ROS_ERROR("[visual_servo] 输出保护：feedback_fresh=%d following_error=%d target_stale=%d；锁存并减速，禁用后复位",
+              fresh, following_error, target_stale);
+  JointPoint wanted = stream_target_;
+  if (!enabled_ || safety_stop_.load() || target_stale) wanted.fill(0.0);
+  point = stream_->step(wanted);
+  if (stream_->braking() && !safety_stop_.exchange(true))
+    ROS_ERROR("[visual_servo] 关节制动余量不足，锁存并减速");
+  command_position_ = point;
+  command_velocity_ = stream_->velocity();
+  if (timing) {
+    timing->target_id = stream_target_id_;
+    timing->command_id = stream_command_id_;
+    timing->velocity = command_velocity_;
+    timing->desired = stream_->appliedTarget();
+    timing->end_ns = TimingTrace::ns();
+  }
+  return true;
+}
+
 } // namespace aubo_ros_control
 
 int main(int argc, char **argv) {
@@ -1085,8 +1338,9 @@ int main(int argc, char **argv) {
   ros::Rate monitor(10.0);
   while (ros::ok() && servo.healthy())
     monitor.sleep();
-  if (ros::ok())
+  const bool backend_failed = ros::ok();
+  if (backend_failed)
     ROS_ERROR("[visual_servo] 后端失效，节点退出");
   ros::shutdown();
-  return 0;
+  return backend_failed ? 1 : 0;
 }

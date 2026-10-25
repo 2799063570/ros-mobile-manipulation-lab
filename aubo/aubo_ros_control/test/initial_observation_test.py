@@ -51,8 +51,17 @@ class InitialObservationTest(unittest.TestCase):
         timer = rospy.Timer(rospy.Duration(0.01), tick)
         try:
             rospy.wait_for_service('/visual_servo/set_enabled', timeout=10)
-            time.sleep(0.2)
-            self.assertTrue(rospy.ServiceProxy('/visual_servo/set_enabled', SetBool)(True).success)
+            # The streaming frontend requires a real feedback sample and an
+            # initialized, settled sequence before accepting enable.
+            enable = rospy.ServiceProxy('/visual_servo/set_enabled', SetBool)
+            ready_deadline = time.monotonic() + 4
+            accepted = False
+            while time.monotonic() < ready_deadline:
+                if enable(True).success:
+                    accepted = True
+                    break
+                time.sleep(0.05)
+            self.assertTrue(accepted, 'feedback/output readiness did not recover')
             deadline = time.monotonic() + 8
             while time.monotonic() < deadline and 'TRACKING' not in states:
                 with lock:

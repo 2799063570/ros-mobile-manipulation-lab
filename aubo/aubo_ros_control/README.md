@@ -8,6 +8,10 @@
 位于 `aubo_sorting/launch`。`visual_servo_core.launch` 是被各 `eye_...` 入口包含的
 共用底层入口，通常不单独启动。
 
+2026-10-25：独立视觉PBVS已接入点动的SDK按需输出与5 ms V/A/J平滑，绕过旧位置队列；
+下文队列输出说明保留用于旧路径/hybrid对照，当前机制与验证见
+[视觉位置伺服按需供点改进](../../docs/视觉位置伺服按需供点改进.md)。
+
 该功能包为真实 AUBO i5 提供 ROS 1 硬件接口。其实现参考了 [`aubo_ros_control`](https://github.com/2799063570/aubo_perception_planning/tree/main/aubo_ros_control) 的 AUBO SDK 驱动模式，并适配当前工作空间的关节名称和 MoveIt 控制器：`/aubo_i5/aubo_i5_controller/follow_joint_trajectory`。
 
 ## 视觉伺服源码结构

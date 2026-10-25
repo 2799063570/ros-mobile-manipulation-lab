@@ -1,0 +1,32 @@
+<launch>
+  <arg name="mode" default="eye_to_hand"/>
+  <arg name="send_delay_ms" default="90"/>
+  <arg name="accept_late" default="true"/>
+  <arg name="trace_path" default=""/>
+  <param name="robot_description" textfile="$(find aubo_ros_control)/test/hybrid_test.urdf"/>
+  <!-- Test implementation: no SDK login/startup or hardware connection. -->
+  <node pkg="aubo_ros_control" type="aubo_visual_servo_fake_sdk_node"
+        name="visual_stream_controller" required="true" output="screen">
+    <rosparam file="$(find aubo_ros_control)/config/visual_servo_common.yaml"/>
+    <param name="backend" value="sdk"/>
+    <param name="servo_mode" value="$(arg mode)"/>
+    <param name="camera_link" value="tcp_link"/>
+    <param name="control_link" value="tcp_link"/>
+    <param name="loss_strategy" value="stop"/>
+    <param name="initial_search_enabled" value="false"/>
+    <param name="use_orientation_control" value="false"/>
+    <param name="on_demand_output" value="true"/>
+    <param name="fake_send_delay_ms" value="$(arg send_delay_ms)"/>
+    <param name="fake_accept_late" value="$(arg accept_late)"/>
+    <param name="fake_diagnosis_delay_ms" value="20"/>
+    <param name="fake_mac_cache_lag_ms" value="20"/>
+    <param name="fake_startup_slow_query_ms" value="500"/>
+    <param name="timing_trace_path" value="$(arg trace_path)"/>
+    <rosparam param="desired_target_position" subst_value="true">$(eval '[0.0, 0.0, 0.3]' if arg('mode') == 'eye_in_hand' else '[0.0, 0.0, 0.0]')</rosparam>
+    <rosparam param="desired_target_rpy">[0.0, 0.0, 0.0]</rosparam>
+  </node>
+  <test test-name="visual_servo_stream" pkg="aubo_ros_control"
+        type="visual_servo_stream_test.py" time-limit="40">
+    <param name="mode" value="$(arg mode)"/>
+  </test>
+</launch>

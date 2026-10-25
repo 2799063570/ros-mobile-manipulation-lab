@@ -3,6 +3,7 @@
 
 #include <aubo_ros_control/VisualServoConfig.h>
 #include <aubo_ros_control/direct_sdk_backend.h>
+#include <aubo_ros_control/visual_servo_stream.h>
 
 #include <dynamic_reconfigure/server.h>
 #include <geometry_msgs/PoseStamped.h>
@@ -39,6 +40,7 @@ namespace aubo_ros_control {
 class VisualServo {
 public:
   VisualServo();// 构造函数：读取参数服务器中的参数，初始化运动学链、后端和 ROS 通信通道。
+  ~VisualServo();
   VisualServo(const VisualServo &) = delete;
   VisualServo &operator=(const VisualServo &) = delete;
 
@@ -52,11 +54,16 @@ private:
   using JointPoint = visual_servo_internal::JointPoint;
   using CommandQueue = visual_servo_internal::CommandQueue;
   using DirectSdkBackend = visual_servo_internal::DirectSdkBackend;
+  using Clock = std::chrono::steady_clock;
+  using PointTiming = visual_servo_internal::PointTiming;
+  using TimingTrace = visual_servo_internal::MotionTimingTrace;
   using ReconfigureServer = dynamic_reconfigure::Server<VisualServoConfig>;
 
   // 视觉伺服状态机：覆盖等待、跟踪、稳定对齐、丢失恢复和安全保持。
   enum class ServoState {
     DISABLED,
+    STOPPING,
+    WAITING_FOR_SDK,
     WAITING,
     PLANNING,
     APPROACH,
@@ -102,6 +109,11 @@ private:
   void publishState();
   void controlLoop(const ros::TimerEvent &event);
   void gazeboOutput(const ros::TimerEvent &event);
+  bool generateStreamPoint(JointPoint& point, PointTiming* timing);
+  bool generateStreamPointLocked(JointPoint& point, PointTiming* timing);
+  bool streamFeedback(JointPoint& feedback);
+  void updateStreamTarget(const JointPoint& velocity, std::uint64_t command_id = 0,
+                          std::int64_t begin_ns = 0, std::int64_t locked_ns = 0);
   bool loadHybridParameters();
   void resetHybrid();
   void holdFeedback(const JointPoint &feedback);
@@ -144,6 +156,16 @@ private:
   tf2_ros::Buffer tf_buffer_;
   tf2_ros::TransformListener tf_listener_;
   CommandQueue queue_;
+  bool on_demand_output_{false};
+  bool stream_armed_{false};
+  std::unique_ptr<visual_servo_internal::VisualServoStream> stream_;
+  JointPoint stream_target_{};
+  double stream_feedback_timeout_{0.15}, stream_target_timeout_{0.04};
+  double stream_max_following_error_{0.12};
+  Clock::time_point stream_target_received_{}, last_joint_received_{}, last_target_received_{};
+  std::shared_ptr<TimingTrace> timing_trace_;
+  std::uint64_t target_input_id_{0}, stream_target_id_{0}, stream_command_id_{0};
+  std::string timing_trace_path_;
   bool valid_{false};
 
   // 运行模式、坐标系、话题及控制器参数。
@@ -169,7 +191,7 @@ private:
 
   // 关节约束、搜索姿态、反馈状态和积分命令。
   JointPoint lower_limits_{}, upper_limits_{}, velocity_limits_{},
-      acceleration_limits_;
+      acceleration_limits_, jerk_limits_;
   JointPoint open_posture_{}, initial_search_posture_{}, recovery_posture_;
   JointPoint feedback_position_{}, command_position_{}, command_velocity_;
   JointPoint backend_velocity_{}, last_output_;

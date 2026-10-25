@@ -159,6 +159,11 @@ target_include_directories(aubo_cartesian_jog_panel PRIVATE ${catkin_INCLUDE_DIR
 target_link_libraries(aubo_cartesian_jog_panel ${catkin_LIBRARIES} Qt5::Widgets)
 
 if(CATKIN_ENABLE_TESTING)
+  catkin_add_gtest(visual_servo_stream_test test/visual_servo_stream_test.cpp)
+  if(TARGET visual_servo_stream_test)
+    target_compile_features(visual_servo_stream_test PRIVATE cxx_std_14)
+    target_include_directories(visual_servo_stream_test PRIVATE include)
+  endif()
   add_executable(motion_timing_trace_test test/motion_timing_trace_test.cpp)
   target_compile_features(motion_timing_trace_test PRIVATE cxx_std_14)
   target_include_directories(motion_timing_trace_test PRIVATE include)
@@ -200,6 +205,16 @@ if(CATKIN_ENABLE_TESTING)
   target_include_directories(cartesian_jog_common_test PRIVATE include)
   add_test(NAME cartesian_jog_common_test COMMAND cartesian_jog_common_test)
   find_package(rostest REQUIRED)
+  add_executable(aubo_visual_servo_fake_sdk_node
+    src/visual_servo.cpp src/hybrid_control.cpp src/visual_servo_common.cpp test/fake_direct_sdk_backend.cpp)
+  add_dependencies(aubo_visual_servo_fake_sdk_node ${PROJECT_NAME}_gencfg ${catkin_EXPORTED_TARGETS})
+  target_compile_features(aubo_visual_servo_fake_sdk_node PRIVATE cxx_std_14)
+  target_include_directories(aubo_visual_servo_fake_sdk_node PRIVATE
+    include ${catkin_INCLUDE_DIRS} ${orocos_kdl_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIR})
+  target_link_libraries(aubo_visual_servo_fake_sdk_node PRIVATE
+    ${catkin_LIBRARIES} ${orocos_kdl_LIBRARIES} ${AUBO_SDK_LIB} Threads::Threads)
+  set_target_properties(aubo_visual_servo_fake_sdk_node PROPERTIES
+    BUILD_RPATH "${AUBO_SDK_RUNTIME_DIRS}" LINK_FLAGS "-Wl,--disable-new-dtags")
   add_executable(aubo_cartesian_jog_fake_sdk_node
     src/cartesian_jog.cpp test/fake_direct_sdk_backend.cpp src/visual_servo_common.cpp)
   add_dependencies(aubo_cartesian_jog_fake_sdk_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
@@ -239,8 +254,10 @@ if(CATKIN_ENABLE_TESTING)
   add_rostest(test/cartesian_jog_sdk50.test DEPENDENCIES
     aubo_cartesian_jog_fake_sdk_node cartesian_jog_ros_control_integration_test)
   catkin_install_python(PROGRAMS test/hybrid_control_test.py
+    test/visual_servo_stream_test.py
     DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
   add_rostest(test/hybrid_control.test)
+  add_rostest(test/visual_servo_stream.test DEPENDENCIES aubo_visual_servo_fake_sdk_node)
   add_rostest(test/initial_observation.test)
   catkin_add_gtest(visual_servo_common_test
     test/visual_servo_common_test.cpp

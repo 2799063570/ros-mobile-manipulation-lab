@@ -9,6 +9,11 @@ start_enabled: false
 feedback_rate: 50.0
 control_rate: 50.0
 output_rate: 200.0
+# 独立PBVS：最新速度目标覆盖，SDK按需取5ms平滑点；hybrid保留原回放路径。
+on_demand_output: true
+feedback_timeout: 0.15
+control_target_timeout: 0.04
+max_following_error: 0.12
 
 linear_gain: 0.8
 angular_gain: 0.5
@@ -26,6 +31,7 @@ joint_lower_limits: [-3.04, -1.0471976, -3.04, -3.04, -3.04, -3.04]
 joint_upper_limits: [ 3.04,  1.0471976,  3.04,  3.04,  3.04,  3.04]
 joint_velocity_limits: [0.50, 0.50, 0.50, 0.70, 0.70, 0.70]
 joint_acceleration_limits: [0.80, 0.80, 0.80, 1.20, 1.20, 1.20]
+joint_jerk_limits: [8.0, 8.0, 8.0, 12.0, 12.0, 12.0]
 joint_limit_margin: 0.08
 
 target_timeout: 0.20
@@ -41,7 +47,8 @@ open_posture: [0.0, 0.20, 1.20, 0.0, 1.20, 0.0]
 open_posture_gain: 0.7
 search_velocity_limit: 0.20
 command_queue_capacity: 80
-# 由原 100 Hz 系数换算到 50 Hz，保持近似相同的时间常数。
+# 旧队列/hybrid路径使用；按需输出不反馈混合，也不叠加该速度滤波。
+# 系数由原100 Hz换算到50 Hz。
 feedback_blend: 0.0396
 tracking_velocity_filter_alpha: 0.3276
 
@@ -52,4 +59,7 @@ username: aubo
 password: "123456"
 collision_class: 6
 require_real_robot: true
-sdk_mac_buffer_target: 60
+# 未显式设置目标时，按需路径采用300标量/50点，旧队列路径仍默认60标量。
+# 目标和水位均为名义观测；已经入柜的点不能被新目标撤回。
+sdk_mac_buffer_limit: 360
+sdk_diagnosis_timeout: 0.15

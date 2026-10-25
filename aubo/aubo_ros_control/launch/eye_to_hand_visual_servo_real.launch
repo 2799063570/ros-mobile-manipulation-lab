@@ -10,8 +10,12 @@
   <arg name="start_perception" default="true"/>
   <arg name="target_label" default="red"/>
   <arg name="auto_start" default="false"/>
+  <arg name="on_demand_output" default="true"/>
+  <arg name="timing_trace_path" default=""/>
   <arg name="hybrid_enabled" default="false"/>
   <arg name="hybrid_config" default="$(find aubo_ros_control)/config/hybrid_control.yaml"/>
+  <arg name="sdk_mac_buffer_target"
+       default="$(eval 300 if arg('on_demand_output') and not arg('hybrid_enabled') else 60)"/>
 
   <!-- 使用无腕部相机的模型，防止外部相机模式下误启动手部传感器和重复话题。 -->
   <include file="$(find aubo_moveit_config)/launch/planning_context.launch">
@@ -21,6 +25,11 @@
   </include>
   <node name="robot_state_publisher" pkg="robot_state_publisher"
         type="robot_state_publisher" output="screen"/>
+  <node name="aubo_visual_joint_state_relay" pkg="joint_state_publisher"
+        type="joint_state_publisher" output="screen">
+    <rosparam param="source_list">[/visual_servo/sdk_joint_states]</rosparam>
+    <rosparam param="zeros">{joint1: 0.0, joint2: 0.0}</rosparam>
+  </node>
 
   <!-- 固定相机入口同时负责 RealSense 数据和已标定静态 TF。 -->
   <include if="$(arg start_camera)"
@@ -41,7 +50,11 @@
     <arg name="mode_config"
          value="$(find aubo_ros_control)/config/visual_servo_eye_to_hand.yaml"/>
     <arg name="backend" value="sdk"/>
+    <arg name="on_demand_output" value="$(arg on_demand_output)"/>
+    <arg name="timing_trace_path" value="$(arg timing_trace_path)"/>
+    <arg name="sdk_mac_buffer_target" value="$(arg sdk_mac_buffer_target)"/>
     <arg name="robot_ip" value="$(arg robot_ip)"/>
+    <arg name="joint_states_topic" value="/visual_servo/sdk_joint_states"/>
     <arg name="start_enabled" value="$(arg auto_start)"/>
     <arg name="hybrid_enabled" value="$(arg hybrid_enabled)"/>
     <arg name="hybrid_config" value="$(arg hybrid_config)"/>

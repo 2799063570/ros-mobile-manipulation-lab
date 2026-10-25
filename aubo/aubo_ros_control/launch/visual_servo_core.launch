@@ -9,9 +9,13 @@
   <arg name="joint_states_topic" default="/joint_states"/>
   <arg name="loss_strategy" default=""/>
   <arg name="start_enabled" default="false"/>
+  <arg name="on_demand_output" default="true"/>
+  <arg name="timing_trace_path" default=""/>
   <arg name="hybrid_enabled" default="false"/>
   <arg name="hybrid_lock_pregrasp_path" default="false"/>
   <arg name="hybrid_config" default="$(find aubo_ros_control)/config/hybrid_control.yaml"/>
+  <arg name="sdk_mac_buffer_target"
+       default="$(eval 300 if arg('on_demand_output') and not arg('hybrid_enabled') else 60)"/>
 
   <!-- required=true：控制核心异常退出时终止所属 launch，避免其余节点继续误导操作者。 -->
   <node name="aubo_visual_servo" pkg="aubo_ros_control"
@@ -31,6 +35,9 @@
     <param name="target_topic" value="$(arg target_topic)"/>
     <param name="joint_states_topic" value="$(arg joint_states_topic)"/>
     <param name="start_enabled" value="$(arg start_enabled)"/>
+    <param name="on_demand_output" value="$(arg on_demand_output)"/>
+    <param name="timing_trace_path" value="$(arg timing_trace_path)"/>
+    <param name="sdk_mac_buffer_target" value="$(arg sdk_mac_buffer_target)"/>
     <param if="$(eval arg('loss_strategy') != '')"
            name="loss_strategy" value="$(arg loss_strategy)"/>
     <!-- Gazebo 后端向六个独立位置控制器发布 200 Hz 关节位置指令。 -->

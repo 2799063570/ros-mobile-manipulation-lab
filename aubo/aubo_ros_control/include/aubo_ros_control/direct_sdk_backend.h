@@ -39,7 +39,7 @@ public:
   ~DirectSdkBackend();
 
   bool connect(ros::NodeHandle& nh);
-  // 点动专用：在 connect 前设置。控制柜需要补点时才调用，避免软件队列积压。
+  // 在线点动/PBVS：在 connect 前设置。控制柜需要补点时才调用，避免软件队列积压。
   // 回调只由输出线程串行执行；false 表示当前尚未准备好，不生成新点。
   void setPointGenerator(std::function<bool(JointPoint&, PointTiming*)> generator);
   // Configure before connect; the owner dumps only after SDK shutdown and all
