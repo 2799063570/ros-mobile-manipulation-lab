@@ -23,7 +23,7 @@ source devel/setup.bash
 roslaunch aubo_handeye_validation handeye_yolo_verify_real.launch \
   robot_ip:=192.168.1.2 \
   target_class:=can \
-  table_z:=0.10 object_height:=0.05
+  table_z:=0.00285 object_height:=0.05
 ```
 
 `target_class` 要填模型实际输出的类别。Python/权重路径沿用工程现有 YOLO 环境，
@@ -33,9 +33,16 @@ roslaunch aubo_handeye_validation handeye_yolo_verify_real.launch \
 显式使用 `height_mode:=table` 时，高度来自已知桌高和物高，不能用来评价深度精度。
 感知工作区及各类别物高覆盖由 `perception_config:=...` 设置。
 
-桌面碰撞体的默认中心 XY 为 `[0.70, 0.0]`，尺寸为 `[0.70, 1.00, 0.20]`。
-实际工位不同须通过 `table_center_x`、`table_center_y`、`table_size_x`、`table_size_y`、
-`table_thickness` 修改；碰撞体顶面随 `table_z` 设置。其他障碍物仍应加入 MoveIt 场景。
+当前默认桌高、桌面中心和尺寸来自 2026-10-26 点云快照：中心约为
+`[-0.0442, -0.6707]`，桌面尺寸约为 `[0.74, 0.93]` m；工作区限制来自该快照的桌面
+点云范围并留约 5 cm 边界。它们是现场初值，运行前须对照当前工位实测确认。
+可通过 `table_center_x`、`table_center_y`、`table_size_x`、`table_size_y`、
+`table_thickness` 和 `verification_config` 覆盖。点云发布默认关闭，因为本验证只用对齐深度。
+其他障碍物仍应加入 MoveIt 场景。
+
+有效目标以 TF `base_link -> handeye_verify_target` 发布；预期 TCP 悬停位姿另以
+`base_link -> handeye_verify_grasp_goal` 发布，便于对照物体短边和末端朝向。默认 RViz
+配置已开启 TF 轴和名称。
 规划依赖实际机器人、TCP、夹爪状态与碰撞模型准确。
 
 相机命名默认 `/camera`，匹配当前标定 YAML 中的 `camera_color_optical_frame`。
@@ -70,9 +77,13 @@ rosservice call /handeye_yolo_verify/move "{}"
 
 1. 等待请求之后至少 5 帧新观测，跨越至少 0.25 秒，位置抖动不超过 5 mm。
 2. 在当前 XY 位置抬升到通行高度，保留起始朝向。
-3. 在高处调整为 TCP 局部 +Z 指向基座 -Z，固定 yaw=π/2。
+3. 在高处调整为 TCP 局部 +Z 指向基座 -Z，yaw 使用配置基准角 `downward_yaw`
+   加上稳定检测到的 YOLO 短边方向 `grasp_angle`。若 OBB 角无效或跨帧变化超过 8°，拒绝规划。
 4. 保持朝下，在高处平移到目标上方，再竖直下降到悬停点。
 5. 在目标**顶面上方 10 cm**停止，保持朝向，不闭合夹爪。
+
+规划结束后，执行前还会重新等待至少 5 帧规划后的新观测，并再次核对目标位置和抓取角；
+默认等待上限 3 秒。未确认、位置变化超过 10 mm 或抓取角变化超过 8° 时，拒绝执行。
 
 通行高度默认至少高于目标顶面 20 cm，不会为了横移而先降低当前高度。
 更大距离可设置 `hover_clearance:=0.15 travel_clearance:=0.25`。

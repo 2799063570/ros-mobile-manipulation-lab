@@ -340,6 +340,7 @@ class ColorObjectDetector(object):
         return cv2.morphologyEx(combined, cv2.MORPH_CLOSE, self._kernel)
 
     def _image_callback(self, image_message):
+        processing_started = time.monotonic()
         with self._lock:
             camera_info = self._camera_info
         if camera_info is None:
@@ -432,6 +433,17 @@ class ColorObjectDetector(object):
 
         output.objects.sort(key=lambda item: (item.color, -item.contour_area))
         self._detections_publisher.publish(output)
+        processing_fps = 1.0 / max(time.monotonic() - processing_started, 1.0e-9)
+        cv2.putText(
+            debug_image,
+            "Processing FPS: {:.1f}".format(processing_fps),
+            (12, 30),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.8,
+            (0, 255, 0),
+            2,
+            cv2.LINE_AA,
+        )
         # 此处直接构造消息，避免调用 cv2_to_imgmsg。部分机器的用户目录中安装了
         # 另一版本的 OpenCV，其 CV_8UC3 数值与编译 Noetic cv_bridge 时使用的版本
         # 不一致。当前像素已经是 BGR uint8 格式，因此无需再执行图像转换。

@@ -28,6 +28,11 @@ def quaternion_angle(a, b):
     return 2*math.acos(min(1., float(abs(np.dot(a/np.linalg.norm(a), b/np.linalg.norm(b))))))
 
 
+def downward_quaternion(yaw):
+    """Quaternion for TCP roll=pi, pitch=0 and the requested base-frame yaw."""
+    return [math.cos(yaw/2), math.sin(yaw/2), 0.0, 0.0]
+
+
 def stable_target(samples, jitter, table_z, height_tolerance, require_depth):
     """Samples are unique, fresh, unambiguous observations from one class."""
     if not samples:
@@ -40,13 +45,25 @@ def stable_target(samples, jitter, table_z, height_tolerance, require_depth):
         raise ValueError('depth mode requires validated depth for every observation')
     if np.max(np.abs(xyz[:, 2] - table_z - heights/2)) > height_tolerance:
         raise ValueError('object center disagrees with configured table/object height')
+    raw_angles = [s.get('grasp_angle', 0.0) for s in samples]
+    if any(angle is None for angle in raw_angles):
+        raise ValueError('grasp angle unavailable; YOLO OBB orientation is required')
+    angles = np.asarray(raw_angles, dtype=float)
+    if angles.shape != (len(samples),) or not np.isfinite(angles).all():
+        raise ValueError('grasp angle unavailable; YOLO OBB orientation is required')
+    angle = 0.5 * math.atan2(float(np.mean(np.sin(2*angles))),
+                             float(np.mean(np.cos(2*angles))))
+    angle_errors = (angles-angle+math.pi/2) % math.pi-math.pi/2
+    angle_tolerance = float(samples[0].get('grasp_angle_tolerance', math.radians(8)))
+    if float(np.max(np.abs(angle_errors))) > angle_tolerance:
+        raise ValueError('grasp angle is unstable')
     center = np.median(xyz, axis=0)
     if np.max(np.linalg.norm(xyz-center, axis=1)) > jitter:
         raise ValueError('target is moving or unstable')
     tops = xyz[:, 2] + heights/2
     if float(np.ptp(tops)) > jitter*2:
         raise ValueError('inconsistent target surface height')
-    return dict(xyz=center.tolist(), height=float(np.median(heights)),
+    return dict(xyz=center.tolist(), height=float(np.median(heights)), grasp_angle=angle,
                 surface_z=float(np.max(tops)), stamp_ns=samples[-1]['stamp_ns'])
 
 
@@ -65,9 +82,9 @@ def verification_waypoints(current, orientation, target, config):
     if high > config['max_tcp_z'] or hover > config['max_tcp_z']:
         raise ValueError('required overhead clearance exceeds max_tcp_z')
     q = finite_vector(orientation, 4).tolist()
-    yaw = config['downward_yaw']
+    yaw = config['downward_yaw'] + target.get('grasp_angle', 0.0)
     # roll=pi, pitch=0: local TCP +Z points along base -Z.
-    down = [math.cos(yaw/2), math.sin(yaw/2), 0., 0.]
+    down = downward_quaternion(yaw)
     return [dict(xyz=[start[0], start[1], high], q=q),
             dict(xyz=[start[0], start[1], high], q=down),
             dict(xyz=[xyz[0], xyz[1], high], q=down),
@@ -131,15 +148,17 @@ def validate_config(config):
                 'target_jitter', 'height_tolerance', 'sample_timeout', 'sample_window',
                 'planning_time', 'state_max_age', 'execution_timeout', 'orientation_tolerance',
                 'minimum_tcp_table_clearance', 'target_recheck_distance', 'max_start_error',
-                'final_position_tolerance'):
+                'target_recheck_timeout', 'final_position_tolerance'):
         value = float(config[key])
         if not math.isfinite(value) or value <= 0:
             raise ValueError('{} must be finite and positive'.format(key))
         config[key] = value
-    for key in ('table_z', 'downward_yaw'):
+    for key in ('table_z', 'downward_yaw', 'grasp_angle_tolerance'):
         config[key] = float(config[key])
         if not math.isfinite(config[key]):
             raise ValueError('invalid '+key)
+    if config['grasp_angle_tolerance'] <= 0 or config['grasp_angle_tolerance'] > math.pi/2:
+        raise ValueError('grasp_angle_tolerance must be between 0 and pi/2')
     if (config['velocity_scaling'] > .10 or config['acceleration_scaling'] > .10 or
             config['max_joint_speed'] > .10 or config['max_joint_acceleration'] > .20 or
             config['max_tcp_speed'] > .03):
@@ -180,12 +199,13 @@ class HandeyeYoloVerify:
     def __init__(self):
         from actionlib import SimpleActionClient
         from aubo_perception.msg import DetectedObjectArray
-        from geometry_msgs.msg import PoseStamped
+        from geometry_msgs.msg import PoseStamped, TransformStamped
         from moveit_msgs.msg import DisplayTrajectory, ExecuteTrajectoryAction
         from moveit_msgs.srv import GetPositionFK, GetStateValidity
         from sensor_msgs.msg import JointState
         from std_msgs.msg import String, Bool
         from std_srvs.srv import Trigger
+        import tf2_ros
 
         self.config = validate_config(rospy.get_param('~'))
         c = self.config
@@ -216,6 +236,10 @@ class HandeyeYoloVerify:
         self.preview = rospy.Publisher('~display_trajectory', DisplayTrajectory, queue_size=1, latch=True)
         self.goal_pub = rospy.Publisher('~goal', PoseStamped, queue_size=1, latch=True)
         self.status = rospy.Publisher('~status', String, queue_size=1, latch=True)
+        self.target_tf_frame = rospy.get_param('~target_tf_frame', 'handeye_verify_target')
+        self.grasp_goal_tf_frame = rospy.get_param('~grasp_goal_tf_frame', 'handeye_verify_grasp_goal')
+        self.target_tf_broadcaster = tf2_ros.TransformBroadcaster()
+        self.transform_stamped_type = TransformStamped
         self.subscribers = [rospy.Subscriber(c['detections_topic'], DetectedObjectArray,
                                             self.detections, queue_size=5),
                             rospy.Subscriber(c['joint_states_topic'], JointState,
@@ -267,7 +291,40 @@ class HandeyeYoloVerify:
                 if (math.isfinite(obj.confidence) and obj.confidence >= c['min_confidence'] and
                         all(math.isfinite(v) for v in (p.x, p.y, p.z, obj.object_height))):
                     candidate = dict(xyz=[p.x, p.y, p.z], height=obj.object_height,
-                                     depth_valid=obj.depth_valid, stamp_ns=stamp)
+                                     depth_valid=obj.depth_valid, stamp_ns=stamp,
+                                     grasp_angle=(float(obj.grasp_angle)
+                                                  if obj.grasp_geometry_valid and
+                                                  math.isfinite(obj.grasp_angle) else None),
+                                     grasp_angle_tolerance=c['grasp_angle_tolerance'])
+        if candidate is not None:
+            transform = self.transform_stamped_type()
+            transform.header.stamp = message.header.stamp
+            transform.header.frame_id = c['target_frame']
+            transform.child_frame_id = self.target_tf_frame
+            transform.transform.translation.x = candidate['xyz'][0]
+            transform.transform.translation.y = candidate['xyz'][1]
+            transform.transform.translation.z = candidate['xyz'][2]
+            object_angle = candidate['grasp_angle'] if candidate['grasp_angle'] is not None else 0.0
+            half_angle = 0.5 * object_angle
+            transform.transform.rotation.z = math.sin(half_angle)
+            transform.transform.rotation.w = math.cos(half_angle)
+            self.target_tf_broadcaster.sendTransform(transform)
+            if candidate['grasp_angle'] is not None:
+                goal_transform = self.transform_stamped_type()
+                goal_transform.header.stamp = message.header.stamp
+                goal_transform.header.frame_id = c['target_frame']
+                goal_transform.child_frame_id = self.grasp_goal_tf_frame
+                goal_transform.transform.translation.x = candidate['xyz'][0]
+                goal_transform.transform.translation.y = candidate['xyz'][1]
+                goal_transform.transform.translation.z = (
+                    candidate['xyz'][2] + candidate['height']/2 + c['hover_clearance'])
+                goal_quaternion = downward_quaternion(
+                    c['downward_yaw'] + candidate['grasp_angle'])
+                (goal_transform.transform.rotation.x,
+                 goal_transform.transform.rotation.y,
+                 goal_transform.transform.rotation.z,
+                 goal_transform.transform.rotation.w) = goal_quaternion
+                self.target_tf_broadcaster.sendTransform(goal_transform)
         with self.data_lock:
             # Duplicates do not count as new frames. Invalid frames break continuity.
             if stamp <= self.last_detection_stamp:
@@ -428,17 +485,50 @@ class HandeyeYoloVerify:
         self.preview.publish(DisplayTrajectory(trajectory_start=start, trajectory=[trajectory]))
         return start, trajectory, goal
 
-    def recheck_target(self, target):
-        with self.data_lock:
+    def recheck_target(self, target, after_stamp_ns):
+        c = self.config
+        deadline = time.monotonic() + c['target_recheck_timeout']
+        last_reason = 'waiting for new observations after planning'
+        valid_count, latest_age = 0, None
+        while time.monotonic() < deadline:
+            self.check_cancel()
             now = rospy.Time.now().to_nsec()
-            samples = [copy.deepcopy(s) for s in self.history if
-                       0 <= (now-s['stamp_ns'])/1e9 <= self.config['target_max_age']]
-        if len(samples) < self.config['min_samples']:
-            raise RuntimeError('YOLO target lost/stale while planning; motion refused')
-        latest = stable_target(samples, self.config['target_jitter'], self.config['table_z'],
-                               self.config['height_tolerance'], self.config['height_mode'] == 'depth')
-        if np.linalg.norm(np.asarray(latest['xyz'])-target['xyz']) > self.config['target_recheck_distance']:
-            raise RuntimeError('YOLO target moved during planning; motion refused')
+            with self.data_lock:
+                samples = [copy.deepcopy(s) for s in self.history
+                           if s['stamp_ns'] > after_stamp_ns and
+                           0 <= (now-s['stamp_ns'])/1e9 <= c['target_max_age']]
+            valid_count = len(samples)
+            latest_age = ((now-max(s['stamp_ns'] for s in samples))/1e9
+                          if samples else None)
+            if len(samples) >= c['min_samples']:
+                span = (samples[-1]['stamp_ns']-samples[0]['stamp_ns'])/1e9
+                if span >= c['sample_window']:
+                    try:
+                        latest = stable_target(samples, c['target_jitter'], c['table_z'],
+                                               c['height_tolerance'], c['height_mode'] == 'depth')
+                    except ValueError as error:
+                        last_reason = str(error)
+                    else:
+                        position_delta = float(np.linalg.norm(
+                            np.asarray(latest['xyz'])-target['xyz']))
+                        if position_delta > c['target_recheck_distance']:
+                            raise RuntimeError(
+                                'YOLO target moved after planning ({:.1f} mm); motion refused'.format(
+                                    position_delta*1000))
+                        angle_delta = abs((latest['grasp_angle']-target['grasp_angle']+
+                                           math.pi/2) % math.pi-math.pi/2)
+                        if angle_delta > c['grasp_angle_tolerance']:
+                            raise RuntimeError(
+                                'YOLO grasp angle changed after planning ({:.1f} deg); motion refused'.format(
+                                    math.degrees(angle_delta)))
+                        return
+                else:
+                    last_reason = 'new observations span only {:.2f} s'.format(span)
+            time.sleep(.02)
+        age_text = 'none' if latest_age is None else '{:.3f} s'.format(latest_age)
+        raise RuntimeError(
+            'post-plan target confirmation timed out: {} fresh observations, latest age {}; {}. '
+            'Motion refused'.format(valid_count, age_text, last_reason))
 
     def cancel_motion(self):
         # Serialize cancellation with dispatch so a stop cannot race with send_goal.
@@ -509,7 +599,8 @@ class HandeyeYoloVerify:
             if not move:
                 self.publish_status('PLANNED: {:.1f} s; {}'.format(duration, path))
                 return TriggerResponse(success=True, message='preview only; {:.1f} s; {}'.format(duration, path))
-            self.recheck_target(target)
+            self.publish_status('REVALIDATING_TARGET')
+            self.recheck_target(target, rospy.Time.now().to_nsec())
             self.publish_status('MOVING: lift, align downward, transfer, hover')
             sent = True
             self.execute(start, trajectory)

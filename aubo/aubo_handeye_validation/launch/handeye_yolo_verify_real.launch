@@ -7,11 +7,12 @@
   <!-- /camera matches the optical frame saved in the supplied calibration YAML. -->
   <arg name="camera_namespace" default="/camera"/>
   <arg name="target_class" default="can"/>
-  <arg name="table_z" default="0.10"/>
-  <arg name="table_center_x" default="0.70"/>
-  <arg name="table_center_y" default="0.0"/>
-  <arg name="table_size_x" default="0.70"/>
-  <arg name="table_size_y" default="1.00"/>
+  <!-- 2026-10-26 point-cloud fit; verify these against the current physical workcell. -->
+  <arg name="table_z" default="0.00285"/>
+  <arg name="table_center_x" default="-0.0442"/>
+  <arg name="table_center_y" default="-0.6707"/>
+  <arg name="table_size_x" default="0.74"/>
+  <arg name="table_size_y" default="0.93"/>
   <arg name="table_thickness" default="0.20"/>
   <arg name="table_center_z" value="$(eval float(arg('table_z')) - float(arg('table_thickness')) / 2)"/>
   <arg name="object_height" default="0.05"/>
@@ -21,18 +22,24 @@
   <arg name="velocity_scaling" default="0.03"/>
   <arg name="acceleration_scaling" default="0.02"/>
   <arg name="start_camera" default="true"/>
+  <!-- Point cloud is unused by this validation; disabling it reduces USB and CPU load. -->
+  <arg name="enable_pointcloud" default="false"/>
   <arg name="start_perception" default="true"/>
   <arg name="start_gripper" default="false"/>
   <arg name="gripper_port" default="/dev/ttyUSB0"/>
   <arg name="rviz" default="true"/>
+  <arg name="rviz_config" default="$(find aubo_handeye_validation)/config/handeye_yolo_verify.rviz"/>
+  <arg name="target_tf_frame" default="handeye_verify_target"/>
+  <arg name="grasp_goal_tf_frame" default="handeye_verify_grasp_goal"/>
   <arg name="python" default="/home/zlab/anaconda3/envs/yolo/bin/python"/>
   <arg name="model_path" default="/home/zlab/deepL/code/ultralytics-main-modify/weights/GC-yolo.pt"/>
-  <arg name="verification_config" default="$(find aubo_handeye_validation)/config/handeye_yolo_verify.yaml"/>
-  <arg name="perception_config" default="$(find aubo_perception)/config/grasp_pipeline.yaml"/>
+  <arg name="verification_config" default="$(find aubo_handeye_validation)/config/handeye_yolo_verify_real.yaml"/>
+  <arg name="perception_config" default="$(find aubo_handeye_validation)/config/handeye_perception.yaml"/>
 
   <include file="$(find aubo_ros_control)/launch/aubo_real_bringup.launch">
     <arg name="robot_ip" value="$(arg robot_ip)"/>
     <arg name="use_rviz" value="$(arg rviz)"/>
+    <arg name="rviz_config" value="$(arg rviz_config)"/>
     <arg name="robot_xacro" value="aubo_i5.xacro"/>
     <arg name="robot_srdf" value="aubo_i5.srdf"/>
   </include>
@@ -40,6 +47,7 @@
     <arg name="serial_no" value="$(arg camera_serial_no)"/>
     <arg name="camera_name" value="$(eval arg('camera_namespace').strip('/'))"/>
     <arg name="calibration_file" value="$(arg calibration_file)"/>
+    <arg name="enable_pointcloud" value="$(arg enable_pointcloud)"/>
   </include>
   <include if="$(arg start_gripper)" file="$(find inspire_gripper)/launch/gripper_control.launch">
     <arg name="port" value="$(arg gripper_port)"/>
@@ -68,6 +76,8 @@
     <rosparam command="load" file="$(arg verification_config)"/>
     <param name="calibration_file" value="$(arg calibration_file)"/>
     <param name="target_class" value="$(arg target_class)"/>
+    <param name="target_tf_frame" value="$(arg target_tf_frame)"/>
+    <param name="grasp_goal_tf_frame" value="$(arg grasp_goal_tf_frame)"/>
     <param name="height_mode" value="$(arg height_mode)"/>
     <param name="table_z" value="$(arg table_z)"/>
     <param name="hover_clearance" value="$(arg hover_clearance)"/>

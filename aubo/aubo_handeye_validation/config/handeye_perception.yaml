@@ -1,0 +1,18 @@
+# Fixed-camera validation profile based on the 2026-10-26 point-cloud snapshot.
+# table_z and object_height are also explicitly set by the launch arguments.
+target_frame: base_link
+table_z: 0.00285
+object_height: 0.05
+class_heights: {}
+height_tolerance: 0.02
+minimum_probability: 0.30
+minimum_depth: 0.10
+maximum_depth: 2.50
+depth_scale_16u: 0.001
+maximum_depth_age: 0.08
+depth_cache_size: 90
+depth_save_directory: ""
+roi_scale: 0.45
+class_aliases: {}
+# Bounds cover the measured plane percentiles with roughly 5 cm margin.
+workspace: {min_x: -0.42, max_x: 0.33, min_y: -1.16, max_y: -0.18}

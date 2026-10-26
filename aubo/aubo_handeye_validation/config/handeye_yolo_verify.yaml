@@ -20,10 +20,13 @@ sample_timeout: 8.0
 target_max_age: 0.8
 target_jitter: 0.005
 target_recheck_distance: 0.010
+target_recheck_timeout: 3.0
 state_max_age: 0.5
 
-# TCP +Z downward, fixed yaw. Do not apply YOLO yaw or grasp compensation.
+# Base TCP orientation when detected grasp angle is zero. Detected short-edge
+# angle is added to this yaw for the hover goal.
 downward_yaw: 1.5707963267948966
+grasp_angle_tolerance: 0.13962634016  # 8 degrees, modulo pi
 hover_clearance: 0.10
 travel_clearance: 0.20
 minimum_tcp_table_clearance: 0.05

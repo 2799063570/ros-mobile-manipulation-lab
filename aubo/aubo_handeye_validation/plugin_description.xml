@@ -1,0 +1,7 @@
+<library path="lib/libhandeye_verify_panel">
+  <class name="aubo_handeye_validation/HandeyeVerifyPanel"
+         type="aubo_handeye_validation::HandeyeVerifyPanel"
+         base_class_type="rviz::Panel">
+    <description>Plan, move to a target hover pose, and cancel the hand-eye verification motion.</description>
+  </class>
+</library>

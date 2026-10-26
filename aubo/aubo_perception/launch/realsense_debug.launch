@@ -2,6 +2,9 @@
   <!-- 仅采集和识别，输出相机光学坐标；无需手眼外参或机械臂。 -->
   <arg name="serial_no" default=""/>
   <arg name="camera_name" default="camera"/>
+  <arg name="width" default="640"/>
+  <arg name="height" default="480"/>
+  <arg name="fps" default="30"/>
   <arg name="start_camera" default="true"/>
   <arg name="enable_pointcloud" default="true"/>
   <arg name="enable_imu" default="false"/>
@@ -9,10 +12,13 @@
   <arg name="detector" default="color" doc="color | yolo"/>
   <arg name="selected_class" default="$(eval 'can' if arg('detector') == 'yolo' else 'red')"/>
   <arg name="python" default="/home/zlab/anaconda3/envs/yolo/bin/python"/>
-  <arg name="model_path" default="/home/zlab/deepL/code/ultralytics-main-modify/weights/GC-yolo.pt"/>
+  <arg name="model_path" default="/home/zlab/deepL/code/ultralytics-main-modify/weights/yolo11n-obb.pt"/>
   <include if="$(arg start_camera)" file="$(find aubo_perception)/launch/realsense_d435i.launch">
     <arg name="serial_no" value="$(arg serial_no)"/>
     <arg name="camera_name" value="$(arg camera_name)"/>
+    <arg name="width" value="$(arg width)"/>
+    <arg name="height" value="$(arg height)"/>
+    <arg name="fps" value="$(arg fps)"/>
     <arg name="enable_pointcloud" value="$(arg enable_pointcloud)"/>
     <arg name="enable_imu" value="$(arg enable_imu)"/>
     <arg name="initial_reset" value="$(arg initial_reset)"/>

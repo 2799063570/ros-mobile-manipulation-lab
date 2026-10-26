@@ -89,6 +89,7 @@ class UltralyticsYoloNode:
         self.minimum_interval = 0.0 if inference_rate <= 0 else 1.0 / inference_rate
         self.last_inference_time = 0.0
         self.inference_lock = threading.Lock()
+        self.processing_fps = 0.0
 
         if not self.project_path.is_dir():
             raise RuntimeError("YOLO project directory does not exist: {}".format(self.project_path))
@@ -175,6 +176,7 @@ class UltralyticsYoloNode:
         if not self.inference_lock.acquire(False):
             return
         self.last_inference_time = now
+        processing_started = time.monotonic()
         try:
             image = image_message_to_bgr(message)
             result = self.model.predict(
@@ -192,7 +194,17 @@ class UltralyticsYoloNode:
             self._append_detections(output, result) # 获取检测结果
             self.detections_publisher.publish(output)
             if self.publish_annotated and (self.input_mode == "image" or self.annotated_publisher.get_num_connections()):
-                self.annotated_publisher.publish(bgr_to_image_message(result.plot(), message))
+                import cv2
+
+                annotated = result.plot()
+                elapsed = max(time.monotonic() - processing_started, 1.0e-9)
+                instantaneous_fps = 1.0 / elapsed
+                self.processing_fps = (instantaneous_fps if self.processing_fps <= 0.0
+                                       else 0.2 * instantaneous_fps + 0.8 * self.processing_fps)
+                cv2.putText(annotated, "Inference FPS: {:.1f}".format(self.processing_fps),
+                            (12, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2,
+                            cv2.LINE_AA)
+                self.annotated_publisher.publish(bgr_to_image_message(annotated, message))
         except Exception as error:
             rospy.logerr_throttle(2.0, "YOLO inference failed: %s", str(error))
             if self.input_mode == "image":

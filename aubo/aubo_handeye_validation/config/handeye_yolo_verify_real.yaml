@@ -1,0 +1,44 @@
+# Real-cell bounds derived from the 2026-10-26 point-cloud snapshot.
+# Confirm the physical table and reachable region before executing any trajectory.
+planning_group: aubo_i5
+calibration_file: ""
+end_effector_link: tcp_link
+target_frame: base_link
+detections_topic: /sorting/detections
+joint_states_topic: /aubo_i5/joint_states
+target_class: can
+min_confidence: 0.6
+height_mode: depth
+table_z: 0.00285
+height_tolerance: 0.02
+workspace: {min_x: -0.42, max_x: 0.33, min_y: -1.16, max_y: -0.18}
+
+min_samples: 5
+sample_window: 0.25
+sample_timeout: 8.0
+target_max_age: 0.8
+target_jitter: 0.005
+target_recheck_distance: 0.010
+target_recheck_timeout: 3.0
+state_max_age: 0.5
+
+downward_yaw: 1.5707963267948966
+grasp_angle_tolerance: 0.13962634016
+hover_clearance: 0.10
+travel_clearance: 0.20
+minimum_tcp_table_clearance: 0.05
+max_tcp_z: 0.80
+orientation_tolerance: 0.035
+eef_step: 0.005
+max_joint_step: 0.12
+max_start_error: 0.01
+final_position_tolerance: 0.005
+planning_time: 10.0
+execution_timeout: 180.0
+
+velocity_scaling: 0.03
+acceleration_scaling: 0.02
+max_joint_speed: 0.05
+max_joint_acceleration: 0.08
+max_tcp_speed: 0.02
+output_directory: ~/handeye_yolo_verify
