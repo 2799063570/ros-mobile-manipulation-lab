@@ -1,0 +1,18 @@
+<launch>
+  <!-- 调用方提供 robot_description、真实关节反馈和唯一的 jog 后端。 -->
+  <arg name="config" default="$(find aubo_trajectory_tracking)/config/tracking.yaml"/>
+  <arg name="joint_states_topic" default="/cartesian_jog/sdk_joint_states"/>
+  <arg name="panel" default="true"/>
+  <arg name="rviz" default="true"/>
+  <!-- Some desktop/IDE environments export QT_XCB_GL_INTEGRATION=none. -->
+  <arg name="qt_gl_integration" default="xcb_glx"/>
+  <node pkg="aubo_trajectory_tracking" type="trajectory_tracker_node" name="trajectory_tracking" output="screen" required="true">
+    <rosparam file="$(arg config)"/>
+    <param name="joint_states_topic" value="$(arg joint_states_topic)"/>
+  </node>
+  <node if="$(arg panel)" pkg="aubo_trajectory_tracking" type="tracking_panel.py" name="trajectory_tracking_panel" output="screen"/>
+  <node if="$(arg rviz)" pkg="rviz" type="rviz" name="trajectory_tracking_rviz"
+        args="-d $(find aubo_trajectory_tracking)/config/tracking.rviz">
+    <env name="QT_XCB_GL_INTEGRATION" value="$(arg qt_gl_integration)"/>
+  </node>
+</launch>

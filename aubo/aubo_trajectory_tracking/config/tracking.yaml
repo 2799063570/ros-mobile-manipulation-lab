@@ -1,0 +1,23 @@
+base_link: base_link
+tool_link: tcp_link
+joint_states_topic: /cartesian_jog/sdk_joint_states
+jog_ns: /cartesian_jog
+# 轨迹尺寸单位 m，周期 s；plane 为基坐标系平面。
+shape: circle
+plane: xy
+radius: 0.03
+amplitude: 0.02
+length: 0.10
+waves: 1
+cycles: 1
+# 包含五次时间缩放的完整运行时间，起终点速度/加速度为零。
+duration: 40.0
+kp: 0.5
+max_speed: 0.015
+max_error: 0.04
+max_extent: 0.15
+feedback_timeout: 0.15
+state_timeout: 0.35
+settle_tolerance: 0.002
+settle_speed: 0.003
+settle_timeout: 15.0

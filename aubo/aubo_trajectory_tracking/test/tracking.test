@@ -1,0 +1,10 @@
+<launch>
+  <param name="robot_description" textfile="$(find aubo_trajectory_tracking)/test/xyz.urdf"/>
+  <node pkg="aubo_trajectory_tracking" type="trajectory_tracker_node" name="trajectory_tracking" output="screen">
+    <rosparam file="$(find aubo_trajectory_tracking)/config/tracking.yaml"/>
+    <param name="tool_link" value="tcp"/>
+    <param name="joint_states_topic" value="/test/joints"/>
+    <param name="jog_ns" value="/test/jog"/>
+  </node>
+  <test test-name="tracking_integration" pkg="aubo_trajectory_tracking" type="tracking_test.py" time-limit="75"/>
+</launch>

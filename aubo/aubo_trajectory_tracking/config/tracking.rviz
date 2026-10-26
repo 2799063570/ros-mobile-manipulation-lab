@@ -1,0 +1,58 @@
+Panels:
+  - Class: rviz/Displays
+    Name: Displays
+  - Class: rviz/Views
+    Name: Views
+Visualization Manager:
+  Class: ""
+  Global Options:
+    Fixed Frame: base_link
+    Background Color: 24; 29; 39
+    Frame Rate: 30
+  Displays:
+    - Class: rviz/Grid
+      Name: Workspace grid
+      Enabled: true
+      Cell Size: 0.1
+      Plane Cell Count: 20
+      Color: 65; 75; 90
+    - Class: rviz/RobotModel
+      Name: AUBO actual robot
+      Enabled: true
+      Robot Description: robot_description
+      Alpha: 0.75
+    - Class: rviz/Path
+      Name: Reference - cyan
+      Enabled: true
+      Topic: /trajectory_tracking/reference_path
+      Color: 30; 220; 230
+      Line Style: Billboards
+      Line Width: 0.003
+      Buffer Length: 1
+      Pose Style: None
+    - Class: rviz/Path
+      Name: Actual TCP - orange
+      Enabled: true
+      Topic: /trajectory_tracking/actual_path
+      Color: 255; 145; 40
+      Line Style: Billboards
+      Line Width: 0.002
+      Buffer Length: 1
+      Pose Style: None
+    - Class: rviz/MarkerArray
+      Name: Target error and status
+      Enabled: true
+      Marker Topic: /trajectory_tracking/markers
+    - Class: rviz/TF
+      Name: Coordinate frames
+      Enabled: false
+  Views:
+    Current:
+      Class: rviz/Orbit
+      Distance: 1.7
+      Pitch: 0.45
+      Yaw: 0.8
+      Focal Point: {X: 0, Y: 0, Z: 0.45}
+Window Geometry:
+  Width: 1280
+  Height: 800

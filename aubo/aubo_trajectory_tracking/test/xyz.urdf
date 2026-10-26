@@ -1,0 +1,6 @@
+<robot name="xyz_fixture">
+  <link name="base_link"/><link name="x_link"/><link name="y_link"/><link name="tcp"/>
+  <joint name="x" type="prismatic"><parent link="base_link"/><child link="x_link"/><axis xyz="1 0 0"/><limit lower="-2" upper="2" effort="1" velocity="1"/></joint>
+  <joint name="y" type="prismatic"><parent link="x_link"/><child link="y_link"/><axis xyz="0 1 0"/><limit lower="-2" upper="2" effort="1" velocity="1"/></joint>
+  <joint name="z" type="prismatic"><parent link="y_link"/><child link="tcp"/><axis xyz="0 0 1"/><limit lower="-2" upper="2" effort="1" velocity="1"/></joint>
+</robot>

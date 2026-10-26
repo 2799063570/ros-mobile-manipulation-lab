@@ -43,6 +43,15 @@
         <joint name="wrist2_joint" value="1.5956" />
         <joint name="wrist3_joint" value="0" />
     </group_state>
+    <!-- work: captured from the stopped real robot SDK on 2026-10-25; units rad. -->
+    <group_state name="work" group="aubo_i5">
+        <joint name="shoulder_joint" value="1.388221621513" />
+        <joint name="upperArm_joint" value="0.083065070212" />
+        <joint name="foreArm_joint" value="-1.958168029785" />
+        <joint name="wrist1_joint" value="-0.440115660429" />
+        <joint name="wrist2_joint" value="-1.627500295639" />
+        <joint name="wrist3_joint" value="-1.750364661217" />
+    </group_state>
     <group_state name="work_ready" group="aubo_i5">
         <joint name="foreArm_joint" value="1.562" />
         <joint name="shoulder_joint" value="0" />

@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>aubo_trajectory_tracking</name><version>0.1.0</version>
+  <description>Cartesian curve tracking through the existing AUBO jog servo, with preview and RViz feedback.</description>
+  <maintainer email="maintainer@example.com">AUBO developers</maintainer><license>MIT</license>
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>roscpp</depend><depend>geometry_msgs</depend><depend>sensor_msgs</depend>
+  <depend>std_msgs</depend><depend>std_srvs</depend><depend>nav_msgs</depend>
+  <depend>visualization_msgs</depend><depend>kdl_parser</depend><depend>orocos_kdl</depend>
+  <exec_depend>aubo_ros_control</exec_depend><exec_depend>rviz</exec_depend>
+  <exec_depend>rospy</exec_depend><exec_depend>python_qt_binding</exec_depend>
+  <test_depend>rostest</test_depend>
+</package>

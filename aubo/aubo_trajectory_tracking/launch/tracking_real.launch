@@ -1,0 +1,18 @@
+<launch>
+  <arg name="robot_ip" default="192.168.1.2"/>
+  <arg name="robot_xacro" default="aubo_i5_with_camera.xacro"/>
+  <arg name="robot_srdf" default="aubo_i5_with_camera.srdf"/>
+  <arg name="jog_config" default="$(find aubo_ros_control)/config/cartesian_jog.yaml"/>
+  <arg name="config" default="$(find aubo_trajectory_tracking)/config/tracking.yaml"/>
+  <arg name="panel" default="true"/><arg name="rviz" default="true"/>
+  <arg name="qt_gl_integration" default="xcb_glx"/>
+  <include file="$(find aubo_ros_control)/launch/cartesian_jog_real.launch">
+    <arg name="robot_ip" value="$(arg robot_ip)"/>
+    <arg name="robot_xacro" value="$(arg robot_xacro)"/><arg name="robot_srdf" value="$(arg robot_srdf)"/>
+    <arg name="config" value="$(arg jog_config)"/><arg name="panel" value="false"/>
+  </include>
+  <include file="$(find aubo_trajectory_tracking)/launch/tracking.launch">
+    <arg name="config" value="$(arg config)"/><arg name="panel" value="$(arg panel)"/><arg name="rviz" value="$(arg rviz)"/>
+    <arg name="qt_gl_integration" value="$(arg qt_gl_integration)"/>
+  </include>
+</launch>

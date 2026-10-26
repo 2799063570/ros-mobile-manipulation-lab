@@ -1,0 +1,40 @@
+# Captured real-robot work pose; archival metadata, not an automatic motion command.
+work:
+  group: aubo_i5
+  joint_names:
+  - shoulder_joint
+  - upperArm_joint
+  - foreArm_joint
+  - wrist1_joint
+  - wrist2_joint
+  - wrist3_joint
+  joint_positions:
+  - 1.3882216215133667
+  - 0.08306507021188736
+  - -1.9581680297851562
+  - -0.44011566042900085
+  - -1.627500295639038
+  - -1.7503646612167358
+  units: rad
+  source: sdk_real_robot
+  robot_ip: 192.168.1.2
+  captured_at: '2026-10-25T22:37:30+08:00'
+  robot_state: RobotStopped
+  sample_count: 12
+  max_joint_span_rad: 6.079673767089844e-06
+  diagnosis:
+    power_on: true
+    soft_estop: false
+    remote_estop: false
+    collision: false
+  sdk_reported_waypoint:
+    position_m:
+    - 0.029159193599505445
+    - -0.48191851404832603
+    - 0.23774838260780276
+    quaternion_xyzw:
+    - -0.7074995112029453
+    - -0.705982553969765
+    - 0.0036359168810359468
+    - 0.0319351725587266
+    note: SDK-reported waypoint; not assumed to equal the URDF tcp_link pose.
