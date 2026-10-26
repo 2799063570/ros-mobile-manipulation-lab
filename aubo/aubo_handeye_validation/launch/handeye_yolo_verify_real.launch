@@ -19,8 +19,8 @@
   <arg name="height_mode" default="depth"/>
   <arg name="hover_clearance" default="0.10"/>
   <arg name="travel_clearance" default="0.20"/>
-  <arg name="velocity_scaling" default="0.03"/>
-  <arg name="acceleration_scaling" default="0.02"/>
+  <arg name="velocity_scaling" default="0.10"/>
+  <arg name="acceleration_scaling" default="0.10"/>
   <arg name="start_camera" default="true"/>
   <!-- Point cloud is unused by this validation; disabling it reduces USB and CPU load. -->
   <arg name="enable_pointcloud" default="false"/>

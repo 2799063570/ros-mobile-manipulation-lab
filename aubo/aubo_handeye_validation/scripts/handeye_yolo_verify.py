@@ -8,6 +8,7 @@ import os
 import sys
 import threading
 import time
+import traceback
 from collections import deque
 
 import numpy as np
@@ -644,6 +645,9 @@ def main():
     try:
         HandeyeYoloVerify()
         rospy.spin()
+    except Exception:
+        rospy.logfatal('handeye_yolo_verify crashed:\n%s', traceback.format_exc())
+        raise
     finally:
         moveit_commander.roscpp_shutdown()
 
