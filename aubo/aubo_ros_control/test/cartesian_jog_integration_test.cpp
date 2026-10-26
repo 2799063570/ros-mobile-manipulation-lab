@@ -249,7 +249,37 @@ TEST_F(JogIntegration, FramesNeutralTimeoutAndFaultLatch)
   EXPECT_TRUE(home.getResult()->success);
   EXPECT_NEAR(position()[0], 0.12, 0.005);
   EXPECT_TRUE(wait([this]() { return state() == "DISABLED"; }));
+  // Explicit start targets use the same executor; keep this fixture publishing.
+  {
+    using HomeClient = actionlib::SimpleActionClient<aubo_ros_control::MoveHomeAction>;
+    HomeClient home("/cartesian_jog/move_home", true);
+    ASSERT_TRUE(home.waitForServer(ros::Duration(5)));
+    const auto before=position();
+    aubo_ros_control::MoveHomeGoal goal;
+    goal.target_joint_positions={0.0};
+    home.sendGoal(goal);
+    ASSERT_TRUE(home.waitForResult(ros::Duration(2)));
+    EXPECT_EQ(home.getState(), actionlib::SimpleClientGoalState::REJECTED);
+    goal.target_joint_positions.assign(before.begin(),before.end());
+    goal.target_joint_positions[0]=std::numeric_limits<double>::quiet_NaN();
+    home.sendGoal(goal);
+    ASSERT_TRUE(home.waitForResult(ros::Duration(2)));
+    EXPECT_EQ(home.getState(), actionlib::SimpleClientGoalState::REJECTED);
+    goal.target_joint_positions[0]=3.0;
+    home.sendGoal(goal);
+    ASSERT_TRUE(home.waitForResult(ros::Duration(2)));
+    EXPECT_EQ(home.getState(), actionlib::SimpleClientGoalState::REJECTED);
+    EXPECT_NEAR(position()[0],before[0],1e-6);
+    goal.target_joint_positions[0]=before[0]+.025;
+    home.sendGoal(goal);
+    ASSERT_TRUE(home.waitForResult(ros::Duration(12)));
+    EXPECT_EQ(home.getState(), actionlib::SimpleClientGoalState::SUCCEEDED);
+    EXPECT_TRUE(home.getResult()->success);
+    EXPECT_NEAR(position()[0],goal.target_joint_positions[0],.005);
+    ASSERT_TRUE(wait([this]() { return state()=="DISABLED"; }));
+  }
 }
+
 
 int main(int argc, char** argv)
 {

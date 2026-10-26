@@ -1,0 +1,14 @@
+<launch>
+  <param name="use_sim_time" value="true"/>
+  <param name="robot_description" textfile="$(find aubo_trajectory_tracking)/test/xyz.urdf"/>
+  <node pkg="aubo_trajectory_tracking" type="trajectory_tracker_node" name="trajectory_tracking" output="screen">
+    <rosparam file="$(find aubo_trajectory_tracking)/config/tracking.yaml"/>
+    <param name="check_feasibility" value="false"/>
+    <param name="tool_link" value="tcp"/>
+    <param name="joint_states_topic" value="/test/joints"/>
+    <param name="jog_ns" value="/test/jog"/>
+    <param name="radius" value="0.001"/>
+    <param name="duration" value="2.0"/>
+  </node>
+  <test test-name="tracking_clock" pkg="aubo_trajectory_tracking" type="tracking_clock_test.py" time-limit="15"/>
+</launch>

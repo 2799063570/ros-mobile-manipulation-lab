@@ -1,0 +1,20 @@
+<launch>
+  <!-- Actual AUBO kinematics, ROS-only fake plant, no SDK or Gazebo process. -->
+  <include file="$(find aubo_moveit_config)/launch/planning_context.launch">
+    <arg name="load_robot_description" value="true"/>
+    <arg name="robot_xacro" value="aubo_i5.xacro"/>
+    <arg name="robot_srdf" value="aubo_i5.srdf"/>
+  </include>
+  <node pkg="aubo_ros_control" type="aubo_cartesian_jog_node" name="aubo_cartesian_jog" required="true" output="screen">
+    <rosparam file="$(find aubo_ros_control)/config/cartesian_jog.yaml"/>
+    <param name="backend" value="gazebo"/>
+    <param name="joint_states_topic" value="/preparation_test/joints"/>
+    <param name="scene_joint_states_topic" value="/preparation_test/joints"/>
+    <rosparam param="gazebo_command_topics">[/preparation_test/q0, /preparation_test/q1, /preparation_test/q2, /preparation_test/q3, /preparation_test/q4, /preparation_test/q5]</rosparam>
+  </node>
+  <include file="$(find aubo_trajectory_tracking)/launch/tracking.launch">
+    <arg name="joint_states_topic" value="/preparation_test/joints"/>
+    <arg name="panel" value="false"/><arg name="rviz" value="false"/>
+  </include>
+  <test test-name="preparation_integration" pkg="aubo_trajectory_tracking" type="preparation_test.py" time-limit="100"/>
+</launch>

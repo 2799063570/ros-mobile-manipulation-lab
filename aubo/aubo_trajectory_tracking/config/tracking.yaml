@@ -12,12 +12,20 @@ waves: 1
 cycles: 1
 # 包含五次时间缩放的完整运行时间，起终点速度/加速度为零。
 duration: 40.0
-kp: 0.5
+# 位置误差修正：提高 P；有界积分默认关闭，避免相位滞后。纠偏速度最多占总预算的 20%。
+kp: 1.0
+ki: 0.0
+correction_fraction: 0.2
+# 趋势速度只用于诊断；原始速度仍保留，并参与停稳判断。
+velocity_window: 0.08
 max_speed: 0.015
 max_error: 0.04
-max_extent: 0.15
+max_extent: 0.25
 feedback_timeout: 0.15
 state_timeout: 0.35
 settle_tolerance: 0.002
 settle_speed: 0.003
 settle_timeout: 15.0
+
+# 更新预览时，对实际当前姿态执行整条曲线的离散运动学/碰撞/速度检查。
+check_feasibility: true

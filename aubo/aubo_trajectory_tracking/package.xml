@@ -7,7 +7,10 @@
   <depend>roscpp</depend><depend>geometry_msgs</depend><depend>sensor_msgs</depend>
   <depend>std_msgs</depend><depend>std_srvs</depend><depend>nav_msgs</depend>
   <depend>visualization_msgs</depend><depend>kdl_parser</depend><depend>orocos_kdl</depend>
-  <exec_depend>aubo_ros_control</exec_depend><exec_depend>rviz</exec_depend>
+  <depend>aubo_ros_control</depend><depend>actionlib</depend>
+  <depend>moveit_core</depend><depend>moveit_ros_planning</depend>
+  <exec_depend>python3-matplotlib</exec_depend><exec_depend>python3-numpy</exec_depend><exec_depend>rviz</exec_depend>
   <exec_depend>rospy</exec_depend><exec_depend>python_qt_binding</exec_depend>
-  <test_depend>rostest</test_depend>
+  <test_depend>rostest</test_depend><test_depend>rosgraph_msgs</test_depend>
+  <test_depend>aubo_moveit_config</test_depend><test_depend>moveit_msgs</test_depend><test_depend>shape_msgs</test_depend>
 </package>

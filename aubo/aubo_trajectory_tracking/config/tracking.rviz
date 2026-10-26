@@ -31,6 +31,15 @@ Visualization Manager:
       Buffer Length: 1
       Pose Style: None
     - Class: rviz/Path
+      Name: Recommended start curve - purple
+      Enabled: true
+      Topic: /trajectory_preparation/candidate_path
+      Color: 190; 100; 255
+      Line Style: Billboards
+      Line Width: 0.002
+      Buffer Length: 1
+      Pose Style: None
+    - Class: rviz/Path
       Name: Actual TCP - orange
       Enabled: true
       Topic: /trajectory_tracking/actual_path

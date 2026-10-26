@@ -17,7 +17,7 @@
 
 ```bash
 cd /home/zlab/aubo/ros_mobile_manipulation_lab
-catkin_make --pkg aubo_trajectory_tracking -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+catkin_make --pkg aubo_ros_control aubo_trajectory_tracking -DCMAKE_POLICY_VERSION_MINIMUM=3.5
 source devel/setup.bash
 ```
 
@@ -47,12 +47,17 @@ roslaunch aubo_trajectory_tracking tracking.launch
 
 ## 操作
 
-1. 等待 SDK、关节反馈和点动节点就绪，底层状态为 `DISABLED`。机械臂当前位置应有足够工作空间且避开奇异位形；本包不会自动调整起始关节姿态。
-2. 在面板设置 `circle` 或 `sine`、平面、尺寸和总时间，点击“更新预览”。预览捕获当前实际 TCP 作为起点，冻结本次参数，并显示完整参考曲线。
-3. 检查 RViz 的曲线与实际场景。点击“开始跟踪”：显式使能、发送至少约 0.3 s 零指令、等待新的使能状态确认，再开始推进轨迹。
-4. 完成后先等待实际 TCP 收敛，再请求禁用。途中可点击“停止”；关闭面板也会先请求停止。停止或故障后必须重新预览并显式开始。
+1. 查看面板“准备状态”，等待关节反馈和点动节点就绪、底层状态为 `DISABLED`。未就绪时会显示具体原因（反馈无效/过期、时钟异常、底层状态超时或未禁用），预览和开始按钮按条件开放。机械臂当前位置应有足够工作空间且避开奇异位形；本包不会自动调整起始关节姿态，移动起点必须显式点击。
+2. 设置 `circle` 或 `sine`、平面、尺寸、总时间和速度上限。允许最大位移 `max_extent` 也可在面板修改，圆需要至少为直径；不代表机械臂可达范围。
+3. 点击“搜索推荐起点”：从当前姿态、配置 HOME 及其单关节扰动形成 22 个候选，使用同一曲线定义进行连续逆解、关节余量、已知场景碰撞、奇异性和关节速度/加速度预算检查。推荐有限候选中的较优姿态，不声称全局最优。RViz 紫色曲线显示推荐起点对应的完整路径，面板显示起点 XYZ 和检查结果。搜索不移动机械臂。
+4. 检查场景后，点击“移动到推荐起点”。移动前重新检查已知场景与到起点的关节直线路径，沿原点动后端的关节控制流程限速、平滑移动，可用“停止”取消。参数或当前姿态改变后，旧推荐会被拒绝。遇到障碍不做全局绕障，需调整当前姿态后重新搜索。
+5. 到位后点击“更新预览”：基于实际 TCP 和当前实际关节姿态，重新检查整条曲线，记录起点并冻结本次参数。也可跳过搜索和移动，直接检查并使用当前位置。预览仅在成功后清空上一轮跟踪数据。
+6. 检查 RViz 曲线，点击“开始跟踪”：显式使能、发送至少约 0.3 s 零指令、等待新的使能状态确认，再推进轨迹。点击“跟踪曲线 / 导出”查看实时目标/实际路径、XYZ 随时间变化、位置误差与实际速度；支持保存 PNG、导出 SI 单位 CSV。关闭绘图窗口后仍继续接收数据。
+7. 完成后等待实际 TCP 收敛，再请求禁用。途中“停止”和关闭主面板都会同时请求取消起点准备并停止跟踪。完成、停止或故障后，须重新预览并显式开始。
 
-预览后如果 TCP 位置移动超过到位容差，开始请求会被拒绝。面板修改参数后须重新“更新预览”，否则开始仍采用上一次预览冻结的参数。
+Gazebo 入口已设置非零初始关节姿态以避开零位伸直奇异位形。请保持 Gazebo 物理运行；暂停会导致反馈超时。本包不自动回零或复位故障。新版本扩展了 `MoveHome.action` 的可选 `target_joint_positions` 字段，空数组仍使用原 HOME；升级时需重新编译底层节点与相关动作客户端并重启，避免旧动作消息的 MD5 不匹配。
+
+预览后如果 TCP 移动超过到位容差，开始会显示偏移量和允许值。面板修改参数后会禁用开始和移动起点按钮，直到对应的预览或搜索重新成功；直接调用跟踪服务仍采用上一次成功预览冻结的参数。
 
 普通停止会经过点动程序和控制柜已有前瞻点及减速尾段，不等于硬件急停。`COMPLETED` 表示末点位置与估计速度满足上层判据且禁用请求已被接受，不证明柜内队列完全排空或机械臂已经物理停稳。上层进程突然退出时，停止仍依赖底层输入超时保护。
 
@@ -65,13 +70,21 @@ roslaunch aubo_trajectory_tracking tracking.launch
 - 圆：`a = radius × (cos(2π × cycles × s) − 1)`，`b = radius × sin(2π × cycles × s)`。整数圈数执行一次后返回起点。
 - 正弦：`a = length × s`，`b = amplitude × sin(2π × waves × s)`。执行一次后停在前进距离 `length` 处，不自动往返。
 
-起终点的参考速度、参考加速度为零。上层以 50 Hz 更新：`v = derivative(p_ref) + kp × (p_ref − p_actual)`，再按合速度限幅。实际 TCP 使用原始关节反馈及与点动相同的 `robot_description`、`base_link → tool_link` KDL 链计算；不使用参考位置充当实际反馈。姿态保持由现有点动节点完成。
+起终点的参考速度、参考加速度为零。上层以 50 Hz 更新：`v = derivative(p_ref) + bounded(kp × (p_ref − p_actual) + integral)`，纠偏速度限于总速度预算的 20%，再按合速度限幅。积分具有限幅和条件抗饱和，默认关闭；快速曲线上的积分可能增加相位误差，需根据实测选择。实际 TCP 使用原始关节反馈及与点动相同的 `robot_description`、`base_link → tool_link` KDL 链计算；不使用参考位置充当实际反馈。姿态保持由现有点动节点完成。
 
-默认圆半径 30 mm，总时间 40 s，最大指令速度 15 mm/s，`kp=0.5/s`。这是带时间参数的轨迹跟踪，上层误差是同一时刻参考位置与实际 TCP 的欧氏距离，不是到整条曲线的最近距离。SDK 前瞻、平滑和通信延迟会造成相位滞后；当前回授未补偿这些延迟，实机跟踪精度需现场测量，不能由模拟测试推断。
+默认圆半径 30 mm，总时间 40 s，最大指令速度 15 mm/s，`kp=1.0/s`、`ki=0`。这是带时间参数的轨迹跟踪，上层误差是同一时刻参考位置与实际 TCP 的欧氏距离，不是到整条曲线的最近距离。SDK 前瞻、平滑和通信延迟会造成相位滞后；当前回授未补偿这些延迟，实机跟踪精度需现场测量，不能由模拟测试推断。
+
+轨迹相位按 ROS 时间推进，Gazebo 降速时与 `/clock` 一致；回调、反馈、状态、使能确认和收敛超时仍使用真实时间看门狗。统计/绘图将目标位置计算到反馈本身的时间戳，每帧有效反馈最多计入一次，避免用较新的目标与旧反馈比较产生速度相关偏差。控制命令仍使用当前目标与新鲜的实际 TCP 误差；不对实测位置做平滑或以预测值替代。时钟倒退或异常跳变会停止跟踪。
+
+原始速度仍是相邻反馈位置差分，完整保留。另提供默认 80 ms 带时间戳的三维位置线性拟合趋势速度，便于分辨持续运动与高频抖动。停稳判断同时要求原始速度和趋势速度满足阈值，不能依赖平滑掩盖真实尖峰。末点误差小于一半位置容差时进入零指令保持，超过完整容差才恢复修正，以减少抖动驱动的反复启停。
+
+绘图提供参考/指令/原始/趋势速度对比，并显示进入末点收敛阶段的虚线；位置默认显示相对首个参考点的位移，可切回绝对坐标。误差分为总误差、沿参考切向的有符号分量、其余法向分量；法向误差不是整条曲线的严格最近距离。参考速度为零时切向分量记为零，法向分量等于总误差。
 
 预览检查解析速度上界，为回授预留 20% 速度预算。五次时间缩放最大 `ds/dt=1.875/duration`，圆的速度界为 `2π × cycles × radius × 1.875/duration`；正弦使用 `hypot(length, 2π × waves × amplitude) × 1.875/duration`。超限时增加运行时间或减小尺寸。
 
-预览仅显示几何轨迹并校验数值、尺寸、速度，**不承诺整条路径可达、无碰撞或远离奇异点**。运动中的底层检查继续生效，遇到不能执行的局部路径会停止，不做全局绕障。现实障碍物仍需按原点动流程发布到规划场景。
+预览默认启用 `check_feasibility`，由准备节点对固定末端姿态的整条曲线进行离散检查：至少 300 段、按路径长度约 1 mm 加密（最多 5000 段），以前一点逆解为下一点种子，拒绝无解、残差过大或关节跳变。关节路径以最大 0.01 rad 增量采样碰撞，并检查关节限位余量及与底层一致的雅可比最小奇异值阈值。按时间采样的关节速度/加速度估计保留 20% 预算，速度估计考虑底层奇异性缩放，超限时提示建议时长。
+
+这些检查是离散模型预测，不是连续碰撞证明，不模拟 jerk 平滑、DLS 误差、控制柜前瞻或真实动力学，也不保证跟踪误差。执行时保留底层实时制动碰撞和限位保护。准备节点订阅与底层相同的规划场景话题/完整场景服务；Gazebo 模型不会自动转为 MoveIt 碰撞物体，实际障碍物必须发布到规划场景。合成运动学单元测试可显式关闭可行性检查；正常运行保持启用。
 
 ## 参数
 
@@ -83,13 +96,17 @@ roslaunch aubo_trajectory_tracking tracking.launch
 | `radius / amplitude / length` | `0.03 / 0.02 / 0.10` | m |
 | `cycles / waves` | `1 / 1` | 圆圈数 / 正弦波数，整数 1–20 |
 | `duration` | `40.0` | 一次完整轨迹时间 s，含起止时间缩放 |
-| `kp` | `0.5` | 位置回授增益 1/s |
+| `kp` | `1.0` | 位置回授增益 1/s，面板可调 |
+| `ki` | `0.0` | 有界积分增益 1/s²，默认关闭，面板可调 |
+| `correction_fraction` | `0.2` | 纠偏速度预算比例，上限 20% |
+| `velocity_window` | `0.08` | 趋势速度拟合窗口 s；原始速度仍保留 |
 | `max_speed` | `0.015` | 线速度合量上限 m/s，另受底层限速 |
 | `max_error` | `0.04` | 超过此 TCP 误差则中止，m |
-| `max_extent` | `0.15` | 相对起点最大几何位移界，m |
+| `max_extent` | `0.25` | 相对起点最大几何位移界，m |
 | `feedback_timeout / state_timeout` | `0.15 / 0.35` | 原始关节反馈 / 底层状态新鲜度，s |
 | `settle_tolerance / settle_speed` | `0.002 / 0.003` | 末点收敛位置 m / 估计 TCP 速度 m/s |
 | `settle_timeout` | `15.0` | 轨迹时间结束后最大收敛等待 s |
+| `check_feasibility` | `true` | 预览时要求准备节点完成整条曲线离散检查 |
 | `base_link / tool_link` | `base_link / tcp_link` | 必须与底层点动配置一致 |
 | `joint_states_topic` | `/cartesian_jog/sdk_joint_states` | 原始六轴反馈，Gazebo 入口覆盖为 `/aubo_i5/joint_states` |
 
@@ -104,10 +121,18 @@ RViz 默认配置包含机械臂模型、网格、青色参考路径、橙色实
 | `/trajectory_tracking/preview` | `std_srvs/Trigger`，更新预览、捕获起点与参数 |
 | `/trajectory_tracking/start` | `std_srvs/Trigger`，开始已预览的轨迹 |
 | `/trajectory_tracking/stop` | `std_srvs/Trigger`，请求停止 |
+| `/trajectory_tracking/readiness` | `std_msgs/String`，`WAITING / PREVIEW_READY / START_READY` 及准备条件说明，持续更新，不使能或移动机械臂 |
 | `/trajectory_tracking/state` | `std_msgs/String`，状态及原因 |
 | `/trajectory_tracking/reference_path` | `nav_msgs/Path`，锁存的完整参考曲线 |
 | `/trajectory_tracking/actual_path` | `nav_msgs/Path`，实际 TCP 路径 |
 | `/trajectory_tracking/markers` | `visualization_msgs/MarkerArray` |
+| `/trajectory_tracking/samples` | `Float64MultiArray`，`[反馈时间相对运行起点 s, 同时刻目标 XYZ m, 实际 XYZ m, 位置误差 m, 原始实际速度 m/s, 参考速度 m/s, 本次指令速度 m/s, 趋势速度 m/s, 反馈年龄 s, 收敛阶段标志 0/1, 切向误差 m, 法向误差 m]`，共 16 项；前 9 项保持原顺序；预览成功发送空数组作为新轮次标记 |
+| `/trajectory_preparation/analyze` | `std_srvs/Trigger`，搜索起点，不移动 |
+| `/trajectory_preparation/move` | `std_srvs/Trigger`，复查后显式移动到推荐姿态，异步报告到位 |
+| `/trajectory_preparation/check_current` | `std_srvs/Trigger`，检查当前起点对应的整条曲线 |
+| `/trajectory_preparation/stop` | `std_srvs/Trigger`，取消搜索、取消起点移动并请求底层禁用 |
+| `/trajectory_preparation/state` | `std_msgs/String`，搜索/推荐/移动/到位及失败原因 |
+| `/trajectory_preparation/candidate_path` | `nav_msgs/Path`，最近推荐起点的完整曲线，RViz 紫色 |
 | `/trajectory_tracking/metrics` | `Float64MultiArray`，`[elapsed_s, error_m, peak_m, rms_m, actual_speed_m_s]` |
 
 无界面示例（先启动节点）：
@@ -133,6 +158,8 @@ rosbag record -O tracking.bag /trajectory_tracking/state /trajectory_tracking/me
 
 ```bash
 rostest aubo_trajectory_tracking tracking.test
+rostest aubo_trajectory_tracking preparation.test
+rostest aubo_trajectory_tracking tracking_clock.test
 ```
 
 模拟执行端没有复现 SDK 前瞻与真实动力学，实机效果仍需验证。现有实机点动约束参见 [调试复盘](../../docs/AUBO实机点动问题与调试复盘.md)。
@@ -147,3 +174,5 @@ rostest aubo_trajectory_tracking tracking.test
 - `No p gain specified ... /gazebo_ros_control/pid_gains/...`：这是 Gazebo 硬件仿真层的 PID 参数命名空间，与各位置控制器的 `pid` 参数不同。当前模型仍成功加载和运行位置控制器，并完成上述圆形跟踪；这组日志不是此次上层节点缺失的原因。不要为了消除提示直接复制控制器增益到硬件层，以免改变仿真驱动方式。
 
 轨迹跟踪节点设置为 `required`，意外退出时整套 launch 会关闭，避免界面仍在运行却没有跟踪控制节点。
+
+跟踪优化验证新增：时间戳对齐、慢仿真时钟与暂停保护、积分抗饱和、末点保持滞回、速度趋势估计，以及存在增益损失/一阶滞后的模拟执行端新旧参数对照。该对照不代表当前 Gazebo 场景或实机的精度承诺。CSV 中位置和误差保持原始测量，速度趋势只作为额外诊断列；旧 9 列样本仍可绘制，新增诊断缺失时记为 NaN。

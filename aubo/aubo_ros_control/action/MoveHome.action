@@ -1,4 +1,5 @@
-# Empty goal: move to the configured home_joint_positions, only on explicit request.
+# Empty target: configured HOME. Otherwise an explicitly requested six-joint start pose.
+float64[] target_joint_positions
 ---
 bool success
 string message

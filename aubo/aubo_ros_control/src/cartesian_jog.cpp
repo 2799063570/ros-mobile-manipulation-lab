@@ -411,12 +411,36 @@ private:
         return;
       }
     // 不接管其他执行器，不调用阻塞式 SDK moveJoint；沿现有 5 ms 流生成点。
+    JointPoint target = home_position_;
+    const auto& requested_target = goal.getGoal()->target_joint_positions;
+    if (!requested_target.empty())
+    {
+      if (requested_target.size() != kDof)
+      {
+        result.message = "Start target must contain six joint positions";
+        goal.setRejected(result);
+        return;
+      }
+      for (std::size_t i = 0; i < kDof; ++i)
+      {
+        if (!std::isfinite(requested_target[i]) || requested_target[i] < lower_[i] + limit_margin_ ||
+            requested_target[i] > upper_[i] - limit_margin_)
+        {
+          result.message = "Start target exceeds joint limits";
+          goal.setRejected(result);
+          return;
+        }
+        target[i] = requested_target[i];
+      }
+    }
+
     if (sdk_ && !sdk_->armMotion())
     {
       result.message = "SDK diagnosis not ready; wait for fresh empty MAC observations and request home again";
       goal.setRejected(result);
       return;
     }
+    home_target_ = target;
     invalidateControlTarget();
     home_goal_.reset(new HomeHandle(goal));
     home_stopping_ = false;
@@ -449,7 +473,7 @@ private:
       fault("home_timeout");
     double error = 0.0;
     for (std::size_t i = 0; i < kDof; ++i)
-      error = std::max(error, std::abs(home_position_[i] - position_[i]));
+      error = std::max(error, std::abs(home_target_[i] - position_[i]));
     if (error < 0.001)
       home_stopping_ = true;
     if (home_stopping_)
@@ -458,7 +482,7 @@ private:
     double scale = 1.0;
     for (std::size_t i = 0; i < kDof; ++i)
     {
-      velocity(i) = 0.8 * (home_position_[i] - position_[i]);
+      velocity(i) = 0.8 * (home_target_[i] - position_[i]);
       if (std::abs(velocity(i)) > 0)
         scale = std::min(scale, std::min(home_velocity_, velocity_limits_[i]) / std::abs(velocity(i)));
     }
@@ -471,12 +495,12 @@ private:
       return;
     MoveHomeFeedback feedback;
     feedback.current_joint_positions.assign(feedback_.begin(), feedback_.end());
-    feedback.target_joint_positions.assign(home_position_.begin(), home_position_.end());
+    feedback.target_joint_positions.assign(home_target_.begin(), home_target_.end());
     feedback.stopping = home_stopping_;
     double following = 0.0;
     for (std::size_t i = 0; i < kDof; ++i)
     {
-      feedback.max_joint_error = std::max(feedback.max_joint_error, std::abs(home_position_[i] - feedback_[i]));
+      feedback.max_joint_error = std::max(feedback.max_joint_error, std::abs(home_target_[i] - feedback_[i]));
       following = std::max(following, std::abs(position_[i] - feedback_[i]));
     }
     home_goal_->publishFeedback(feedback);
@@ -1105,7 +1129,7 @@ private:
   std::string fault_;
   std::unique_ptr<HomeServer> home_server_;
   std::unique_ptr<HomeHandle> home_goal_;
-  JointPoint home_position_{};
+  JointPoint home_position_{}, home_target_{};
   double home_velocity_, home_timeout_, feedback_speed_{0.0};
   bool home_stopping_{false}, home_cancelled_{false};
   Time home_started_{};

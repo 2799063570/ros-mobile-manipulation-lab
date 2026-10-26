@@ -15,44 +15,22 @@
 #include <memory>
 #include <stdexcept>
 #include <vector>
+#include <sstream>
+#include <iomanip>
+#include "tracking_curve.h"
+#include "tracking_control.h"
 
 using Clock = std::chrono::steady_clock;
 using Time = Clock::time_point;
 static double age(Time t) { return std::chrono::duration<double>(Clock::now()-t).count(); }
-static constexpr double PI = 3.14159265358979323846;
-
-struct Curve
-{
-  std::string shape, plane;
-  double radius, amplitude, length, duration, kp, speed, error, extent, tolerance, settle_speed, settle_timeout;
-  int waves, cycles;
-  // Relative curve starts exactly at the captured TCP; quintic phase gives smooth endpoints.
-  void sample(double t, KDL::Vector& p, KDL::Vector& v) const
-  {
-    const double u = std::max(0.0, std::min(1.0, t/duration));
-    const double s = u*u*u*(10+u*(-15+6*u));
-    const double ds = 30*u*u*(1-u)*(1-u)/duration;
-    double a, b, da, db;
-    if (shape == "circle") {
-      const double theta = 2*PI*cycles*s, omega = 2*PI*cycles*ds;
-      a = radius*(std::cos(theta)-1); b = radius*std::sin(theta);
-      da = -radius*std::sin(theta)*omega; db = radius*std::cos(theta)*omega;
-    } else {
-      const double theta = 2*PI*waves*s;
-      a = length*s; b = amplitude*std::sin(theta);
-      da = length*ds; db = amplitude*std::cos(theta)*2*PI*waves*ds;
-    }
-    p = plane == "xy" ? KDL::Vector(a,b,0) : plane == "xz" ? KDL::Vector(a,0,b) : KDL::Vector(0,a,b);
-    v = plane == "xy" ? KDL::Vector(da,db,0) : plane == "xz" ? KDL::Vector(da,0,db) : KDL::Vector(0,da,db);
-  }
-};
 
 class Tracker
 {
   ros::NodeHandle nh_, pn_{"~"};
-  ros::Publisher cmd_, state_pub_, metrics_, reference_pub_, actual_pub_, markers_;
+  ros::Publisher cmd_, state_pub_, readiness_pub_, metrics_, samples_pub_, reference_pub_, actual_pub_, markers_;
   ros::Subscriber joints_, jog_state_sub_;
-  ros::ServiceClient enable_;
+  ros::ServiceClient enable_, preflight_;
+  bool check_feasibility_{true};
   ros::ServiceServer preview_srv_, start_srv_, stop_srv_;
   ros::WallTimer timer_;
   KDL::Chain chain_;
@@ -62,40 +40,54 @@ class Tracker
   KDL::Vector origin_, target_, previous_actual_;
   Curve curve_;
   nav_msgs::Path reference_, trace_;
+  std::string feedback_issue_{"尚未收到有效关节反馈"};
   std::string base_, tool_, jog_ns_, jog_state_, state_{"IDLE"}, detail_{"Preview a curve to begin"};
+  ros::Time run_stamp_, tick_stamp_, sample_stamp_;
+  TcpVelocityWindow velocity_window_;
+  TrackingCorrection correction_;
+  KDL::Vector trend_velocity_{KDL::Vector::Zero()};
+  double velocity_window_duration_{0.08}, reported_error_{0};
   Time feedback_time_{}, state_time_{}, tick_time_{Clock::now()}, warmup_time_{}, settle_time_{}, stable_time_{};
   ros::Time feedback_stamp_;
   double feedback_timeout_, state_timeout_, elapsed_{0}, peak_{0}, sum2_{0}, actual_speed_{0};
   size_t samples_{0};
   bool feedback_valid_{false}, have_feedback_{false}, previewed_{false}, active_{false}, owned_{false};
 
-  Curve load()
+  Curve load() { return loadCurve(pn_); }
+  std::string healthIssue() const
   {
-    Curve c;
-    pn_.param<std::string>("shape",c.shape,"circle"); pn_.param<std::string>("plane",c.plane,"xy");
-    pn_.param("radius",c.radius,0.03); pn_.param("amplitude",c.amplitude,0.02);
-    pn_.param("length",c.length,0.10); pn_.param("waves",c.waves,1); pn_.param("cycles",c.cycles,1);
-    pn_.param("duration",c.duration,40.0); pn_.param("kp",c.kp,0.5);
-    pn_.param("max_speed",c.speed,0.015); pn_.param("max_error",c.error,0.04); pn_.param("max_extent",c.extent,0.15);
-    pn_.param("settle_tolerance",c.tolerance,0.002); pn_.param("settle_speed",c.settle_speed,0.003);
-    pn_.param("settle_timeout",c.settle_timeout,15.0);
-    for(double x : {c.radius,c.amplitude,c.length,c.duration,c.kp,c.speed,c.error,c.extent,c.tolerance,c.settle_speed,c.settle_timeout})
-      if(!std::isfinite(x) || x<=0) throw std::runtime_error("All numeric parameters must be finite and positive");
-    if((c.shape!="circle" && c.shape!="sine") || (c.plane!="xy" && c.plane!="xz" && c.plane!="yz") ||
-       c.waves<1 || c.waves>20 || c.cycles<1 || c.cycles>20 || c.duration<2 || c.duration>3600 || c.speed>0.10 || c.extent>0.5)
-      throw std::runtime_error("Invalid shape/plane or parameters outside supported bounds");
-    // Analytic upper bounds (max quintic phase speed = 1.875/T), not a sparse speed check.
-    const double path_bound = c.shape=="circle" ? 2*c.radius : std::hypot(c.length,c.amplitude);
-    const double speed_bound = 1.875/c.duration*(c.shape=="circle" ? 2*PI*c.cycles*c.radius : std::hypot(c.length,2*PI*c.waves*c.amplitude));
-    if(path_bound>c.extent || speed_bound>0.8*c.speed || c.tolerance>=c.error)
-      throw std::runtime_error("Curve exceeds extent/speed budget (reserve 20% for correction); increase duration or reduce size");
-    return c;
+    if(!feedback_valid_) return "关节反馈无效："+feedback_issue_;
+    if(age(feedback_time_)>feedback_timeout_) return "关节反馈接收超时，请检查反馈话题和 Gazebo 是否暂停";
+    const double stamp_age=(ros::Time::now()-feedback_stamp_).toSec();
+    if(stamp_age < -0.05) return "关节反馈时间戳超前，请检查 /clock 和 use_sim_time";
+    if(stamp_age>feedback_timeout_) return "关节反馈时间戳过期，请检查 /clock 和反馈发布频率";
+    if(jog_state_.empty()) return "尚未收到点动控制器状态";
+    if(age(state_time_)>state_timeout_) return "点动控制器状态超时，请检查底层节点";
+    return "";
   }
-  bool healthy() const
+  bool healthy() const { return healthIssue().empty(); }
+  std::string previewIssue() const
   {
-    const double stamp_age = (ros::Time::now()-feedback_stamp_).toSec();
-    return feedback_valid_ && age(feedback_time_)<=feedback_timeout_ && stamp_age>=-0.05 && stamp_age<=feedback_timeout_ &&
-           age(state_time_)<=state_timeout_;
+    if(active_ || owned_) return "请先停止当前跟踪，等待底层禁用";
+    const auto issue=healthIssue();
+    if(!issue.empty()) return issue;
+    if(jog_state_!="DISABLED") return "底层状态为 "+jog_state_+"，需等待 DISABLED；故障需在底层排查";
+    return "";
+  }
+  std::string startIssue() const
+  {
+    const auto issue=previewIssue();
+    if(!issue.empty()) return issue;
+    if(!previewed_) return "请先点击“更新预览”，成功后再开始跟踪";
+    const double distance=(actual_.p-origin_).Norm();
+    if(distance>curve_.tolerance) {
+      std::ostringstream out;
+      out<<std::fixed<<std::setprecision(2)<<"TCP 已偏离预览起点 "<<distance*1000
+         <<" mm（允许 "<<curve_.tolerance*1000<<" mm），请重新更新预览";
+      return out.str();
+    }
+    if(cmd_.getNumSubscribers()!=1) return "点动指令订阅者数量为 "+std::to_string(cmd_.getNumSubscribers())+"，应为 1，请检查底层节点";
+    return "";
   }
   geometry_msgs::PoseStamped pose(const KDL::Vector& p) const
   {
@@ -118,7 +110,7 @@ class Tracker
   }
   void finish(const std::string& state, const std::string& why)
   {
-    active_=false; previewed_=false;
+    active_=false; previewed_=false; correction_.reset();
     if(owned_) command();
     actual_pub_.publish(trace_);
     state_=state; detail_=why;
@@ -129,42 +121,52 @@ class Tracker
   {
     feedback_valid_=false;
     const double delay=(ros::Time::now()-msg->header.stamp).toSec();
-    if(msg->header.stamp.isZero() || delay>feedback_timeout_ || delay < -0.05 ||
-       msg->name.size()!=msg->position.size() || (have_feedback_ && msg->header.stamp<=feedback_stamp_)) return;
+    if(msg->header.stamp.isZero()) {feedback_issue_="时间戳为零，等待仿真时钟和反馈就绪"; return;}
+    if(delay>feedback_timeout_) {feedback_issue_="时间戳过期，请检查仿真时钟和发布频率"; return;}
+    if(delay < -0.05) {feedback_issue_="时间戳超前，请检查仿真时钟"; return;}
+    if(msg->name.size()!=msg->position.size()) {feedback_issue_="关节名称与位置数量不一致"; return;}
+    if(have_feedback_ && msg->header.stamp<=feedback_stamp_) {feedback_issue_="时间戳重复或倒退，请检查 Gazebo 暂停或仿真重置"; return;}
     KDL::JntArray q(joint_names_.size());
     for(size_t i=0;i<joint_names_.size();++i) {
       auto it=std::find(msg->name.begin(),msg->name.end(),joint_names_[i]);
-      if(it==msg->name.end()) return;
-      q(i)=msg->position[it-msg->name.begin()]; if(!std::isfinite(q(i))) return;
+      if(it==msg->name.end()) {feedback_issue_="缺少关节 "+joint_names_[i]; return;}
+      q(i)=msg->position[it-msg->name.begin()]; if(!std::isfinite(q(i))) {feedback_issue_="关节位置包含非有限数值"; return;}
     }
     KDL::Frame frame;
-    if(fk_->JntToCart(q,frame)<0) return;
+    if(fk_->JntToCart(q,frame)<0) {feedback_issue_="TCP 正运动学计算失败"; return;}
     actual_speed_=have_feedback_ ? (frame.p-previous_actual_).Norm()/(msg->header.stamp-feedback_stamp_).toSec() : 0;
+    trend_velocity_=velocity_window_.add(msg->header.stamp.toSec(),frame.p,velocity_window_duration_);
     if(!have_feedback_) target_=frame.p;
     actual_=frame; previous_actual_=frame.p; feedback_stamp_=msg->header.stamp;
-    feedback_time_=Clock::now(); have_feedback_=feedback_valid_=true;
+    feedback_time_=Clock::now(); have_feedback_=feedback_valid_=true; feedback_issue_.clear();
   }
   bool preview(std_srvs::Trigger::Request&,std_srvs::Trigger::Response& res)
   {
-    if(active_ || owned_) {res.message="Stop the current run first"; return true;}
+    if(active_ || owned_) {res.message="请先停止当前跟踪"; return true;}
     previewed_=false;
-    if(!healthy() || jog_state_!="DISABLED") {res.message="Fresh feedback and DISABLED jog state required"; return true;}
+    const auto issue=previewIssue();
+    if(!issue.empty()) {res.message=issue; return true;}
     try {curve_=load();} catch(const std::exception& e) {res.message=e.what(); return true;}
+    if(check_feasibility_) {
+      std_srvs::Trigger check;
+      if(!preflight_.exists() || !preflight_.call(check)) {res.message="起点检查服务未就绪，请检查 trajectory_preparation 节点"; return true;}
+      if(!check.response.success) {res.message="整圈检查未通过："+check.response.message; return true;}
+    }
     origin_=actual_.p; target_=origin_;
     reference_.header.frame_id=trace_.header.frame_id=base_; reference_.header.stamp=ros::Time::now();
     reference_.poses.clear(); trace_.poses.clear();
     for(int i=0;i<=1000;++i) {KDL::Vector p,v; curve_.sample(curve_.duration*i/1000.0,p,v); reference_.poses.push_back(pose(origin_+p));}
     reference_pub_.publish(reference_); actual_pub_.publish(trace_);
-    elapsed_=peak_=sum2_=0; samples_=0;
+    elapsed_=peak_=sum2_=reported_error_=0; samples_=0;
+    correction_.reset(); sample_stamp_=ros::Time();
+    samples_pub_.publish(std_msgs::Float64MultiArray());
     previewed_=true; state_="PREVIEW"; detail_="Preview only; Start explicitly to move";
-    res.success=true; res.message="Preview captured at current TCP; configuration frozen until next Preview"; return true;
+    res.success=true; res.message="预览成功：已记录当前 TCP 起点和参数，请检查曲线后点击开始跟踪"; return true;
   }
   bool start(std_srvs::Trigger::Request&,std_srvs::Trigger::Response& res)
   {
-    if(active_ || owned_ || !previewed_ || !healthy() || jog_state_!="DISABLED" || (actual_.p-origin_).Norm()>curve_.tolerance) {
-      res.message="Preview required, TCP must remain at preview origin, jog must be DISABLED with fresh feedback"; return true;
-    }
-    if(cmd_.getNumSubscribers()!=1) {res.message="Expected exactly one jog command subscriber"; return true;}
+    const auto issue=startIssue();
+    if(!issue.empty()) {res.message=issue; return true;}
     std_srvs::SetBool srv; srv.request.data=true;
     // A lost service response does not prove the request was never applied.
     owned_=true;
@@ -172,7 +174,7 @@ class Tracker
       finish("FAULT","Jog enable failed: "+srv.response.message); res.message=detail_; return true;
     }
     owned_=active_=true; previewed_=false; state_="ARMING"; detail_="Sending neutral commands; waiting for fresh enable confirmation";
-    warmup_time_=Clock::now(); tick_time_=Clock::now(); command(); res.success=true; res.message=detail_; return true;
+    correction_.reset(); warmup_time_=Clock::now(); tick_time_=Clock::now(); tick_stamp_=ros::Time::now(); command(); res.success=true; res.message=detail_; return true;
   }
   bool stop(std_srvs::Trigger::Request&,std_srvs::Trigger::Response& res)
   {
@@ -182,6 +184,14 @@ class Tracker
   void visualize()
   {
     std_msgs::String status; status.data=state_+": "+detail_; state_pub_.publish(status);
+    std_msgs::String readiness;
+    const auto issue=previewIssue();
+    if(!issue.empty()) readiness.data="WAITING: "+issue;
+    else {
+      const auto start_issue=startIssue();
+      readiness.data=start_issue.empty() ? "START_READY: 预览就绪，可开始跟踪" : "PREVIEW_READY: "+start_issue;
+    }
+    readiness_pub_.publish(readiness);
     if(!have_feedback_) return;
     visualization_msgs::MarkerArray arr;
     visualization_msgs::Marker m; m.header.frame_id=base_; m.header.stamp=ros::Time::now(); m.ns="tracking";
@@ -193,35 +203,61 @@ class Tracker
     m.scale.z=0.025; m.color.r=m.color.g=m.color.b=1;
     m.text=state_+"  "+std::to_string(static_cast<int>(1000*(target_-actual_.p).Norm()))+" mm"; arr.markers.push_back(m); markers_.publish(arr);
     std_msgs::Float64MultiArray metrics;
-    metrics.data={elapsed_,(target_-actual_.p).Norm(),peak_,samples_?std::sqrt(sum2_/samples_):0,actual_speed_}; metrics_.publish(metrics);
+    metrics.data={elapsed_,reported_error_,peak_,samples_?std::sqrt(sum2_/samples_):0,actual_speed_}; metrics_.publish(metrics);
   }
   void tick(const ros::WallTimerEvent&)
   {
-    const double dt=age(tick_time_); tick_time_=Clock::now();
+    const double wall_dt=age(tick_time_); tick_time_=Clock::now();
+    const ros::Time now=ros::Time::now();
+    const double dt=tick_stamp_.isZero() ? 0.0 : (now-tick_stamp_).toSec(); tick_stamp_=now;
     if(!active_) { if(owned_) {command(); disable();} visualize(); return; }
-    if(dt>0.10 || !healthy()) {finish("FAULT","Tick stalled or feedback/controller state stale"); visualize(); return;}
+    if(wall_dt>0.10 || dt<0 || dt>0.10 || !healthy()) {finish("FAULT","Tick stalled or feedback/controller state stale"); visualize(); return;}
     if(state_=="ARMING") {
       command();
       if(jog_state_.find("FAULT")==0 || age(warmup_time_)>1.0) finish("FAULT","Enable confirmation failed");
       else if(age(warmup_time_)>=0.3 && (jog_state_=="ENABLED_IDLE" || jog_state_=="JOGGING") && state_time_>warmup_time_) {
-        state_="RUNNING"; detail_="Tracking with feedforward + TCP position correction";
+        run_stamp_=now; state_="RUNNING"; detail_="Tracking with feedforward + TCP position correction";
       }
       visualize(); return;
     }
     if(jog_state_!="ENABLED_IDLE" && jog_state_!="JOGGING") {finish("FAULT","Jog controller left enabled state: "+jog_state_); visualize(); return;}
-    elapsed_=std::min(curve_.duration,elapsed_+dt);
+    elapsed_=std::min(curve_.duration,(now-run_stamp_).toSec());
+    if(dt<=0) {visualize(); return;}
+    if(elapsed_>=curve_.duration && state_!="SETTLING") {
+      state_="SETTLING"; settle_time_=Clock::now(); stable_time_=Time{};
+    }
     KDL::Vector p,v; curve_.sample(elapsed_,p,v); target_=origin_+p;
     const KDL::Vector error=target_-actual_.p; const double e=error.Norm();
-    peak_=std::max(peak_,e); sum2_+=e*e; ++samples_;
     if(e>curve_.error) {finish("FAULT","TCP tracking error exceeded limit"); visualize(); return;}
-    v=v+error*curve_.kp; if(v.Norm()>curve_.speed) v=v*(curve_.speed/v.Norm());
-    command(v);
-    trace_.header.stamp=ros::Time::now(); trace_.poses.push_back(pose(actual_.p));
-    if(trace_.poses.size()>10000) trace_.poses.erase(trace_.poses.begin());
-    if(samples_%5==0) actual_pub_.publish(trace_);
+    const auto output=correction_.step(v,error,dt,curve_.kp,curve_.ki,curve_.speed,
+                                      curve_.correction_fraction,state_=="SETTLING",curve_.tolerance);
+    command(output);
+    // Compare measured TCP to the reference at the feedback's timestamp, never
+    // to a newer target. Count each physical feedback sample once in RMS/trace.
+    if(feedback_stamp_>sample_stamp_ && feedback_stamp_>=run_stamp_) {
+      const double sample_t=(feedback_stamp_-run_stamp_).toSec();
+      KDL::Vector measured_p,measured_v;
+      curve_.sample(sample_t,measured_p,measured_v);
+      const KDL::Vector measured_target=origin_+measured_p;
+      const auto measured_error=measured_target-actual_.p;
+      reported_error_=measured_error.Norm();
+      peak_=std::max(peak_,reported_error_); sum2_+=reported_error_*reported_error_; ++samples_;
+      const auto tangent=measured_v.Norm()>1e-8 ? measured_v/measured_v.Norm() : KDL::Vector::Zero();
+      const double along=KDL::dot(measured_error,tangent);
+      const double normal=(measured_error-tangent*along).Norm();
+      std_msgs::Float64MultiArray sample;
+      sample.data={sample_t,measured_target.x(),measured_target.y(),measured_target.z(),
+        actual_.p.x(),actual_.p.y(),actual_.p.z(),reported_error_,actual_speed_,
+        measured_v.Norm(),output.Norm(),trend_velocity_.Norm(),(now-feedback_stamp_).toSec(),
+        sample_t>=curve_.duration ? 1.0 : 0.0,along,normal};
+      samples_pub_.publish(sample); sample_stamp_=feedback_stamp_;
+      trace_.header.stamp=feedback_stamp_; auto point=pose(actual_.p); point.header.stamp=feedback_stamp_;
+      trace_.poses.push_back(point);
+      if(trace_.poses.size()>10000) trace_.poses.erase(trace_.poses.begin());
+      if(samples_%5==0) actual_pub_.publish(trace_);
+    }
     if(elapsed_>=curve_.duration) {
-      if(state_!="SETTLING") {state_="SETTLING"; settle_time_=Clock::now(); stable_time_=Time{};}
-      const bool stable=e<=curve_.tolerance && actual_speed_<=curve_.settle_speed;
+      const bool stable=e<=curve_.tolerance && std::max(actual_speed_,trend_velocity_.Norm())<=curve_.settle_speed;
       if(!stable) stable_time_=Time{};
       else if(stable_time_==Time{}) stable_time_=Clock::now();
       if(stable && age(stable_time_)>=0.5) finish("COMPLETED","Final TCP within tolerance for 0.5 s; disable requested");
@@ -234,6 +270,11 @@ public:
   {
     pn_.param<std::string>("base_link",base_,"base_link"); pn_.param<std::string>("tool_link",tool_,"tcp_link");
     pn_.param<std::string>("jog_ns",jog_ns_,"/cartesian_jog");
+    pn_.param("velocity_window",velocity_window_duration_,0.08);
+    if(!std::isfinite(velocity_window_duration_) || velocity_window_duration_<0.02 || velocity_window_duration_>0.25)
+      throw std::runtime_error("velocity_window must be in 0.02..0.25 s");
+    pn_.param("check_feasibility",check_feasibility_,true);
+    preflight_=nh_.serviceClient<std_srvs::Trigger>("/trajectory_preparation/check_current");
     pn_.param("feedback_timeout",feedback_timeout_,0.15); pn_.param("state_timeout",state_timeout_,0.35);
     if(!std::isfinite(feedback_timeout_) || feedback_timeout_<=0 || !std::isfinite(state_timeout_) || state_timeout_<=0)
       throw std::runtime_error("Invalid watchdog timeouts");
@@ -243,7 +284,9 @@ public:
       joint_names_.push_back(chain_.getSegment(i).getJoint().getName());
     fk_.reset(new KDL::ChainFkSolverPos_recursive(chain_));
     cmd_=nh_.advertise<geometry_msgs::TwistStamped>(jog_ns_+"/command",1);
-    state_pub_=pn_.advertise<std_msgs::String>("state",1,true); metrics_=pn_.advertise<std_msgs::Float64MultiArray>("metrics",1);
+    state_pub_=pn_.advertise<std_msgs::String>("state",1,true);
+    readiness_pub_=pn_.advertise<std_msgs::String>("readiness",1,true); metrics_=pn_.advertise<std_msgs::Float64MultiArray>("metrics",1);
+    samples_pub_=pn_.advertise<std_msgs::Float64MultiArray>("samples",50);
     reference_pub_=pn_.advertise<nav_msgs::Path>("reference_path",1,true); actual_pub_=pn_.advertise<nav_msgs::Path>("actual_path",1,true);
     markers_=pn_.advertise<visualization_msgs::MarkerArray>("markers",1);
     std::string topic; pn_.param<std::string>("joint_states_topic",topic,"/cartesian_jog/sdk_joint_states");

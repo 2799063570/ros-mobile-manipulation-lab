@@ -10,6 +10,7 @@
     <rosparam file="$(arg config)"/>
     <param name="joint_states_topic" value="$(arg joint_states_topic)"/>
   </node>
+  <node pkg="aubo_trajectory_tracking" type="trajectory_preparation_node" name="trajectory_preparation" output="screen"/>
   <node if="$(arg panel)" pkg="aubo_trajectory_tracking" type="tracking_panel.py" name="trajectory_tracking_panel" output="screen"/>
   <node if="$(arg rviz)" pkg="rviz" type="rviz" name="trajectory_tracking_rviz"
         args="-d $(find aubo_trajectory_tracking)/config/tracking.rviz">
