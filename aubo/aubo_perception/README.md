@@ -2,6 +2,67 @@
 
 颜色识别和 YOLO 共用 RGB-D 几何层，支持眼在手上与眼在手外。包名沿用 `aubo_perception`。
 
+## D435i 真机采集与识别调试
+
+先加载已经编译的兼容驱动工作区（它同时包含本工作区环境）：
+
+```bash
+source /home/zlab/aubo/ros_mobile_manipulation_lab/realsense_noetic_ws/devel/setup.bash
+# 仅相机：640×480、30 Hz，开启 RGB 对齐深度、同步和点云。
+roslaunch aubo_perception realsense_d435i.launch serial_no:=335222076553
+# 或直接启动相机 + 易拉罐识别，二选一，避免重复打开同一设备。
+roslaunch aubo_perception realsense_debug.launch detector:=yolo serial_no:=335222076553
+```
+
+本机如需同时使用 IMU，采用已实测通过的 SDK 2.56.5，并在启动时重置设备：
+
+```bash
+roslaunch aubo_perception realsense_debug.launch detector:=yolo \
+  serial_no:=335222076553 enable_imu:=true initial_reset:=true
+```
+
+原系统 ROS 驱动链接 SDK 2.50.0，与本机固件 5.17.0.10 的 IMU 格式不兼容。
+独立工作区使用官方 ROS 驱动 2.3.2 源码，重新链接 SDK 2.56.5，保留系统安装。
+需确认启动日志中 `Built with` 和 `Running with LibRealSense` 均为 `2.56.5`。
+`initial_reset` 会重置选定相机，勿在另一程序采集时执行。
+IMU 合并输出 `/camera/imu` 约 400 Hz；仍有默认 IMU 标定告警，
+静止量级检查通过不等于惯性导航精度验证通过。
+
+`realsense_debug.launch` 默认使用颜色检测，`detector:=yolo` 使用现有 `GC-yolo.pt`，
+目标类别默认分别为 `red` 和 `can`，可用 `selected_class:=...` 覆盖。
+已有相机时传 `start_camera:=false`；`camera_name:=workspace_camera` 可切换话题前缀。
+调试入口仅启动采集、二维检测和 RGB-D 几何节点，输出位于相机光学坐标系，
+无需机械臂或手眼外参。目标位置是检测框中心区域的可见表面深度，不能直接当作抓取中心。
+当前调试入口按固定在机械臂外的相机设置 `camera_mount=eye_to_hand`，但 `servo`
+几何模式仍仅输出相机坐标：+X 向右、+Y 向下、+Z 朝镜头前方。
+`target_pose` 的单位四元数只是位置消息的占位，不是测得的易拉罐姿态或手眼旋转。
+它不会加载或验证 9 月保存的手眼 YAML，也不发布 `base_link -> camera`。
+
+```bash
+rostopic echo /camera_debug/target_pose
+rostopic echo /camera_debug/target_label
+rosrun image_view image_view image:=/camera_debug/annotated_image
+# 第二个终端加载相同工作区与 ROS_MASTER_URI 后执行，异常返回非零退出码。
+rosrun aubo_perception check_rgbd_camera.py --pointcloud --duration 10
+# 使用上面的 IMU 配置时检查全部数据流：
+rosrun aubo_perception check_rgbd_camera.py --pointcloud --imu --duration 15
+# 相机保持静止时，额外检查重力与角速度量级：
+rosrun aubo_perception check_rgbd_camera.py --pointcloud --imu --stationary --duration 20
+```
+
+检测框为 `/camera_debug/boxes`，只有选定类别且深度有效时才发布目标位置；
+未检测到目标时标签为空，不重复发送旧位姿。调试输出与 `/visual_servo`、`/sorting`
+任务输入分开。机器人集成仍使用 `aubo_ros_control` 的两个 `*_camera_real.launch`，
+它们复用同一采集配置，并保留原有 TF 发布权。
+
+检查脚本统计实际收帧率、有效深度、内参与图像尺寸/坐标系一致性、时间戳递增及
+RGB/深度配对误差，可用 `--output /tmp/camera_check.json` 保存报告。
+源码直接执行时使用 `PYTHONNOUSERSITE=1 /usr/bin/python3`，避免默认 Conda Python
+与 ROS 的 `cv_bridge` 不兼容。IMU 默认关闭，独立采集入口可通过 `enable_imu:=true`
+开启，再用检查脚本的 `--imu` 验证；创建话题不代表已经收到 IMU 数据。
+
+本机实测记录见 [D435I_DEBUG.md](D435I_DEBUG.md)。
+
 ## 独立感知仿真
 
 ```bash

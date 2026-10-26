@@ -1,0 +1,84 @@
+{
+  "date": "2026-10-26",
+  "serial_no": "335222076553",
+  "firmware": "05.17.00.10",
+  "ros_driver": "2.3.2",
+  "sdk": "2.56.5",
+  "camera_check": {
+    "camera": "/camera",
+    "duration_s": 20.0,
+    "streams": {
+      "color": {
+        "count": 600,
+        "hz": 29.98,
+        "frame": "camera_color_optical_frame"
+      },
+      "depth": {
+        "count": 600,
+        "hz": 29.98,
+        "frame": "camera_color_optical_frame"
+      },
+      "info": {
+        "count": 600,
+        "hz": 29.98,
+        "frame": "camera_color_optical_frame"
+      },
+      "points": {
+        "count": 600,
+        "hz": 29.98,
+        "frame": "camera_color_optical_frame"
+      },
+      "imu": {
+        "count": 8007,
+        "hz": 400.28,
+        "frame": "camera_imu_optical_frame"
+      }
+    },
+    "imu_accel_m_s2": [
+      -0.10880938876567446,
+      0.013699694328382809,
+      -9.83809061789744
+    ],
+    "imu_gyro_rad_s": [
+      0.0010646508308127522,
+      0.0010646508308127522,
+      0.0
+    ],
+    "imu_accel_norm_m_s2": 9.838701853937332,
+    "imu_mean_accel_norm_m_s2": 9.843858451467693,
+    "imu_mean_gyro_norm_rad_s": 0.003350340765173864,
+    "resolution": [
+      640,
+      480
+    ],
+    "K": [
+      607.6826171875,
+      0.0,
+      316.281982421875,
+      0.0,
+      607.2978515625,
+      249.35142517089844,
+      0.0,
+      0.0,
+      1.0
+    ],
+    "depth_valid_fraction": 0.9666438802083334,
+    "depth_median_m": 0.906000018119812,
+    "rgb_depth_p95_ms": 0.0,
+    "errors": [],
+    "ok": true
+  },
+  "can_check": {
+    "duration_s": 10,
+    "counts": {
+      "boxes": 85,
+      "poses": 85
+    },
+    "can_confidence_max": 0.9040210247039795,
+    "last_xyz_m": [
+      0.07094400752820604,
+      0.03145627004838852,
+      0.8410000205039978
+    ]
+  }
+}

@@ -9,6 +9,14 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class PackageResourcesTest(unittest.TestCase):
+    def test_legacy_publisher_has_no_second_optical_transform(self):
+        path = ROOT.parents[1] / 'easy_handeye/easy_handeye/launch/aubo_realsense_publish_only.launch'
+        tree = ET.parse(path)
+        args = {arg.get('name'): arg.get('default') for arg in tree.findall('arg')}
+        self.assertEqual(args['tracking_base_frame'], 'camera_color_optical_frame')
+        self.assertEqual(tree.findall('node'), [])
+        self.assertEqual(len(tree.findall('include')), 1)
+
     def test_local_scripts_configs_and_document_links_resolve(self):
         cmake = (ROOT/'CMakeLists.txt').read_text()
         for script in (ROOT/'scripts').glob('*.py'):

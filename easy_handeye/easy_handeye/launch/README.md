@@ -44,6 +44,14 @@
 - 发布对应的手眼外参到 `tf`
 - 不再重新采样，不再重新计算标定
 
+本项目保存的是 `base_link -> camera_color_optical_frame`，不能只把子坐标系名称改成
+`camera_link` 而沿用同一组数值。该入口现仅发布 YAML 中的结果，已移除旧的
+`handeye_fix_optical` 硬编码变换；该变换会把原本向下的相机光轴翻到向上。
+使用这个直接发布光学坐标系的入口时，相机驱动必须设置 `publish_tf:=false`，
+且不能同时启动其他手眼外参发布器。机器人集成优先使用
+`aubo_ros_control/eye_to_hand_camera_real.launch camera_name:=camera`，该入口会检查
+YAML 与请求的坐标系完全一致，并统一管理驱动 TF。
+
 适用场景：
 
 - 日常启动系统时直接加载已有标定结果

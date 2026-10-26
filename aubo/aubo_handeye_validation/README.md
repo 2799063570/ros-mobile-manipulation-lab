@@ -20,6 +20,8 @@ aubo_handeye_validation/
 `aubo_perception` 的 YOLO/RGB-D 定位；不依赖分拣场景或分拣状态机。
 共享标定结果仍以
 `aubo_ros_control/config/aubo_realsense_handeye_eye_on_base.yaml` 为准，不复制一份。
+固定相机配置及 180° 朝向问题的检查记录见
+[2026-10-26 诊断](docs/diagnosis_20261026.md)。
 
 ## 编译
 

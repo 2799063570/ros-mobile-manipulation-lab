@@ -11,13 +11,9 @@
   <arg name="enable_pointcloud" default="true"/>
 
   <!-- 相机驱动负责彩色、深度、对齐深度及可选点云，但不发布安装外参。 -->
-  <include file="$(find realsense2_camera)/launch/rs_camera.launch">
+  <include file="$(find aubo_perception)/launch/realsense_d435i.launch">
     <arg name="serial_no" value="$(arg serial_no)"/>
-    <arg name="camera" value="$(arg camera_name)"/>
-    <arg name="tf_prefix" value="$(arg camera_name)"/>
-    <arg name="enable_color" value="true"/>
-    <arg name="enable_depth" value="true"/>
-    <arg name="align_depth" value="true"/>
+    <arg name="camera_name" value="$(arg camera_name)"/>
     <arg name="enable_pointcloud" value="$(arg enable_pointcloud)"/>
     <arg name="publish_tf" value="false"/>
   </include>

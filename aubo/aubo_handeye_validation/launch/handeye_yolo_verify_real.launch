@@ -13,6 +13,7 @@
   <arg name="table_size_x" default="0.70"/>
   <arg name="table_size_y" default="1.00"/>
   <arg name="table_thickness" default="0.20"/>
+  <arg name="table_center_z" value="$(eval float(arg('table_z')) - float(arg('table_thickness')) / 2)"/>
   <arg name="object_height" default="0.05"/>
   <arg name="height_mode" default="depth"/>
   <arg name="hover_clearance" default="0.10"/>
@@ -59,7 +60,7 @@
   <!-- Include the known table in MoveIt's collision world even with sorting disabled. -->
   <node pkg="aubo_ros_control" type="hybrid_planning_scene.py" name="handeye_verify_table" output="screen">
     <param name="table_frame" value="base_link"/>
-    <rosparam param="table_center" subst_value="true">[$(arg table_center_x), $(arg table_center_y), $(eval float(arg('table_z')) - float(arg('table_thickness')) / 2)]</rosparam>
+    <rosparam param="table_center" subst_value="true">[$(arg table_center_x), $(arg table_center_y), $(arg table_center_z)]</rosparam>
     <rosparam param="table_size" subst_value="true">[$(arg table_size_x), $(arg table_size_y), $(arg table_thickness)]</rosparam>
     <param name="table_top_margin" value="0.01"/>
   </node>

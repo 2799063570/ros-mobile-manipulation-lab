@@ -41,7 +41,8 @@ roslaunch aubo_handeye_validation handeye_yolo_verify_real.launch \
 相机命名默认 `/camera`，匹配当前标定 YAML 中的 `camera_color_optical_frame`。
 更换标定文件时通过 `calibration_file:=...` 指定，并核对 `camera_namespace:=...`。
 发布脚本继续严格检查坐标系，不应通过重命名把不同物理坐标系的外参混用。
-若 YAML 仍有 `z: 0.9094763530288582neng`，先核对并修正数值，程序不会自动改动标定文件。
+工程 YAML 的 Z 字段已于 2026-10-26 按一致的原始备份恢复为有效数值。
+这不代表重新标定或精度验收；先确认当前安装位置、朝向和坐标系，再执行运动验证。
 
 ## 一次验证
 

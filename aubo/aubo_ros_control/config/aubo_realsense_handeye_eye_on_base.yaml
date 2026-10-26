@@ -1,5 +1,6 @@
 # easy_handeye result imported from arm_ws on 2026-09-01.
-# This file is the source of truth for the fixed-camera installation TF.
+# Saved fixed-camera result; validate against the current installation before use.
+# z restored on 2026-10-26 from matching ~/.ros/easy_handeye and arm_ws backups.
 parameters:
   eye_on_hand: false
   freehand_robot_movement: true
@@ -17,4 +18,4 @@ transformation:
   qz: -0.0027157196628248654
   x: -0.02923796383642016
   y: -0.6524278933371906
-  z: 0.9094763530288582neng
+  z: 0.9094763530288582

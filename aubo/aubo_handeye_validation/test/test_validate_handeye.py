@@ -75,6 +75,13 @@ def synthetic_session():
 
 
 class ValidationTests(unittest.TestCase):
+    def test_repository_calibration_is_a_valid_optical_frame_transform(self):
+        path = SCRIPT.parents[2] / 'aubo_ros_control/config/aubo_realsense_handeye_eye_on_base.yaml'
+        calibration = validation.load_calibration(str(path))
+        self.assertEqual(calibration['frames']['robot_base_frame'], 'base_link')
+        self.assertEqual(calibration['frames']['tracking_base_frame'], 'camera_color_optical_frame')
+        self.assertTrue(np.isfinite(validation.matrix(calibration['transform'])).all())
+
     def run_collector(self, scenario):
         """Exercise the actual service callbacks with deterministic ROS/TF doubles."""
         session = synthetic_session()

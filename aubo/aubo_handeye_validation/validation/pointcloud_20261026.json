@@ -1,0 +1,81 @@
+{
+  "cloud_frame": "camera_color_optical_frame",
+  "sample_count": 73182,
+  "base_xyz_percentiles_m": [
+    [
+      -0.3613929450584822,
+      -1.0960130357811093,
+      -0.004892218184126106
+    ],
+    [
+      -0.0441873870522041,
+      -0.6706627167418301,
+      0.003757721615799292
+    ],
+    [
+      0.2760588432667727,
+      -0.2696368009740502,
+      0.3997642012248843
+    ]
+  ],
+  "dominant_plane": {
+    "inlier_fraction": 0.736888852450056,
+    "normal_in_base": [
+      -0.003279971520674358,
+      0.004022958015294943,
+      0.9999865287070774
+    ],
+    "tilt_from_horizontal_deg": 0.2974012281118194,
+    "median_z_m": 0.002847146761445374,
+    "rmse_m": 0.00296883957355959
+  },
+  "target_samples": 43,
+  "target_camera_m": [
+    0.07364107305752933,
+    0.03227112812383083,
+    0.8380000591278076
+  ],
+  "target_base_saved_m": [
+    0.006669451757290126,
+    -0.5903579161207909,
+    0.07068763834357228
+  ],
+  "target_base_optical_z180_m": [
+    -0.051307859037942376,
+    -0.7403345901458405,
+    0.07252123784546705
+  ],
+  "scope": "Read-only snapshot; no robot joint feedback available. Operator qualitatively prefers saved calibration over optical-Z 180-degree candidate; metric accuracy and yaw accuracy not established.",
+  "calibration_rotation_matrix_camera_to_base": [
+    [
+      -0.04413203223280421,
+      0.9989915903696787,
+      0.008256276501096069
+    ],
+    [
+      0.9989013021302326,
+      0.04425544838751688,
+      -0.01541570272628684
+    ],
+    [
+      -0.015765542601766807,
+      0.007566879058084285,
+      -0.9998470833121391
+    ]
+  ],
+  "calibration_translation_m": [
+    -0.02923796383642016,
+    -0.6524278933371906,
+    0.9094763530288582
+  ],
+  "plane_fit_inlier_threshold_m": 0.008,
+  "absolute_accuracy_established": false,
+  "yaw_verified": false,
+  "operator_comparison": {
+    "selected_candidate": "saved_calibration",
+    "feedback": "绿色原标定更符合",
+    "method": "visual comparison of RViz snapshot with physical scene",
+    "qualitative_only": true,
+    "apply_optical_z180_correction": false
+  }
+}

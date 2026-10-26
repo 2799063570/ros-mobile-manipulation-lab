@@ -1,0 +1,40 @@
+<launch>
+  <!-- 仅采集和识别，输出相机光学坐标；无需手眼外参或机械臂。 -->
+  <arg name="serial_no" default=""/>
+  <arg name="camera_name" default="camera"/>
+  <arg name="start_camera" default="true"/>
+  <arg name="enable_pointcloud" default="true"/>
+  <arg name="enable_imu" default="false"/>
+  <arg name="initial_reset" default="false"/>
+  <arg name="detector" default="color" doc="color | yolo"/>
+  <arg name="selected_class" default="$(eval 'can' if arg('detector') == 'yolo' else 'red')"/>
+  <arg name="python" default="/home/zlab/anaconda3/envs/yolo/bin/python"/>
+  <arg name="model_path" default="/home/zlab/deepL/code/ultralytics-main-modify/weights/GC-yolo.pt"/>
+  <include if="$(arg start_camera)" file="$(find aubo_perception)/launch/realsense_d435i.launch">
+    <arg name="serial_no" value="$(arg serial_no)"/>
+    <arg name="camera_name" value="$(arg camera_name)"/>
+    <arg name="enable_pointcloud" value="$(arg enable_pointcloud)"/>
+    <arg name="enable_imu" value="$(arg enable_imu)"/>
+    <arg name="initial_reset" value="$(arg initial_reset)"/>
+  </include>
+  <group ns="camera_debug">
+    <remap from="/visual_servo/target_pose" to="/camera_debug/target_pose"/>
+    <remap from="/visual_servo/target_label" to="/camera_debug/target_label"/>
+    <remap from="/visual_servo/target_confidence" to="/camera_debug/target_confidence"/>
+    <remap from="/sorting/debug_image" to="/camera_debug/annotated_image"/>
+    <include file="$(find aubo_perception)/launch/grasp_perception.launch">
+      <arg name="detector" value="$(arg detector)"/>
+      <arg name="camera_mount" value="eye_to_hand"/>
+      <arg name="camera_namespace" value="/$(arg camera_name)"/>
+      <arg name="task_mode" value="servo"/>
+      <arg name="height_mode" value="depth"/>
+      <arg name="selected_class" value="$(arg selected_class)"/>
+      <arg name="target_frame" value="$(arg camera_name)_color_optical_frame"/>
+      <arg name="boxes_topic" value="/camera_debug/boxes"/>
+      <arg name="annotated_image_topic" value="/camera_debug/annotated_image"/>
+      <arg name="detections_topic" value="/camera_debug/detections"/>
+      <arg name="python" value="$(arg python)"/>
+      <arg name="model_path" value="$(arg model_path)"/>
+    </include>
+  </group>
+</launch>
