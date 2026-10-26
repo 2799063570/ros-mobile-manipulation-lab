@@ -227,18 +227,22 @@ class TrackingTest(unittest.TestCase):
 
         self.plant_gain, self.plant_lag = .8, .08
         results = []
-        for kp, ki in [(.5, 0.), (1., 0.)]:
+        for kp, ki, kd, ff in [(.5, 0., 0., 0.), (1., 0., 0., 0.), (1., 0., 0., .10), (1., .05, .1, .10)]:
             self.configure()
             for key, value in dict(radius=.03, duration=8., max_speed=.08, max_error=.04,
-                                   kp=kp, ki=ki, settle_tolerance=.0005).items():
+                                   kp=kp, ki=ki, kd=kd, acceleration_ff_time=ff, settle_tolerance=.0005).items():
                 rospy.set_param('/trajectory_tracking/'+key, value)
             self.begin()
             self.wait(lambda: self.state.startswith('COMPLETED'), 15)
+            self.assertTrue(all(math.sqrt(sum(v*v for v in command)) <= .080001 for _,command in self.commands))
             errors = [row[7] for row in self.tracking_samples if row[13] == 0]
             results.append((max(errors), math.sqrt(sum(e*e for e in errors)/len(errors))))
-        rospy.loginfo('Lagged plant old P / bounded correction peak,RMS (m): %s', results)
+        rospy.loginfo('Lagged plant old P / bounded P / acceleration FF / optional PID peak,RMS (m): %s', results)
         self.assertLess(results[1][0], .85*results[0][0], 'Must reduce peak tracking error in lagged plant')
         self.assertLess(results[1][1], .9*results[0][1], 'Must reduce RMS tracking error in lagged plant')
+
+        self.assertLess(results[2][0], results[1][0], 'Acceleration FF must reduce peak in lagged plant')
+        self.assertLess(results[2][1], results[1][1], 'Acceleration FF must reduce RMS in lagged plant')
 
 
 if __name__ == '__main__':

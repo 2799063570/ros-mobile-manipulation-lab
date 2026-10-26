@@ -4,10 +4,12 @@ import csv
 from collections import deque
 import numpy as np
 from python_qt_binding.QtCore import QTimer, Signal
-from python_qt_binding.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog, QLabel, QCheckBox
+from python_qt_binding.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QFileDialog, QLabel, QCheckBox, QTabWidget
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT
+
+from joint_tracking_plot import JointTrackingPlot
 
 
 class TrackingPlot(QWidget):
@@ -28,8 +30,15 @@ class TrackingPlot(QWidget):
         self.canvas = FigureCanvasQTAgg(self.figure)
         self.axes = self.figure.subplots(2, 2).ravel()
         layout = QVBoxLayout(self)
-        layout.addWidget(NavigationToolbar2QT(self.canvas, self))
-        layout.addWidget(self.canvas)
+        self.tabs = QTabWidget()
+        tcp_page = QWidget()
+        tcp_layout = QVBoxLayout(tcp_page)
+        tcp_layout.addWidget(NavigationToolbar2QT(self.canvas, tcp_page))
+        tcp_layout.addWidget(self.canvas)
+        self.joint_plot = JointTrackingPlot()
+        self.tabs.addTab(tcp_page, 'TCP 跟踪')
+        self.tabs.addTab(self.joint_plot, '六轴关节 / 链路诊断')
+        layout.addWidget(self.tabs)
         controls = QHBoxLayout()
         layout.addLayout(controls)
         for title, handler in [('保存 PNG', self.save_png), ('导出 CSV', self.save_csv)]:
@@ -92,6 +101,8 @@ class TrackingPlot(QWidget):
     def add_sample(self, values):
         if not values:
             self.rows.clear()
+            self.joint_plot.add_sample([])
+            self.joint_plot.add_servo([])
             self.message.setText('新一轮预览成功，等待开始跟踪。')
         elif len(values) in (9, 16) and np.isfinite(values).all():
             # Accept old nodes; missing diagnostics remain explicitly unavailable.
@@ -140,9 +151,13 @@ class TrackingPlot(QWidget):
         for axis in self.axes:
             axis.relim()
             axis.autoscale_view()
-        self.canvas.draw_idle()
+        if self.tabs.currentIndex() == 0:
+            self.canvas.draw_idle()
 
     def save_png(self):
+        if self.tabs.currentIndex() == 1:
+            self.joint_plot.save_png()
+            return
         path, _ = QFileDialog.getSaveFileName(self, '保存跟踪曲线', 'tracking.png', 'PNG (*.png)')
         if path:
             self.redraw()
@@ -150,6 +165,9 @@ class TrackingPlot(QWidget):
             self.message.setText('已保存 '+path)
 
     def save_csv(self):
+        if self.tabs.currentIndex() == 1:
+            self.joint_plot.save_csv()
+            return
         path, _ = QFileDialog.getSaveFileName(self, '导出跟踪数据', 'tracking.csv', 'CSV (*.csv)')
         if path:
             with open(path, 'w', newline='') as output:

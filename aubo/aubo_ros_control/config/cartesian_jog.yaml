@@ -11,7 +11,9 @@ command_timeout: 0.15
 feedback_timeout: 0.15
 max_following_error: 0.12
 joint_limit_margin: 0.08
+# adaptive_damping 未设置时仅 Gazebo 默认启用；SDK 保留固定阻尼。
 dls_lambda: 0.02
+dls_lambda_min: 0.002
 singularity_stop: 0.008
 singularity_slow: 0.06
 # 显式请求回 home 时才使用；不会在启动时自动运动。顺序同 joint_names。

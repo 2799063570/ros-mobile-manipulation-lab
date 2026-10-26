@@ -10,25 +10,32 @@ static constexpr double PI = 3.14159265358979323846;
 struct Curve
 {
   std::string shape, plane;
-  double radius, amplitude, length, duration, kp, ki, correction_fraction, speed, error, extent, tolerance, settle_speed, settle_timeout;
+  double radius, amplitude, length, duration, kp, ki, kd, acceleration_ff_time, correction_fraction, speed, error, extent, tolerance, settle_speed, settle_timeout;
   int waves, cycles;
   // Relative curve starts exactly at the captured TCP; quintic phase gives smooth endpoints.
-  void sample(double t, KDL::Vector& p, KDL::Vector& v) const
+  void sample(double t, KDL::Vector& p, KDL::Vector& v, KDL::Vector* acceleration=nullptr) const
   {
     const double u = std::max(0.0, std::min(1.0, t/duration));
     const double s = u*u*u*(10+u*(-15+6*u));
     const double ds = 30*u*u*(1-u)*(1-u)/duration;
-    double a, b, da, db;
+    const double dds = 60*u*(1-u)*(1-2*u)/(duration*duration);
+    double a, b, da, db, dda, ddb;
     if (shape == "circle") {
       const double theta = 2*PI*cycles*s, omega = 2*PI*cycles*ds;
+      const double alpha = 2*PI*cycles*dds;
       a = radius*(std::cos(theta)-1); b = radius*std::sin(theta);
       da = -radius*std::sin(theta)*omega; db = radius*std::cos(theta)*omega;
+      dda = -radius*(std::cos(theta)*omega*omega+std::sin(theta)*alpha);
+      ddb = radius*(-std::sin(theta)*omega*omega+std::cos(theta)*alpha);
     } else {
       const double theta = 2*PI*waves*s;
       a = length*s; b = amplitude*std::sin(theta);
-      da = length*ds; db = amplitude*std::cos(theta)*2*PI*waves*ds;
+      const double omega=2*PI*waves*ds, alpha=2*PI*waves*dds;
+      da = length*ds; db = amplitude*std::cos(theta)*omega;
+      dda = length*dds; ddb = amplitude*(-std::sin(theta)*omega*omega+std::cos(theta)*alpha);
     }
     p = plane == "xy" ? KDL::Vector(a,b,0) : plane == "xz" ? KDL::Vector(a,0,b) : KDL::Vector(0,a,b);
+    if(acceleration) *acceleration = plane == "xy" ? KDL::Vector(dda,ddb,0) : plane == "xz" ? KDL::Vector(dda,0,ddb) : KDL::Vector(0,dda,ddb);
     v = plane == "xy" ? KDL::Vector(da,db,0) : plane == "xz" ? KDL::Vector(da,0,db) : KDL::Vector(0,da,db);
   }
 };
@@ -40,12 +47,14 @@ inline Curve loadCurve(ros::NodeHandle& pn)
   pn.param("radius",c.radius,0.03); pn.param("amplitude",c.amplitude,0.02);
   pn.param("length",c.length,0.10); pn.param("waves",c.waves,1); pn.param("cycles",c.cycles,1);
   pn.param("duration",c.duration,40.0); pn.param("kp",c.kp,1.0);
-  pn.param("ki",c.ki,0.0); pn.param("correction_fraction",c.correction_fraction,0.2);
+  pn.param("ki",c.ki,0.0); pn.param("kd",c.kd,0.0); pn.param("acceleration_ff_time",c.acceleration_ff_time,0.0); pn.param("correction_fraction",c.correction_fraction,0.2);
   pn.param("max_speed",c.speed,0.015); pn.param("max_error",c.error,0.04); pn.param("max_extent",c.extent,0.25);
   pn.param("settle_tolerance",c.tolerance,0.002); pn.param("settle_speed",c.settle_speed,0.003);
   pn.param("settle_timeout",c.settle_timeout,15.0);
   for(double x : {c.radius,c.amplitude,c.length,c.duration,c.kp,c.speed,c.error,c.extent,c.tolerance,c.settle_speed,c.settle_timeout})
     if(!std::isfinite(x) || x<=0) throw std::runtime_error("所有数值参数必须是有限正数");
+  if(!std::isfinite(c.kd) || c.kd<0 || c.kd>1 || !std::isfinite(c.acceleration_ff_time) || c.acceleration_ff_time<0 || c.acceleration_ff_time>.25)
+    throw std::runtime_error("D 增益必须在 0..1，加速度前馈时间必须在 0..0.25 s");
   if(!std::isfinite(c.ki) || c.ki<0 || c.ki>2 || !std::isfinite(c.correction_fraction) || c.correction_fraction<=0 || c.correction_fraction>.2)
     throw std::runtime_error("积分增益必须在 0..2，纠偏速度比例必须在 0..0.2");
   if((c.shape!="circle" && c.shape!="sine") || (c.plane!="xy" && c.plane!="xz" && c.plane!="yz") ||

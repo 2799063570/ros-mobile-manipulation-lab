@@ -1,4 +1,12 @@
 <launch>
+  <arg name="adaptive_damping" default="true"/>
+  <arg name="acceleration_ff_time" default="0.10"/>
+  <arg name="artifact_dir" default=""/>
+  <arg name="tracking_radius" default="0.01"/>
+  <arg name="tracking_duration" default="10.0"/>
+  <param name="/preparation_test/artifact_dir" value="$(arg artifact_dir)"/>
+  <param name="/preparation_test/tracking_radius" value="$(arg tracking_radius)"/>
+  <param name="/preparation_test/tracking_duration" value="$(arg tracking_duration)"/>
   <!-- Actual AUBO kinematics, ROS-only fake plant, no SDK or Gazebo process. -->
   <include file="$(find aubo_moveit_config)/launch/planning_context.launch">
     <arg name="load_robot_description" value="true"/>
@@ -7,12 +15,14 @@
   </include>
   <node pkg="aubo_ros_control" type="aubo_cartesian_jog_node" name="aubo_cartesian_jog" required="true" output="screen">
     <rosparam file="$(find aubo_ros_control)/config/cartesian_jog.yaml"/>
+    <param name="adaptive_damping" value="$(arg adaptive_damping)"/>
     <param name="backend" value="gazebo"/>
     <param name="joint_states_topic" value="/preparation_test/joints"/>
     <param name="scene_joint_states_topic" value="/preparation_test/joints"/>
     <rosparam param="gazebo_command_topics">[/preparation_test/q0, /preparation_test/q1, /preparation_test/q2, /preparation_test/q3, /preparation_test/q4, /preparation_test/q5]</rosparam>
   </node>
   <include file="$(find aubo_trajectory_tracking)/launch/tracking.launch">
+    <arg name="acceleration_ff_time" value="$(arg acceleration_ff_time)"/>
     <arg name="joint_states_topic" value="/preparation_test/joints"/>
     <arg name="panel" value="false"/><arg name="rviz" value="false"/>
   </include>

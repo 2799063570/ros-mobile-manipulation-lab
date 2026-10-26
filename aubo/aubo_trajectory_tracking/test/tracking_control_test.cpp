@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 #include "tracking_control.h"
+#include "tracking_curve.h"
 
 TEST(TcpVelocityWindow, ConstantMotionAndOscillatingNoise)
 {
@@ -33,6 +34,28 @@ TEST(TrackingCorrection, AntiWindupAndSettlingHysteresis)
   controller.reset();
   v=controller.step(KDL::Vector::Zero(),KDL::Vector::Zero(),.02,1.,.2,.05,.2,false,.002);
   EXPECT_DOUBLE_EQ(v.Norm(),0.);
+}
+
+TEST(TrackingFeedforward, AnalyticAccelerationAndLimits)
+{
+  Curve c{}; c.duration=8.; c.radius=.03; c.amplitude=.02; c.length=.1; c.cycles=2; c.waves=3;
+  for(const auto& shape: {"circle","sine"}) for(const auto& plane: {"xy","xz","yz"}) {
+    c.shape=shape; c.plane=plane;
+    KDL::Vector p,v,a,pm,vm,pp,vp;
+    c.sample(3.1,p,v,&a); c.sample(3.1-1e-4,pm,vm); c.sample(3.1+1e-4,pp,vp);
+    EXPECT_LT((a-(vp-vm)/2e-4).Norm(),1e-7);
+    c.sample(0,p,v,&a); EXPECT_DOUBLE_EQ(a.Norm(),0.);
+    c.sample(c.duration,p,v,&a); EXPECT_DOUBLE_EQ(a.Norm(),0.);
+  }
+  auto ff=accelerationFeedforward(KDL::Vector(.03,0,0),KDL::Vector(100,0,0),.25,.05);
+  EXPECT_LE(ff.Norm(),.040000001);
+  ff=accelerationFeedforward(KDL::Vector(.01,0,0),KDL::Vector(.1,0,0),0.,.05);
+  EXPECT_DOUBLE_EQ(ff.x(),.01);
+  TrackingCorrection controller;
+  auto command=controller.step(KDL::Vector::Zero(),KDL::Vector::Zero(),.02,1.,0.,.05,.2,false,.002,KDL::Vector(.01,0,0),.5);
+  EXPECT_NEAR(command.x(),.005,1e-12);
+  command=controller.step(KDL::Vector::Zero(),KDL::Vector::Zero(),.02,1.,0.,.05,.2,false,.002,KDL::Vector(100,0,0),.5);
+  EXPECT_LE(command.Norm(),.010000001);
 }
 
 int main(int argc,char** argv)

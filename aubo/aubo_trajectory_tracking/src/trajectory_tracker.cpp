@@ -3,6 +3,7 @@
 #include <geometry_msgs/TwistStamped.h>
 #include <nav_msgs/Path.h>
 #include <std_msgs/String.h>
+#include <std_msgs/Header.h>
 #include <std_msgs/Float64MultiArray.h>
 #include <std_srvs/Trigger.h>
 #include <std_srvs/SetBool.h>
@@ -27,7 +28,7 @@ static double age(Time t) { return std::chrono::duration<double>(Clock::now()-t)
 class Tracker
 {
   ros::NodeHandle nh_, pn_{"~"};
-  ros::Publisher cmd_, state_pub_, readiness_pub_, metrics_, samples_pub_, reference_pub_, actual_pub_, markers_;
+  ros::Publisher cmd_, state_pub_, readiness_pub_, metrics_, samples_pub_, run_start_pub_, reference_pub_, actual_pub_, markers_;
   ros::Subscriber joints_, jog_state_sub_;
   ros::ServiceClient enable_, preflight_;
   bool check_feasibility_{true};
@@ -160,6 +161,7 @@ class Tracker
     elapsed_=peak_=sum2_=reported_error_=0; samples_=0;
     correction_.reset(); sample_stamp_=ros::Time();
     samples_pub_.publish(std_msgs::Float64MultiArray());
+    run_start_pub_.publish(std_msgs::Header());
     previewed_=true; state_="PREVIEW"; detail_="Preview only; Start explicitly to move";
     res.success=true; res.message="预览成功：已记录当前 TCP 起点和参数，请检查曲线后点击开始跟踪"; return true;
   }
@@ -216,7 +218,7 @@ class Tracker
       command();
       if(jog_state_.find("FAULT")==0 || age(warmup_time_)>1.0) finish("FAULT","Enable confirmation failed");
       else if(age(warmup_time_)>=0.3 && (jog_state_=="ENABLED_IDLE" || jog_state_=="JOGGING") && state_time_>warmup_time_) {
-        run_stamp_=now; state_="RUNNING"; detail_="Tracking with feedforward + TCP position correction";
+        run_stamp_=now; std_msgs::Header run; run.stamp=now; run_start_pub_.publish(run); state_="RUNNING"; detail_="Tracking with feedforward + TCP position correction";
       }
       visualize(); return;
     }
@@ -226,11 +228,12 @@ class Tracker
     if(elapsed_>=curve_.duration && state_!="SETTLING") {
       state_="SETTLING"; settle_time_=Clock::now(); stable_time_=Time{};
     }
-    KDL::Vector p,v; curve_.sample(elapsed_,p,v); target_=origin_+p;
+    KDL::Vector p,v,a; curve_.sample(elapsed_,p,v,&a); target_=origin_+p;
     const KDL::Vector error=target_-actual_.p; const double e=error.Norm();
     if(e>curve_.error) {finish("FAULT","TCP tracking error exceeded limit"); visualize(); return;}
-    const auto output=correction_.step(v,error,dt,curve_.kp,curve_.ki,curve_.speed,
-                                      curve_.correction_fraction,state_=="SETTLING",curve_.tolerance);
+    const auto feedforward=accelerationFeedforward(v,a,curve_.acceleration_ff_time,curve_.speed);
+    const auto output=correction_.step(feedforward,error,dt,curve_.kp,curve_.ki,curve_.speed,
+                                      curve_.correction_fraction,state_=="SETTLING",curve_.tolerance,v-trend_velocity_,curve_.kd);
     command(output);
     // Compare measured TCP to the reference at the feedback's timestamp, never
     // to a newer target. Count each physical feedback sample once in RMS/trace.
@@ -286,6 +289,7 @@ public:
     cmd_=nh_.advertise<geometry_msgs::TwistStamped>(jog_ns_+"/command",1);
     state_pub_=pn_.advertise<std_msgs::String>("state",1,true);
     readiness_pub_=pn_.advertise<std_msgs::String>("readiness",1,true); metrics_=pn_.advertise<std_msgs::Float64MultiArray>("metrics",1);
+    run_start_pub_=pn_.advertise<std_msgs::Header>("run_start",1,true);
     samples_pub_=pn_.advertise<std_msgs::Float64MultiArray>("samples",50);
     reference_pub_=pn_.advertise<nav_msgs::Path>("reference_path",1,true); actual_pub_=pn_.advertise<nav_msgs::Path>("actual_path",1,true);
     markers_=pn_.advertise<visualization_msgs::MarkerArray>("markers",1);

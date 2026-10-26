@@ -30,6 +30,16 @@ public:
   }
 };
 
+inline KDL::Vector accelerationFeedforward(const KDL::Vector& velocity,const KDL::Vector& acceleration,
+                                           double lead_time,double speed)
+{
+  auto lead=acceleration*lead_time;
+  if(lead.Norm()>.1*speed) lead=lead*(.1*speed/lead.Norm());
+  auto result=velocity+lead;
+  if(result.Norm()>.8*speed) result=result*(.8*speed/result.Norm());
+  return result;
+}
+
 // Integral is a velocity correction, bounded by the same correction reserve as P.
 // Conditional integration prevents windup when correction or total speed saturates.
 class TrackingCorrection
@@ -43,7 +53,8 @@ class TrackingCorrection
 public:
   void reset() {integral_=KDL::Vector::Zero(); holding_=false;}
   KDL::Vector step(const KDL::Vector& feedforward,const KDL::Vector& error,double dt,
-                   double kp,double ki,double speed,double fraction,bool settling,double tolerance)
+                   double kp,double ki,double speed,double fraction,bool settling,double tolerance,
+                   const KDL::Vector& velocity_error=KDL::Vector::Zero(),double kd=0.)
   {
     const double budget=speed*fraction;
     if(settling) {
@@ -53,12 +64,12 @@ public:
       if(holding_) {integral_=KDL::Vector::Zero(); return KDL::Vector::Zero();}
     } else {
       const auto candidate=limited(integral_+error*(ki*dt),budget);
-      const auto correction=error*kp+candidate;
+      const auto correction=error*kp+candidate+velocity_error*kd;
       const auto total=feedforward+correction;
       const bool saturating=correction.Norm()>budget || total.Norm()>speed;
       // Permit unwinding an existing integrator even while a limit is active.
       if(!saturating || KDL::dot(error,integral_)<0) integral_=candidate;
     }
-    return limited(feedforward+limited(error*kp+integral_,budget),speed);
+    return limited(feedforward+limited(error*kp+integral_+velocity_error*kd,budget),speed);
   }
 };

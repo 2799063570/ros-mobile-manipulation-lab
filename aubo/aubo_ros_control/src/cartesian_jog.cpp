@@ -8,6 +8,7 @@
 #include <geometry_msgs/TwistStamped.h>
 #include <sensor_msgs/JointState.h>
 #include <std_msgs/Float64.h>
+#include <std_msgs/Float64MultiArray.h>
 #include <std_msgs/String.h>
 #include <std_srvs/SetBool.h>
 #include <std_srvs/Trigger.h>
@@ -74,6 +75,9 @@ public:
                trace_path.c_str(), capacity);
     }
     initializeModel();
+    joint_target_pub_ = io_.advertise<sensor_msgs::JointState>("joint_target", 10);
+    servo_diagnostics_pub_ = io_.advertise<std_msgs::Float64MultiArray>("servo_diagnostics", 10);
+    telemetry_timer_ = nh_.createWallTimer(ros::WallDuration(0.02), &CartesianJog::publishTelemetry, this);
     state_pub_ = io_.advertise<std_msgs::String>("state", 1, true);
     command_sub_ = io_.subscribe("command", 1, &CartesianJog::command, this,
                                  ros::TransportHints().tcpNoDelay());
@@ -209,6 +213,8 @@ private:
     private_nh_.param("max_following_error", following_error_, 0.12);
     private_nh_.param("joint_limit_margin", limit_margin_, 0.08);
     private_nh_.param("dls_lambda", damping_, 0.02);
+    private_nh_.param("adaptive_damping", adaptive_damping_, backend_ == "gazebo");
+    private_nh_.param("dls_lambda_min", damping_min_, 0.002);
     private_nh_.param("singularity_stop", singular_stop_, 0.008);
     private_nh_.param("singularity_slow", singular_slow_, 0.06);
     private_nh_.param("collision_resolution", collision_resolution_, 0.002);
@@ -224,7 +230,7 @@ private:
          controller_name_.empty())) || base_ == tool_ ||
         !positive(max_linear_) || max_linear_ > 0.10 || !positive(command_timeout_) ||
         command_timeout_ > 0.5 || !positive(feedback_timeout_) || feedback_timeout_ > 0.5 ||
-        !positive(following_error_) || !positive(limit_margin_) || !positive(damping_) ||
+        !positive(damping_min_) || (adaptive_damping_ && damping_min_ > damping_) || !positive(following_error_) || !positive(limit_margin_) || !positive(damping_) ||
         !positive(singular_stop_) || !positive(singular_slow_) || singular_slow_ <= singular_stop_ ||
         !positive(collision_resolution_) || collision_resolution_ > 0.01 ||
         !positive(home_velocity_) || home_velocity_ > 0.25 || !positive(home_timeout_))
@@ -737,6 +743,7 @@ private:
   Eigen::Matrix<double, 6, 1> desiredVelocity()
   {
     Eigen::Matrix<double, 6, 1> result = Eigen::Matrix<double, 6, 1>::Zero();
+    diagnostic_requested_.setZero(); diagnostic_resolved_.setZero(); diagnostic_scale_ = 0.0;
     if (!enabled_ || requested_.norm() < 1e-12)
       return result;
     KDL::JntArray q(kDof);
@@ -772,8 +779,9 @@ private:
       fault("singularity_stop");
       return result;
     }
+    const double lambda = jog::dlsDamping(smallest, singular_stop_, singular_slow_, damping_, damping_min_, adaptive_damping_);
     result = matrix.transpose() *
-             (matrix * matrix.transpose() + damping_ * damping_ * Eigen::Matrix<double, 6, 6>::Identity())
+             (matrix * matrix.transpose() + lambda * lambda * Eigen::Matrix<double, 6, 6>::Identity())
                  .ldlt().solve(twist);
     if (!result.allFinite())
     {
@@ -791,6 +799,10 @@ private:
       scale = std::min(scale, jog::VelocitySmoother::clamp(
           (room - filters_[i].stoppingDistance()) / 0.10, 0.0, 1.0));
     }
+    diagnostic_jacobian_ = matrix;
+    diagnostic_requested_ = twist.head<3>();
+    diagnostic_resolved_ = (matrix * (result * scale)).head<3>();
+    diagnostic_sigma_ = smallest; diagnostic_lambda_ = lambda; diagnostic_scale_ = scale;
     return result * scale;
   }
 
@@ -903,6 +915,7 @@ private:
       }
     motion_started_ = motion_started_ || next != position_;
     position_ = next;
+    target_stamp_ = ros::Time::now();
     filters_ = std::move(next_filters);
     output = position_;
     return true;
@@ -981,6 +994,7 @@ private:
     if (enabled_ && elapsed(started, last_command_) > command_timeout_)
       fault("command_timeout");
     JointVelocity target = JointVelocity::Zero();
+    diagnostic_requested_.setZero(); diagnostic_resolved_.setZero(); diagnostic_scale_ = 0.0;
     if (!shutting_down_ && fault_.empty())
       target = home_goal_ ? homeVelocity() : desiredVelocity();
     if (elapsed(Clock::now(), started) >= control_period_)
@@ -1057,6 +1071,28 @@ private:
     }
   }
 
+  void publishTelemetry(const ros::WallTimerEvent&)
+  {
+    sensor_msgs::JointState target;
+    std_msgs::Float64MultiArray diagnostic;
+    {
+      std::lock_guard<std::mutex> lock(mutex_);
+      if (!initialized_ || target_stamp_.isZero()) return;
+      target.header.stamp = target_stamp_; target.name = names_;
+      target.position.assign(position_.begin(), position_.end());
+      JointVelocity velocity;
+      for (std::size_t i=0; i<kDof; ++i) {
+        velocity(i)=filters_[i].velocity(); target.velocity.push_back(velocity(i));
+      }
+      const Eigen::Vector3d smooth=(diagnostic_jacobian_*velocity).head<3>();
+      diagnostic.data={target_stamp_.toSec(), diagnostic_requested_(0), diagnostic_requested_(1), diagnostic_requested_(2),
+        diagnostic_resolved_(0), diagnostic_resolved_(1), diagnostic_resolved_(2), smooth(0), smooth(1), smooth(2),
+        diagnostic_sigma_, diagnostic_lambda_, diagnostic_scale_, backend_=="sdk" ? 2.0 : backend_=="ros_control" ? 1.0 : 0.0};
+    }
+    // Publish from a diagnostic timer, never from the SDK point-generation path.
+    joint_target_pub_.publish(target); servo_diagnostics_pub_.publish(diagnostic);
+  }
+
   void publishStatus(const ros::WallTimerEvent&)
   {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -1079,12 +1115,18 @@ private:
 
   ros::CallbackQueue feedback_queue_;
   ros::NodeHandle nh_, private_nh_, io_, feedback_nh_;
+  ros::Publisher joint_target_pub_, servo_diagnostics_pub_;
+  ros::Time target_stamp_;
+  bool adaptive_damping_{false};
+  double damping_min_{0.002}, diagnostic_sigma_{0}, diagnostic_lambda_{0}, diagnostic_scale_{0};
+  Eigen::Matrix<double,6,6> diagnostic_jacobian_{Eigen::Matrix<double,6,6>::Zero()};
+  Eigen::Vector3d diagnostic_requested_{Eigen::Vector3d::Zero()}, diagnostic_resolved_{Eigen::Vector3d::Zero()};
   ros::Publisher state_pub_, joint_pub_, trajectory_pub_;
   ros::Subscriber command_sub_, feedback_sub_;
   ros::ServiceServer enable_service_, reset_service_;
   ros::ServiceClient controller_list_client_;
   ros::Timer output_timer_;
-  ros::WallTimer feedback_timer_, status_timer_;
+  ros::WallTimer feedback_timer_, status_timer_, telemetry_timer_;
   std::atomic<bool> control_running_{false};
   std::thread control_thread_;
   std::mutex control_wait_mutex_;

@@ -81,7 +81,7 @@ class Preparation
   }
   bool sameCurve(const Curve& a,const Curve& b) const
   {
-    return a.shape==b.shape && a.plane==b.plane && a.radius==b.radius && a.amplitude==b.amplitude &&
+    return a.kd==b.kd && a.acceleration_ff_time==b.acceleration_ff_time && a.shape==b.shape && a.plane==b.plane && a.radius==b.radius && a.amplitude==b.amplitude &&
       a.length==b.length && a.cycles==b.cycles && a.waves==b.waves && a.duration==b.duration &&
       a.ki==b.ki && a.correction_fraction==b.correction_fraction && a.speed==b.speed && a.extent==b.extent && a.kp==b.kp && a.error==b.error &&
       a.tolerance==b.tolerance && a.settle_speed==b.settle_speed && a.settle_timeout==b.settle_timeout;

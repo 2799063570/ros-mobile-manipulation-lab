@@ -23,6 +23,16 @@ inline unsigned interpolationSteps(double control_frequency, double point_period
   return static_cast<unsigned>(rounded);
 }
 
+// Reduce DLS bias only away from the existing singularity guard. The stop,
+// slowdown, velocity and braking limits are applied independently afterwards.
+inline double dlsDamping(double sigma, double stop, double slow, double base,
+                         double floor, bool adaptive)
+{
+  if (!adaptive) return base;
+  const double blend = std::max(0.0, std::min(1.0, (sigma-stop)/(slow-stop)));
+  return std::max(floor, std::min(base, floor+(base-floor)*(1.0-blend)*(1.0-blend)));
+}
+
 // 点动平滑器只依赖标准库，便于脱离 ROS 对启停、反向和离散导数做测试。
 // 第一层限制速度变化率，第二层用一阶滤波限制加速度变化率。
 // 固定周期 h 下：|v|<=V，|Δv/h|<=A，|Δ²v/h²|<=J。

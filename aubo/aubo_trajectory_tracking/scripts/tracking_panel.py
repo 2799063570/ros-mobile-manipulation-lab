@@ -10,7 +10,7 @@ from std_srvs.srv import Trigger, SetBool
 from python_qt_binding.QtCore import QObject, Signal, QTimer
 from python_qt_binding.QtWidgets import (QApplication, QWidget, QVBoxLayout, QFormLayout,
                                         QHBoxLayout, QComboBox, QDoubleSpinBox, QSpinBox,
-                                        QPushButton, QLabel)
+                                        QPushButton, QLabel, QScrollArea)
 
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -50,7 +50,13 @@ class Panel(QWidget):
         layout = QVBoxLayout(self)
         layout.addWidget(QLabel('当前 TCP 为起点 · 基坐标系 · 固定末端姿态'))
         form = QFormLayout()
-        layout.addLayout(form)
+        parameter_widget = QWidget()
+        parameter_widget.setLayout(form)
+        parameter_scroll = QScrollArea()
+        parameter_scroll.setWidgetResizable(True)
+        parameter_scroll.setWidget(parameter_widget)
+        parameter_scroll.setMinimumHeight(260)
+        layout.addWidget(parameter_scroll, 1)
         self.fields = {}
         for key, title, choices in [('shape', '轨迹', ['circle', 'sine']), ('plane', '平面', ['xy', 'xz', 'yz'])]:
             box = QComboBox()
@@ -66,7 +72,9 @@ class Panel(QWidget):
             ('max_speed', '速度上限 (m/s)', .001, .10, .015),
             ('max_extent', '允许最大位移 (m)', .01, .50, .25),
             ('kp', '位置纠偏增益 (1/s)', .05, 3., 1.),
-            ('ki', '积分增益 (默认关闭)', 0., 2., 0.)]:
+            ('ki', '积分增益 (默认关闭)', 0., 2., 0.),
+            ('kd', '速度误差 D 增益', 0., 1., 0.),
+            ('acceleration_ff_time', '加速度前馈时间 (s)', 0., .25, 0.)]:
             box = QDoubleSpinBox()
             box.setDecimals(3)
             box.setRange(lo, hi)
@@ -135,6 +143,9 @@ class Panel(QWidget):
             rospy.Subscriber(self.ns + '/readiness', String, lambda m: self.events.readiness.emit(m.data)),
             rospy.Subscriber(self.ns + '/metrics', Float64MultiArray, self.on_metrics),
             rospy.Subscriber(self.prep_ns + '/state', String, lambda m: self.events.preparation.emit(m.data)),
+            rospy.Subscriber(self.ns + '/joint_samples', Float64MultiArray, lambda m: self.plot.joint_plot.sample_received.emit(list(m.data)), queue_size=200),
+            rospy.Subscriber(self.ns + '/servo_samples', Float64MultiArray, lambda m: self.plot.joint_plot.servo_received.emit(list(m.data)), queue_size=200),
+            rospy.Subscriber(self.ns + '/joint_recording_state', String, lambda m: self.plot.joint_plot.status_received.emit(m.data)),
             rospy.Subscriber(self.ns + '/samples', Float64MultiArray, lambda m: self.plot.sample_received.emit(list(m.data)), queue_size=200)]
 
     def unlock(self):
@@ -252,6 +263,7 @@ class Panel(QWidget):
     def finish_close(self):
         self.close_ready = True
         self.plot.timer.stop()
+        self.plot.joint_plot.timer.stop()
         self.plot.hide()
         self.close()
 

@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Full AUBO model with a ROS-only position plant; never connects to SDK/Gazebo."""
 import threading
+import csv
+import os
+import math
 import time
 import unittest
 import rospy
@@ -24,6 +27,8 @@ class PreparationTest(unittest.TestCase):
         self.bottom = ''
         self.candidate = None
         self.samples = []
+        self.joint_samples = []
+        self.servo_samples = []
         self.names = ['shoulder_joint', 'upperArm_joint', 'foreArm_joint',
                       'wrist1_joint', 'wrist2_joint', 'wrist3_joint']
         self.scene_pub = rospy.Publisher('/planning_scene', PlanningScene, queue_size=1)
@@ -34,7 +39,9 @@ class PreparationTest(unittest.TestCase):
                       rospy.Subscriber('/trajectory_tracking/state', String, self.track_state),
                       rospy.Subscriber('/cartesian_jog/state', String, self.bottom_state),
                       rospy.Subscriber('/trajectory_preparation/candidate_path', Path, self.path),
-                      rospy.Subscriber('/trajectory_tracking/samples', Float64MultiArray, self.sample)]
+                      rospy.Subscriber('/trajectory_tracking/samples', Float64MultiArray, self.sample),
+                      rospy.Subscriber('/trajectory_tracking/joint_samples', Float64MultiArray, self.joint_sample),
+                      rospy.Subscriber('/trajectory_tracking/servo_samples', Float64MultiArray, self.servo_sample)]
         self.timer = rospy.Timer(rospy.Duration(.01), self.plant)
         for name in ('analyze', 'move', 'check_current', 'stop'):
             rospy.wait_for_service('/trajectory_preparation/'+name, 20)
@@ -76,6 +83,14 @@ class PreparationTest(unittest.TestCase):
         else:
             self.samples.append(msg.data)
 
+    def joint_sample(self, msg):
+        if not msg.data: self.joint_samples = []
+        else: self.joint_samples.append(list(msg.data))
+
+    def servo_sample(self, msg):
+        if not msg.data: self.servo_samples = []
+        else: self.servo_samples.append(list(msg.data))
+
     def call(self, name, ns='/trajectory_preparation'):
         return rospy.ServiceProxy(ns+'/'+name, Trigger)()
 
@@ -103,9 +118,10 @@ class PreparationTest(unittest.TestCase):
             self.assertLess(max(abs(a-b) for a, b in zip(self.q, before)), 1e-5,
                             'Searching must not move the robot')
         # A stale recommendation cannot move after the trajectory changes.
-        rospy.set_param('/trajectory_tracking/radius', .01)
+        rospy.set_param('/trajectory_tracking/radius', rospy.get_param('/preparation_test/tracking_radius', .01))
         self.assertFalse(self.call('move').success)
-        rospy.set_param('/trajectory_tracking/duration', 10.)
+        duration = rospy.get_param('/preparation_test/tracking_duration', 10.)
+        rospy.set_param('/trajectory_tracking/duration', duration)
         result = self.call('analyze')
         self.assertTrue(result.success, result.message)
         result = self.call('move')
@@ -115,10 +131,26 @@ class PreparationTest(unittest.TestCase):
         self.assertTrue(result.success, result.message)
         result = self.call('start', '/trajectory_tracking')
         self.assertTrue(result.success, result.message)
-        self.wait(lambda: self.tracker.startswith('COMPLETED'), 18)
+        self.wait(lambda: self.tracker.startswith('COMPLETED'), duration+10)
         self.assertGreater(len(self.samples), 100)
         self.assertTrue(all(len(row) == 16 for row in self.samples))
         self.wait(lambda: self.bottom == 'DISABLED')
+        self.wait(lambda: len(self.joint_samples)>100 and len(self.servo_samples)>100)
+        for row in self.joint_samples:
+            self.assertEqual(len(row), 34)
+            for j in range(6): self.assertAlmostEqual(row[13+j], row[1+j]-row[7+j], places=10)
+            self.assertLessEqual(row[31], .06)
+            self.assertEqual(row[32], 0.)
+        self.assertTrue(all(a[0] < b[0] for a,b in zip(self.joint_samples,self.joint_samples[1:])))
+        self.assertTrue(all(len(row)==14 for row in self.servo_samples))
+        errors = [row[7] for row in self.samples if row[13]==0]
+        rospy.loginfo('AUBO_MODEL peak %.6f mm RMS %.6f mm', max(errors)*1000, math.sqrt(sum(e*e for e in errors)/len(errors))*1000)
+        artifact_dir = rospy.get_param('/preparation_test/artifact_dir', '')
+        if artifact_dir:
+            os.makedirs(artifact_dir, exist_ok=True)
+            for name, rows in [('tcp',self.samples),('joints',self.joint_samples),('servo',self.servo_samples)]:
+                with open(os.path.join(artifact_dir,name+'.csv'),'w',newline='') as output:
+                    csv.writer(output).writerows(rows)
         # Sine shares the same solver and fixed-orientation path check.
         rospy.set_param('/trajectory_tracking/shape', 'sine')
         rospy.set_param('/trajectory_tracking/length', .02)

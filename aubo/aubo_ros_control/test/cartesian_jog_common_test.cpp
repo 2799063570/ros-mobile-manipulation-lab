@@ -68,6 +68,21 @@ int main()
       catch (const std::invalid_argument&) { rejected_rate = true; }
       require(rejected_rate, "Nonintegral/invalid control rate was accepted");
     }
+    using aubo_ros_control::jog::dlsDamping;
+    require(std::abs(dlsDamping(.008,.008,.06,.02,.002,true)-.02)<1e-12, "Near-stop damping must be preserved");
+    require(std::abs(dlsDamping(.10,.008,.06,.02,.002,true)-.002)<1e-12, "Well-conditioned damping floor");
+    require(std::abs(dlsDamping(.10,.008,.06,.02,.002,false)-.02)<1e-12, "Fixed damping compatibility");
+    double previous=.02;
+    for(int i=0;i<=1000;++i) {
+      const double sigma=.008+.1*i/1000;
+      const double lambda=dlsDamping(sigma,.008,.06,.02,.002,true);
+      require(lambda<=previous+1e-12 && lambda>=.002 && lambda<=.02, "Adaptive damping bounds / continuity");
+      previous=lambda;
+    }
+    const double sigma=.08;
+    const double fixed_gain=sigma*sigma/(sigma*sigma+.02*.02);
+    const double adaptive_gain=sigma*sigma/(sigma*sigma+.002*.002);
+    require(1-adaptive_gain < .02*(1-fixed_gain), "Adaptive DLS must reduce unconstrained model bias");
     derivatives(0.25, 0.60, 8.0);
     derivatives(0.35, 0.80, 12.0);
     derivatives(0.05, 0.10, 100.0);  // alpha=1 分支。

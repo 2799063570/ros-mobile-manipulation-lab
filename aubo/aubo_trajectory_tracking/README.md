@@ -52,7 +52,7 @@ roslaunch aubo_trajectory_tracking tracking.launch
 3. 点击“搜索推荐起点”：从当前姿态、配置 HOME 及其单关节扰动形成 22 个候选，使用同一曲线定义进行连续逆解、关节余量、已知场景碰撞、奇异性和关节速度/加速度预算检查。推荐有限候选中的较优姿态，不声称全局最优。RViz 紫色曲线显示推荐起点对应的完整路径，面板显示起点 XYZ 和检查结果。搜索不移动机械臂。
 4. 检查场景后，点击“移动到推荐起点”。移动前重新检查已知场景与到起点的关节直线路径，沿原点动后端的关节控制流程限速、平滑移动，可用“停止”取消。参数或当前姿态改变后，旧推荐会被拒绝。遇到障碍不做全局绕障，需调整当前姿态后重新搜索。
 5. 到位后点击“更新预览”：基于实际 TCP 和当前实际关节姿态，重新检查整条曲线，记录起点并冻结本次参数。也可跳过搜索和移动，直接检查并使用当前位置。预览仅在成功后清空上一轮跟踪数据。
-6. 检查 RViz 曲线，点击“开始跟踪”：显式使能、发送至少约 0.3 s 零指令、等待新的使能状态确认，再推进轨迹。点击“跟踪曲线 / 导出”查看实时目标/实际路径、XYZ 随时间变化、位置误差与实际速度；支持保存 PNG、导出 SI 单位 CSV。关闭绘图窗口后仍继续接收数据。
+6. 检查 RViz 曲线，点击“开始跟踪”：显式使能、发送至少约 0.3 s 零指令、等待新的使能状态确认，再推进轨迹。点击“跟踪曲线 / 导出”查看实时目标/实际路径、XYZ 随时间变化、位置误差与实际速度；支持保存 PNG、导出 SI 单位 CSV。切换“六轴关节 / 链路诊断”可查看六轴位置、误差、速度及控制链路，一键导出四张图。关闭绘图窗口后仍继续接收数据。
 7. 完成后等待实际 TCP 收敛，再请求禁用。途中“停止”和关闭主面板都会同时请求取消起点准备并停止跟踪。完成、停止或故障后，须重新预览并显式开始。
 
 Gazebo 入口已设置非零初始关节姿态以避开零位伸直奇异位形。请保持 Gazebo 物理运行；暂停会导致反馈超时。本包不自动回零或复位故障。新版本扩展了 `MoveHome.action` 的可选 `target_joint_positions` 字段，空数组仍使用原 HOME；升级时需重新编译底层节点与相关动作客户端并重启，避免旧动作消息的 MD5 不匹配。
@@ -60,6 +60,8 @@ Gazebo 入口已设置非零初始关节姿态以避开零位伸直奇异位形�
 预览后如果 TCP 移动超过到位容差，开始会显示偏移量和允许值。面板修改参数后会禁用开始和移动起点按钮，直到对应的预览或搜索重新成功；直接调用跟踪服务仍采用上一次成功预览冻结的参数。
 
 普通停止会经过点动程序和控制柜已有前瞻点及减速尾段，不等于硬件急停。`COMPLETED` 表示末点位置与估计速度满足上层判据且禁用请求已被接受，不证明柜内队列完全排空或机械臂已经物理停稳。上层进程突然退出时，停止仍依赖底层输入超时保护。
+
+控制器结构、PID/前馈公式、参数和逐图讲解见 [CONTROLLER_GUIDE.md](CONTROLLER_GUIDE.md)；误差对照与数据接口细节见 [CONTROL_ANALYSIS.md](CONTROL_ANALYSIS.md)。
 
 ## 曲线与控制
 
@@ -70,9 +72,9 @@ Gazebo 入口已设置非零初始关节姿态以避开零位伸直奇异位形�
 - 圆：`a = radius × (cos(2π × cycles × s) − 1)`，`b = radius × sin(2π × cycles × s)`。整数圈数执行一次后返回起点。
 - 正弦：`a = length × s`，`b = amplitude × sin(2π × waves × s)`。执行一次后停在前进距离 `length` 处，不自动往返。
 
-起终点的参考速度、参考加速度为零。上层以 50 Hz 更新：`v = derivative(p_ref) + bounded(kp × (p_ref − p_actual) + integral)`，纠偏速度限于总速度预算的 20%，再按合速度限幅。积分具有限幅和条件抗饱和，默认关闭；快速曲线上的积分可能增加相位误差，需根据实测选择。实际 TCP 使用原始关节反馈及与点动相同的 `robot_description`、`base_link → tool_link` KDL 链计算；不使用参考位置充当实际反馈。姿态保持由现有点动节点完成。
+起终点的参考速度、参考加速度为零。上层以 50 Hz 更新：`v = bounded_feedforward(v_ref + tau_ff × a_ref) + bounded(kp × (p_ref − p_actual) + integral + kd × velocity_error)`，纠偏速度限于总速度预算的 20%，再按合速度限幅。可选解析加速度前馈用于补偿平滑滞后，Gazebo 入口默认 0.10 s，实机默认 0。积分具有限幅和条件抗饱和，默认关闭；快速曲线上的积分可能增加相位误差，需根据实测选择。实际 TCP 使用原始关节反馈及与点动相同的 `robot_description`、`base_link → tool_link` KDL 链计算；不使用参考位置充当实际反馈。姿态保持由现有点动节点完成。
 
-默认圆半径 30 mm，总时间 40 s，最大指令速度 15 mm/s，`kp=1.0/s`、`ki=0`。这是带时间参数的轨迹跟踪，上层误差是同一时刻参考位置与实际 TCP 的欧氏距离，不是到整条曲线的最近距离。SDK 前瞻、平滑和通信延迟会造成相位滞后；当前回授未补偿这些延迟，实机跟踪精度需现场测量，不能由模拟测试推断。
+默认圆半径 30 mm，总时间 40 s，最大指令速度 15 mm/s，`kp=1.0/s`、`ki=0`。这是带时间参数的轨迹跟踪，上层误差是同一时刻参考位置与实际 TCP 的欧氏距离，不是到整条曲线的最近距离。SDK 前瞻、平滑和通信延迟会造成相位滞后；加速度前馈只对部分平滑滞后作有界补偿，尚未辨识并精确补偿 SDK 队列、通信和真实执行器延迟；实机跟踪精度需现场测量，不能由模拟测试推断。
 
 轨迹相位按 ROS 时间推进，Gazebo 降速时与 `/clock` 一致；回调、反馈、状态、使能确认和收敛超时仍使用真实时间看门狗。统计/绘图将目标位置计算到反馈本身的时间戳，每帧有效反馈最多计入一次，避免用较新的目标与旧反馈比较产生速度相关偏差。控制命令仍使用当前目标与新鲜的实际 TCP 误差；不对实测位置做平滑或以预测值替代。时钟倒退或异常跳变会停止跟踪。
 
@@ -97,6 +99,8 @@ Gazebo 入口已设置非零初始关节姿态以避开零位伸直奇异位形�
 | `cycles / waves` | `1 / 1` | 圆圈数 / 正弦波数，整数 1–20 |
 | `duration` | `40.0` | 一次完整轨迹时间 s，含起止时间缩放 |
 | `kp` | `1.0` | 位置回授增益 1/s，面板可调 |
+| `kd` | `0.0` | 短窗速度误差 D 增益，默认关闭 |
+| `acceleration_ff_time` | `0.0` | 解析加速度前馈时间 s，Gazebo 入口覆盖为 0.10，限于 0..0.25 |
 | `ki` | `0.0` | 有界积分增益 1/s²，默认关闭，面板可调 |
 | `correction_fraction` | `0.2` | 纠偏速度预算比例，上限 20% |
 | `velocity_window` | `0.08` | 趋势速度拟合窗口 s；原始速度仍保留 |
@@ -133,6 +137,9 @@ RViz 默认配置包含机械臂模型、网格、青色参考路径、橙色实
 | `/trajectory_preparation/stop` | `std_srvs/Trigger`，取消搜索、取消起点移动并请求底层禁用 |
 | `/trajectory_preparation/state` | `std_msgs/String`，搜索/推荐/移动/到位及失败原因 |
 | `/trajectory_preparation/candidate_path` | `nav_msgs/Path`，最近推荐起点的完整曲线，RViz 紫色 |
+| `/trajectory_tracking/joint_samples` | 34 项，时间对齐的六轴生成目标、实际位置、误差及速度，详见控制分析 |
+| `/trajectory_tracking/servo_samples` | 14 项，逆解/限速/平滑链路诊断，详见控制分析 |
+| `/trajectory_tracking/run_start` | `std_msgs/Header`，本轮运行起点时间；预览清零 |
 | `/trajectory_tracking/metrics` | `Float64MultiArray`，`[elapsed_s, error_m, peak_m, rms_m, actual_speed_m_s]` |
 
 无界面示例（先启动节点）：
@@ -149,7 +156,7 @@ rosservice call /trajectory_tracking/stop
 保存一次跟踪记录：
 
 ```bash
-rosbag record -O tracking.bag /trajectory_tracking/state /trajectory_tracking/metrics /trajectory_tracking/reference_path /trajectory_tracking/actual_path /cartesian_jog/command /cartesian_jog/state /cartesian_jog/sdk_joint_states
+rosbag record -O tracking.bag /trajectory_tracking/state /trajectory_tracking/metrics /trajectory_tracking/reference_path /trajectory_tracking/actual_path /cartesian_jog/command /cartesian_jog/state /cartesian_jog/sdk_joint_states /aubo_i5/joint_states /trajectory_tracking/joint_samples /trajectory_tracking/servo_samples /cartesian_jog/joint_target /cartesian_jog/servo_diagnostics
 ```
 
 ## 验证边界
@@ -175,4 +182,4 @@ rostest aubo_trajectory_tracking tracking_clock.test
 
 轨迹跟踪节点设置为 `required`，意外退出时整套 launch 会关闭，避免界面仍在运行却没有跟踪控制节点。
 
-跟踪优化验证新增：时间戳对齐、慢仿真时钟与暂停保护、积分抗饱和、末点保持滞回、速度趋势估计，以及存在增益损失/一阶滞后的模拟执行端新旧参数对照。该对照不代表当前 Gazebo 场景或实机的精度承诺。CSV 中位置和误差保持原始测量，速度趋势只作为额外诊断列；旧 9 列样本仍可绘制，新增诊断缺失时记为 NaN。
+跟踪优化验证新增：时间戳对齐、慢仿真时钟与暂停保护、积分抗饱和、末点保持滞回、速度趋势估计，以及存在增益损失/一阶滞后的模拟执行端新旧参数对照。该对照不代表当前 Gazebo 场景或实机的精度承诺。CSV 中位置和误差保持原始测量，速度趋势作为额外诊断列，启用 D 项时也参与速度误差估计；旧 9 列样本仍可绘制，新增诊断缺失时记为 NaN。
