@@ -51,6 +51,9 @@
     <arg name="robot_srdf" value="$(arg robot_srdf)" />
   </include>
 
+  <!-- Per-joint jerk caps used by MoveIt's Ruckig smoothing adapter. -->
+  <rosparam command="load" file="$(find aubo_moveit_config)/config/ruckig_limits.yaml"/>
+
   <!-- Planning Functionality -->
   <include ns="move_group" file="$(find aubo_moveit_config)/launch/planning_pipeline.launch.xml">
     <arg name="pipeline" value="$(arg pipeline)" />

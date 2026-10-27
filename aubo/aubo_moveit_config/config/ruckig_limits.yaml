@@ -1,0 +1,14 @@
+# Jerk limits for MoveIt's Ruckig trajectory smoother, in rad/s^3.
+ruckig:
+  shoulder_joint:
+    jerk_limit: 2.0
+  upperArm_joint:
+    jerk_limit: 2.0
+  foreArm_joint:
+    jerk_limit: 2.0
+  wrist1_joint:
+    jerk_limit: 2.5
+  wrist2_joint:
+    jerk_limit: 2.5
+  wrist3_joint:
+    jerk_limit: 2.5

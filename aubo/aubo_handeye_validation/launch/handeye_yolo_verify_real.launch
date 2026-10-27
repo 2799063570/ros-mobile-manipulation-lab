@@ -29,6 +29,8 @@
   <arg name="gripper_port" default="/dev/ttyUSB0"/>
   <arg name="rviz" default="true"/>
   <arg name="rviz_config" default="$(find aubo_handeye_validation)/config/handeye_yolo_verify.rviz"/>
+  <arg name="record_motion" default="false"/>
+  <arg name="motion_bag_prefix" default="/tmp/aubo_motion"/>
   <arg name="target_tf_frame" default="handeye_verify_target"/>
   <arg name="grasp_goal_tf_frame" default="handeye_verify_grasp_goal"/>
   <arg name="python" default="/home/zlab/anaconda3/envs/yolo/bin/python"/>
@@ -42,6 +44,8 @@
     <arg name="rviz_config" value="$(arg rviz_config)"/>
     <arg name="robot_xacro" value="aubo_i5.xacro"/>
     <arg name="robot_srdf" value="aubo_i5.srdf"/>
+    <arg name="record_motion" value="$(arg record_motion)"/>
+    <arg name="motion_bag_prefix" value="$(arg motion_bag_prefix)"/>
   </include>
   <include if="$(arg start_camera)" file="$(find aubo_ros_control)/launch/eye_to_hand_camera_real.launch">
     <arg name="serial_no" value="$(arg camera_serial_no)"/>

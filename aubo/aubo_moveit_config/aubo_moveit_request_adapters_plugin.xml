@@ -1,0 +1,7 @@
+<library path="libaubo_moveit_request_adapters">
+  <class name="aubo_moveit_config/ZeroBoundaryAcceleration"
+         type="aubo_moveit_config::ZeroBoundaryAcceleration"
+         base_class_type="planning_request_adapter::PlanningRequestAdapter">
+    <description>Set endpoint accelerations to zero before jerk-limited smoothing.</description>
+  </class>
+</library>

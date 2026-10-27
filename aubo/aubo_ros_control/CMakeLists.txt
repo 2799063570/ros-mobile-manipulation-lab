@@ -10,6 +10,7 @@ find_package(catkin REQUIRED COMPONENTS
   aubo_sdk
   controller_manager
   controller_manager_msgs
+  diagnostic_msgs
   dynamic_reconfigure
   geometry_msgs
   hardware_interface
@@ -45,6 +46,7 @@ generate_dynamic_reconfigure_options(
 )
 
 catkin_install_python(PROGRAMS
+  scripts/analyze_moveit_motion.py
   scripts/analyze_motion_timing.py
   scripts/handeye_tf_publisher.py
   scripts/hybrid_planning_scene.py
@@ -83,7 +85,7 @@ endif()
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME} aubo_visual_servo_panel
-  CATKIN_DEPENDS actionlib actionlib_msgs message_runtime aubo_sdk controller_manager dynamic_reconfigure geometry_msgs hardware_interface
+  CATKIN_DEPENDS actionlib actionlib_msgs message_runtime aubo_sdk controller_manager controller_manager_msgs diagnostic_msgs dynamic_reconfigure geometry_msgs hardware_interface
     kdl_parser moveit_msgs moveit_core moveit_ros_planning shape_msgs pluginlib roscpp rospy roslib rviz sensor_msgs
     std_msgs std_srvs tf2_geometry_msgs tf2_ros visualization_msgs
   DEPENDS orocos_kdl

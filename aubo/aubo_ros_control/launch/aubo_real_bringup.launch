@@ -12,8 +12,13 @@
   <arg name="publish_sorting_box" default="false"/>
   <arg name="sorting_box_config" default="$(find aubo_planning)/config/sorting_box_reference.yaml"/>
   <arg name="control_frequency" default="200.0"/>
-  <arg name="mac_buffer_target" default="120"/>
+  <arg name="mac_buffer_target" default="300"/>
   <arg name="trajectory_preload_points" default="20"/>
+  <!-- Use SDK pushed feedback so the 50 Hz state loop only performs safety diagnosis. -->
+  <arg name="use_realtime_feedback" default="true"/>
+  <!-- Optional motion trace capture. The timestamped bag is written under /tmp. -->
+  <arg name="record_motion" default="false"/>
+  <arg name="motion_bag_prefix" default="/tmp/aubo_motion"/>
   <!-- 运动指令源：move_group（ROS/MoveIt 接管）或 teach_pendant（示教器接管）。
        使用映射表可令非法取值在 roslaunch 解析阶段直接报错。 -->
   <arg name="motion_source" default="move_group"/>
@@ -31,6 +36,7 @@
     <arg name="control_frequency" value="$(arg control_frequency)"/>
     <arg name="mac_buffer_target" value="$(arg mac_buffer_target)"/>
     <arg name="trajectory_preload_points" value="$(arg trajectory_preload_points)"/>
+    <arg name="use_realtime_feedback" value="$(arg use_realtime_feedback)"/>
   </include>
 
   <node name="robot_state_publisher" pkg="robot_state_publisher"
@@ -53,6 +59,29 @@
     <arg name="robot_srdf" value="$(arg robot_srdf)"/>
     <arg name="use_sensor_manager" value="$(arg use_sensor_manager)"/>
   </include>
+
+  <!-- Record both commanded trajectory and hardware/controller feedback so startup
+       transients can be separated from MoveIt planning and action execution. -->
+  <node if="$(arg record_motion)" pkg="rosbag" type="record"
+        name="aubo_motion_recorder" output="screen"
+        args="--lz4 -o $(arg motion_bag_prefix)
+              /joint_states
+              /aubo_i5/joint_states
+              /aubo_i5/aubo_hw_node/raw_joint_states
+              /aubo_i5/aubo_i5_controller/state
+              /aubo_i5/aubo_i5_controller/follow_joint_trajectory/goal
+              /aubo_i5/aubo_i5_controller/follow_joint_trajectory/feedback
+              /aubo_i5/aubo_i5_controller/follow_joint_trajectory/result
+              /aubo_i5/aubo_i5_controller/follow_joint_trajectory/status
+              /execute_trajectory/goal
+              /execute_trajectory/feedback
+              /execute_trajectory/result
+              /execute_trajectory/status
+              /move_group/goal /move_group/feedback
+              /move_group/result /move_group/status
+              /move_group/display_planned_path
+              /aubo_i5/aubo_hw_node/flow_diagnostics
+              /tf /tf_static /diagnostics /rosout"/>
 
   <include if="$(arg publish_camera_stand)"
            file="$(find aubo_planning)/launch/publish_camera_stand.launch">

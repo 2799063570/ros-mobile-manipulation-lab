@@ -9,8 +9,9 @@
   <arg name="collision_class" default="6"/>
   <!-- TCP2CANBUS 路点周期是 5 ms，必须以 200 Hz 生成命令。 -->
   <arg name="control_frequency" default="200.0"/>
-  <!-- SDK 按 6 个关节标量计数：120 = 20 个路点 = 约 100 ms。 -->
-  <arg name="mac_buffer_target" default="120"/>
+  <!-- SDK 按 6 个关节标量计数：300 = 50 个路点 = 约 250 ms。 -->
+  <arg name="mac_buffer_target" default="300"/>
+  <!-- 初始仅预装 20 点（100 ms），避免启动时额外累积长段参考轨迹。 -->
   <arg name="trajectory_preload_points" default="20"/>
   <!-- true: ros_control/MoveIt 接管运动；false: 仅读取状态，运动由示教器控制。 -->
   <arg name="enable_motion_control" default="true"/>

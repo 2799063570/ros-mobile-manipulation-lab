@@ -19,14 +19,15 @@ joint_limits:
     max_acceleration: 2.0
   foreArm_joint:
     has_velocity_limits: true
-    max_velocity: 0.5
+    # Conservative real-robot profile while diagnosing start vibration.
+    max_velocity: 0.35
     has_acceleration_limits: true
-    max_acceleration: 0.8
+    max_acceleration: 0.4
   shoulder_joint:
     has_velocity_limits: true
-    max_velocity: 0.5
+    max_velocity: 0.35
     has_acceleration_limits: true
-    max_acceleration: 0.8
+    max_acceleration: 0.4
   upperArm_joint:
     # Global task safety limit: -60 deg ... +60 deg. Keep this synchronized
     # with aubo_description/urdf/arm.xacro and visual-servo integration limits.
@@ -34,21 +35,21 @@ joint_limits:
     min_position: -1.0471976
     max_position: 1.0471976
     has_velocity_limits: true
-    max_velocity: 0.5
+    max_velocity: 0.35
     has_acceleration_limits: true
-    max_acceleration: 0.8
+    max_acceleration: 0.4
   wrist1_joint:
     has_velocity_limits: true
-    max_velocity: 0.7
+    max_velocity: 0.5
     has_acceleration_limits: true
-    max_acceleration: 1.2
+    max_acceleration: 0.6
   wrist2_joint:
     has_velocity_limits: true
-    max_velocity: 0.7
+    max_velocity: 0.5
     has_acceleration_limits: true
-    max_acceleration: 1.2
+    max_acceleration: 0.6
   wrist3_joint:
     has_velocity_limits: true
-    max_velocity: 0.7
+    max_velocity: 0.5
     has_acceleration_limits: true
-    max_acceleration: 1.2
+    max_acceleration: 0.6

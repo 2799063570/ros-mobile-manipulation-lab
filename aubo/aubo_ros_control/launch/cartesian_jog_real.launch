@@ -25,7 +25,7 @@
     <arg name="enable_motion_control" value="true"/>
     <arg name="use_realtime_feedback" value="true"/>
     <arg name="control_frequency" value="200.0"/>
-    <arg name="mac_buffer_target" value="120"/>
+    <arg name="mac_buffer_target" value="300"/>
     <arg name="trajectory_preload_points" value="20"/>
   </include>
   <node name="aubo_joint_state_relay"

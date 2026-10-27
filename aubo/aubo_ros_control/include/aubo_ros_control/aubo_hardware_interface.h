@@ -34,6 +34,7 @@
 #include <cmath>
 
 #include <ros/ros.h>
+#include <diagnostic_msgs/DiagnosticArray.h>
 
 // ros_control
 #include <hardware_interface/joint_command_interface.h>
@@ -55,13 +56,12 @@ namespace aubo_ros_control
 /// 关节数
 static constexpr int NUM_JOINTS = aubo_robot_namespace::ARM_DOF;  // 6
 
-/// TCP2CANBUS MAC 缓冲区目标大小。诊断值按关节标量计数，60 约为
-/// 10 个路点（50 ms @ 200 Hz）。标准 ros_control 轨迹控制器会实时检查
-/// path tolerance，不能照搬旧驱动的 400（约 335 ms），否则实机反馈
-/// 长期落后于期望状态。
-static constexpr int DEFAULT_MAC_BUF_SIZE = 120;
+/// TCP2CANBUS MAC 缓冲区目标大小。诊断值按关节标量计数，300 = 50 个
+/// 路点（250 ms @ 200 Hz），覆盖本机实测的最长 167 ms 喂点周期并留出余量。
+/// 仍低于 SDK 接口上限 400，避免把 MAC 前瞻无限增大造成跟踪滞后。
+static constexpr int DEFAULT_MAC_BUF_SIZE = 300;
 
-/// 首次轨迹下发前累积的 5 ms 路点数，避免控制柜缓冲欠载。
+/// 首次轨迹下发前累积的 5 ms 路点数。保留 100 ms 启动预装，避免额外扩大起步相位滞后。
 static constexpr int DEFAULT_TRAJECTORY_PRELOAD_POINTS = 20;
 
 /// 最小缓冲区阈值（参照 aubo_driver.h MINIMUM_BUFFER_SIZE）
@@ -212,6 +212,7 @@ private:
     // Only new successful SDK reads are published here; ros_control's regular
     // joint_state_controller can republish its cached state with newer stamps.
     ros::Publisher raw_joint_state_pub_;
+    ros::Publisher flow_diagnostics_pub_;
     bool use_realtime_feedback_{false}, feedback_callback_registered_{false};
     std::atomic<bool> accept_feedback_callbacks_{false};
     std::mutex feedback_mutex_;
@@ -268,6 +269,8 @@ private:
     // 无锁运动队列（对应 aubo_driver.cpp ros_motion_queue_）
     // -------------------------------------------------------------------------
     moodycamel::ReaderWriterQueue<std::array<double, NUM_JOINTS>> ros_motion_queue_;
+    std::atomic<std::uint64_t> motion_queue_full_count_{0};
+    std::atomic<double> controller_loop_period_max_ms_{0.0};
 
     // -------------------------------------------------------------------------
     // 喂点线程相关（对应 aubo_driver.cpp publishWaypointToRobot）

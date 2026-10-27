@@ -13,17 +13,41 @@
 
 #include "aubo_ros_control/aubo_hardware_interface.h"
 #include <sensor_msgs/JointState.h>
+#include <diagnostic_msgs/DiagnosticStatus.h>
+#include <diagnostic_msgs/KeyValue.h>
 
 #include <cstring>
 #include <cmath>
 #include <algorithm>
 #include <chrono>
+#include <limits>
 #include <unistd.h>   // usleep
 
 using namespace aubo_robot_namespace;
 
 namespace aubo_ros_control
 {
+namespace
+{
+void updateAtomicMax(std::atomic<double>& destination, double value)
+{
+    double current = destination.load(std::memory_order_relaxed);
+    while (value > current &&
+           !destination.compare_exchange_weak(current, value,
+               std::memory_order_relaxed, std::memory_order_relaxed))
+    {
+    }
+}
+
+void addDiagnosticValue(diagnostic_msgs::DiagnosticStatus& status,
+                        const std::string& key, const std::string& value)
+{
+    diagnostic_msgs::KeyValue item;
+    item.key = key;
+    item.value = value;
+    status.values.push_back(item);
+}
+}
 
 // =============================================================================
 // 构造 / 析构
@@ -150,6 +174,8 @@ bool AuboHardwareInterface::init()
     }
 
     raw_joint_state_pub_ = nh_.advertise<sensor_msgs::JointState>("raw_joint_states", 1);
+    flow_diagnostics_pub_ = nh_.advertise<diagnostic_msgs::DiagnosticArray>(
+        "flow_diagnostics", 10);
 
     // ------------------------------------------------------------------
     // 2. 连接机械臂（带重试，来自 aubo_driver.cpp connectToRobotController）
@@ -329,8 +355,11 @@ void AuboHardwareInterface::read(const ros::Time& /*time*/,
 // =============================================================================
 
 void AuboHardwareInterface::write(const ros::Time& /*time*/,
-                                  const ros::Duration& /*period*/)
+                                  const ros::Duration& period)
 {
+    if (std::isfinite(period.toSec()) && period.toSec() > 0.0)
+        updateAtomicMax(controller_loop_period_max_ms_, period.toSec() * 1000.0);
+
     if (!controller_connected_flag_.load() || !in_tcp2canbus_mode_)
         return;
 
@@ -388,6 +417,7 @@ void AuboHardwareInterface::write(const ros::Time& /*time*/,
 
     if (!ros_motion_queue_.try_enqueue(cmd))
     {
+        motion_queue_full_count_.fetch_add(1, std::memory_order_relaxed);
         ROS_WARN_THROTTLE(1.0, "[AuboHW] write(): 运动队列已满，丢弃该点");
         return;
     }
@@ -842,18 +872,147 @@ int AuboHardwareInterface::readSafetyDiagnosis(RobotDiagnosis& diagnosis)
 
 void AuboHardwareInterface::publishWaypointToRobot()
 {
+    using SteadyClock = std::chrono::steady_clock;
     std::vector<wayPoint_S> waypoint_vector;
     int current_macsz = 0;
     int cnt = 0;
     bool stream_started = false;
     int empty_polls = 0;
+    auto previous_loop_start = SteadyClock::now();
+    auto next_report = previous_loop_start + std::chrono::milliseconds(100);
+    double max_feed_loop_ms = 0.0;
+    double max_diagnosis_ms = 0.0;
+    double max_send_ms = 0.0;
+    int min_mac_window = std::numeric_limits<int>::max();
+    int min_active_mac_window = std::numeric_limits<int>::max();
+    int max_mac_window = 0;
+    std::size_t max_queue_window = 0;
+    std::size_t query_count = 0, diagnosis_failures = 0;
+    std::size_t send_count = 0, send_points = 0, send_failures = 0;
+    std::size_t low_water_samples = 0, empty_with_pending_samples = 0;
+    std::size_t above_target_samples = 0;
+    int last_diagnosis_result = InterfaceCallSuccCode;
+    int last_send_result = InterfaceCallSuccCode;
+    std::uint64_t last_queue_full_count =
+        motion_queue_full_count_.load(std::memory_order_relaxed);
+
+    const auto publish_flow_window = [&](bool force)
+    {
+        const auto now = SteadyClock::now();
+        if (!force && now < next_report)
+            return;
+
+        const std::uint64_t queue_full_total =
+            motion_queue_full_count_.load(std::memory_order_relaxed);
+        const std::uint64_t queue_full_window = queue_full_total - last_queue_full_count;
+        last_queue_full_count = queue_full_total;
+
+        diagnostic_msgs::DiagnosticArray array;
+        array.header.stamp = ros::Time::now();
+        diagnostic_msgs::DiagnosticStatus status;
+        status.name = "Aubo hardware motion flow";
+        status.hardware_id = server_host_;
+        const bool rpc_error = diagnosis_failures > 0 || send_failures > 0;
+        const double mac_target_coverage_ms =
+            mac_buffer_target_ / static_cast<double>(NUM_JOINTS) * control_period_s_ * 1000.0;
+        const std::size_t mac_target_points =
+            static_cast<std::size_t>(mac_buffer_target_ / NUM_JOINTS);
+        const bool feed_loop_exceeded_coverage = stream_started &&
+            max_feed_loop_ms > mac_target_coverage_ms;
+        const bool queue_backlog = stream_started && max_queue_window > mac_target_points;
+        const bool flow_warning = low_water_samples > 0 ||
+            empty_with_pending_samples > 0 || above_target_samples > 0 || queue_full_window > 0 ||
+            feed_loop_exceeded_coverage || queue_backlog;
+        status.level = rpc_error ? diagnostic_msgs::DiagnosticStatus::ERROR :
+            (flow_warning ? diagnostic_msgs::DiagnosticStatus::WARN :
+                            diagnostic_msgs::DiagnosticStatus::OK);
+        status.message = rpc_error ? "SDK diagnosis/send failure" :
+            (empty_with_pending_samples > 0 ? "MAC empty while commands were pending" :
+             (low_water_samples > 0 ? "MAC low-water samples observed" :
+              (feed_loop_exceeded_coverage ? "feed loop slower than MAC target coverage" :
+               (queue_backlog ? "ROS motion queue backlog exceeds MAC target" :
+                (above_target_samples > 0 ? "MAC occupancy exceeded refill target" :
+                 (queue_full_window > 0 ? "ROS motion queue overflow" : "flow nominal"))))));
+
+        const std::size_t queue_current = ros_motion_queue_.size_approx();
+        const double control_loop_max = controller_loop_period_max_ms_.exchange(
+            0.0, std::memory_order_relaxed);
+        const auto add = [&](const std::string& key, const std::string& value)
+        {
+            addDiagnosticValue(status, key, value);
+        };
+        add("stream_active", stream_started ? "true" : "false");
+        add("controller_connected", controller_connected_flag_.load() ? "true" : "false");
+        add("tcp2canbus_active", in_tcp2canbus_mode_ ? "true" : "false");
+        add("mac_current_scalars", std::to_string(current_macsz));
+        add("mac_current_points", std::to_string(current_macsz / NUM_JOINTS));
+        add("mac_target_scalars", std::to_string(mac_buffer_target_));
+        add("mac_target_points", std::to_string(mac_target_points));
+        add("mac_target_coverage_ms", std::to_string(mac_target_coverage_ms));
+        add("mac_window_min_scalars", min_mac_window == std::numeric_limits<int>::max() ?
+            "-1" : std::to_string(min_mac_window));
+        add("mac_active_window_min_scalars",
+            min_active_mac_window == std::numeric_limits<int>::max() ?
+            "-1" : std::to_string(min_active_mac_window));
+        add("mac_window_max_scalars", std::to_string(max_mac_window));
+        add("mac_low_water_samples_below_5_points", std::to_string(low_water_samples));
+        add("mac_empty_with_pending_queue_samples", std::to_string(empty_with_pending_samples));
+        add("mac_above_target_samples", std::to_string(above_target_samples));
+        add("queue_current_points", std::to_string(queue_current));
+        add("queue_window_max_points", std::to_string(max_queue_window));
+        add("queue_backlog_warning_points", std::to_string(mac_target_points));
+        add("queue_window_max_nominal_horizon_ms", std::to_string(
+            max_queue_window * control_period_s_ * 1000.0));
+        add("queue_full_total", std::to_string(queue_full_total));
+        add("queue_full_window", std::to_string(queue_full_window));
+        add("query_count", std::to_string(query_count));
+        add("diagnosis_failures", std::to_string(diagnosis_failures));
+        add("last_diagnosis_result", std::to_string(last_diagnosis_result));
+        add("diagnosis_max_ms", std::to_string(max_diagnosis_ms));
+        add("send_count", std::to_string(send_count));
+        add("send_points", std::to_string(send_points));
+        add("send_failures", std::to_string(send_failures));
+        add("last_send_result", std::to_string(last_send_result));
+        add("send_max_ms", std::to_string(max_send_ms));
+        add("feed_loop_max_ms", std::to_string(max_feed_loop_ms));
+        add("controller_loop_period_max_ms", std::to_string(control_loop_max));
+        add("trajectory_preload_points", std::to_string(trajectory_preload_points_));
+        status.message += "; interval: queries=" + std::to_string(query_count) +
+            ", sends=" + std::to_string(send_count) +
+            ", max_query_ms=" + std::to_string(max_diagnosis_ms) +
+            ", max_send_ms=" + std::to_string(max_send_ms);
+        array.status.push_back(status);
+        flow_diagnostics_pub_.publish(array);
+
+        max_feed_loop_ms = max_diagnosis_ms = max_send_ms = 0.0;
+        min_mac_window = std::numeric_limits<int>::max();
+        min_active_mac_window = std::numeric_limits<int>::max();
+        max_mac_window = 0;
+        max_queue_window = 0;
+        query_count = diagnosis_failures = send_count = send_points = send_failures = 0;
+        low_water_samples = empty_with_pending_samples = above_target_samples = 0;
+        last_diagnosis_result = last_send_result = InterfaceCallSuccCode;
+        next_report = now + std::chrono::milliseconds(100);
+    };
 
     while (feed_thread_running_.load())
     {
+        const bool stream_was_active = stream_started;
+        const auto loop_start = SteadyClock::now();
+        max_feed_loop_ms = std::max(max_feed_loop_ms,
+            std::chrono::duration<double, std::milli>(loop_start - previous_loop_start).count());
+        previous_loop_start = loop_start;
+
         RobotDiagnosis mac_diagnosis{};
         // --- 读取 MAC 缓冲区大小（来自 aubo_driver.cpp robot_mac_size_service_） ---
+        const auto diagnosis_start = SteadyClock::now();
         const int diagnosis_ret =
             robot_mac_service_.robotServiceGetRobotDiagnosisInfo(mac_diagnosis);
+        const double diagnosis_ms = std::chrono::duration<double, std::milli>(
+            SteadyClock::now() - diagnosis_start).count();
+        ++query_count;
+        max_diagnosis_ms = std::max(max_diagnosis_ms, diagnosis_ms);
+        last_diagnosis_result = diagnosis_ret;
         const bool diagnosis_ok = diagnosis_ret == InterfaceCallSuccCode;
         if (diagnosis_ok)
         {
@@ -863,15 +1022,29 @@ void AuboHardwareInterface::publishWaypointToRobot()
         }
         else
         {
+            ++diagnosis_failures;
             ROS_ERROR("[AuboHW] 读取 MAC 缓冲状态失败，错误码: %d；已锁定停止", diagnosis_ret);
             controller_connected_flag_.store(false);
             feed_thread_running_.store(false);
+            publish_flow_window(true);
         }
 
         if (!diagnosis_ok)
             continue;
 
         const std::size_t queued_points = ros_motion_queue_.size_approx();
+        min_mac_window = std::min(min_mac_window, current_macsz);
+        max_mac_window = std::max(max_mac_window, current_macsz);
+        if (stream_was_active)
+            min_active_mac_window = std::min(min_active_mac_window, current_macsz);
+        max_queue_window = std::max(max_queue_window, queued_points);
+        if (stream_was_active && queued_points > 0 &&
+            current_macsz < 5 * NUM_JOINTS)
+            ++low_water_samples;
+        if (stream_was_active && current_macsz == 0 && queued_points > 0)
+            ++empty_with_pending_samples;
+        if (current_macsz > mac_buffer_target_ + NUM_JOINTS - 1)
+            ++above_target_samples;
 
         // 旧驱动先生成一段固定 5 ms 路点再启动控制柜。标准
         // JointTrajectoryController 是逐周期产生点，若立即发送，MAC 会反复
@@ -880,6 +1053,7 @@ void AuboHardwareInterface::publishWaypointToRobot()
         {
             if (queued_points < static_cast<std::size_t>(trajectory_preload_points_))
             {
+                publish_flow_window(false);
                 std::this_thread::sleep_for(
                     std::chrono::milliseconds(FEED_THREAD_SLEEP_MS));
                 continue;
@@ -924,10 +1098,18 @@ void AuboHardwareInterface::publishWaypointToRobot()
 
             if (!waypoint_vector.empty())
             {
+                const auto send_start = SteadyClock::now();
                 const int send_ret =
                     robot_mac_service_.robotServiceSetRobotPosData2Canbus(waypoint_vector);
+                const double send_ms = std::chrono::duration<double, std::milli>(
+                    SteadyClock::now() - send_start).count();
+                ++send_count;
+                send_points += waypoint_vector.size();
+                max_send_ms = std::max(max_send_ms, send_ms);
+                last_send_result = send_ret;
                 if (send_ret != InterfaceCallSuccCode)
                 {
+                    ++send_failures;
                     ROS_ERROR("[AuboHW] 轨迹点发送失败，错误码: %d；已停止发送", send_ret);
                     controller_connected_flag_.store(false);
                     feed_thread_running_.store(false);
@@ -935,6 +1117,8 @@ void AuboHardwareInterface::publishWaypointToRobot()
             }
             waypoint_vector.clear();
         }
+
+        publish_flow_window(!feed_thread_running_.load());
 
         // 1 ms 检查周期，给 5 ms 硬件消费周期留出调度余量。
         std::this_thread::sleep_for(std::chrono::milliseconds(FEED_THREAD_SLEEP_MS));
