@@ -17,6 +17,8 @@
   <buildtool_depend>catkin</buildtool_depend>
 
   <build_depend>moveit_core</build_depend>
+  <build_depend>ruckig</build_depend>
+  <run_depend>ruckig</run_depend>
   <build_depend>roscpp</build_depend>
 
   <run_depend>moveit_ros_move_group</run_depend>
@@ -44,6 +46,9 @@
   <run_depend>moveit_ros_warehouse</run_depend>
   <run_depend>warehouse_ros_mongo</run_depend>
   <run_depend>aubo_description</run_depend>
+
+  <test_depend>rostest</test_depend>
+  <test_depend>joint_trajectory_controller</test_depend>
 
   <export>
     <moveit_core plugin="${prefix}/aubo_moveit_request_adapters_plugin.xml"/>

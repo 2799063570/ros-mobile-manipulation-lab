@@ -47,6 +47,7 @@ generate_dynamic_reconfigure_options(
 
 catkin_install_python(PROGRAMS
   scripts/analyze_moveit_motion.py
+  scripts/analyze_hardware_trace.py
   scripts/analyze_motion_timing.py
   scripts/handeye_tf_publisher.py
   scripts/hybrid_planning_scene.py
@@ -169,6 +170,8 @@ target_include_directories(aubo_visual_servo_visualization_node PRIVATE include 
 target_link_libraries(aubo_visual_servo_visualization_node ${catkin_LIBRARIES} ${orocos_kdl_LIBRARIES})
 
 if(CATKIN_ENABLE_TESTING)
+  add_test(NAME hardware_trace_analysis_test COMMAND ${PYTHON_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/test/hardware_trace_analysis_test.py)
   catkin_add_gtest(visual_servo_stream_test test/visual_servo_stream_test.cpp)
   if(TARGET visual_servo_stream_test)
     target_compile_features(visual_servo_stream_test PRIVATE cxx_std_14)
@@ -242,6 +245,15 @@ if(CATKIN_ENABLE_TESTING)
     target_include_directories(aubo_hardware_feedback_test PRIVATE include ${catkin_INCLUDE_DIRS})
     target_link_libraries(aubo_hardware_feedback_test ${PROJECT_NAME} ${catkin_LIBRARIES})
     set_target_properties(aubo_hardware_feedback_test PROPERTIES
+      BUILD_RPATH "${AUBO_SDK_RUNTIME_DIRS}" LINK_FLAGS "-Wl,--disable-new-dtags")
+  endif()
+  add_rostest_gtest(aubo_hardware_streaming_test
+    test/aubo_hardware_streaming.test test/aubo_hardware_streaming_test.cpp)
+  if(TARGET aubo_hardware_streaming_test)
+    target_compile_features(aubo_hardware_streaming_test PRIVATE cxx_std_14)
+    target_include_directories(aubo_hardware_streaming_test PRIVATE include ${catkin_INCLUDE_DIRS})
+    target_link_libraries(aubo_hardware_streaming_test ${PROJECT_NAME} ${catkin_LIBRARIES})
+    set_target_properties(aubo_hardware_streaming_test PROPERTIES
       BUILD_RPATH "${AUBO_SDK_RUNTIME_DIRS}" LINK_FLAGS "-Wl,--disable-new-dtags")
   endif()
   add_rostest_gtest(cartesian_jog_integration_test

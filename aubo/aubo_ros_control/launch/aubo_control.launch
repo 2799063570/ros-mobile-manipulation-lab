@@ -11,13 +11,15 @@
   <arg name="control_frequency" default="200.0"/>
   <!-- SDK 按 6 个关节标量计数：300 = 50 个路点 = 约 250 ms。 -->
   <arg name="mac_buffer_target" default="300"/>
-  <!-- 初始仅预装 20 点（100 ms），避免启动时额外累积长段参考轨迹。 -->
-  <arg name="trajectory_preload_points" default="20"/>
+  <!-- 连续流在静止时也供点，首次预装与目标水位对齐，避免只达到 100 ms。 -->
+  <arg name="trajectory_preload_points" default="$(eval int(arg('mac_buffer_target')) // 6)"/>
   <!-- true: ros_control/MoveIt 接管运动；false: 仅读取状态，运动由示教器控制。 -->
   <arg name="enable_motion_control" default="true"/>
   <arg name="load_robot_description" default="true"/>
   <arg name="require_real_robot" default="true"/>
   <arg name="use_realtime_feedback" default="false"/>
+  <arg name="motion_trace_prefix" default=""/>
+  <arg name="motion_trace_capacity" default="120000"/>
   <arg name="robot_xacro" default="aubo_i5_with_camera.xacro"/>
   <arg name="robot_srdf" default="aubo_i5_with_camera.srdf"/>
 
@@ -47,6 +49,8 @@
       <param name="trajectory_preload_points" value="$(arg trajectory_preload_points)"/>
       <param name="require_real_robot" value="$(arg require_real_robot)"/>
       <param name="use_realtime_feedback" value="$(arg use_realtime_feedback)"/>
+      <param name="motion_trace_prefix" value="$(arg motion_trace_prefix)"/>
+      <param name="motion_trace_capacity" value="$(arg motion_trace_capacity)"/>
       <!-- 是否由 ros_control 接管真机运动；硬件节点异常退出时 required 会终止整个 launch。 -->
       <param name="enable_motion_control" value="$(arg enable_motion_control)"/>
       <!-- JointTrajectoryController 已输出平滑样条，避免二次滤波造成滞后。 -->

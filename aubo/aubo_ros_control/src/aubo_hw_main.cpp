@@ -31,6 +31,7 @@
 #include <clocale>
 
 #include "aubo_ros_control/aubo_hardware_interface.h"
+#include "aubo_ros_control/fixed_step_clock.h"
 
 int main(int argc, char** argv)
 {
@@ -49,12 +50,12 @@ int main(int argc, char** argv)
     double control_freq = aubo_ros_control::DEFAULT_CONTROL_FREQUENCY_HZ;
     nh_priv.param<double>("control_frequency", control_freq,
                           aubo_ros_control::DEFAULT_CONTROL_FREQUENCY_HZ);
-    if (!std::isfinite(control_freq) || control_freq <= 0.0 || control_freq > 1000.0)
+    if (!std::isfinite(control_freq) ||
+        std::fabs(control_freq - aubo_ros_control::DEFAULT_CONTROL_FREQUENCY_HZ) > 1e-6)
     {
-        ROS_FATAL("[aubo_hw_node] control_frequency 必须在 (0, 1000] Hz 范围内");
+        ROS_FATAL("[aubo_hw_node] TCP2CANBUS 固定 5 ms/点，control_frequency 必须为 200 Hz");
         return -1;
     }
-    ros::Rate loop_rate(control_freq);
 
     bool enable_motion_control = true;
     nh_priv.param<bool>("enable_motion_control", enable_motion_control, true);
@@ -103,23 +104,41 @@ int main(int argc, char** argv)
     // 主控制循环
     // read()   — 实际状态已由 timerCallback 50Hz 填充到缓冲区
     // update() — 运行控制器算法，写命令到 joint_position_cmd_
-    // write()  — 将命令差分后推入 ros_motion_queue_（无锁）
+    // write()  — 将每个 5 ms 命令（包括保持点）推入 ros_motion_queue_
     // ------------------------------------------------------------------
-    ros::Time last_time = ros::Time::now();
+    using SampleClock = aubo_ros_control::FixedStepClock;
+    auto last_wakeup = SampleClock::Clock::now();
+    SampleClock sample_clock(last_wakeup);
+    ros::Time sample_time = ros::Time::now();
+    const ros::Duration sample_period(0.005);
+    // Do not replay an arbitrarily old backlog after a process/OS stall.
+    int mac_target_scalars = aubo_ros_control::DEFAULT_MAC_BUF_SIZE;
+    nh_priv.param<int>("mac_buffer_target", mac_target_scalars, mac_target_scalars);
+    const std::size_t max_catchup_samples = mac_target_scalars / aubo_ros_control::NUM_JOINTS;
 
     ROS_INFO("[aubo_hw_node] 进入主控制循环 (%.0f Hz)...", control_freq);
 
     while (ros::ok() && aubo_hw.isConnected())
     {
-        ros::Time   now    = ros::Time::now();
-        ros::Duration period = now - last_time;
-        last_time = now;
-
-        aubo_hw.read(now, period);
-        cm.update(now, period);
-        aubo_hw.write(now, period);
-
-        loop_rate.sleep();
+        std::this_thread::sleep_until(sample_clock.deadline());
+        const auto woke = SampleClock::Clock::now();
+        const auto due = sample_clock.pending(woke);
+        const ros::Duration wall_period(std::chrono::duration<double>(woke - last_wakeup).count());
+        last_wakeup = woke;
+        if (due > max_catchup_samples)
+        {
+            ROS_ERROR("[aubo_hw_node] 控制循环落后 %zu 个 5 ms 采样，超过恢复上限；停止并要求重启", due);
+            break;
+        }
+        for (std::size_t tick = 0; tick < due && ros::ok() && aubo_hw.isConnected(); ++tick)
+        {
+            sample_time += sample_period;
+            aubo_hw.read(sample_time, sample_period);
+            cm.update(sample_time, sample_period);
+            // write uses period only to report actual host scheduling stalls.
+            aubo_hw.write(sample_time, tick == 0 ? wall_period : sample_period);
+            sample_clock.advance();
+        }
     }
 
     if (ros::ok() && !aubo_hw.isConnected())

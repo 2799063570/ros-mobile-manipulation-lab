@@ -14,8 +14,8 @@ aubo_i5_controller:
   constraints:
     goal_time: 2.0
     stopped_velocity_tolerance: 0.05
-    # 20 个 5 ms 预装点及控制柜队列会带来约 100--200 ms 的固定
-    # 跟随延迟。执行期容差覆盖该传输延迟；最终目标容差仍为 0.05 rad。
+    # 默认连续流预装 50 个 5 ms 点，名义延迟约 250 ms；通信/软件
+    # 排队还会增加延迟。保留现有容差，超差时应查供点而非继续放宽。
     shoulder_joint: {trajectory: 0.15, goal: 0.05}
     upperArm_joint:  {trajectory: 0.15, goal: 0.05}
     foreArm_joint:   {trajectory: 0.15, goal: 0.05}

@@ -168,6 +168,7 @@ def analyze(path, path_tolerance):
         "bag": str(path),
         "duration_s": round(duration, 3),
         "hardware_flow_samples": len(flow),
+        "hardware_trace_prefixes": sorted({row['values'].get('motion_trace_prefix', '') for row in flow} - {''}),
         "controller_state_samples": len(states),
         "trajectory_goals": len(goals),
         "trajectory_results": len(results),
@@ -208,11 +209,23 @@ def analyze(path, path_tolerance):
                 get_sum("mac_low_water_samples_below_5_points")),
             "mac_empty_with_pending_queue_samples": int(
                 get_sum("mac_empty_with_pending_queue_samples")),
+            "mac_active_empty_samples": int(get_sum("mac_active_empty_samples")),
+            "mac_data_interrupt_warning_samples": int(get_sum("mac_data_interrupt_warning_samples")),
+            "stream_fault_latched": any(v.get("stream_fault_latched") == "true" for v in all_values),
+            "output_sample_peaks": {
+                "velocity_rad_s": get_max("command_velocity_max_rad_s"),
+                "acceleration_rad_s2": get_max("command_acceleration_max_rad_s2"),
+                "jerk_rad_s3": get_max("command_jerk_max_rad_s3"),
+            },
             "mac_above_target_samples": int(get_sum("mac_above_target_samples")),
             "diagnosis_failures": int(get_sum("diagnosis_failures")),
             "send_failures": int(get_sum("send_failures")),
             "queue_full_total": int(get_max("queue_full_total")),
             "queue_full_events_in_capture": int(get_sum("queue_full_window")),
+            "tcp_info_available": any(v.get("tcp_info_valid") == "true" for v in all_values),
+            "tcp_retransmissions_in_capture": int(get_sum("tcp_retransmissions_window")),
+            "tcp_max_rtt_ms": get_max("tcp_max_rtt_ms"),
+            "tcp_max_rto_ms": get_max("tcp_max_rto_ms"),
         }
     else:
         report["hardware_flow"] = None
@@ -293,6 +306,14 @@ def analyze(path, path_tolerance):
     if hw is None:
         findings.append("缺少硬件流量诊断话题；该 bag 不是由带新诊断的硬件节点录制。")
     else:
+        if hw["tcp_retransmissions_in_capture"]:
+            findings.append("机械臂 SDK 连接出现 TCP 重传；对照慢 RPC 时刻检查链路，柜端发送的重传仍需抓包确认。")
+        if hw["mac_data_interrupt_warning_samples"]:
+            findings.append("控制柜报告 MAC 数据中断标志；驱动已锁定停流，需检查柜内日志后重启。")
+        if hw["mac_active_empty_samples"]:
+            findings.append("已建立的连续流观测到 MAC 空水位；驱动禁止继续发送积压运动点。")
+        if hw["stream_fault_latched"]:
+            findings.append("驱动记录到连续流/轨迹保护故障，结合 /rosout 的首条故障定位原因。")
         if hw["diagnosis_failures"] or hw["send_failures"] or hw["queue_full_events_in_capture"]:
             findings.append("检测到 MAC 查询/发送失败或 ROS 运动队列满，优先排查通信供点链路。")
         if hw["mac_empty_with_pending_queue_samples"]:
@@ -300,7 +321,7 @@ def analyze(path, path_tolerance):
         if hw["mac_low_water_samples_below_5_points"]:
             findings.append("运动中多次观测到 MAC 低于 5 个路点（当前队列同时有待发点）；存在缓冲余量不足风险。")
         if hw["max_feed_loop_ms"] > hw["mac_target_coverage_ms"] > 0:
-            findings.append("最长供点循环间隔超过 MAC 目标覆盖时长；这可能造成短时供点断档，但本次未采样到 MAC 为空且队列待发。")
+            findings.append("最长供点循环间隔超过 MAC 目标覆盖时长，存在供点断档风险；核对同一时刻空水位及柜内中断标志。")
         if hw["max_ros_queue_points"] > hw["software_queue_warning_points"] > 0:
             findings.append("ROS 软件运动队列峰值超过 MAC 目标点数；这些待发点会增加命令滞后，应结合跟随误差出现时刻检查。")
         if hw["mac_above_target_samples"]:

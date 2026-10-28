@@ -13,12 +13,15 @@
   <arg name="sorting_box_config" default="$(find aubo_planning)/config/sorting_box_reference.yaml"/>
   <arg name="control_frequency" default="200.0"/>
   <arg name="mac_buffer_target" default="300"/>
-  <arg name="trajectory_preload_points" default="20"/>
+  <arg name="trajectory_preload_points" default="$(eval int(arg('mac_buffer_target')) // 6)"/>
   <!-- Use SDK pushed feedback so the 50 Hz state loop only performs safety diagnosis. -->
   <arg name="use_realtime_feedback" default="true"/>
   <!-- Optional motion trace capture. The timestamped bag is written under /tmp. -->
   <arg name="record_motion" default="false"/>
   <arg name="motion_bag_prefix" default="/tmp/aubo_motion"/>
+  <!-- Bounded in-memory command/RPC trace; written only on orderly shutdown. -->
+  <arg name="motion_trace_prefix" default="$(arg motion_bag_prefix)_hardware_$(anon capture)"/>
+  <arg name="motion_trace_capacity" default="120000"/>
   <!-- 运动指令源：move_group（ROS/MoveIt 接管）或 teach_pendant（示教器接管）。
        使用映射表可令非法取值在 roslaunch 解析阶段直接报错。 -->
   <arg name="motion_source" default="move_group"/>
@@ -37,6 +40,8 @@
     <arg name="mac_buffer_target" value="$(arg mac_buffer_target)"/>
     <arg name="trajectory_preload_points" value="$(arg trajectory_preload_points)"/>
     <arg name="use_realtime_feedback" value="$(arg use_realtime_feedback)"/>
+    <arg name="motion_trace_prefix" value="$(eval arg('motion_trace_prefix') if arg('record_motion') else '')"/>
+    <arg name="motion_trace_capacity" value="$(arg motion_trace_capacity)"/>
   </include>
 
   <node name="robot_state_publisher" pkg="robot_state_publisher"

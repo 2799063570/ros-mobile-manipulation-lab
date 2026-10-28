@@ -1,0 +1,4 @@
+<launch>
+  <!-- In-memory robot model and controller interpolation; no hardware SDK. -->
+  <test test-name="spline_dynamics" pkg="aubo_moveit_config" type="spline_dynamics_test" time-limit="30"/>
+</launch>

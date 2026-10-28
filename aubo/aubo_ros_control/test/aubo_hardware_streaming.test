@@ -1,0 +1,5 @@
+<launch>
+  <!-- All motion RPCs are mocked. No SDK login, startup or robot motion. -->
+  <test test-name="aubo_hardware_streaming" pkg="aubo_ros_control"
+        type="aubo_hardware_streaming_test" time-limit="30"/>
+</launch>

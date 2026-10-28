@@ -1,4 +1,9 @@
 <library path="libaubo_moveit_request_adapters">
+  <class name="aubo_moveit_config/LimitSplineDynamics"
+         type="aubo_moveit_config::LimitSplineDynamics"
+         base_class_type="planning_request_adapter::PlanningRequestAdapter">
+    <description>Bound velocity, acceleration and jerk over the complete executed quintic spline after Ruckig.</description>
+  </class>
   <class name="aubo_moveit_config/ZeroBoundaryAcceleration"
          type="aubo_moveit_config::ZeroBoundaryAcceleration"
          base_class_type="planning_request_adapter::PlanningRequestAdapter">
