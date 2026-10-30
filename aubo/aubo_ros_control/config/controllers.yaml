@@ -3,7 +3,7 @@ joint_state_controller:
   publish_rate: 50
 
 aubo_i5_controller:
-  type: position_controllers/JointTrajectoryController
+  type: aubo_ros_control/GuardedJointTrajectoryController
   joints:
     - shoulder_joint
     - upperArm_joint

@@ -56,6 +56,22 @@ struct AuboHardwareFeedbackTestAccess
         std::lock_guard<std::mutex> lock(hardware.feedback_mutex_);
         return std::chrono::duration<double>(std::chrono::steady_clock::now() - hardware.last_feedback_sample_).count();
     }
+    static std::uint64_t ignored(AuboHardwareInterface& hardware)
+    { return hardware.ignored_push_samples_.load(); }
+    static bool fresh(AuboHardwareInterface& hardware) { return hardware.motionFeedbackFresh(); }
+    static void capture(AuboHardwareInterface& hardware, const std::string& prefix)
+    { hardware.motion_trace_.reset(new HardwareMotionTrace(prefix, 64)); }
+    static bool dumpCapture(AuboHardwareInterface& hardware)
+    {
+        const bool result = hardware.motion_trace_->dumpAfterJoin();
+        hardware.motion_trace_.reset();
+        return result;
+    }
+    static bool startup(AuboHardwareInterface& hardware)
+    {
+        aubo_robot_namespace::ROBOT_SERVICE_STATE result{};
+        return hardware.startRobotPreservingTool(result);
+    }
 };
 }
 
@@ -86,7 +102,60 @@ private:
     }
 };
 
-TEST(AuboHardwareFeedback, IndependentQueryBridgesPushGapAndPreservesSamplingAge)
+class ToolHardware : public aubo_ros_control::AuboHardwareInterface
+{
+public:
+    explicit ToolHardware(ros::NodeHandle& nh) : AuboHardwareInterface(nh) {}
+    aubo_robot_namespace::ToolDynamicsParam configured{}, received{};
+    int read_result = 0, startup_result = 0, startup_calls = 0;
+private:
+    int readToolDynamics(aubo_robot_namespace::ToolDynamicsParam& tool) override
+    { tool = configured; return read_result; }
+    int startupRobot(const aubo_robot_namespace::ToolDynamicsParam& tool,
+                     aubo_robot_namespace::ROBOT_SERVICE_STATE&) override
+    { received = tool; ++startup_calls; return startup_result; }
+};
+
+TEST(AuboHardwareStartup, PreservesConfiguredPayloadAndCenterOfMass)
+{
+    ros::NodeHandle nh("/hardware_tool_test");
+    ToolHardware hardware(nh);
+    hardware.configured.payload = .75;
+    hardware.configured.positionX = .01;
+    hardware.configured.positionY = -.02;
+    hardware.configured.positionZ = .08;
+    ASSERT_TRUE(aubo_ros_control::AuboHardwareFeedbackTestAccess::startup(hardware));
+    EXPECT_EQ(hardware.startup_calls, 1);
+    EXPECT_DOUBLE_EQ(hardware.received.payload, .75);
+    EXPECT_DOUBLE_EQ(hardware.received.positionX, .01);
+    EXPECT_DOUBLE_EQ(hardware.received.positionY, -.02);
+    EXPECT_DOUBLE_EQ(hardware.received.positionZ, .08);
+    hardware.configured = {}; // A genuinely configured bare flange remains valid.
+    EXPECT_TRUE(aubo_ros_control::AuboHardwareFeedbackTestAccess::startup(hardware));
+    EXPECT_DOUBLE_EQ(hardware.received.payload, 0);
+}
+
+TEST(AuboHardwareStartup, ReadFailureInvalidToolAndStartupFailureCannotSucceed)
+{
+    using Access = aubo_ros_control::AuboHardwareFeedbackTestAccess;
+    ros::NodeHandle nh("/hardware_tool_failure_test");
+    ToolHardware hardware(nh);
+    hardware.read_result = -1;
+    EXPECT_FALSE(Access::startup(hardware));
+    hardware.read_result = 0;
+    hardware.configured.positionZ = std::numeric_limits<double>::quiet_NaN();
+    EXPECT_FALSE(Access::startup(hardware));
+    hardware.configured = {};
+    hardware.configured.payload = -1;
+    EXPECT_FALSE(Access::startup(hardware));
+    EXPECT_EQ(hardware.startup_calls, 0);
+    hardware.configured = {};
+    hardware.startup_result = -1;
+    EXPECT_FALSE(Access::startup(hardware));
+    EXPECT_EQ(hardware.startup_calls, 1);
+}
+
+TEST(AuboHardwareFeedback, QueryTakeoverRejectsDelayedPushesEvenWhileNextQueryIsBlocked)
 {
     using Access = aubo_ros_control::AuboHardwareFeedbackTestAccess;
     ros::NodeHandle nh("/hardware_feedback_fallback_test");
@@ -120,7 +189,9 @@ TEST(AuboHardwareFeedback, IndependentQueryBridgesPushGapAndPreservesSamplingAge
         std::lock_guard<std::mutex> lock(mutex);
         EXPECT_GE(samples.size(), 5u);
     }
-    // Hold a query, but continue receiving pushed frames on the other socket.
+    // The query source has taken over. Simulate the recorded SDK burst while
+    // the next query is blocked: callback receipt stamps MUST NOT grant those
+    // older cabinet frames authority or refresh the feedback watchdog.
     hardware.mode.store(1);
     const auto query_deadline = ros::WallTime::now() + ros::WallDuration(1.0);
     while (!hardware.entered.load() && ros::WallTime::now() < query_deadline)
@@ -132,12 +203,14 @@ TEST(AuboHardwareFeedback, IndependentQueryBridgesPushGapAndPreservesSamplingAge
         Access::receive(hardware, &point);
         ros::WallDuration(0.02).sleep();
     }
-    EXPECT_LT(Access::age(hardware), 0.08);
+    EXPECT_GE(Access::ignored(hardware), 12u);
+    EXPECT_GT(Access::age(hardware), 0.2);
+    EXPECT_DOUBLE_EQ(Access::position(hardware)[0], 0.1);
     hardware.mode.store(2);
     hardware.release.store(true);
     ros::WallDuration(0.03).sleep();
-    // The late query (q=0.1) began before the newer pushed q=0.5. Discard it.
-    EXPECT_DOUBLE_EQ(Access::position(hardware)[0], 0.5);
+    // A slow query keeps its request stamp; its return cannot freshen old data.
+    EXPECT_DOUBLE_EQ(Access::position(hardware)[0], 0.1);
     // Failed queries must leave age increasing past the watchdog threshold.
     ros::WallDuration(0.2).sleep();
     EXPECT_GT(Access::age(hardware), 0.15);
@@ -157,6 +230,69 @@ TEST(AuboHardwareFeedback, IndependentQueryBridgesPushGapAndPreservesSamplingAge
         ASSERT_FALSE(samples.empty());
         EXPECT_GT((ros::Time::now() - samples.back().header.stamp).toSec(), 0.2);
     }
+    EXPECT_FALSE(Access::fresh(hardware));
+    EXPECT_FALSE(hardware.isConnected());
+}
+
+TEST(AuboHardwareFeedback, FailedFirstFallbackCannotBeOverriddenByFreshlyStampedOldPushes)
+{
+    using Access = aubo_ros_control::AuboHardwareFeedbackTestAccess;
+    ros::NodeHandle nh("/hardware_failed_takeover_test");
+    SnapshotHardware hardware(nh);
+    Access::prepare(hardware, nh);
+    aubo_robot_namespace::wayPoint_S point{};
+    point.jointpos[0] = -0.16720483;
+    Access::receive(hardware, &point);
+    hardware.mode.store(2);
+    Access::startPolling(hardware);
+    const auto deadline = ros::WallTime::now() + ros::WallDuration(1.0);
+    while (hardware.calls.load() == 0 && ros::WallTime::now() < deadline)
+        ros::WallDuration(.005).sleep();
+    ASSERT_GT(hardware.calls.load(), 0);
+    // Seven recorded old positions were delivered within 0.306 ms. Their host
+    // callback stamps increase, but no value may replace the accepted source.
+    for (double q : {-0.13400634,-0.13924804,-0.14447445,-0.14971308,
+                     -0.15582432,-0.16020873,-0.16457172})
+    {
+        point.jointpos[0] = q;
+        Access::receive(hardware, &point);
+    }
+    EXPECT_EQ(Access::ignored(hardware), 7u);
+    EXPECT_DOUBLE_EQ(Access::position(hardware)[0], -0.16720483);
+    ros::WallDuration(.2).sleep();
+    Access::stopPolling(hardware);
+    EXPECT_FALSE(Access::fresh(hardware));
+    EXPECT_FALSE(hardware.isConnected());
+}
+
+TEST(AuboHardwareFeedback, SlowQueryIsCapturedEvenWhenItsFeedbackIsAlreadyStale)
+{
+    using Access = aubo_ros_control::AuboHardwareFeedbackTestAccess;
+    char directory[] = "/tmp/aubo_feedback_trace_XXXXXX";
+    ASSERT_NE(mkdtemp(directory), nullptr);
+    const std::string prefix = std::string(directory) + "/capture";
+    ros::NodeHandle nh("/hardware_feedback_trace_test");
+    SnapshotHardware hardware(nh);
+    Access::prepare(hardware, nh);
+    Access::capture(hardware, prefix);
+    hardware.mode.store(3); // 220 ms response, longer than the freshness limit.
+    Access::startPolling(hardware);
+    const auto deadline = ros::WallTime::now() + ros::WallDuration(1.0);
+    while (hardware.calls.load() == 0 && ros::WallTime::now() < deadline)
+        ros::WallDuration(.005).sleep();
+    Access::stopPolling(hardware); // Join the in-flight RPC before exporting.
+    EXPECT_EQ(hardware.calls.load(), 1);
+    EXPECT_GT(Access::age(hardware), .2);
+    ASSERT_TRUE(Access::dumpCapture(hardware));
+    std::ifstream capture(prefix + ".rpc.csv");
+    std::string line;
+    int records = 0;
+    while (std::getline(capture, line))
+        if (line.find("feedback_query,1,0,") == 0) ++records;
+    EXPECT_EQ(records, 2); // Before and after, including unavailable TCP data.
+    std::remove((prefix + ".rpc.csv").c_str());
+    std::remove((prefix + ".commands.csv").c_str());
+    rmdir(directory);
 }
 
 class BlockingDiagnosisHardware : public aubo_ros_control::AuboHardwareInterface

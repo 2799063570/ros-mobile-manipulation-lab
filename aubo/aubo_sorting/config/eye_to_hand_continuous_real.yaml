@@ -1,0 +1,25 @@
+# 连续分拣叠加配置：桌面、抓放高度、类别和 real_observe 复用实机任务 YAML。
+# 实例独立编号；同类别多个目标分别跟踪，按 sort_classes 优先级领取。
+continuous_sorting: true
+target_cache_min_observations: 8
+queue_match_distance: 0.04
+queue_stable_distance: 0.015
+queue_reserved_distance: 0.035
+queue_duplicate_distance: 0.008
+queue_max_age: 10.0
+# 本工位 0.10 速度比例下，已实测预抓取运动约 100 s。
+# 只对已经领取的目标允许较长遮挡；检测流过期或观测到目标位移仍拒绝下降。
+queue_reserved_max_age: 120.0
+queue_confirmation_gap: 1.0
+queue_retention: 30.0
+queue_done_hold: 2.0
+queue_frame_max_age: 1.0
+# 在观察位收到至少 5 帧、持续 2 s 的有效空检测，才结束本轮。
+queue_empty_confirmation: 2.0
+queue_empty_min_frames: 5
+# 覆盖当前三容器的最大半对角线及约 2 cm 余量，排除容器中的已放置目标。
+queue_place_exclusion_radius: 0.18
+queue_gripper_exclusion_radius: 0.10
+queue_height_tolerance: 0.04
+# 暂无可靠实例时等待 2 s，再返回 real_observe 重建队列。
+target_cache_fallback_delay: 2.0

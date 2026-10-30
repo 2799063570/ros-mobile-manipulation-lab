@@ -110,6 +110,7 @@ install(FILES README.md
 if(CATKIN_ENABLE_TESTING)
   catkin_add_gtest(instance_queue_test test/instance_queue_test.cpp)
   catkin_add_gtest(height_recovery_test test/height_recovery_test.cpp)
+  catkin_add_gtest(placement_height_test test/placement_height_test.cpp)
   catkin_add_gtest(observation_tf_test test/observation_tf_test.cpp)
   if(TARGET observation_tf_test)
     target_link_libraries(observation_tf_test ${catkin_LIBRARIES})

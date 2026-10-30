@@ -103,6 +103,11 @@ class ColorSortingTask(object):
         if not math.isfinite(self.preplace_height) or self.preplace_height <= 0.0:
             raise ValueError("preplace_height must be finite and positive")
         self.place_clearance = float(rospy.get_param("~place_clearance", 0.02))
+        self.minimum_place_z = rospy.get_param("~minimum_place_z", None)
+        if self.minimum_place_z is not None:
+            self.minimum_place_z = float(self.minimum_place_z)
+            if not math.isfinite(self.minimum_place_z):
+                raise ValueError("minimum_place_z must be finite in target_frame")
         self.cartesian_step = float(rospy.get_param("~cartesian_step", 0.01))
         self.minimum_cartesian_fraction = float(
             rospy.get_param("~minimum_cartesian_fraction", 0.90)
@@ -1456,6 +1461,12 @@ class ColorSortingTask(object):
             return False
         self._active_grasp_angle = detected.grasp_angle if self.use_detected_angle else 0.0
         preplace_z = self.table_z + self.preplace_height
+        place_z = expected_center + self.grasp_height_offset + self.place_clearance
+        if self.minimum_place_z is not None:
+            place_z = max(place_z, self.minimum_place_z)
+        if not math.isfinite(place_z) or preplace_z <= place_z:
+            self._set_failure("CONFIGURATION_FAILED", "preplace TCP Z must exceed the release TCP Z")
+            return False
 
         rospy.loginfo(
             "Picking %s at [%.3f, %.3f, %.3f]", color, object_x, object_y, grasp_z
@@ -1501,7 +1512,7 @@ class ColorSortingTask(object):
         ):
             return False
         if not self._cartesian_to(
-            self._pose(place_x, place_y, expected_center + self.grasp_height_offset + self.place_clearance),
+            self._pose(place_x, place_y, place_z),
             color + " place",
         ):
             return False

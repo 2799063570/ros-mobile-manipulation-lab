@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Analyze queued 5ms commands and per-socket MAC RPC timing; never sends commands."""
+"""Analyze queued 5ms commands and MAC/feedback RPC timing; never sends commands."""
 import argparse
 import csv
 import json
@@ -75,7 +75,7 @@ def analyze(prefix, slow_ms=50.0):
         if phase not in ('before','after') or port in call[phase]:
             raise ValueError('Duplicate/invalid socket snapshot')
         call[phase][port] = row
-    latencies = {'query': [], 'send': []}
+    latencies = {'query': [], 'send': [], 'feedback_query': []}
     queue_waits = []
     slow = []
     for (kind, ident), call in sorted(calls.items(), key=lambda item: int(item[1]['metadata']['begin_ns'])):
@@ -110,7 +110,9 @@ def analyze(prefix, slow_ms=50.0):
             after = call['after'].get(port)
             if not after or before['fd'] != after['fd'] or not all(int(s[field]) for s in [before,after] for field in ['tcp_valid','bytes_valid']):
                 continue
-            delta = dict(local_port=port, fd=int(after['fd']), is_mac_login_hint=port==int(row['port_hint']))
+            delta = dict(local_port=port, fd=int(after['fd']),
+                         is_rpc_login_hint=port==int(row['port_hint']),
+                         is_mac_login_hint=kind in ('query', 'send') and port==int(row['port_hint']))
             for field in ['bytes_sent','bytes_acked','bytes_received','retransmissions']:
                 value = int(after[field])-int(before[field])
                 if value < 0:
@@ -119,9 +121,9 @@ def analyze(prefix, slow_ms=50.0):
             for field in ['last_data_sent_ms','last_data_received_ms','unacked','notsent_bytes','rtt_us','rto_us']:
                 delta[field+'_after'] = int(after[field])
             event['socket_deltas'].append(delta)
-        hint = next((s for s in event['socket_deltas'] if s['is_mac_login_hint']), None)
+        hint = next((s for s in event['socket_deltas'] if s['is_rpc_login_hint']), None)
         if hint is None or hint.get('counter_reset'):
-            event['observation'] = 'No comparable MAC login socket; inspect per-port rows.'
+            event['observation'] = 'No comparable RPC login socket; inspect per-port rows.'
         elif hint['retransmissions_delta'] > 0:
             event['observation'] = 'Outbound retransmission observed during RPC; not proof it caused all latency.'
         elif hint['bytes_received_delta'] > 0 and hint['last_data_received_ms_after'] >= .75*elapsed:
@@ -136,7 +138,7 @@ def analyze(prefix, slow_ms=50.0):
                 latency={kind:latency_stats(values) for kind,values in latencies.items()}, slow_calls=slow,
                 batch_first_point_queue_wait=latency_stats(queue_waits),
                 limitations=['Queued commands are not cabinet execution or motor vibration measurements.',
-                             'Port hint is inferred at MAC login; SDK reconnection may invalidate it.',
+                             'Port hint is inferred at the corresponding SDK login; reconnection may invalidate it.',
                              'TCP_INFO contains socket counters/last-payload age, not RPC payload identification.',
                              'No outbound retransmission does not exclude loss or retries in the other direction.'])
 

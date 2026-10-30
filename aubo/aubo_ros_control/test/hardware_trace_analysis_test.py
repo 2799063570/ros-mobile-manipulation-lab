@@ -11,7 +11,7 @@ spec.loader.exec_module(analysis)
 
 
 class HardwareTraceAnalysisTest(unittest.TestCase):
-    def capture(self, root, received_age=1, retransmissions=0, hint=12345):
+    def capture(self, root, received_age=1, retransmissions=0, hint=12345, kind='send'):
         prefix = Path(root)/'test'
         with Path(str(prefix)+'.commands.csv').open('w') as out:
             out.write('# hardware_commands_v1; period_s=0.005; dropped=0\n')
@@ -26,7 +26,7 @@ class HardwareTraceAnalysisTest(unittest.TestCase):
             out.write('# hardware_rpc_v1; dropped=0\n'); writer=csv.DictWriter(out,fields);writer.writeheader()
             for after in [False,True]:
                 row=dict.fromkeys(fields,0)
-                row.update(kind='send',id=1,first_point_id=1,ros_ns=1000000000,begin_ns=1000000000,end_ns=1200000000,count=2,mac_scalars=240,
+                row.update(kind=kind,id=1,first_point_id=1,ros_ns=1000000000,begin_ns=1000000000,end_ns=1200000000,count=2,mac_scalars=240,
                            port_hint=hint,phase='after' if after else 'before',tcp_valid=1,fd=5,local_port=12345,bytes_valid=1,
                            bytes_sent=200 if after else 100,bytes_acked=200 if after else 100,bytes_received=70 if after else 50,
                            retransmissions=retransmissions if after else 0,last_data_received_ms=received_age if after else 0,rtt_us=20000,rto_us=200000)
@@ -57,6 +57,19 @@ class HardwareTraceAnalysisTest(unittest.TestCase):
             with self.assertRaises(ValueError):analysis.analyze(prefix)
             path.write_text('# incomplete: waiting for shutdown\n')
             with self.assertRaises(ValueError):analysis.analyze(prefix)
+
+    def test_feedback_latency_uses_its_own_socket_without_command_association(self):
+        with tempfile.TemporaryDirectory() as root:
+            prefix = self.capture(root, retransmissions=1, kind='feedback_query')
+            report = analysis.analyze(prefix)
+            self.assertEqual(report['latency']['feedback_query']['max_ms'], 200.)
+            self.assertEqual(report['latency']['send']['n'], 0)
+            self.assertEqual(report['batch_first_point_queue_wait']['n'], 0)
+            event = report['slow_calls'][0]
+            self.assertEqual(event['queue_wait'], {})
+            self.assertTrue(event['socket_deltas'][0]['is_rpc_login_hint'])
+            self.assertFalse(event['socket_deltas'][0]['is_mac_login_hint'])
+            self.assertIn('Outbound retransmission', event['observation'])
 
 
 if __name__=='__main__':unittest.main()

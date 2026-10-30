@@ -21,6 +21,9 @@ public:
         return now < next_ ? 0 : static_cast<std::size_t>((now - next_) / step()) + 1;
     }
     void advance() { next_ += step(); }
+    // Backpressure delays the next sample, not the trajectory's sample index.
+    // Do not repay this intentional wait with a burst of old wall-clock ticks.
+    void defer(Time now) { next_ = now + step(); }
     Time deadline() const { return next_; }
 
 private:

@@ -11,7 +11,10 @@
   <build_depend>message_generation</build_depend>
   <exec_depend>message_runtime</exec_depend>
   <depend>aubo_sdk</depend>
+  <depend>control_msgs</depend>
   <depend>controller_manager</depend>
+  <depend>controller_interface</depend>
+  <depend>joint_trajectory_controller</depend>
   <depend>controller_manager_msgs</depend>
   <depend>diagnostic_msgs</depend>
   <depend>dynamic_reconfigure</depend>
@@ -59,6 +62,7 @@
   <exec_depend>moveit_ros_move_group</exec_depend>
   <exec_depend>xacro</exec_depend>
   <export>
+    <controller_interface plugin="${prefix}/controller_plugins.xml"/>
     <rviz plugin="${prefix}/plugin_description.xml"/>
   </export>
 </package>

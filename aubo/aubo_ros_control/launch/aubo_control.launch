@@ -9,6 +9,7 @@
   <arg name="collision_class" default="6"/>
   <!-- TCP2CANBUS 路点周期是 5 ms，必须以 200 Hz 生成命令。 -->
   <arg name="control_frequency" default="200.0"/>
+  <!-- 真机轨迹统一由带故障锁停保护的 JTC 执行。 -->
   <!-- SDK 按 6 个关节标量计数：300 = 50 个路点 = 约 250 ms。 -->
   <arg name="mac_buffer_target" default="300"/>
   <!-- 连续流在静止时也供点，首次预装与目标水位对齐，避免只达到 100 ms。 -->
@@ -18,6 +19,8 @@
   <arg name="load_robot_description" default="true"/>
   <arg name="require_real_robot" default="true"/>
   <arg name="use_realtime_feedback" default="false"/>
+  <arg name="feedback_timeout" default="0.2"/>
+  <arg name="max_command_queue_duration" default="1.0"/>
   <arg name="motion_trace_prefix" default=""/>
   <arg name="motion_trace_capacity" default="120000"/>
   <arg name="robot_xacro" default="aubo_i5_with_camera.xacro"/>
@@ -49,6 +52,8 @@
       <param name="trajectory_preload_points" value="$(arg trajectory_preload_points)"/>
       <param name="require_real_robot" value="$(arg require_real_robot)"/>
       <param name="use_realtime_feedback" value="$(arg use_realtime_feedback)"/>
+      <param name="feedback_timeout" value="$(arg feedback_timeout)"/>
+      <param name="max_command_queue_duration" value="$(arg max_command_queue_duration)"/>
       <param name="motion_trace_prefix" value="$(arg motion_trace_prefix)"/>
       <param name="motion_trace_capacity" value="$(arg motion_trace_capacity)"/>
       <!-- 是否由 ros_control 接管真机运动；硬件节点异常退出时 required 会终止整个 launch。 -->
@@ -63,7 +68,7 @@
          wrist1_joint, wrist2_joint, wrist3_joint]
       </rosparam>
     </node>
-    <!-- 两种模式都发布关节状态；仅上层运动模式加载六轴轨迹控制器。 -->
+    <!-- 启用运动时加载 JTC；示教器模式只发布状态。 -->
     <node name="controller_spawner" pkg="controller_manager" type="spawner"
           output="screen" args="joint_state_controller aubo_i5_controller"
           if="$(arg enable_motion_control)"/>

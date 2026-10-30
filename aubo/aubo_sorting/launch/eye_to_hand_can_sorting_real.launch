@@ -1,0 +1,63 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Real cell: one YAML owns category destinations and container geometry. -->
+  <arg name="containers_config" default="$(find aubo_planning)/config/sorting_containers_real.yaml"/>
+  <arg name="camera_stand_config" default="$(find aubo_planning)/config/camera_stand_reference.yaml"/>
+  <arg name="continuous_sorting" default="false"/>
+  <arg name="queue_config" default="$(find aubo_sorting)/config/eye_to_hand_continuous_real.yaml"/>
+  <arg name="task_config" default="$(find aubo_sorting)/config/eye_to_hand_can_real.yaml"/>
+  <arg name="perception_config" default="$(find aubo_sorting)/config/eye_to_hand_can_perception_real.yaml"/>
+  <arg name="start_robot" default="true"/>
+  <arg name="start_camera" default="true"/>
+  <arg name="start_gripper" default="true"/>
+  <arg name="start_perception" default="true"/>
+  <arg name="start_task" default="true"/>
+  <arg name="rviz" default="true"/>
+  <arg name="gripper_port" default="/dev/serial/by-id/usb-1a86_USB_Serial-if00-port0"/>
+  <arg name="object_height" default="0.065"/>
+  <arg name="velocity_scaling" default="0.10"/>
+  <arg name="acceleration_scaling" default="0.10"/>
+  <arg name="calibration_file" default="$(find aubo_ros_control)/config/aubo_realsense_handeye_eye_on_base.yaml"/>
+
+  <include file="$(find aubo_sorting)/launch/sorting_real.launch" pass_all_args="true">
+    <arg name="detector" value="yolo"/>
+    <arg name="camera_mount" value="eye_to_hand"/>
+    <!-- Must match tracking_base_frame in the saved calibration. -->
+    <arg name="camera_namespace" value="/camera"/>
+    <arg name="calibration_file" value="$(arg calibration_file)"/>
+    <arg name="start_robot" value="$(arg start_robot)"/>
+    <arg name="start_camera" value="$(arg start_camera)"/>
+    <arg name="start_gripper" value="$(arg start_gripper)"/>
+    <arg name="start_perception" value="$(arg start_perception)"/>
+    <arg name="start_task" value="$(arg start_task)"/>
+    <arg name="rviz" value="$(arg rviz)"/>
+    <arg name="gripper_port" value="$(arg gripper_port)"/>
+    <arg name="task_config" value="$(arg task_config)"/>
+    <arg name="perception_config" value="$(arg perception_config)"/>
+    <arg name="height_mode" value="depth"/>
+    <arg name="table_z" value="0.00285"/>
+    <arg name="object_height" value="$(arg object_height)"/>
+    <arg name="velocity_scaling" value="$(arg velocity_scaling)"/>
+    <arg name="acceleration_scaling" value="$(arg acceleration_scaling)"/>
+  </include>
+  <rosparam command="load" file="$(arg containers_config)" ns="/color_sorting_task"/>
+  <!-- Applied after the base task YAML; all parameters load before nodes start. -->
+  <rosparam if="$(arg continuous_sorting)" command="load" file="$(arg queue_config)" ns="/color_sorting_task"/>
+  <param name="/color_sorting_task/continuous_sorting" value="$(arg continuous_sorting)"/>
+  <include file="$(find aubo_planning)/launch/publish_sorting_containers.launch">
+    <arg name="config" value="$(arg containers_config)"/>
+  </include>
+
+  <include file="$(find aubo_planning)/launch/publish_camera_stand.launch">
+    <arg name="config" value="$(arg camera_stand_config)"/>
+  </include>
+  <!-- Publish the same table even when starting only perception / scene setup.
+       The task replaces this ID with identical geometry before each pick. -->
+  <node pkg="aubo_planning" type="publish_camera_stand.py" name="real_sorting_table" output="screen" required="true">
+    <param name="frame_id" value="base_link"/>
+    <param name="object_id" value="sorting_table"/>
+    <rosparam param="parts">
+      - {name: table, size: [0.78, 0.97, 0.20], center: [-0.0442, -0.6707, -0.09715]}
+    </rosparam>
+  </node>
+</launch>

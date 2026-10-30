@@ -1,5 +1,6 @@
 #include <aubo_sorting_core/sorting_task.hpp>
 #include "task_utils.hpp"
+#include <aubo_sorting_core/placement_height.hpp>
 #include <algorithm>
 #include <cmath>
 
@@ -57,6 +58,17 @@ bool SortingTask::pickAndPlaceImpl(const aubo_perception::DetectedObject& detect
   const auto reset_angle = [this](void*) { active_grasp_angle_ = 0.0; };
   std::unique_ptr<void, decltype(reset_angle)> angle_guard(this, reset_angle);
   const double preplace_z = table_z_ + preplace_height_;// 放置前及放置后的退离高度
+  double place_z;
+  try
+  {
+    place_z = placementHeight(expected_center + grasp_height_offset_ + place_clearance_,
+                              minimum_place_z_, preplace_z);
+  }
+  catch (const std::invalid_argument& error)
+  {
+    setFailure("CONFIGURATION_FAILED", error.what());
+    return false;  // Reject an invalid approach/release height before grasping.
+  }
   ROS_INFO("Picking %s at [%.3f, %.3f, %.3f]", category.c_str(), object_x, object_y, grasp_z);
 
   if (!validateReservedTarget() || !commandGripper(gripper_open_) ||
@@ -109,7 +121,7 @@ bool SortingTask::pickAndPlaceImpl(const aubo_perception::DetectedObject& detect
       !moveToPose(makePose(place_x, place_y, preplace_z), category + " pre-place"))  // 移动到目标放置位置上方
     return false;
   queue_vision_phase_.store(QueueVisionPhase::MASKED);
-  if (!cartesianTo(makePose(place_x, place_y, expected_center + grasp_height_offset_ + place_clearance_), category + " place") || // 移动到目标放置位置
+  if (!cartesianTo(makePose(place_x, place_y, place_z), category + " place") || // 移动到目标放置位置
       !commandGripper(gripper_open_) || !setGraspAttachment(object_model_name, false) || // 夹爪张开 释放吸附
       !wallSleep(0.5, stop_requested_))
     return false;

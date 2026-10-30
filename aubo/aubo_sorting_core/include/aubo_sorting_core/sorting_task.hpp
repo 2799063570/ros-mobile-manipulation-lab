@@ -25,6 +25,7 @@
 #include <condition_variable>
 #include <functional>
 #include <map>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <set>
@@ -266,6 +267,7 @@ private:
   int lift_max_attempts_{5};
   double preplace_height_{0.30};  // Height above the table for placement approach/retreat.
   double place_clearance_{0.02};
+  double minimum_place_z_{-std::numeric_limits<double>::infinity()};
   double cartesian_step_{0.01};
   double minimum_cartesian_fraction_{0.90};
   double gripper_open_{0.0};

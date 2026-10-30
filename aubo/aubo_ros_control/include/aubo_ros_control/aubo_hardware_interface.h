@@ -145,19 +145,36 @@ public:
     void shutdown();
 
     bool isConnected() const { return controller_connected_flag_.load(); }
+    void requestExecutionStop();
+    // Producer-side gate: call BEFORE advancing JTC and generating a point.
+    // Existing queued points, including holds, are never discarded.
+    bool canGenerateJtcSample();
+    bool executionStopAccepted() const { return execution_stop_accepted_.load(); }
 
 private:
     friend struct AuboHardwareFeedbackTestAccess;
     friend struct AuboHardwareStreamingTestAccess;
+    std::atomic<bool> execution_stop_accepted_{false};
+    bool stopStreamSession();
+    virtual int stopRobotMotion();
+    virtual int exitStreamMode();
+    bool startRobotPreservingTool(aubo_robot_namespace::ROBOT_SERVICE_STATE& result);
+    virtual int readToolDynamics(aubo_robot_namespace::ToolDynamicsParam& tool);
+    virtual int startupRobot(const aubo_robot_namespace::ToolDynamicsParam& tool,
+                             aubo_robot_namespace::ROBOT_SERVICE_STATE& result);
     MotionLease motion_lease_;
     visual_servo_internal::SdkTcpTransport tcp_transport_;
     std::unique_ptr<HardwareMotionTrace> motion_trace_;
     std::string motion_trace_prefix_;
     std::atomic<bool> position_controller_started_{false};
+    std::atomic<bool> jtc_feed_started_{false};
+    static constexpr std::size_t JTC_QUEUE_TARGET_POINTS = 40; // 200 ms, separate from MAC.
+    std::atomic<std::uint64_t> jtc_backpressure_waits_{0};
     bool stream_reference_initialized_{false}; // Feeder-owned, set on its first dequeue.
     std::atomic<bool> startup_reference_seeded_{false};
     std::uint64_t command_sequence_{0}; // Producer-owned.
     std::uint16_t mac_socket_port_hint_{0};
+    std::uint16_t feedback_socket_port_hint_{0};
     // -------------------------------------------------------------------------
     // 内部辅助
     // -------------------------------------------------------------------------
@@ -207,6 +224,8 @@ private:
     void updateFeedbackAt(const aubo_robot_namespace::wayPoint_S& waypoint,
                           const ros::Time& stamp, std::chrono::steady_clock::time_point sampled,
                           bool pushed);
+    bool motionFeedbackFresh();
+    double oldestQueuedCommandAgeMs(); // Consumer thread only (SPSC peek).
 
     // -------------------------------------------------------------------------
     // ROS 参数
@@ -228,6 +247,13 @@ private:
     std::mutex feedback_publish_mutex_;
     std::chrono::steady_clock::time_point last_feedback_sample_{}, last_push_sample_{};
     std::uint64_t feedback_sample_count_{0};
+    // Once fallback starts, callback arrival time cannot establish that a push
+    // is newer than the queried cabinet state. Keep one source until restart.
+    bool feedback_query_authoritative_{false}; // Protected by feedback_mutex_.
+    std::atomic<std::uint64_t> ignored_push_samples_{0};
+    std::atomic<std::uint64_t> feedback_query_failures_{0};
+    std::atomic<double> feedback_query_max_ms_{0.0};
+    double feedback_timeout_s_{0.2};
 
     std::string server_host_;    ///< 机械臂 IP
     int         server_port_;    ///< 机械臂端口（默认 8899）
@@ -271,7 +297,15 @@ private:
     // -------------------------------------------------------------------------
     // 无锁运动队列（对应 aubo_driver.cpp ros_motion_queue_）
     // -------------------------------------------------------------------------
-    moodycamel::ReaderWriterQueue<std::array<double, NUM_JOINTS>> ros_motion_queue_;
+    struct QueuedCommand
+    {
+        std::array<double, NUM_JOINTS> positions;
+        std::int64_t enqueued_ns;
+    };
+    moodycamel::ReaderWriterQueue<QueuedCommand> ros_motion_queue_;
+    double max_command_queue_duration_s_{1.0};
+    std::atomic<bool> command_queue_limit_exceeded_{false};
+    std::atomic<bool> feedback_timeout_latched_{false};
     std::atomic<std::uint64_t> motion_queue_full_count_{0};
     std::atomic<double> controller_loop_period_max_ms_{0.0};
     std::atomic<double> command_velocity_max_{0.0};

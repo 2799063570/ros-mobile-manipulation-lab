@@ -131,10 +131,10 @@ class SortingBoxTest(unittest.TestCase):
             self.assertIn('sorting_box_reference.yaml', args['sorting_box_config'])
         include = next(i for i in bringup.findall('include') if 'publish_sorting_box.launch' in i.get('file', ''))
         self.assertEqual(include.get('if'), '$(arg publish_sorting_box)')
-        real = next(i for i in sorting.findall('include') if 'aubo_real_bringup.launch' in i.get('file', ''))
+        real = next(i for i in sorting.findall('include') if 'publish_sorting_box.launch' in i.get('file', ''))
+        self.assertEqual(real.get('if'), '$(arg publish_sorting_box)')
         forwarded = {a.get('name'): a.get('value') for a in real.findall('arg')}
-        self.assertEqual(forwarded['publish_sorting_box'], '$(arg publish_sorting_box)')
-        self.assertEqual(forwarded['sorting_box_config'], '$(arg sorting_box_config)')
+        self.assertEqual(forwarded['config'], '$(arg sorting_box_config)')
 
 
 if __name__ == '__main__':

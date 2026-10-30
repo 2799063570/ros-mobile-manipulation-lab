@@ -47,6 +47,23 @@ void addDiagnosticValue(diagnostic_msgs::DiagnosticStatus& status,
     item.value = value;
     status.values.push_back(item);
 }
+
+std::uint16_t newSocketPort(const HardwareMotionTrace::TcpSnapshot& before,
+                           const HardwareMotionTrace::TcpSnapshot& after)
+{
+    if (!before.valid || !after.valid) return 0;
+    std::uint16_t result = 0;
+    std::size_t count = 0;
+    for (std::size_t i = 0; i < after.detail_count; ++i)
+    {
+        const auto port = after.sockets[i].local_port;
+        bool existed = false;
+        for (std::size_t j = 0; j < before.detail_count; ++j)
+            existed = existed || before.sockets[j].local_port == port;
+        if (!existed) { ++count; result = port; }
+    }
+    return count == 1 ? result : 0;
+}
 }
 
 // =============================================================================
@@ -130,7 +147,9 @@ bool AuboHardwareInterface::init()
     nh_.param<bool>       ("enable_motion_control", enable_motion_control_, true);
     nh_.param<bool>       ("require_real_robot", require_real_robot_, true);
     nh_.param<bool>       ("use_realtime_feedback", use_realtime_feedback_, false);
-    // JointTrajectoryController 已按轨迹时间做三次样条插值。再次低通和
+    nh_.param<double>     ("feedback_timeout", feedback_timeout_s_, 0.2);
+    nh_.param<double>     ("max_command_queue_duration", max_command_queue_duration_s_, 1.0);
+    // JointTrajectoryController 按位置/速度/加速度做五次样条插值。再次低通和
     // 大死区会造成相位滞后与台阶命令，从而导致抖动和跟踪超差。
     nh_.param<bool>       ("enable_command_smoothing", enable_command_smoothing_, false);
     nh_.param<double>     ("command_filter_alpha", command_filter_alpha_, 1.0);
@@ -146,6 +165,9 @@ bool AuboHardwareInterface::init()
     if (server_port_ <= 0 || server_port_ > 65535 || collision_class_ < 1 || collision_class_ > 6 ||
         command_filter_alpha_ <= 0.0 || command_filter_alpha_ > 1.0 ||
         command_deadband_ < 0.0 || max_command_step_scale_ <= 0.0 || max_command_step_scale_ > 1.0 ||
+        !std::isfinite(feedback_timeout_s_) || feedback_timeout_s_ < 0.1 || feedback_timeout_s_ > 0.5 ||
+        !std::isfinite(max_command_queue_duration_s_) || max_command_queue_duration_s_ < 0.5 ||
+        max_command_queue_duration_s_ > 5.0 ||
         mac_buffer_target_ < NUM_JOINTS || mac_buffer_target_ > 400 ||
         mac_buffer_target_ % NUM_JOINTS != 0 ||
         trajectory_preload_points_ < 2 ||
@@ -153,7 +175,8 @@ bool AuboHardwareInterface::init()
         !std::isfinite(control_frequency_hz) ||
         std::fabs(control_frequency_hz - DEFAULT_CONTROL_FREQUENCY_HZ) > 1e-6)
     {
-        ROS_ERROR("[AuboHW] 参数无效：请检查端口、碰撞等级和命令平滑参数");
+        ROS_ERROR("[AuboHW] 参数无效：检查端口/碰撞等级、命令参数、feedback_timeout [0.1,0.5] s、"
+                  "max_command_queue_duration [0.5,5] s 和固定 200 Hz 节拍");
         return false;
     }
     control_period_s_ = 1.0 / control_frequency_hz;
@@ -231,6 +254,7 @@ bool AuboHardwareInterface::init()
     // 5. 读取当前关节角，同步初始化所有缓冲区
     //    （来自 aubo_driver.cpp run() setCurrentPosition / setTagrtPosition）
     // ------------------------------------------------------------------
+    const auto initial_requested = std::chrono::steady_clock::now();
     int ret = robot_receive_service_.robotServiceGetCurrentWaypointInfo(current_waypoint_);
     if (ret == InterfaceCallSuccCode)
     {
@@ -250,6 +274,13 @@ bool AuboHardwareInterface::init()
         ROS_INFO("[AuboHW] 初始关节角已读取，Joint0 = %.4f rad",
                  joint_position_[0]);
         last_state_wall_time_ = ros::WallTime::now();
+        // Non-push mode needs a sampled-time reference before the timer runs.
+        // Push mode must still wait for its first real callback below.
+        if (!use_realtime_feedback_)
+        {
+            last_feedback_sample_ = initial_requested;
+            have_feedback_sample_ = true;
+        }
     }
     else
     {
@@ -319,7 +350,7 @@ bool AuboHardwareInterface::init()
         ROS_INFO("[AuboHW] 实时关节推送已就绪；诊断查询不阻塞反馈发布");
         feedback_poll_running_.store(true);
         feedback_poll_thread_ = std::thread(&AuboHardwareInterface::pollFeedback, this);
-        ROS_INFO("[AuboHW] 独立反馈查询已启动：推送间隔达 60 ms 时查询真实路点，保留请求时间戳");
+        ROS_INFO("[AuboHW] 独立反馈查询待命：推送间隔达 60 ms 后接管至节点重启；保留请求时间戳，拒绝旧推送补发");
     }
 
     // 状态定时器：默认读取路点和诊断；推送模式下只读取诊断。
@@ -383,6 +414,20 @@ void AuboHardwareInterface::doSwitch(const std::list<hardware_interface::Control
                 position_controller_started_.store(true, std::memory_order_release);
 }
 
+bool AuboHardwareInterface::canGenerateJtcSample()
+{
+    if (!controller_connected_flag_.load()) return false;
+    if (!enable_motion_control_ || !position_controller_started_.load())
+        return true;
+    // Also run the feedback watchdog while the producer is intentionally waiting.
+    if (!motionFeedbackFresh()) return false;
+    const auto limit = jtc_feed_started_.load() ? JTC_QUEUE_TARGET_POINTS :
+        static_cast<std::size_t>(trajectory_preload_points_);
+    if (ros_motion_queue_.size_approx() < limit) return true;
+    jtc_backpressure_waits_.fetch_add(1, std::memory_order_relaxed);
+    return false;
+}
+
 void AuboHardwareInterface::write(const ros::Time& time,
                                   const ros::Duration& period)
 {
@@ -395,6 +440,8 @@ void AuboHardwareInterface::write(const ros::Time& time,
     if (!enable_motion_control_)
         return;
     if (!position_controller_started_.load(std::memory_order_acquire))
+        return;
+    if (!motionFeedbackFresh())
         return;
 
     // 若处于急停状态，清空队列不发送（来自 aubo_driver.cpp setRobotJointsByMoveIt）
@@ -444,13 +491,23 @@ void AuboHardwareInterface::write(const ros::Time& time,
     }
 
     // --- 推入无锁队列（来自 aubo_driver.cpp moveItPosCallback buf_queue_.push） ---
-    const auto command_record_ns = motion_trace_ ? HardwareMotionTrace::ns() : 0;
+    const auto command_record_ns = HardwareMotionTrace::ns();
     const auto command_ros_ns = motion_trace_ ? ros::Time::now().toNSec() : 0;
     std::array<double, NUM_JOINTS> cmd;
     for (int i = 0; i < NUM_JOINTS; ++i)
         cmd[i] = smoothed_cmd[i];
 
-    if (!ros_motion_queue_.try_enqueue(cmd))
+    const auto queue_limit = static_cast<std::size_t>(max_command_queue_duration_s_ / control_period_s_);
+    if (ros_motion_queue_.size_approx() >= queue_limit)
+    {
+        command_queue_limit_exceeded_.store(true);
+        ROS_ERROR("[AuboHW] 待发送指令超过 %.0f ms 上限；已锁定停止，禁止丢点追赶或延后续发",
+                  max_command_queue_duration_s_ * 1000.0);
+        controller_connected_flag_.store(false);
+        feed_thread_running_.store(false);
+        return;
+    }
+    if (!ros_motion_queue_.try_enqueue(QueuedCommand{cmd, command_record_ns}))
     {
         motion_queue_full_count_.fetch_add(1, std::memory_order_relaxed);
         ROS_ERROR("[AuboHW] write(): 运动队列已满，已锁定停止；禁止丢点后继续执行");
@@ -491,8 +548,6 @@ void AuboHardwareInterface::shutdown()
     feed_thread_running_.store(false);
     feedback_ready_.notify_all();
     state_timer_.stop();
-    if (feedback_poll_thread_.joinable())
-        feedback_poll_thread_.join();
 
     // 停止喂点线程
     feed_thread_running_.store(false);
@@ -504,17 +559,22 @@ void AuboHardwareInterface::shutdown()
         feed_thread_ = nullptr;
     }
 
+    // No further send can follow the stop: the feeder has joined. Stop before
+    // waiting for an unrelated in-flight feedback RPC or exporting records.
+    if (enable_motion_control_ && in_tcp2canbus_mode_)
+    {
+        execution_stop_accepted_.store(stopStreamSession());
+        in_tcp2canbus_mode_ = false;
+        if (execution_stop_accepted_.load())
+            ROS_INFO("[AuboHW] 柜端已应答停止和退出透传；禁止自动续跑");
+    }
+
+    if (feedback_poll_thread_.joinable())
+        feedback_poll_thread_.join();
     if (feedback_callback_registered_)
     {
         robot_send_service_.robotServiceRegisterRealTimeRoadPointCallback(nullptr, nullptr);
         feedback_callback_registered_ = false;
-    }
-
-    // 离开 TCP2CANBUS 模式（来自 aubo_driver.cpp 析构）
-    if (enable_motion_control_ && in_tcp2canbus_mode_)
-    {
-        robot_send_service_.robotServiceLeaveTcp2CanbusMode();
-        in_tcp2canbus_mode_ = false;
     }
 
     // 注销 SDK 连接（独立反馈查询连接仅在实时反馈模式下登录）。
@@ -527,7 +587,7 @@ void AuboHardwareInterface::shutdown()
         feedback_poll_connected_ = false;
     }
     controller_connected_flag_.store(false);
-    ROS_INFO("[AuboHW] SDK 已安全退出。");
+    ROS_INFO("[AuboHW] SDK 连接已关闭；停止是否获确认见前述日志。");
     motion_lease_.release();
     // Export only after stream mode/logout; file IO must not delay the cabinet stop.
     if (motion_trace_)
@@ -608,19 +668,7 @@ bool AuboHardwareInterface::connectToRobotController()
     }
     tcp_transport_.configure(server_host_, server_port_);
     const auto after_mac_login = tcp_transport_.snapshot();
-    if (before_mac_login.valid && after_mac_login.valid)
-    {
-        std::size_t new_ports = 0;
-        for (std::size_t i = 0; i < after_mac_login.detail_count; ++i)
-        {
-            const auto port = after_mac_login.sockets[i].local_port;
-            bool existed = false;
-            for (std::size_t j = 0; j < before_mac_login.detail_count; ++j)
-                existed = existed || before_mac_login.sockets[j].local_port == port;
-            if (!existed) { ++new_ports; mac_socket_port_hint_ = port; }
-        }
-        if (new_ports != 1) mac_socket_port_hint_ = 0;
-    }
+    mac_socket_port_hint_ = newSocketPort(before_mac_login, after_mac_login);
 
     if (use_realtime_feedback_)
     {
@@ -633,6 +681,8 @@ bool AuboHardwareInterface::connectToRobotController()
             return false;
         }
         feedback_poll_connected_ = true;
+        tcp_transport_.configure(server_host_, server_port_);
+        feedback_socket_port_hint_ = newSocketPort(after_mac_login, tcp_transport_.snapshot());
     }
 
     if (!tcp_transport_.configure(server_host_, server_port_))
@@ -660,28 +710,16 @@ bool AuboHardwareInterface::connectToRobotController()
     // 示教器模式下只保留状态读取，不主动唤醒或接管控制权
     if (enable_motion_control_)
     {
-        ToolDynamicsParam tool_param;
-        memset(&tool_param, 0, sizeof(tool_param));
         ROBOT_SERVICE_STATE startup_result;
-
-        int ret = robot_send_service_.rootServiceRobotStartup(
-            tool_param,
-            static_cast<uint8>(collision_class_),  // 碰撞等级（来自 aubo_driver.cpp robotControlCallback）
-            true,    // readPose
-            true,    // staticCollisionDetect
-            1000,    // boardBaxAcc
-            startup_result);
-
-        if (ret != InterfaceCallSuccCode)
+        if (!startRobotPreservingTool(startup_result))
         {
-            ROS_ERROR("[AuboHW] 机械臂启动失败，错误码: %d", ret);
             shutdown();
             return false;
         }
         ROS_INFO("[AuboHW] 机械臂启动成功，state = %d",
                  static_cast<int>(startup_result));
 
-        ret = robot_send_service_.robotServiceRobotHandShake(true);
+        const int ret = robot_send_service_.robotServiceRobotHandShake(true);
         if (ret != InterfaceCallSuccCode)
         {
             ROS_ERROR("[AuboHW] 机械臂握手失败，错误码: %d", ret);
@@ -695,6 +733,47 @@ bool AuboHardwareInterface::connectToRobotController()
     }
 
     return true;
+}
+
+int AuboHardwareInterface::readToolDynamics(ToolDynamicsParam& tool)
+{
+    return robot_send_service_.robotServiceGetToolDynamicsParam(tool);
+}
+
+int AuboHardwareInterface::startupRobot(const ToolDynamicsParam& tool, ROBOT_SERVICE_STATE& result)
+{
+    return robot_send_service_.rootServiceRobotStartup(
+        tool, static_cast<uint8>(collision_class_), true, true, 1000, result);
+}
+
+bool AuboHardwareInterface::startRobotPreservingTool(ROBOT_SERVICE_STATE& result)
+{
+    ToolDynamicsParam tool{};
+    const int read_result = readToolDynamics(tool);
+    if (read_result != InterfaceCallSuccCode)
+    {
+        ROS_ERROR("[AuboHW] 无法读取柜端工具动力学参数 %d，拒绝以零负载覆盖并启动", read_result);
+        return false;
+    }
+    for (double value : {tool.payload, tool.positionX, tool.positionY, tool.positionZ,
+                         tool.toolInertia.xx, tool.toolInertia.xy, tool.toolInertia.xz,
+                         tool.toolInertia.yy, tool.toolInertia.yz, tool.toolInertia.zz})
+        if (!std::isfinite(value))
+        {
+            ROS_ERROR("[AuboHW] 柜端工具动力学参数含非有限值，拒绝启动");
+            return false;
+        }
+    if (tool.payload < 0)
+    {
+        ROS_ERROR("[AuboHW] 柜端工具负载为负数，拒绝启动");
+        return false;
+    }
+    ROS_INFO("[AuboHW] 保留柜端工具参数：负载 %.4f kg，重心 [%.4f, %.4f, %.4f] m",
+             tool.payload, tool.positionX, tool.positionY, tool.positionZ);
+    const int startup_result = startupRobot(tool, result);
+    if (startup_result != InterfaceCallSuccCode)
+        ROS_ERROR("[AuboHW] 机械臂启动失败，错误码: %d", startup_result);
+    return startup_result == InterfaceCallSuccCode;
 }
 
 // =============================================================================
@@ -824,6 +903,11 @@ void AuboHardwareInterface::updateFeedbackAt(const wayPoint_S& waypoint,
         std::lock_guard<std::mutex> lock(feedback_mutex_);
         if (shutdown_started_.load() || !controller_connected_flag_.load())
             return;
+        if (pushed && feedback_query_authoritative_)
+        {
+            ignored_push_samples_.fetch_add(1, std::memory_order_relaxed);
+            return;
+        }
         if (have_feedback_sample_ && sampled <= last_feedback_sample_)
             return;
         const double dt = have_feedback_sample_
@@ -850,38 +934,103 @@ void AuboHardwareInterface::updateFeedbackAt(const wayPoint_S& waypoint,
     raw_joint_state_pub_.publish(sample);
     feedback_ready_.notify_all();
     if (push_gap > 0.08)
-        ROS_WARN_THROTTLE(1.0, "[AuboHW/feedback] SDK 推送间隔 %.2f ms，独立查询仍可补充真实采样；累计 %llu 帧",
+        ROS_WARN_THROTTLE(1.0, "[AuboHW/feedback] SDK 推送间隔 %.2f ms；累计 %llu 帧",
                           push_gap * 1000.0, static_cast<unsigned long long>(count));
 }
 
 void AuboHardwareInterface::pollFeedback()
 {
     using Clock = std::chrono::steady_clock;
+    auto next_query = Clock::now();
+    std::uint64_t query_sequence = 0;
     while (feedback_poll_running_.load())
     {
+        bool took_over = false;
         {
             std::unique_lock<std::mutex> lock(feedback_mutex_);
             feedback_ready_.wait_for(lock, std::chrono::milliseconds(5),
                                      [this] { return !feedback_poll_running_.load(); });
-            if (!feedback_poll_running_.load())
+            if (!feedback_poll_running_.load() || !controller_connected_flag_.load())
                 break;
-            if (have_feedback_sample_ && Clock::now() - last_feedback_sample_ < std::chrono::milliseconds(60))
+            if (Clock::now() < next_query)
                 continue;
+            if (!feedback_query_authoritative_)
+            {
+                if (have_feedback_sample_ && Clock::now() - last_feedback_sample_ < std::chrono::milliseconds(60))
+                    continue;
+                // A callback's host arrival stamp cannot distinguish delayed
+                // cabinet frames from fresh ones after another source advanced.
+                // Fence pushes BEFORE starting even a failed/slow query.
+                feedback_query_authoritative_ = true;
+                took_over = true;
+            }
         }
+        if (took_over)
+            ROS_WARN("[AuboHW/feedback] 推送超时，独立路点查询已接管至重启；忽略随后推送，避免旧帧覆盖新状态");
         const auto requested = Clock::now();
+        // At most 25 RPC/s, including SDK time, to bound the extra cabinet
+        // load after takeover. Slow calls do not incur another full period.
+        next_query = requested + std::chrono::milliseconds(40);
         const ros::Time stamp = ros::Time::now();
         wayPoint_S point{};
+        HardwareMotionTrace::Rpc event;
+        if (motion_trace_)
+        {
+            event.kind = HardwareMotionTrace::Rpc::Kind::FeedbackQuery;
+            event.id = ++query_sequence;
+            event.port_hint = feedback_socket_port_hint_;
+            event.ros_ns = stamp.toNSec();
+            event.before = tcp_transport_.snapshot();
+            event.begin_ns = HardwareMotionTrace::ns();
+        }
         const int ret = readFeedbackSnapshot(point);
+        const auto returned = Clock::now();
+        if (motion_trace_)
+        {
+            event.end_ns = HardwareMotionTrace::ns();
+            event.result = ret;
+            event.after = tcp_transport_.snapshot();
+            motion_trace_->append(event);
+        }
         if (ret == InterfaceCallSuccCode)
             // The controller may have sampled at any point during this RPC.
             // Use the request time conservatively; never freshen a late reply.
             updateFeedbackAt(point, stamp, requested, false);
         else
+        {
+            feedback_query_failures_.fetch_add(1, std::memory_order_relaxed);
             ROS_WARN_THROTTLE(1.0, "[AuboHW/feedback] 独立路点查询失败 %d；不刷新反馈时间", ret);
-        const double duration_ms = std::chrono::duration<double, std::milli>(Clock::now() - requested).count();
+        }
+        const double duration_ms = std::chrono::duration<double, std::milli>(returned - requested).count();
+        updateAtomicMax(feedback_query_max_ms_, duration_ms);
         if (duration_ms > 60.0)
             ROS_WARN_THROTTLE(1.0, "[AuboHW/feedback] 独立路点查询耗时 %.2f ms，仍使用请求时间戳", duration_ms);
     }
+}
+
+bool AuboHardwareInterface::motionFeedbackFresh()
+{
+    double age = 0.0;
+    {
+        std::lock_guard<std::mutex> lock(feedback_mutex_);
+        age = have_feedback_sample_ ? std::chrono::duration<double>(
+            std::chrono::steady_clock::now() - last_feedback_sample_).count() :
+            std::numeric_limits<double>::infinity();
+    }
+    if (age >= 0.0 && age <= feedback_timeout_s_)
+        return true;
+    if (!feedback_timeout_latched_.exchange(true))
+        ROS_ERROR("[AuboHW] 有效关节反馈年龄 %.1f ms 超过 %.1f ms；已锁定停止，SDK 返回或旧推送不续期",
+                  age * 1000.0, feedback_timeout_s_ * 1000.0);
+    controller_connected_flag_.store(false);
+    feed_thread_running_.store(false);
+    return false;
+}
+
+double AuboHardwareInterface::oldestQueuedCommandAgeMs()
+{
+    const auto* oldest = ros_motion_queue_.peek();
+    return oldest ? (HardwareMotionTrace::ns() - oldest->enqueued_ns) * 1e-6 : 0.0;
 }
 
 int AuboHardwareInterface::readFeedbackSnapshot(wayPoint_S& point)
@@ -903,9 +1052,11 @@ void AuboHardwareInterface::timerCallback(const ros::TimerEvent& /*e*/)
     int ret = InterfaceCallSuccCode;
     if (!use_realtime_feedback_)
     {
+        const auto requested = std::chrono::steady_clock::now();
+        const auto stamp = ros::Time::now();
         ret = robot_receive_service_.robotServiceGetCurrentWaypointInfo(current_waypoint_);
         if (ret == InterfaceCallSuccCode)
-            updateFeedback(current_waypoint_);
+            updateFeedbackAt(current_waypoint_, stamp, requested, false);
         else
         {
             ROS_ERROR("[AuboHW] 读取路点失败，错误码: %d；已锁定停止", ret);
@@ -989,6 +1140,9 @@ void AuboHardwareInterface::publishWaypointToRobot()
     double max_feed_loop_ms = 0.0;
     double max_diagnosis_ms = 0.0;
     double max_send_ms = 0.0;
+    double last_diagnosis_ms = 0.0;
+    std::size_t slow_query_samples = 0;
+    std::size_t query_coverage_exhausted_samples = 0;
     int min_mac_window = std::numeric_limits<int>::max();
     int min_active_mac_window = std::numeric_limits<int>::max();
     int max_mac_window = 0;
@@ -1021,6 +1175,10 @@ void AuboHardwareInterface::publishWaypointToRobot()
         diagnostic_msgs::DiagnosticStatus status;
         status.name = "Aubo hardware motion flow";
         status.hardware_id = server_host_;
+        addDiagnosticValue(status, "trajectory_execution_mode", "jtc");
+        addDiagnosticValue(status, "jtc_queue_target_points", std::to_string(JTC_QUEUE_TARGET_POINTS));
+        addDiagnosticValue(status, "jtc_backpressure_waits_total", std::to_string(jtc_backpressure_waits_.load()));
+        addDiagnosticValue(status, "controller_state_time_basis", "ROS wall stamp; fixed 5ms trajectory samples paced by queue capacity");
         const bool rpc_error = diagnosis_failures > 0 || send_failures > 0 || stream_fault;
         fault_reported = rpc_error;
         const double mac_target_coverage_ms =
@@ -1032,7 +1190,7 @@ void AuboHardwareInterface::publishWaypointToRobot()
         const bool queue_backlog = stream_started && max_queue_window > mac_target_points;
         const bool flow_warning = low_water_samples > 0 ||
             empty_with_pending_samples > 0 || above_target_samples > 0 || queue_full_window > 0 ||
-            feed_loop_exceeded_coverage || queue_backlog;
+            feed_loop_exceeded_coverage || queue_backlog || slow_query_samples > 0;
         status.level = rpc_error ? diagnostic_msgs::DiagnosticStatus::ERROR :
             (flow_warning ? diagnostic_msgs::DiagnosticStatus::WARN :
                             diagnostic_msgs::DiagnosticStatus::OK);
@@ -1042,7 +1200,8 @@ void AuboHardwareInterface::publishWaypointToRobot()
               (feed_loop_exceeded_coverage ? "feed loop slower than MAC target coverage" :
                (queue_backlog ? "ROS motion queue backlog exceeds MAC target" :
                 (above_target_samples > 0 ? "MAC occupancy exceeded refill target" :
-                 (queue_full_window > 0 ? "ROS motion queue overflow" : "flow nominal"))))));
+                 (queue_full_window > 0 ? "ROS motion queue overflow" :
+                  (slow_query_samples > 0 ? "MAC query response delayed" : "flow nominal")))))));
 
         const std::size_t queue_current = ros_motion_queue_.size_approx();
         const double control_loop_max = controller_loop_period_max_ms_.exchange(
@@ -1076,12 +1235,21 @@ void AuboHardwareInterface::publishWaypointToRobot()
         add("queue_backlog_warning_points", std::to_string(mac_target_points));
         add("queue_window_max_nominal_horizon_ms", std::to_string(
             max_queue_window * control_period_s_ * 1000.0));
+        add("queue_oldest_command_age_ms", std::to_string(oldestQueuedCommandAgeMs()));
+        add("max_command_queue_duration_ms", std::to_string(max_command_queue_duration_s_ * 1000.0));
+        add("command_queue_limit_exceeded", command_queue_limit_exceeded_.load() ? "true" : "false");
         add("queue_full_total", std::to_string(queue_full_total));
         add("queue_full_window", std::to_string(queue_full_window));
         add("query_count", std::to_string(query_count));
         add("diagnosis_failures", std::to_string(diagnosis_failures));
         add("last_diagnosis_result", std::to_string(last_diagnosis_result));
         add("diagnosis_max_ms", std::to_string(max_diagnosis_ms));
+        add("mac_query_last_duration_ms", std::to_string(last_diagnosis_ms));
+        add("mac_slow_query_samples_over_50ms", std::to_string(slow_query_samples));
+        add("mac_query_exceeded_reported_coverage_samples", std::to_string(query_coverage_exhausted_samples));
+        // SDK diagnosis carries no cabinet sampling timestamp. Neither the
+        // response receipt time nor the count below establishes fresh credit.
+        add("mac_has_cabinet_sample_timestamp", "false");
         add("send_count", std::to_string(send_count));
         add("send_points", std::to_string(send_points));
         add("send_failures", std::to_string(send_failures));
@@ -1100,6 +1268,20 @@ void AuboHardwareInterface::publishWaypointToRobot()
         add("minimum_send_batch_points", std::to_string(minimum_batch_points));
         add("small_batch_wait_samples", std::to_string(small_batch_wait_samples));
         add("minimum_mac_query_interval_ms", "5");
+        {
+            std::lock_guard<std::mutex> lock(feedback_mutex_);
+            add("feedback_source", feedback_query_authoritative_ ? "query_latched" :
+                (use_realtime_feedback_ ? "push" : "timer_query"));
+            add("feedback_sample_age_ms", have_feedback_sample_ ? std::to_string(
+                std::max(0.0, std::chrono::duration<double, std::milli>(
+                    SteadyClock::now() - last_feedback_sample_).count())) : "-1");
+        }
+        add("feedback_timeout_ms", std::to_string(feedback_timeout_s_ * 1000.0));
+        add("feedback_timeout_latched", feedback_timeout_latched_.load() ? "true" : "false");
+        add("feedback_ignored_push_samples_total", std::to_string(ignored_push_samples_.load()));
+        add("feedback_query_failures_total", std::to_string(feedback_query_failures_.load()));
+        add("feedback_query_max_ms", std::to_string(feedback_query_max_ms_.exchange(0.0)));
+        add("feedback_query_max_frequency_hz", "25");
         const auto tcp = tcp_transport_.snapshot();
         add("tcp_info_valid", tcp.valid ? "true" : "false");
         if (tcp.valid)
@@ -1129,6 +1311,7 @@ void AuboHardwareInterface::publishWaypointToRobot()
         low_water_samples = empty_with_pending_samples = above_target_samples = 0;
         active_empty_samples = interrupt_warning_samples = 0;
         small_batch_wait_samples = 0;
+        slow_query_samples = query_coverage_exhausted_samples = 0;
         last_diagnosis_result = last_send_result = InterfaceCallSuccCode;
         next_report = now + std::chrono::milliseconds(100);
     };
@@ -1139,6 +1322,7 @@ void AuboHardwareInterface::publishWaypointToRobot()
         // Slow RPCs already consume this interval: no extra 5ms sleep afterward.
         std::this_thread::sleep_until(next_mac_query);
         if (!feed_thread_running_.load() || !controller_connected_flag_.load()) break;
+        if (position_controller_started_.load() && !motionFeedbackFresh()) break;
         const bool stream_was_active = stream_started;
         const auto loop_start = SteadyClock::now();
         next_mac_query = loop_start + std::chrono::milliseconds(5);
@@ -1170,6 +1354,8 @@ void AuboHardwareInterface::publishWaypointToRobot()
         }
         const double diagnosis_ms = std::chrono::duration<double, std::milli>(
             diagnosis_end - diagnosis_start).count();
+        last_diagnosis_ms = diagnosis_ms;
+        if (diagnosis_ms > 50.0) ++slow_query_samples;
         ++query_count;
         max_diagnosis_ms = std::max(max_diagnosis_ms, diagnosis_ms);
         last_diagnosis_result = diagnosis_ret;
@@ -1178,7 +1364,6 @@ void AuboHardwareInterface::publishWaypointToRobot()
         {
             rib_buffer_size_ = mac_diagnosis.macTargetPosDataSize;
             current_macsz    = rib_buffer_size_;
-
         }
         else
         {
@@ -1193,6 +1378,9 @@ void AuboHardwareInterface::publishWaypointToRobot()
             continue;
 
         const std::size_t queued_points = ros_motion_queue_.size_approx();
+        if (stream_started && current_macsz > 0 &&
+            diagnosis_ms >= current_macsz / static_cast<double>(NUM_JOINTS) * control_period_s_ * 1000.0)
+            ++query_coverage_exhausted_samples;
         min_mac_window = std::min(min_mac_window, current_macsz);
         max_mac_window = std::max(max_mac_window, current_macsz);
         if (stream_was_active)
@@ -1262,6 +1450,7 @@ void AuboHardwareInterface::publishWaypointToRobot()
                 continue;
             }
             stream_started = true;
+            jtc_feed_started_.store(true);
             ROS_INFO("[AuboHW] 轨迹已预装 %zu 点，开始连续透传", queued_points);
         }
 
@@ -1294,7 +1483,7 @@ void AuboHardwareInterface::publishWaypointToRobot()
                 HardwareMotionTrace::Rpc send_event;
                 if (motion_trace_)
                 {
-                    send_event.send = true;
+                    send_event.kind = HardwareMotionTrace::Rpc::Kind::Send;
                     send_event.id = ++send_sequence;
                     send_event.port_hint = mac_socket_port_hint_;
                     send_event.first_point_id = submitted_points + 1;
@@ -1359,13 +1548,29 @@ void AuboHardwareInterface::publishWaypointToRobot()
 
 std::vector<wayPoint_S> AuboHardwareInterface::tryPopWaypoint(int count)
 {
+    if (!controller_connected_flag_.load())
+        return {};
     std::vector<wayPoint_S> points;
     points.reserve(std::max(0, count));
-    std::array<double, NUM_JOINTS> joint;
+    // Reject the complete batch when feedback is stale or the oldest queued
+    // command is too old. Do not discard points and then resume a later phase.
+    if (!motionFeedbackFresh())
+        return {};
+    if (oldestQueuedCommandAgeMs() > max_command_queue_duration_s_ * 1000.0)
+    {
+        command_queue_limit_exceeded_.store(true);
+        ROS_ERROR("[AuboHW] 最旧待发命令超过 %.0f ms；已锁定停止，禁止迟到后继续轨迹",
+                  max_command_queue_duration_s_ * 1000.0);
+        controller_connected_flag_.store(false);
+        feed_thread_running_.store(false);
+        return {};
+    }
+    QueuedCommand queued;
     for (int k = 0; k < count; ++k)
     {
-        if (!ros_motion_queue_.try_dequeue(joint))
+        if (!ros_motion_queue_.try_dequeue(queued))
             break;
+        const auto& joint = queued.positions;
         if (!stream_reference_initialized_)
         {
             // This is the controller's first hold after its starting() hook,
@@ -1418,5 +1623,26 @@ std::vector<wayPoint_S> AuboHardwareInterface::tryPopWaypoint(int count)
     }
     return points;
 }
+
+void AuboHardwareInterface::requestExecutionStop()
+{
+    controller_connected_flag_.store(false);
+    feed_thread_running_.store(false);
+}
+
+bool AuboHardwareInterface::stopStreamSession()
+{
+    const int stop_result = stopRobotMotion();
+    const int leave_result = exitStreamMode();
+    if (stop_result != InterfaceCallSuccCode || leave_result != InterfaceCallSuccCode)
+        ROS_ERROR("[AuboHW] 柜端停止/退出透传未确认：stop=%d leave=%d", stop_result, leave_result);
+    return stop_result == InterfaceCallSuccCode && leave_result == InterfaceCallSuccCode;
+}
+
+int AuboHardwareInterface::stopRobotMotion()
+{ return robot_send_service_.rootServiceRobotMoveControl(RobotMoveStop); }
+
+int AuboHardwareInterface::exitStreamMode()
+{ return robot_send_service_.robotServiceLeaveTcp2CanbusMode(); }
 
 }  // namespace aubo_ros_control

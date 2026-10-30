@@ -1,0 +1,16 @@
+# Fixed camera, original table. The current lying can is about 65 mm in diameter.
+target_frame: base_link
+table_z: 0.00285
+object_height: 0.065
+class_heights: {}
+height_tolerance: 0.02
+minimum_probability: 0.60
+minimum_depth: 0.10
+maximum_depth: 2.50
+depth_scale_16u: 0.001
+maximum_depth_age: 0.08
+depth_cache_size: 90
+depth_save_directory: ""
+roi_scale: 0.45
+class_aliases: {}
+workspace: {min_x: -0.4142, max_x: 0.3258, min_y: -1.1357, max_y: -0.2057}

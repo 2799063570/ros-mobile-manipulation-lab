@@ -23,7 +23,7 @@ class GraspTest(unittest.TestCase):
                 grasp_offset_x=0., grasp_offset_y=0., gripper_open=0., gripper_closed=.4,
                 gripper_width_open=.08, gripper_width_closed=0., width_close_scale=.9,
                 pregrasp_height=.22, preplace_height=.28, lift_min_height=.18,
-                place_clearance=.02, place_frame='base_link', place_targets={'red':[.4, .2]},
+                place_clearance=.02, minimum_place_z=None, place_frame='base_link', place_targets={'red':[.4, .2]},
                 grasp_model_names={}, _active_grasp_angle=0.).items():
             setattr(t, key, value)
         t._pose = lambda x,y,z: (x,y,z,t._active_grasp_angle)
@@ -48,6 +48,24 @@ class GraspTest(unittest.TestCase):
         self.assertEqual(self.t._category(self.d), 'can')
         self.d.class_name = ''
         self.assertEqual(self.t._category(self.d), 'red')
+
+    def test_minimum_place_z_does_not_change_grasp_height(self):
+        self.t.minimum_place_z = .18
+        self.assertTrue(self.t._pick_and_place(self.d))
+        self.assertAlmostEqual(self.t._cartesian_to.call_args_list[0][0][0][2], .135)
+        self.assertAlmostEqual(self.t._cartesian_to.call_args_list[1][0][0][2], .18)
+
+    def test_floor_below_nominal_does_not_lower_release(self):
+        self.t.minimum_place_z = .10
+        self.assertTrue(self.t._pick_and_place(self.d))
+        self.assertAlmostEqual(self.t._cartesian_to.call_args_list[1][0][0][2], .15)
+
+    def test_invalid_release_height_is_rejected_before_grasping(self):
+        self.t.minimum_place_z = self.t.table_z + self.t.preplace_height
+        self.assertFalse(self.t._pick_and_place(self.d))
+        self.t._command_gripper.assert_not_called()
+        self.t._move_to_pose.assert_not_called()
+        self.assertEqual(self.t._set_failure.call_args[0][0], 'CONFIGURATION_FAILED')
 
     def test_invalid_geometry_cannot_move_robot(self):
         for field, value in [('depth_valid',False), ('grasp_geometry_valid',False),

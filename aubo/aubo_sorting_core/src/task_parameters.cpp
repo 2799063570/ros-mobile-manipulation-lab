@@ -61,6 +61,10 @@ namespace aubo_sorting_core
     if (!std::isfinite(preplace_height_) || preplace_height_ <= 0.0)
       throw std::runtime_error("preplace_height must be finite and positive");
     private_nh_.param("place_clearance", place_clearance_, 0.02);
+    if (private_nh_.hasParam("minimum_place_z") &&
+        (!private_nh_.getParam("minimum_place_z", minimum_place_z_) ||
+         !std::isfinite(minimum_place_z_)))
+      throw std::runtime_error("minimum_place_z must be finite in target_frame");
     private_nh_.param("cartesian_step", cartesian_step_, 0.01);
     private_nh_.param("minimum_cartesian_fraction", minimum_cartesian_fraction_, 0.90);
     private_nh_.param("gripper_open", gripper_open_, 0.0);

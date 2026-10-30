@@ -44,8 +44,8 @@ int main(int argc, char** argv)
 
     // ------------------------------------------------------------------
     // 控制频率（主循环驱动 controller_manager）
-    // TCP2CANBUS 固定以 5 ms 消费一个路点，控制器和硬件接口
-    // 读取同一个 200 Hz 参数，避免生产/消费节拍失配。
+    // 轨迹固定按 5 ms 采样。实际生产还受软件队列容量约束，
+    // 避免主机与控制柜时基微小偏差不断累积成等待时间。
     // ------------------------------------------------------------------
     double control_freq = aubo_ros_control::DEFAULT_CONTROL_FREQUENCY_HZ;
     nh_priv.param<double>("control_frequency", control_freq,
@@ -105,6 +105,7 @@ int main(int argc, char** argv)
     // read()   — 实际状态已由 timerCallback 50Hz 填充到缓冲区
     // update() — 运行控制器算法，写命令到 joint_position_cmd_
     // write()  — 将每个 5 ms 命令（包括保持点）推入 ros_motion_queue_
+    // 队列满时先暂停生成，轨迹相位不前进；不丢点也不重复补偿等待的墙钟时间。
     // ------------------------------------------------------------------
     using SampleClock = aubo_ros_control::FixedStepClock;
     auto last_wakeup = SampleClock::Clock::now();
@@ -132,9 +133,17 @@ int main(int argc, char** argv)
         }
         for (std::size_t tick = 0; tick < due && ros::ok() && aubo_hw.isConnected(); ++tick)
         {
+            if (!aubo_hw.canGenerateJtcSample())
+            {
+                sample_clock.defer(SampleClock::Clock::now());
+                break;
+            }
             sample_time += sample_period;
-            aubo_hw.read(sample_time, sample_period);
-            cm.update(sample_time, sample_period);
+            // JTC uptime advances one 5 ms sample only when we have capacity.
+            // ROS stamps remain wall time for feedback and new goal headers.
+            const auto wall_time = ros::Time::now();
+            aubo_hw.read(wall_time, sample_period);
+            cm.update(wall_time, sample_period);
             // write uses period only to report actual host scheduling stalls.
             aubo_hw.write(sample_time, tick == 0 ? wall_period : sample_period);
             sample_clock.advance();

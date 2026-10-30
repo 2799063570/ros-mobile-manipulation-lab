@@ -349,6 +349,26 @@ TEST(SplineDynamics,
   }
 }
 
+TEST(SplineDynamics, HalfJerkSoftensRampsWithoutReducingPeakVelocityOrAcceleration) {
+  // A long enough straight move reaches cruise under both profiles. Changing
+  // jerk alone must preserve the path and attainable V/A, with only longer ramps.
+  auto original = recordedTrajectory();
+  auto softened = recordedTrajectory();
+  std::vector<std::size_t> added;
+  ASSERT_TRUE(retimeStraightPath(*original, {{{0.175, 0.16, 2.0}}}, added));
+  added.clear();
+  ASSERT_TRUE(retimeStraightPath(*softened, {{{0.175, 0.16, 1.0}}}, added));
+  const auto fast = trajectoryPeaks(*original);
+  const auto slow = trajectoryPeaks(*softened);
+  EXPECT_NEAR(fast[0], slow[0], 1e-7);
+  EXPECT_NEAR(fast[1], slow[1], 1e-7);
+  EXPECT_LE(slow[2], 1.0);
+  EXPECT_GT(fast[2], 1.99);
+  EXPECT_NEAR(softened->getDuration() - original->getDuration(), .08, 1e-8);
+  EXPECT_DOUBLE_EQ(softened->getFirstWayPoint().getVariablePosition(0), recorded[0][1]);
+  EXPECT_DOUBLE_EQ(softened->getLastWayPoint().getVariablePosition(0), recorded[8][1]);
+}
+
 TEST(SplineDynamics,
      StraightTimingRejectsCurvesHiddenInDerivativesAndIntentionalStops) {
   for (int mode = 0; mode < 9; ++mode) {

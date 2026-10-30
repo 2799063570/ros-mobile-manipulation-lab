@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="config" default="$(find aubo_planning)/config/sorting_containers_real.yaml"/>
+  <node pkg="aubo_planning" type="publish_sorting_containers.py"
+        name="publish_sorting_containers" output="screen" required="true">
+    <rosparam command="load" file="$(arg config)"/>
+  </node>
+</launch>

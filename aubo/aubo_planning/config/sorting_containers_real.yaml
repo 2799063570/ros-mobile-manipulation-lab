@@ -1,0 +1,31 @@
+# 眼在手外实机分拣容器。所有长度单位 m；XY 为容器中心坐标。
+place_frame: base_link
+# 放置 TCP 在任务 target_frame（本工位为 base_link）中的最低绝对 Z。
+# 实际放置 Z = max(原放置高度公式, minimum_place_z)。
+minimum_place_z: 0.18
+
+# 容器放在原工位桌面上；这是外侧底面 Z，非容器中心 Z。
+bottom_z: 0.00285
+# 壁厚、底厚未提供，暂按 5 mm 建模，可在实测后修改。
+wall_thickness: 0.005
+bottom_thickness: 0.005
+
+# 同时作为任务放置点与碰撞容器中心，避免两套坐标不一致。
+place_targets:
+  bottle: [-0.40, -0.18]
+  can: [-0.42, -0.3375]   # -18 - (15/2 + 16.5/2) cm
+  box: [-0.42, -0.5425]   # -18 - (15/2 + 16.5 + 24.5/2) cm
+
+containers:
+  bottle:
+    object_id: sorting_container_bottle
+    outer_size: [0.27, 0.15, 0.18]  # 外尺寸 [X长度, Y长度, 高度]
+    yaw: 0.0
+  can:
+    object_id: sorting_container_can
+    outer_size: [0.20, 0.165, 0.16]
+    yaw: 0.0
+  box:
+    object_id: sorting_container_box
+    outer_size: [0.20, 0.245, 0.16]
+    yaw: 0.0

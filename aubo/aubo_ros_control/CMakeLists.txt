@@ -8,7 +8,10 @@ find_package(catkin REQUIRED COMPONENTS
   actionlib_msgs
   message_generation
   aubo_sdk
+  control_msgs
   controller_manager
+  controller_interface
+  joint_trajectory_controller
   controller_manager_msgs
   diagnostic_msgs
   dynamic_reconfigure
@@ -86,7 +89,7 @@ endif()
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES ${PROJECT_NAME} aubo_visual_servo_panel
-  CATKIN_DEPENDS actionlib actionlib_msgs message_runtime aubo_sdk controller_manager controller_manager_msgs diagnostic_msgs dynamic_reconfigure geometry_msgs hardware_interface
+  CATKIN_DEPENDS actionlib actionlib_msgs message_runtime aubo_sdk control_msgs controller_manager controller_interface joint_trajectory_controller controller_manager_msgs diagnostic_msgs dynamic_reconfigure geometry_msgs hardware_interface
     kdl_parser moveit_msgs moveit_core moveit_ros_planning shape_msgs pluginlib roscpp rospy roslib rviz sensor_msgs
     std_msgs std_srvs tf2_geometry_msgs tf2_ros visualization_msgs
   DEPENDS orocos_kdl
@@ -109,6 +112,10 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
   # DT_RPATH is.  Keep the SDK self-contained without requiring users to set
   # LD_LIBRARY_PATH in their shell startup files.
   LINK_FLAGS "-Wl,--disable-new-dtags")
+
+add_library(aubo_guarded_jtc src/guarded_joint_trajectory_controller.cpp)
+target_compile_features(aubo_guarded_jtc PRIVATE cxx_std_14)
+target_link_libraries(aubo_guarded_jtc ${PROJECT_NAME} ${catkin_LIBRARIES})
 
 add_executable(aubo_hw_node src/aubo_hw_main.cpp)
 target_compile_features(aubo_hw_node PRIVATE cxx_std_14)
@@ -170,6 +177,8 @@ target_include_directories(aubo_visual_servo_visualization_node PRIVATE include 
 target_link_libraries(aubo_visual_servo_visualization_node ${catkin_LIBRARIES} ${orocos_kdl_LIBRARIES})
 
 if(CATKIN_ENABLE_TESTING)
+  add_test(NAME moveit_motion_analysis_test COMMAND ${PYTHON_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/test/moveit_motion_analysis_test.py)
   add_test(NAME hardware_trace_analysis_test COMMAND ${PYTHON_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/test/hardware_trace_analysis_test.py)
   catkin_add_gtest(visual_servo_stream_test test/visual_servo_stream_test.cpp)
@@ -250,6 +259,7 @@ if(CATKIN_ENABLE_TESTING)
   add_rostest_gtest(aubo_hardware_streaming_test
     test/aubo_hardware_streaming.test test/aubo_hardware_streaming_test.cpp)
   if(TARGET aubo_hardware_streaming_test)
+    add_dependencies(aubo_hardware_streaming_test aubo_guarded_jtc)
     target_compile_features(aubo_hardware_streaming_test PRIVATE cxx_std_14)
     target_include_directories(aubo_hardware_streaming_test PRIVATE include ${catkin_INCLUDE_DIRS})
     target_link_libraries(aubo_hardware_streaming_test ${PROJECT_NAME} ${catkin_LIBRARIES})
@@ -314,7 +324,7 @@ if(CATKIN_ENABLE_TESTING)
   endif()
 endif()
 
-install(TARGETS ${PROJECT_NAME} aubo_hw_node aubo_visual_servo_node
+install(TARGETS ${PROJECT_NAME} aubo_guarded_jtc aubo_hw_node aubo_visual_servo_node
                 aubo_cartesian_jog_node aubo_cartesian_jog_panel
                 aubo_visual_servo_panel
                 aubo_visual_servo_visualization_node
@@ -325,5 +335,5 @@ install(DIRECTORY include/${PROJECT_NAME}/
   DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION})
 install(DIRECTORY action msg cfg config launch worlds
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
-install(FILES VISUAL_SERVO.md HYBRID_CONTROL.md CARTESIAN_JOG.md plugin_description.xml
+install(FILES VISUAL_SERVO.md HYBRID_CONTROL.md CARTESIAN_JOG.md plugin_description.xml controller_plugins.xml
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})

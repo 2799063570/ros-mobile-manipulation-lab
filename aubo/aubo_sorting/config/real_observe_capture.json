@@ -1,0 +1,28 @@
+{
+  "name": "real_observe",
+  "captured_at": "2026-10-30T09:01:17+0800",
+  "source": "/aubo_i5/joint_states",
+  "joint_names": [
+    "shoulder_joint",
+    "upperArm_joint",
+    "foreArm_joint",
+    "wrist1_joint",
+    "wrist2_joint",
+    "wrist3_joint"
+  ],
+  "positions": [
+    1.0677213668823242,
+    -0.9415102601051331,
+    -2.496562957763672,
+    0.026582198217511177,
+    -1.634069800376892,
+    -2.0714271068573
+  ],
+  "sample_count": 15,
+  "max_joint_span_rad": 3.337860107421875e-06,
+  "fk_error_code": 1,
+  "tcp_pose": "[header: \n  seq: 0\n  stamp: \n    secs: 0\n    nsecs:         0\n  frame_id: \"base_link\"\npose: \n  position: \n    x: 0.024064734382760217\n    y: -0.18021529949059104\n    z: 0.1533856737288462\n  orientation: \n    x: 0.7074837956705538\n    y: 0.7060007242976059\n    z: -0.003649863966176997\n    w: -0.03188000388754998]",
+  "scene_objects": [],
+  "current_state_valid": true,
+  "contacts": []
+}

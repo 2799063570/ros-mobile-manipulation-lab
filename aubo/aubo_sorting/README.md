@@ -299,15 +299,20 @@ roslaunch aubo_sorting eye_to_hand_yolo_sorting_real.launch \
   model_path:=/实际路径/obb.pt task_config:=/实际路径/YOLO分拣参数.yaml
 ```
 
-四个入口共用 `sorting_real.launch`，也可直接通过 `camera_mount:=eye_in_hand|eye_to_hand`
+四个入口最终共用 `sorting_real.launch`，也可直接通过 `camera_mount:=eye_in_hand|eye_to_hand`
 和 `detector:=color|yolo` 选择模式。D435i 驱动启用彩色图、深度图及彩色对齐深度；
-眼在手上默认话题前缀 `/camera`，相机安装 TF 由腕部 URDF 发布；眼在手外默认
-`/workspace_camera`，基座到彩色光学坐标系的 TF 由 `calibration_file` 发布。
+其中 `eye_to_hand_yolo_sorting_real.launch` 默认复用下文实机三容器工位并连续分拣，
+通过 `eye_to_hand_can_sorting_real.launch` 加载桌面、支架、容器和 `real_observe`。
+两种实机入口默认话题前缀均为 `/camera`，与随仓库标定中的
+`camera_color_optical_frame` 一致；眼在手上的相机安装 TF 由腕部 URDF 发布，
+眼在手外的基座到彩色光学坐标系 TF 由 `calibration_file` 发布。
 两种安装方式使用不同的 URDF/SRDF，眼在手外的标定文件必须与当前安装位置相符。
 按序列号指定 D435i，避免多台 RealSense 时连接到错误设备。
 
 总入口默认启动真实控制器、MoveIt、D435i 和 Inspire 驱动，不启动 Gazebo；
-如果相机或夹爪驱动已单独运行，分别设置
+如果硬件和 MoveIt 已运行，设置 `start_robot:=false`，且必须确认已加载与相机安装方式
+一致的模型；眼在手外使用 `aubo_i5.xacro` / `aubo_i5.srdf`，避免腕部模型与标定 TF
+同时发布相机光学帧。如果相机或夹爪驱动已单独运行，分别设置
 `start_camera:=false` 或 `start_gripper:=false`，确保话题和服务名称仍与分拣配置一致。
 默认不自动移动到观察位，也不自动开始分拣；验证现场后可显式调用
 `/sorting/move_to_observation` 和 `/sorting/start`。默认速度与加速度比例均为 0.1，
@@ -326,7 +331,8 @@ roslaunch aubo_sorting eye_to_hand_yolo_sorting_real.launch \
 `preplace_height` 和携物横移高度。测量方法和高度关系见
 [`aubo_planning` 的桌面收纳盒说明](../aubo_planning/README.md#真机桌面收纳盒)。
 
-YOLO 须提供对应类别及放置点的 `task_config`。仓库中的 `config/sorting.yaml`
+通用 YOLO 配置须提供对应类别及放置点的 `task_config`；眼在手外 YOLO 实机入口
+已有当前三容器工位的默认配置。仓库中的 `config/sorting.yaml`
 和 `config/yolo_sorting.yaml` 是仿真尺寸与放置点示例。
 实机运动前必须用实际桌高、工作区、物体尺寸、放置点和相机外参校准
 `task_config`、`perception_config`，并检查规划轨迹。总入口固定使用 Inspire 夹爪
@@ -341,4 +347,81 @@ roslaunch aubo_sorting sorting.launch gripper_backend:=inspire \
 
 真实相机必须发布已经对齐到彩色图的深度图；可用 `camera_namespace` 指定相机话题前缀。
 眼在手外若只启动算法节点，需先自行启动标定 TF 和相机驱动，再使用
-`sorting.launch camera_mount:=eye_to_hand camera_namespace:=/workspace_camera`。
+`sorting.launch camera_mount:=eye_to_hand camera_namespace:=/camera`。
+
+### 原实机工位：三类容器分拣
+
+本工位提供两个入口：
+
+| 入口 | 默认任务方式 |
+| --- | --- |
+| `eye_to_hand_can_sorting_real.launch` | 按 `bottle → can → box` 顺序各处理一个 |
+| `eye_to_hand_yolo_sorting_real.launch` | 连续分拣多个实例，同一类别可以有多个物体 |
+
+连续分拣启动：
+
+```bash
+roslaunch aubo_sorting eye_to_hand_yolo_sorting_real.launch
+rosservice call /sorting/move_to_observation '{}'
+# 等待 /sorting/state 为 READY 后：
+rosservice call /sorting/start '{}'
+```
+
+该入口共享 `eye_to_hand_can_real.yaml` 中的实机抓放参数，并叠加
+[`eye_to_hand_continuous_real.yaml`](config/eye_to_hand_continuous_real.yaml) 的实例队列参数。
+稳定确认使用 `target_cache_min_observations: 8`；每个实例独立编号、跟踪和领取。
+按类别优先级选取当前就绪目标，缺少 bottle 时可处理已经就绪的 can/box，
+不会因某个类别缺失而要求每类必须抓一个。
+可靠实例存在时继续领取；缺少实例才返回 `real_observe` 重建观测。
+只有在观察位收到至少 5 帧、持续 2 秒的有效空检测，才结束本轮并返回 `real_observe`。
+有效空检测指抓取区域内没有待处理实例，不要求容器中已经放下的物体消失。
+检测失联、无效深度或抓放失败会报错，不作为分拣完成的依据。
+
+连续配置的 `queue_place_exclusion_radius: 0.18` 覆盖当前容器的外轮廓及约 2 cm 余量，
+降低已放置物体重新入队的可能；源物体应位于这些放置排除区之外。
+`queue_reserved_max_age: 120` 仅给已经领取的目标保留低速预抓取期间的遮挡余量，
+新目标仍受 10 秒观测时效限制，下降前仍检查有效检测流新鲜度及目标已观测位移。
+默认仍等待服务触发运动。各类物体共用对应容器中心放置点，未增加自动堆叠或箱内摆放规划。
+
+`eye_to_hand_can_sorting_real.launch` 使用原实机桌面、固定相机、Inspire 夹爪，
+按 `bottle → can → box` 顺序各抓放一个，结束后回到 `real_observe`。
+文件名保留先前单罐测试入口，当前类别列表由任务 YAML 设置。
+该观察姿态来自 2026-10-30 的实机关节反馈，
+已写入固定平台的两份 SRDF；默认不自动运动。桌面和相机支架在任务未启动时也加入
+规划场景，任务更新桌面时保留支架和容器。支架默认加载
+`aubo_planning/config/camera_stand_reference.yaml`，可用 `camera_stand_config` 覆盖。
+三个容器的放置点、外尺寸、底面高度、壁厚和最低放置 TCP 高度统一保存在
+[`sorting_containers_real.yaml`](../aubo_planning/config/sorting_containers_real.yaml)。
+任务与碰撞发布器加载同一个文件；修改放置点也会移动对应容器。
+
+```bash
+roslaunch aubo_sorting eye_to_hand_can_sorting_real.launch \
+  containers_config:=$(rospack find aubo_planning)/config/sorting_containers_real.yaml \
+  camera_stand_config:=$(rospack find aubo_planning)/config/camera_stand_reference.yaml
+rosservice call /sorting/move_to_observation '{}'
+# 等待 /sorting/state 为 READY 后：
+rosservice call /sorting/start '{}'
+```
+
+上面的支架文件是原工位参考包络，换工位应传入实测文件。桌面顶高为 `0.00285 m`，
+XY 中心 `[-0.0442,-0.6707]`，物理尺寸 `0.74 × 0.93 × 0.20 m`，
+XY 碰撞余量 `0.02 m`；当前平躺 can 的物高（直径）配置为 `0.065 m`。
+当前 `place_x/place_y` 命令行参数已由容器 YAML 替代。
+三个容器中心分别为 bottle `[-0.40,-0.18]`、can `[-0.42,-0.3375]`、
+box `[-0.42,-0.5425]`（米，`base_link`）。容器采用底板加四面侧壁，顶部开放；
+外尺寸分别为 `[0.27,0.15,0.18]`、`[0.20,0.165,0.16]`、`[0.20,0.245,0.16]`。
+容器底面放在 `Z=0.00285 m` 的桌面，壁厚、底厚暂按 `0.005 m`。
+
+容器 YAML 的 `minimum_place_z: 0.18` 是 `target_frame` 下的绝对 TCP Z 下限，
+本工位 `target_frame=base_link`。放置高度取
+`max(table_z + 物高/2 + grasp_height_offset + place_clearance, minimum_place_z)`。
+它不改变抓取高度；预放置/退离 TCP 高度必须大于实际放置高度，否则在抓取前报配置错误。
+该值描述 TCP，不是物体底面或箱底。
+当前瓶子、物盒尚未分别测量物高，感知中的 `class_heights` 仍需按实际摆放姿态设置；
+缺省类别会沿用 `object_height=0.065 m`。容器配置完成不代表三类物体均已实机验证。
+复用已运行的节点时，按实际情况追加 `start_robot:=false start_camera:=false
+start_gripper:=false start_perception:=false rviz:=false`；只看识别和场景可设置
+`start_task:=false`。停止使用 `/sorting/stop`。
+
+本轮观察位采集、TF 冲突处理与实机验证见
+[`AUBO眼在手外单罐实机分拣测试`](../../docs/AUBO眼在手外单罐实机分拣测试.md)。

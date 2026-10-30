@@ -34,6 +34,7 @@ include_directories(${catkin_INCLUDE_DIRS})
 
 catkin_install_python(PROGRAMS scripts/publish_camera_stand.py
   scripts/publish_sorting_box.py
+  scripts/publish_sorting_containers.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

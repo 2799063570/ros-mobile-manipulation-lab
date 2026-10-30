@@ -10,6 +10,8 @@
   <arg name="trajectory_audit_step" default="0.02"/>
   <!-- 固定 AUBO i5 + RealSense D435i 实机分拣总入口；不会启动 Gazebo。 -->
   <arg name="robot_ip" default="192.168.1.2"/>
+  <!-- Reuse an already running real hardware/MoveIt session. -->
+  <arg name="start_robot" default="true"/>
   <arg name="camera_serial_no" default=""/>
   <arg name="start_camera" default="true"/>
   <arg name="calibration_file" default="$(find aubo_ros_control)/config/aubo_realsense_handeye_eye_on_base.yaml"/>
@@ -28,7 +30,8 @@
   <arg name="yolo_config" default="$(find aubo_perception)/config/ultralytics_yolo.yaml"/>
   <arg name="python" default="/home/zlab/anaconda3/envs/yolo/bin/python"/>
   <arg name="model_path" default="/home/zlab/deepL/code/ultralytics-main-modify/weights/GC-yolo.pt"/>
-  <arg name="camera_namespace" default="$(eval '/camera' if arg('camera_mount') == 'eye_in_hand' else '/workspace_camera')"/>
+  <!-- The supplied real calibration names camera_color_optical_frame. -->
+  <arg name="camera_namespace" default="/camera"/>
   <arg name="robot_xacro" value="$(eval {'eye_in_hand': 'aubo_i5_with_camera.xacro', 'eye_to_hand': 'aubo_i5.xacro'}[arg('camera_mount')])"/>
   <arg name="robot_srdf" value="$(eval {'eye_in_hand': 'aubo_i5_with_camera.srdf', 'eye_to_hand': 'aubo_i5.srdf'}[arg('camera_mount')])"/>
   <arg name="height_mode" default="table"/>
@@ -45,14 +48,17 @@
   <arg name="velocity_scaling" default="0.10"/>
   <arg name="acceleration_scaling" default="0.10"/>
 
-  <include file="$(find aubo_ros_control)/launch/aubo_real_bringup.launch">
+  <include if="$(arg start_robot)" file="$(find aubo_ros_control)/launch/aubo_real_bringup.launch">
     <arg name="robot_ip" value="$(arg robot_ip)"/>
     <arg name="use_rviz" value="$(arg rviz)"/>
     <arg name="rviz_config" value="$(arg rviz_config)"/>
     <arg name="robot_xacro" value="$(arg robot_xacro)"/>
     <arg name="robot_srdf" value="$(arg robot_srdf)"/>
-    <arg name="publish_sorting_box" value="$(arg publish_sorting_box)"/>
-    <arg name="sorting_box_config" value="$(arg sorting_box_config)"/>
+  </include>
+
+  <!-- Scene geometry must also load when reusing an existing MoveIt session. -->
+  <include if="$(arg publish_sorting_box)" file="$(find aubo_planning)/launch/publish_sorting_box.launch">
+    <arg name="config" value="$(arg sorting_box_config)"/>
   </include>
 
   <!-- D435i 的 RGB + 对齐深度话题供两种检测器共用；IMU 不参与分拣。 -->

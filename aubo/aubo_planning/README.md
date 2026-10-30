@@ -1,5 +1,19 @@
 # AUBO Planning
 
+三类实机放置容器配置见
+[`config/sorting_containers_real.yaml`](config/sorting_containers_real.yaml)。
+该文件中的 `place_targets` 同时提供分拣目的地和容器中心，`containers` 提供外尺寸，
+`bottom_z` 是外侧底面高度。`minimum_place_z` 是任务目标坐标系下的最低放置 TCP Z。
+独立发布碰撞场景可运行：
+
+```bash
+roslaunch aubo_planning publish_sorting_containers.launch
+```
+
+需要已有 MoveIt `/apply_planning_scene` 服务；发布后从 `/get_planning_scene` 核对每个容器
+有底板和四面侧壁，再将 `/publish_sorting_containers/ready` 置为 true。
+配置长度单位为米、坐标为容器中心；当前壁厚和底厚暂定 5 mm。
+
 该包提供 AUBO i5 + 双指夹爪的 MoveIt 1 C++ 接口示例：
 
 - `gripper_control_demo`：按 MoveIt 命名状态执行夹爪打开、闭合或循环动作。

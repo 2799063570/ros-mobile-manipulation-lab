@@ -16,9 +16,12 @@
   <arg name="trajectory_preload_points" default="$(eval int(arg('mac_buffer_target')) // 6)"/>
   <!-- Use SDK pushed feedback so the 50 Hz state loop only performs safety diagnosis. -->
   <arg name="use_realtime_feedback" default="true"/>
-  <!-- Optional motion trace capture. The timestamped bag is written under /tmp. -->
+  <!-- Optional motion trace capture. Persist across reboots in the user's home. -->
   <arg name="record_motion" default="false"/>
-  <arg name="motion_bag_prefix" default="/tmp/aubo_motion"/>
+  <!-- Bound stale feedback and queued command latency; faults require restart. -->
+  <arg name="feedback_timeout" default="0.2"/>
+  <arg name="max_command_queue_duration" default="1.0"/>
+  <arg name="motion_bag_prefix" default="$(env HOME)/aubo_motion"/>
   <!-- Bounded in-memory command/RPC trace; written only on orderly shutdown. -->
   <arg name="motion_trace_prefix" default="$(arg motion_bag_prefix)_hardware_$(anon capture)"/>
   <arg name="motion_trace_capacity" default="120000"/>
@@ -40,6 +43,8 @@
     <arg name="mac_buffer_target" value="$(arg mac_buffer_target)"/>
     <arg name="trajectory_preload_points" value="$(arg trajectory_preload_points)"/>
     <arg name="use_realtime_feedback" value="$(arg use_realtime_feedback)"/>
+    <arg name="feedback_timeout" value="$(arg feedback_timeout)"/>
+    <arg name="max_command_queue_duration" value="$(arg max_command_queue_duration)"/>
     <arg name="motion_trace_prefix" value="$(eval arg('motion_trace_prefix') if arg('record_motion') else '')"/>
     <arg name="motion_trace_capacity" value="$(arg motion_trace_capacity)"/>
   </include>

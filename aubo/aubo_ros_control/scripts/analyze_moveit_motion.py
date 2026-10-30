@@ -136,6 +136,7 @@ def analyze(path, path_tolerance):
     goals = []
     results = []
     move_group_goals = []
+    planning_requests = []
     execute_goals = []
     handeye_status = []
     with rosbag.Bag(str(path)) as bag:
@@ -159,6 +160,14 @@ def analyze(path, path_tolerance):
                 results.append(msg)
             elif topic == MOVE_GROUP_GOAL_TOPIC:
                 move_group_goals.append(msg)
+                request = msg.goal.request
+                planning_requests.append({
+                    "goal_id": msg.goal_id.id,
+                    "time_ros_s": stamp.to_sec(),
+                    "group_name": request.group_name,
+                    "requested_velocity_scaling": request.max_velocity_scaling_factor,
+                    "requested_acceleration_scaling": request.max_acceleration_scaling_factor,
+                })
             elif topic == EXECUTE_GOAL_TOPIC:
                 execute_goals.append(msg)
             elif topic == ROSOUT_TOPIC and msg.name == "/handeye_yolo_verify":
@@ -175,6 +184,8 @@ def analyze(path, path_tolerance):
         "motion_entrypoints": {
             "move_group_goal_count": len(move_group_goals),
             "move_group_goal_ids": [goal.goal_id.id for goal in move_group_goals],
+            # Use recorded requests, never infer runtime values from RViz defaults.
+            "move_group_requests": planning_requests,
             "execute_trajectory_goal_count": len(execute_goals),
             "handeye_yolo_verify_status": handeye_status,
         },
@@ -188,6 +199,10 @@ def analyze(path, path_tolerance):
                    for v in all_values]
         mac_min = [value for value in mac_min if value >= 0]
         report["hardware_flow"] = {
+            "trajectory_execution_modes": sorted({v.get("trajectory_execution_mode", "jtc") for v in all_values}),
+            "controller_state_time_bases": sorted({v["controller_state_time_basis"] for v in all_values if v.get("controller_state_time_basis")}),
+            "jtc_queue_target_points": numeric(all_values[-1], "jtc_queue_target_points", -1),
+            "jtc_backpressure_waits_total": get_max("jtc_backpressure_waits_total"),
             "mac_target_points": numeric(all_values[-1], "mac_target_points"),
             "mac_target_coverage_ms": numeric(all_values[-1], "mac_target_coverage_ms", -1.0),
             "observed_min_active_mac_points": min(mac_min) / 6.0 if mac_min else None,
@@ -200,6 +215,17 @@ def analyze(path, path_tolerance):
                 [numeric(v, "queue_window_max_nominal_horizon_ms",
                          numeric(v, "queue_window_max_points") * 5.0)
                  for v in all_values] or [0.0]), 3),
+            "max_oldest_queued_command_age_ms": get_max("queue_oldest_command_age_ms"),
+            "command_queue_duration_limit_ms": numeric(all_values[-1], "max_command_queue_duration_ms", -1),
+            "command_queue_limit_exceeded": any(v.get("command_queue_limit_exceeded") == "true" for v in all_values),
+            "feedback_sources": sorted({v["feedback_source"] for v in all_values if v.get("feedback_source")}),
+            "feedback_max_sample_age_ms": get_max("feedback_sample_age_ms"),
+            "feedback_ignored_push_samples_total": get_max("feedback_ignored_push_samples_total"),
+            "feedback_query_failures_total": get_max("feedback_query_failures_total"),
+            "feedback_query_max_ms": get_max("feedback_query_max_ms"),
+            "feedback_timeout_latched": any(v.get("feedback_timeout_latched") == "true" for v in all_values),
+            "slow_mac_query_samples_over_50ms": int(get_sum("mac_slow_query_samples_over_50ms")),
+            "mac_query_exceeded_reported_coverage_samples": int(get_sum("mac_query_exceeded_reported_coverage_samples")),
             "max_mac_query_ms": round(get_max("diagnosis_max_ms"), 3),
             "max_sdk_send_ms": round(get_max("send_max_ms"), 3),
             "max_feed_loop_ms": round(get_max("feed_loop_max_ms"), 3),
@@ -306,6 +332,15 @@ def analyze(path, path_tolerance):
     if hw is None:
         findings.append("缺少硬件流量诊断话题；该 bag 不是由带新诊断的硬件节点录制。")
     else:
+        if "precomputed" in hw["trajectory_execution_modes"]:
+            # Historical bags only: the executable now supports JTC exclusively.
+            findings.append("本次为预生成轨迹模式；controller/state 的目标相位由 MAC 水位估计，不能把其误差数值直接与 JTC 墙钟目标误差比较，也不能当作振动幅度。")
+        if hw["feedback_timeout_latched"]:
+            findings.append("有效关节反馈超时，已锁定停流；旧推送和迟到查询回复不刷新采样年龄。")
+        if hw["command_queue_limit_exceeded"]:
+            findings.append("待发指令时长或实际等待年龄超过上限，已锁定停流，禁止丢点追赶。")
+        if "query_latched" in hw["feedback_sources"]:
+            findings.append("独立路点查询已接管反馈，随后推送不再覆盖查询状态；检查查询耗时和采样年龄。")
         if hw["tcp_retransmissions_in_capture"]:
             findings.append("机械臂 SDK 连接出现 TCP 重传；对照慢 RPC 时刻检查链路，柜端发送的重传仍需抓包确认。")
         if hw["mac_data_interrupt_warning_samples"]:

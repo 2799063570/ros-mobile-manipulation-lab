@@ -30,11 +30,12 @@ public:
   };
   struct Rpc
   {
-    bool send{false};
+    enum class Kind { MacQuery, Send, FeedbackQuery };
+    Kind kind{Kind::MacQuery};
     std::uint64_t id{0}, first_point_id{0}, ros_ns{0};
     std::int64_t begin_ns{0}, end_ns{0};
     int count{0}, mac_scalars{-1}, result{0};
-    std::uint16_t port_hint{0}; // New socket observed during MAC ServiceInterface login.
+    std::uint16_t port_hint{0}; // New socket observed during the corresponding SDK login.
     TcpSnapshot before{}, after{};
   };
   explicit HardwareMotionTrace(const std::string& prefix, std::size_t capacity)
@@ -93,7 +94,9 @@ public:
         for (std::size_t j = 0; j < std::max<std::size_t>(1, tcp.detail_count); ++j)
         {
           const auto socket = j < tcp.detail_count ? tcp.sockets[j] : visual_servo_internal::SdkTcpTransport::SocketSample{};
-          rpc << (e.send ? "send" : "query") << ',' << e.id << ',' << e.first_point_id << ',' << e.ros_ns << ','
+          const char* kind = e.kind == Rpc::Kind::Send ? "send" :
+              (e.kind == Rpc::Kind::FeedbackQuery ? "feedback_query" : "query");
+          rpc << kind << ',' << e.id << ',' << e.first_point_id << ',' << e.ros_ns << ','
               << e.begin_ns << ',' << e.end_ns << ',' << e.count << ',' << e.mac_scalars << ',' << e.result << ',' << e.port_hint << ','
               << (after ? "after" : "before") << ',' << tcp.valid << ',' << socket.fd << ',' << socket.local_port << ','
               << socket.byte_counters_valid << ',' << socket.bytes_sent << ',' << socket.bytes_acked << ',' << socket.bytes_received << ','

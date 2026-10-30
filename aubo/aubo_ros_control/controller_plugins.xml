@@ -1,0 +1,7 @@
+<library path="lib/libaubo_guarded_jtc">
+  <class name="aubo_ros_control/GuardedJointTrajectoryController"
+         type="aubo_ros_control::GuardedJointTrajectoryController"
+         base_class_type="controller_interface::ControllerBase">
+    <description>Quintic JTC with a same-cycle AUBO output latch on execution failure.</description>
+  </class>
+</library>

@@ -1,0 +1,52 @@
+# Fixed-camera real cell; table confirmed unchanged on 2026-10-30.
+# place_targets and minimum_place_z come from sorting_containers_real.yaml.
+planning_group: aubo_i5
+end_effector_link: tcp_link
+target_frame: base_link
+detections_topic: /sorting/detections
+table_frame: base_link
+table_z: 0.00285
+table_center: [-0.0442, -0.6707, -0.09715]
+table_size: [0.74, 0.93, 0.20]
+table_collision_margin: 0.02
+object_height: 0.065
+height_tolerance: 0.02
+grasp_height_offset: 0.01
+grasp_rpy: [3.141592653589793, 0.0, 1.5707963267948966]
+observation_named_target: real_observe
+work_ready_named_target: real_observe
+finish_named_target: real_observe
+auto_move_to_observation: false
+auto_start: false
+# One object of each class in order, then return to real_observe.
+continuous_sorting: false
+sort_classes: [bottle, can, box]
+target_cache_fallback_enabled: false
+detection_samples: 8
+detection_timeout: 15.0
+detection_settle_time: 1.0
+pregrasp_height: 0.20     # 预备抓取高度
+lift_height: 0.25         # 抓紧抬升高度
+lift_min_height: 0.25     # 抬升最低高度
+preplace_height: 0.25     # 放置抬升高度
+place_clearance: 0.02   # table_z + 物体高度 / 2 + grasp_height_offset + place_clearance
+cartesian_step: 0.005
+minimum_cartesian_fraction: 1.0
+pregrasp_wrist1_limit: 1.2
+gripper_backend: inspire
+gripper_open: 0.0
+gripper_closed: 0.22
+inspire_speed: 300
+inspire_force: 100
+inspire_motion_timeout: 5.0
+use_grasp_attachment: false
+use_detected_angle: true
+use_detected_width: false
+grasp_offset_x: 0.0
+grasp_offset_y: 0.0
+planning_time: 12.0
+velocity_scaling: 0.50
+acceleration_scaling: 0.40
+scene_update_timeout: 10.0
+moveit_server_timeout: 30.0
+gripper_server_timeout: 30.0

@@ -50,6 +50,15 @@
         <joint name="wrist2_joint" value="1.5956" />
         <joint name="wrist3_joint" value="0" />
     </group_state>
+    <!-- real_observe: stopped real feedback, 2026-10-30; units rad. -->
+    <group_state name="real_observe" group="aubo_i5">
+        <joint name="shoulder_joint" value="1.067721366882" />
+        <joint name="upperArm_joint" value="-0.941510260105" />
+        <joint name="foreArm_joint" value="-2.496562957764" />
+        <joint name="wrist1_joint" value="0.026582198218" />
+        <joint name="wrist2_joint" value="-1.634069800377" />
+        <joint name="wrist3_joint" value="-2.071427106857" />
+    </group_state>
     <group_state name="observe" group="aubo_i5">
         <joint name="foreArm_joint" value="0.06780" />
         <joint name="shoulder_joint" value="0.08648" />

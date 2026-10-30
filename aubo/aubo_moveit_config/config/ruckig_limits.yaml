@@ -1,14 +1,16 @@
-# Jerk limits for MoveIt's Ruckig trajectory smoother, in rad/s^3.
+# Jerk limits for Ruckig and the final executed-spline adapter, in rad/s^3.
+# Keep RViz velocity/acceleration at 0.5/0.4; soften acceleration transitions
+# independently. The five 2026-10-28 paths cost about 0.08 s each at these limits.
 ruckig:
   shoulder_joint:
-    jerk_limit: 2.0
+    jerk_limit: 1.0
   upperArm_joint:
-    jerk_limit: 2.0
+    jerk_limit: 1.0
   foreArm_joint:
-    jerk_limit: 2.0
+    jerk_limit: 1.0
   wrist1_joint:
-    jerk_limit: 2.5
+    jerk_limit: 1.25
   wrist2_joint:
-    jerk_limit: 2.5
+    jerk_limit: 1.25
   wrist3_joint:
-    jerk_limit: 2.5
+    jerk_limit: 1.25
