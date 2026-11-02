@@ -3,9 +3,12 @@
   <!-- Real cell: one YAML owns category destinations and container geometry. -->
   <arg name="containers_config" default="$(find aubo_planning)/config/sorting_containers_real.yaml"/>
   <arg name="camera_stand_config" default="$(find aubo_planning)/config/camera_stand_reference.yaml"/>
-  <arg name="continuous_sorting" default="false"/>
+  <!-- Dispatch ready instances in queue order; categories only filter eligibility. -->
+  <arg name="continuous_sorting" default="true"/>
   <arg name="queue_config" default="$(find aubo_sorting)/config/eye_to_hand_continuous_real.yaml"/>
   <arg name="task_config" default="$(find aubo_sorting)/config/eye_to_hand_can_real.yaml"/>
+  <!-- Empty follows task_config; explicit value can select a validated named pose. -->
+  <arg name="observation_named_target" default=""/>
   <arg name="perception_config" default="$(find aubo_sorting)/config/eye_to_hand_can_perception_real.yaml"/>
   <arg name="start_robot" default="true"/>
   <arg name="start_camera" default="true"/>
@@ -13,6 +16,7 @@
   <arg name="start_perception" default="true"/>
   <arg name="start_task" default="true"/>
   <arg name="rviz" default="true"/>
+  <arg name="rqt" default="false"/>
   <arg name="gripper_port" default="/dev/serial/by-id/usb-1a86_USB_Serial-if00-port0"/>
   <arg name="object_height" default="0.065"/>
   <arg name="velocity_scaling" default="0.10"/>
@@ -44,6 +48,7 @@
   <!-- Applied after the base task YAML; all parameters load before nodes start. -->
   <rosparam if="$(arg continuous_sorting)" command="load" file="$(arg queue_config)" ns="/color_sorting_task"/>
   <param name="/color_sorting_task/continuous_sorting" value="$(arg continuous_sorting)"/>
+  <param if="$(eval arg('observation_named_target') != '')" name="/color_sorting_task/observation_named_target" value="$(arg observation_named_target)"/>
   <include file="$(find aubo_planning)/launch/publish_sorting_containers.launch">
     <arg name="config" value="$(arg containers_config)"/>
   </include>
@@ -60,4 +65,5 @@
       - {name: table, size: [0.78, 0.97, 0.20], center: [-0.0442, -0.6707, -0.09715]}
     </rosparam>
   </node>
+  <include if="$(arg rqt)" file="$(find aubo_sorting_rqt)/launch/sorting_panel.launch"/>
 </launch>

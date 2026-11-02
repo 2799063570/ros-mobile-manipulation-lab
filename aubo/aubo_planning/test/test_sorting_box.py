@@ -60,6 +60,7 @@ class SortingBoxTest(unittest.TestCase):
 
             def __init__(self):
                 self.header = NS(frame_id='')
+                self.pose = pose()
                 self.primitives, self.primitive_poses = [], []
 
         class SolidPrimitive:

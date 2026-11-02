@@ -49,6 +49,7 @@ def make_collision_object(frame_id, object_id, parts):
     if not isinstance(frame_id, str) or not frame_id or not isinstance(object_id, str) or not object_id:
         raise ValueError('frame_id and object_id must be nonempty strings')
     collision = CollisionObject()
+    collision.pose.orientation.w = 1.0
     collision.header.frame_id = frame_id
     collision.id = object_id
     collision.operation = CollisionObject.ADD

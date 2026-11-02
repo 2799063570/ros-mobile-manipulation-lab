@@ -1,17 +1,15 @@
 """Check the real launch graph without connecting to hardware."""
-from pathlib import Path
 import unittest
 
 import roslaunch
-
-
-ROOT = Path(__file__).resolve().parents[1]
+import roslaunch.rlutil
 
 
 def resolve(name='sorting_real.launch', *args):
+    path = roslaunch.rlutil.resolve_launch_arguments(['aubo_sorting', name])[0]
     config = roslaunch.config.ROSLaunchConfig()
     roslaunch.xmlloader.XmlLoader().load(
-        str(ROOT / 'launch' / name), config,
+        path, config,
         argv=list(args), verbose=False)
     return config
 
@@ -22,11 +20,15 @@ class RealLaunchTest(unittest.TestCase):
         params = {key: value.value for key, value in config.params.items()}
         self.assertTrue(params['/color_sorting_task/continuous_sorting'])
         self.assertEqual(params['/color_sorting_task/sort_classes'], ['bottle', 'can', 'box'])
-        self.assertEqual(params['/color_sorting_task/observation_named_target'], 'real_observe')
+        self.assertEqual(params['/color_sorting_task/observation_named_target'], 'real_sort_ready')
+        self.assertEqual(params['/color_sorting_task/work_ready_named_target'], 'real_sort_ready')
         self.assertEqual(params['/color_sorting_task/finish_named_target'], 'real_observe')
         self.assertEqual(params['/color_sorting_task/table_center'], [-.0442, -.6707, -.09715])
         self.assertEqual(params['/color_sorting_task/minimum_place_z'], .18)
         self.assertEqual(params['/grasp_geometry/height_mode'], 'depth')
+        self.assertEqual(params['/grasp_geometry/object_height_source'], 'depth')
+        self.assertEqual(params['/grasp_geometry/minimum_object_height'], .005)
+        self.assertEqual(params['/grasp_geometry/maximum_object_height'], .30)
         self.assertEqual(params['/color_sorting_task/target_cache_min_observations'], 8)
         self.assertEqual(params['/color_sorting_task/queue_empty_min_frames'], 5)
         self.assertEqual(params['/color_sorting_task/queue_empty_confirmation'], 2.)
@@ -64,6 +66,16 @@ class RealLaunchTest(unittest.TestCase):
         self.assertEqual(params['/publish_camera_stand/object_id'], 'camera_stand')
         self.assertEqual(len(params['/publish_camera_stand/parts']), 4)
         self.assertFalse(params['/color_sorting_task/auto_start'])
+        self.assertFalse(params['/color_sorting_task/auto_move_to_observation'])
+        self.assertTrue(params['/color_sorting_task/continuous_sorting'])
+        self.assertEqual(params['/color_sorting_task/target_cache_min_observations'], 8)
+        self.assertEqual(params['/color_sorting_task/queue_empty_min_frames'], 5)
+        self.assertEqual(params['/color_sorting_task/queue_reserved_max_age'], 120.)
+        self.assertEqual(params['/color_sorting_task/minimum_gripper_height'], .06)
+        self.assertEqual(params['/color_sorting_task/inspire_open_tolerance'], 5)
+        self.assertEqual(params['/color_sorting_task/queue_tf_wait_timeout'], .15)
+        self.assertLessEqual(params['/color_sorting_task/queue_tf_wait_timeout'],
+                             params['/color_sorting_task/queue_frame_max_age'])
 
     def test_real_can_reuses_hardware_and_keeps_observation_and_obstacles(self):
         config = resolve('eye_to_hand_can_sorting_real.launch',
@@ -73,7 +85,7 @@ class RealLaunchTest(unittest.TestCase):
         self.assertFalse(any(node.type in ('aubo_hw_node', 'move_group', 'robot_state_publisher')
                              for node in config.nodes))
         self.assertEqual(params['/grasp_geometry/camera_info_topic'], '/camera/color/camera_info')
-        self.assertEqual(params['/color_sorting_task/observation_named_target'], 'real_observe')
+        self.assertEqual(params['/color_sorting_task/observation_named_target'], 'real_sort_ready')
         self.assertEqual(params['/color_sorting_task/finish_named_target'], 'real_observe')
         self.assertEqual(params['/color_sorting_task/place_targets/can'], [-.42, -.3375])
         self.assertEqual(params['/color_sorting_task/sort_classes'], ['bottle', 'can', 'box'])
@@ -82,7 +94,7 @@ class RealLaunchTest(unittest.TestCase):
             self.assertEqual(params['/color_sorting_task/place_targets/'+category],
                              params['/publish_sorting_containers/place_targets/'+category])
         self.assertTrue(any(node.type == 'publish_sorting_containers.py' for node in config.nodes))
-        self.assertFalse(params['/color_sorting_task/continuous_sorting'])
+        self.assertTrue(params['/color_sorting_task/continuous_sorting'])
         self.assertEqual(params['/color_sorting_task/minimum_cartesian_fraction'], 1.0)
         self.assertEqual(params['/real_sorting_table/object_id'], 'sorting_table')
         self.assertEqual(len(params['/publish_camera_stand/parts']), 4)
@@ -94,6 +106,25 @@ class RealLaunchTest(unittest.TestCase):
         for actual, expected in zip(table['size'], [size[0]+2*margin, size[1]+2*margin, size[2]]):
             self.assertAlmostEqual(actual, expected)
         self.assertAlmostEqual(center[2]+size[2]/2, params['/color_sorting_task/table_z'])
+
+    def test_real_cell_can_start_rqt_without_enabling_automatic_motion(self):
+        config = resolve('eye_to_hand_can_sorting_real.launch', 'rqt:=true',
+                         'start_robot:=false', 'start_camera:=false', 'start_gripper:=false')
+        self.assertTrue(any(node.package == 'aubo_sorting_rqt' and node.type == 'sorting_panel'
+                            for node in config.nodes))
+        params = {key: value.value for key, value in config.params.items()}
+        self.assertFalse(params['/color_sorting_task/auto_start'])
+        self.assertFalse(params['/color_sorting_task/auto_move_to_observation'])
+
+    def test_observation_override_keeps_the_measured_finish_pose_and_explicit_start(self):
+        for launch in ('eye_to_hand_can_sorting_real.launch', 'eye_to_hand_yolo_sorting_real.launch'):
+            with self.subTest(launch=launch):
+                config = resolve(launch, 'observation_named_target:=real_observe', 'rviz:=false')
+                params = {key: value.value for key, value in config.params.items()}
+                self.assertEqual(params['/color_sorting_task/observation_named_target'], 'real_observe')
+                self.assertEqual(params['/color_sorting_task/finish_named_target'], 'real_observe')
+                self.assertFalse(params['/color_sorting_task/auto_start'])
+                self.assertFalse(params['/color_sorting_task/auto_move_to_observation'])
 
     def test_sorting_box_is_optional_and_passes_through_yolo_entry(self):
         default = resolve('sorting_real.launch', 'rviz:=false')

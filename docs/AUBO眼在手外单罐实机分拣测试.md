@@ -4,8 +4,10 @@
 
 本文的单罐抓放结果保留为历史实测。当前入口已更新为三类容器配置，
 新位置与最低放置高度见文末；原临时放置点不再是当前启动默认值。
-`eye_to_hand_can_sorting_real.launch` 默认各类处理一个，
-`eye_to_hand_yolo_sorting_real.launch` 共享该工位并默认连续处理多个实例。
+`eye_to_hand_can_sorting_real.launch` 和 `eye_to_hand_yolo_sorting_real.launch` 当前均从允许类别的实例队列连续领取目标。
+2026-11-02 起，工作观察/准备位改为离线检查的 `real_sort_ready`，结束收臂仍为历史实测的 `real_observe`。
+新工作观察位尚未实机执行验证，详见[工作观察位说明](../aubo/aubo_sorting/docs/实机工作观察位.md)。
+以下单罐实测记录中的观察位均指当时的 `real_observe`。
 
 ## 观察位置
 
@@ -25,7 +27,7 @@
 本轮图像中机械臂未遮挡桌面 can。关节值已加入
 `aubo_i5.srdf` 和 `aubo_i5_with_camera.srdf`；原始采样信息保存在
 [`real_observe_capture.json`](../aubo/aubo_sorting/config/real_observe_capture.json)。
-分拣观察、工作准备及结束姿态均选择 `real_observe`。
+当时的分拣观察、工作准备及结束姿态均选择 `real_observe`。
 
 ## 工位与规划场景
 
@@ -155,7 +157,7 @@ place_z = max(table_z + object_height/2 + grasp_height_offset + place_clearance,
 ## 连续多物体入口
 
 运行 `roslaunch aubo_sorting eye_to_hand_yolo_sorting_real.launch` 可使用同一工位的连续模式。
-该入口通过已有实机入口加载桌面、相机支架和三容器，观察及结束姿态均为 `real_observe`，
+该入口通过已有实机入口加载桌面、相机支架和三容器，工作观察位当前为 `real_sort_ready`，结束姿态为 `real_observe`，
 最低放置 TCP Z 仍为 `0.18 m`。运动仍由观察服务与开始服务触发。
 类别和抓放参数复用 `eye_to_hand_can_real.yaml`；连续实例参数单独保存在
 `aubo_sorting/config/eye_to_hand_continuous_real.yaml`。

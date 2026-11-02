@@ -5,15 +5,17 @@ import unittest
 import xml.etree.ElementTree as ET
 
 import roslaunch
+import roslaunch.rlutil
 
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def resolve(name, args=()):
+    path = roslaunch.rlutil.resolve_launch_arguments(['aubo_sorting', name])[0]
     config = roslaunch.config.ROSLaunchConfig()
     roslaunch.xmlloader.XmlLoader().load(
-        str(ROOT / 'launch' / name), config, argv=list(args), verbose=False)
+        path, config, argv=list(args), verbose=False)
     return config
 
 
@@ -36,6 +38,7 @@ class GazeboLaunchTest(unittest.TestCase):
                     self.assertEqual(params['/grasp_geometry/camera_info_topic'],
                                      f'/{camera}/color/camera_info')
                     self.assertEqual(params['/color_sorting_task/sort_classes'], classes)
+                    self.assertEqual(params['/color_sorting_task/minimum_gripper_height'], 0.)
                     self.assertEqual(params['/grasp_geometry/object_height'], height)
 
     def test_four_moveit_sorting_modes_connect_camera_and_world(self):

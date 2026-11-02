@@ -175,7 +175,9 @@ roslaunch aubo_perception grasp_perception.launch detector:=yolo \
 | `task_mode=servo` | 必须设置 selected_class；仅发布该类别最高置信度有效目标 |
 | `task_mode=both` | 同时发布上述两种输出，仍须指定 selected_class |
 | `height_mode=table` | 相机射线与“桌高 + 物高”的顶面求交，中心 Z=桌高+半物高；分拣不需要深度 |
-| `height_mode=depth` | 对齐深度反投影、TF 转到基座，校验顶面 Z≈桌高+物高，再减半物高作为中心 Z |
+| `height_mode=depth` | 对齐深度反投影、TF 转到基座，按 object_height_source 选择物高来源并计算中心 Z |
+| `object_height_source=configured` | 默认保持已知物高校验：顶面 Z≈桌高+类别物高，误差不超过 height_tolerance |
+| `object_height_source=depth` | 要求 height_mode=depth；逐物体估计物高=顶面 Z−桌高，中心 Z=桌高+物高/2 |
 | `camera_mount=eye_in_hand` | 默认 `/camera` 话题；需要腕部到相机的外参和采集时刻的机械臂 TF |
 | `camera_mount=eye_to_hand` | 默认 `/workspace_camera` 话题；需要基座到固定相机的外参 |
 
@@ -184,6 +186,14 @@ roslaunch aubo_perception grasp_perception.launch detector:=yolo \
 `depth_topic`、`camera_info_topic` 覆盖话题。配置 `grasp_pipeline.yaml` 中的工作区、
 `height_tolerance`、`class_heights`、`class_aliases`；场景参数 `table_z/object_height/target_frame`
 通过 launch 参数传入。按类别物高与桌高必须在该基座坐标系中有意义。
+
+深度测量物高时，`minimum_object_height/maximum_object_height` 限制可接受测量范围，
+默认 `0.005–0.30 m`，拒绝桌面、负高度及过大的异常返回，不沿用 `class_heights/object_height`
+作固定物高门槛。眼在手外三类实机场景已启用该模式；通用配置默认仍使用已知物高校验。
+物体中心和每个目标的 `object_height` 一起发布，供分拣节点计算该物体的抓放高度。
+该范围独立于任务的 `minimum_gripper_height`：后者限制 TCP 下降终点，实机默认离桌 6 cm。
+工作区 XY 排除先于物高校验，已确认在工作区外的检测不会污染该工作区的有效观测。
+工作区内无法通过高度或深度校验的目标仍使观测无效，不会被当成空桌面。
 
 伺服始终需要深度，输出相机光学坐标系中的可见表面点，不套用分拣桌高校验。
 `/visual_servo/target_pose` 保留 RGB 时间戳，另发 `target_label`、`target_confidence`。
@@ -205,8 +215,8 @@ HSV 的置信度是轮廓对旋转框的填充率，不等同于神经网络概�
 | `grasp_width` | 顶面投影得到的米制窄边宽度 |
 | `grasp_angle` | 基座 XY 平面内窄边方向，弧度，按平行夹爪 π 周期归一化 |
 | `grasp_geometry_valid` | OBB/颜色旋转框可用于角度和宽度抓取；普通水平框为 false |
-| `depth_valid` | 深度中心高度已通过桌高+物高校验；table 模式为 false |
-| `object_height` | 此类别的已知物高，用于中心/顶面换算 |
+| `depth_valid` | 深度有效且通过所选物高来源的校验；table 模式为 false |
+| `object_height` | 当前目标的已知或深度测得物高，用于中心/顶面换算 |
 
 图像角度必须先投影到基座再计算 yaw，不能直接当作 TCP 旋转。
 当前假定物体顶面近似水平、夹爪竖直向下；宽度是旋转框投影的估计，斜面、遮挡或框不贴合时

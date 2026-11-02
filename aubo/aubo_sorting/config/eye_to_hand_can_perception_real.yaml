@@ -1,8 +1,11 @@
-# Fixed camera, original table. The current lying can is about 65 mm in diameter.
+# Fixed camera, original table. Each object's height is measured from aligned depth.
 target_frame: base_link
 table_z: 0.00285
-object_height: 0.065
+object_height: 0.065  # Fallback for configured-height mode; depth measurements override it below.
 class_heights: {}
+object_height_source: depth
+minimum_object_height: 0.005  # Reject table/noise; independent of the 6 cm TCP descent floor.
+maximum_object_height: 0.30
 height_tolerance: 0.02
 minimum_probability: 0.60
 minimum_depth: 0.10

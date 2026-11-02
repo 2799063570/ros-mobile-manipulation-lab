@@ -20,8 +20,25 @@ def center_height(surface_z, table_z, object_height, tolerance):
     if not all(math.isfinite(v) for v in values) or object_height <= 0 or tolerance < 0:
         raise ValueError("invalid height parameters")
     if abs(surface_z - table_z - object_height) > tolerance:
-        raise ValueError("depth surface disagrees with table + object height")
+        raise ValueError("depth surface disagrees with table + object height: "
+                         "surface_z={:.5f}, expected_z={:.5f}, table_z={:.5f}, "
+                         "object_height={:.5f}, error={:+.5f}, tolerance={:.5f} m".format(
+                             surface_z, table_z + object_height, table_z, object_height,
+                             surface_z - table_z - object_height, tolerance))
     return surface_z - object_height / 2
+
+
+def object_height_from_depth(surface_z, table_z, minimum_height, maximum_height):
+    """Measure visible surface height above the table, independently of class size."""
+    if (not all(math.isfinite(v) for v in (surface_z, table_z, minimum_height, maximum_height))
+            or not 0 < minimum_height <= maximum_height):
+        raise ValueError("invalid measured object height/bounds")
+    height = surface_z - table_z
+    if height < minimum_height - 1e-9 or height > maximum_height + 1e-9:
+        raise ValueError("measured object height outside bounds: surface_z={:.5f}, table_z={:.5f}, "
+                         "height={:.5f}, allowed=[{:.5f}, {:.5f}] m".format(
+                             surface_z, table_z, height, minimum_height, maximum_height))
+    return min(max(height, minimum_height), maximum_height)
 
 
 def ray_plane(u, v, K, rotation, translation, plane_z):
@@ -56,3 +73,13 @@ def rectangle_grasp(cx, cy, width, height, angle, K, rotation, translation, surf
         edges.append((float(np.linalg.norm(delta[:2])), math.atan2(delta[1], delta[0])))
     narrow, yaw = min(edges, key=lambda e: e[0])
     return narrow, (yaw + math.pi/2) % math.pi - math.pi/2
+
+
+def rectangle_footprint(cx, cy, width, height, angle, K, rotation, translation, surface_z):
+    """Project all four OBB corners into the same world frame as the grasp pose."""
+    if not all(math.isfinite(v) for v in (cx, cy, width, height, angle)) or min(width, height) <= 0:
+        raise ValueError('invalid footprint rectangle')
+    c, s = math.cos(angle), math.sin(angle)
+    return [ray_plane(cx+c*dx-s*dy, cy+s*dx+c*dy, K, rotation, translation, surface_z)
+            for dx, dy in ((-width/2, -height/2), (width/2, -height/2),
+                           (width/2, height/2), (-width/2, height/2))]

@@ -8,6 +8,7 @@
 #include <set>
 #include <string>
 #include <vector>
+#include <aubo_sorting_core/footprint.hpp>
 
 namespace aubo_sorting_core
 {
@@ -23,6 +24,8 @@ public:
   {
     std::string category;
     double x{0}, y{0}, z{0};
+    double confidence{0};
+    Footprint footprint;
     bool eligible{true};
     Payload payload;
   };
@@ -33,13 +36,14 @@ public:
     Sample sample;
     Status status{Status::CANDIDATE};
     unsigned observations{0};
-    double last_seen{0}, changed_at{0};
+    double last_seen{0}, changed_at{0}, sampled_at{0};
     bool disturbed{false};
     double disturbance_distance{0};
     std::string disturbance_category;
   };
   // 距离单位为米：关联半径、稳定确认半径、预留目标容差、同帧去重半径。
   double match_distance{0.04}, stable_distance{0.015}, reserved_distance{0.035}, duplicate_distance{0.008};
+  double merge_distance{0.02}, merge_overlap{0.5};
   // 时间单位为秒：可分配观测时效、连续确认间隔、轨迹保留期、完成后屏蔽期。
   double max_age{3.0}, confirmation_gap{1.0}, retention{30.0}, done_hold{2.0};
   // 达到确认帧数才可分配；容量限制防止轨迹无限增长。
@@ -58,6 +62,7 @@ public:
     return "review";
   }
   const std::map<std::uint64_t, Track>& tracks() const { return tracks_; }
+  std::uint64_t mergedDetectionsTotal() const { return merged_detections_total_; }
   void clear() { tracks_.clear(); } // 清空工作区轨迹，但不回收已分配的 ID。
   // 感知中断或抓取失败后，要求可用目标重新积累稳定观测。
   void invalidate()
@@ -79,15 +84,33 @@ public:
         it = tracks_.erase(it);
       else ++it;
     }
-    // 同帧同类别且位置几乎重合的检测框，只计作一次观测。
-    std::vector<Sample> samples;
-    for (const auto& sample : input) {
-      if (!std::isfinite(sample.x) || !std::isfinite(sample.y) || !std::isfinite(sample.z)) continue;
-      bool duplicate = false;
-      for (const auto& kept : samples)
-        duplicate = duplicate || (sample.category == kept.category && distance(sample, kept) < duplicate_distance);
-      if (!duplicate) samples.push_back(sample);
+    // Class-agnostic confidence NMS in world geometry. Preserve the earliest
+    // input position of each group so confidence sorting does not reorder FIFO.
+    std::vector<std::size_t> order;
+    for (std::size_t i=0;i<input.size();++i)
+      if (std::isfinite(input[i].x) && std::isfinite(input[i].y) && std::isfinite(input[i].z) &&
+          std::isfinite(input[i].confidence)) order.push_back(i);
+    std::stable_sort(order.begin(),order.end(),[&input](std::size_t a,std::size_t b) {
+      return input[a].confidence>input[b].confidence;
+    });
+    std::vector<std::pair<std::size_t,Sample>> kept;
+    std::vector<std::vector<std::size_t>> duplicate_groups;
+    for (const auto index:order) {
+      auto found=std::find_if(kept.begin(),kept.end(),[this,&input,index](const std::pair<std::size_t,Sample>& item) {
+        return duplicateSamples(input[index],item.second);
+      });
+      if (found==kept.end()) { kept.emplace_back(index,input[index]); duplicate_groups.push_back({index}); }
+      else {
+        duplicate_groups[static_cast<std::size_t>(found-kept.begin())].push_back(index);
+        found->first=std::min(found->first,index); ++merged_detections_total_;
+      }
     }
+    mergeObservedTracks(input,duplicate_groups,now);
+    std::sort(kept.begin(),kept.end(),[](const std::pair<std::size_t,Sample>& a,const std::pair<std::size_t,Sample>& b) {
+      return a.first<b.first;
+    });
+    std::vector<Sample> samples;
+    for (const auto& item:kept) samples.push_back(item.second);
     struct Edge { double distance; std::uint64_t id; std::size_t sample; };
     std::vector<Edge> edges;
     std::set<std::size_t> used_samples;
@@ -97,7 +120,8 @@ public:
       for (auto& item : tracks_) {
         auto& track = item.second;
         const double d = distance(track.sample, samples[i]);
-        if ((track.sample.category == samples[i].category || track.status == Status::RESERVED) && d <= match_distance)
+        if ((track.sample.category == samples[i].category || track.status == Status::RESERVED ||
+             overlappingDuplicate(track.sample,samples[i])) && d <= match_distance)
           edges.push_back({d, item.first, i});
       }
     std::sort(edges.begin(), edges.end(), [](const Edge& a, const Edge& b) {
@@ -113,7 +137,8 @@ public:
       auto& track = tracks_.at(edge.id);
       if (track.status == Status::RESERVED) {
         // 机械臂移动时手眼视角会让轮廓中心轻微偏移；预留目标采用独立的执行容差。
-        if (edge.distance > reserved_distance || samples[edge.sample].category != track.sample.category) {
+        if (edge.distance > reserved_distance || (samples[edge.sample].category != track.sample.category &&
+                                                 !overlappingDuplicate(track.sample,samples[edge.sample]))) {
           track.disturbed = true;
           track.disturbance_distance = edge.distance;
           track.disturbance_category = samples[edge.sample].category;
@@ -123,19 +148,35 @@ public:
       // 已完成目标在屏蔽期内吸收原位置的残留检测，不重新成为可抓取目标。
       if (track.status == Status::DONE && now - track.changed_at < done_hold) continue;
       const Sample& sample = samples[edge.sample];
+      const bool different_class=sample.category!=track.sample.category;
+      const bool retain_best=different_class && sample.confidence<=track.sample.confidence &&
+          edge.distance<=stable_distance && now-track.sampled_at<=max_age;
       const bool stable = edge.distance <= stable_distance && now - track.last_seen <= confirmation_gap &&
                           track.status != Status::DONE && track.status != Status::REVIEW &&
-                          track.sample.eligible && sample.eligible;
+                          track.sample.eligible && sample.eligible && (!different_class || retain_best);
       track.observations = sample.eligible ? (stable ? track.observations + 1 : 1) : 0;
-      Sample filtered = sample;
-      if (stable) { // 坐标与上次轨迹坐标平滑；payload 保留当前帧的抓取几何信息。
+      Sample filtered = retain_best ? track.sample : sample;
+      if (stable && !retain_best) { // 坐标与上次轨迹坐标平滑；payload 保留当前帧的抓取几何信息。
         filtered.x = 0.5 * (sample.x + track.sample.x);
         filtered.y = 0.5 * (sample.y + track.sample.y);
         filtered.z = 0.5 * (sample.z + track.sample.z);
       }
       track.sample = filtered;
+      if (!retain_best) track.sampled_at=now;
       track.last_seen = now;
       track.status = sample.eligible && track.observations >= min_observations ? Status::READY : Status::CANDIDATE;
+    }
+    // One new observation must not validate a second historical same-class
+    // record that lost association to a closer cross-class record.
+    for (auto& item:tracks_) {
+      auto& track=item.second;
+      if (used_tracks.count(item.first) || track.status!=Status::READY) continue;
+      for (std::size_t i=0;i<samples.size();++i)
+        if (used_samples.count(i) && samples[i].category==track.sample.category &&
+            distance(samples[i],track.sample)<=match_distance &&
+            footprintOverlap(samples[i].footprint,track.sample.footprint)>=merge_overlap) {
+          track.status=Status::CANDIDATE; track.observations=0; break;
+        }
     }
     // 超出关联半径的同类新观测也可能是预留目标的大幅位移，不能让旧坐标继续有效。
     for (auto& item : tracks_) {
@@ -164,25 +205,27 @@ public:
       track.sample = samples[i];
       track.observations = 1;
       track.last_seen = now;
+      track.sampled_at = now;
       tracks_[track.id] = track;
     }
+    mergeTracks(now);
   }
-  // 按 categories 的优先级查找近期就绪目标；同类目标按 id 顺序选取。
+  // categories 只作为允许类别列表；按入队 ID 领取最早的近期就绪目标。
   bool reserve(const std::vector<std::string>& categories, double now, Track& result)
   {
-    for (const auto& category : categories)// 按类别优先级查找目标
-      for (auto& item : tracks_)  // 按照id顺序查找目标 先查找id较小的目标（先发现的目标）
-      {
-        auto& track = item.second;
-        if (track.sample.category != category || track.status != Status::READY || now - track.last_seen > max_age) continue;
-        track.status = Status::RESERVED;
-        track.disturbed = false;
-        track.disturbance_distance = 0;
-        track.disturbance_category.clear();
-        track.changed_at = now;
-        result = track; // 返回独立的执行快照，后续帧不会改变本次抓取坐标。
-        return true;
-      }
+    for (auto& item : tracks_)
+    {
+      auto& track = item.second;
+      if (track.status != Status::READY || now - track.last_seen > max_age || now-track.sampled_at>max_age ||
+          std::find(categories.begin(), categories.end(), track.sample.category) == categories.end()) continue;
+      track.status = Status::RESERVED;
+      track.disturbed = false;
+      track.disturbance_distance = 0;
+      track.disturbance_category.clear();
+      track.changed_at = now;
+      result = track; // 返回独立的执行快照，后续帧不会改变本次抓取坐标。
+      return true;
+    }
     return false;
   }
   // 成功后进入残留画面屏蔽期；失败后隔离该目标并使其他可用目标重新确认。
@@ -204,9 +247,96 @@ public:
   }
   bool executionValid(std::uint64_t id, double now) const { return executionValid(id, now, max_age); }
 private:
+  int protectionRank(const Track& track,double now) const {
+    return track.status==Status::RESERVED ? 3 :
+        (track.status==Status::DONE && now-track.changed_at<done_hold ? 2 : (track.status==Status::REVIEW ? 1 : 0));
+  }
+  void mergeObservedTracks(const std::vector<Sample>& input,
+                           const std::vector<std::vector<std::size_t>>& groups,double now) {
+    for (const auto& group:groups) {
+      if (group.size()<2) continue;
+      std::set<std::uint64_t> ids;
+      for (auto index:group) {
+        double closest=match_distance;
+        std::uint64_t nearest=0;
+        for (const auto& item:tracks_) {
+          const auto& track=item.second;
+          const double d=positionDistance(input[index],track.sample);
+          if (track.sample.category==input[index].category && now-track.last_seen<=max_age &&
+              d<=closest && (d<closest || nearest==0)) { closest=d; nearest=item.first; }
+        }
+        if (nearest) ids.insert(nearest);
+      }
+      if (ids.size()<2) continue;
+      auto keep=tracks_.find(*ids.begin());
+      unsigned reserved=0;
+      for (auto id:ids) {
+        auto it=tracks_.find(id);
+        reserved+=it->second.status==Status::RESERVED;
+        if (protectionRank(it->second,now)>protectionRank(keep->second,now)) keep=it;
+      }
+      if (reserved>1) continue;
+      for (auto id:ids) if (id!=keep->first) {
+        const auto& removed=tracks_.at(id);
+        if (keep->second.status==Status::RESERVED && (removed.disturbed || protectionRank(removed,now)>0)) {
+          keep->second.disturbed=true;
+          keep->second.disturbance_category=removed.sample.category;
+          keep->second.disturbance_distance=distance(keep->second.sample,removed.sample);
+        }
+        tracks_.erase(id); ++merged_detections_total_;
+      }
+    }
+  }
+  bool overlappingDuplicate(const Sample& a,const Sample& b) const {
+    return positionDistance(a,b)<=merge_distance && footprintOverlap(a.footprint,b.footprint)>=merge_overlap;
+  }
+  bool duplicateSamples(const Sample& a,const Sample& b) const {
+    return (a.category==b.category && (a.footprint.empty() || b.footprint.empty()) &&
+            distance(a,b)<duplicate_distance) || overlappingDuplicate(a,b);
+  }
+  void mergeTracks(double now) {
+    bool merged=true;
+    while (merged) {
+      merged=false;
+      for (auto a=tracks_.begin();a!=tracks_.end() && !merged;++a) {
+        auto b=a; ++b;
+        for (;b!=tracks_.end();++b) {
+          if (now-a->second.last_seen>max_age || now-b->second.last_seen>max_age ||
+              !duplicateSamples(a->second.sample,b->second.sample) ||
+              (a->second.status==Status::RESERVED && b->second.status==Status::RESERVED)) continue;
+          auto keep=protectionRank(b->second,now)>protectionRank(a->second,now) ? b:a;
+          auto remove=keep==a ? b:a;
+          auto& track=keep->second;
+          const auto& other=remove->second;
+          if (track.status==Status::RESERVED && (other.disturbed || protectionRank(other,now)>0)) {
+            track.disturbed=true; track.disturbance_category=other.sample.category;
+            track.disturbance_distance=distance(track.sample,other.sample);
+          }
+          if (protectionRank(track,now)==0) {
+            const bool replace=other.sample.confidence>track.sample.confidence;
+            const bool category_change=replace && other.sample.category!=track.sample.category;
+            if (replace) { track.sample=other.sample; track.sampled_at=other.sampled_at; }
+            track.observations=category_change ? 1:std::min(track.observations,other.observations);
+            track.status=track.sample.eligible && track.observations>=min_observations ? Status::READY:Status::CANDIDATE;
+            track.last_seen=std::max(track.last_seen,other.last_seen);
+          }
+          tracks_.erase(remove);
+          ++merged_detections_total_;
+          merged=true;
+          break;
+        }
+        if (merged) break; // An erased 'a' iterator must not be incremented.
+      }
+    }
+  }
   static double distance(const Sample& a, const Sample& b) { return std::hypot(a.x-b.x, a.y-b.y); }
+  static double positionDistance(const Sample& a,const Sample& b) {
+    const double xy=distance(a,b), dz=a.z-b.z;
+    return std::sqrt(xy*xy+dz*dz);
+  }
   std::map<std::uint64_t, Track> tracks_;
   std::uint64_t next_id_{1};
+  std::uint64_t merged_detections_total_{0};
 };
 } // namespace aubo_sorting_core
 #endif

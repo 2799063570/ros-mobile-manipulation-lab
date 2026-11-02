@@ -24,6 +24,7 @@ class GraspTest(unittest.TestCase):
                 gripper_width_open=.08, gripper_width_closed=0., width_close_scale=.9,
                 pregrasp_height=.22, preplace_height=.28, lift_min_height=.18,
                 place_clearance=.02, minimum_place_z=None, place_frame='base_link', place_targets={'red':[.4, .2]},
+                minimum_gripper_height=0.,
                 grasp_model_names={}, _active_grasp_angle=0.).items():
             setattr(t, key, value)
         t._pose = lambda x,y,z: (x,y,z,t._active_grasp_angle)
@@ -59,6 +60,30 @@ class GraspTest(unittest.TestCase):
         self.t.minimum_place_z = .10
         self.assertTrue(self.t._pick_and_place(self.d))
         self.assertAlmostEqual(self.t._cartesian_to.call_args_list[1][0][0][2], .15)
+
+    def test_minimum_gripper_height_clamps_both_descents_without_lowering_higher_targets(self):
+        self.t.minimum_gripper_height=.06
+        self.assertTrue(self.t._pick_and_place(self.d))
+        self.assertAlmostEqual(self.t._cartesian_to.call_args_list[0][0][0][2], .16)
+        self.assertAlmostEqual(self.t._cartesian_to.call_args_list[1][0][0][2], .16)
+        self.assertEqual(self.t._command_gripper.call_args_list[0][0][0], self.t.gripper_open)
+        self.assertEqual(self.t._command_gripper.call_args_list[-1][0][0], self.t.gripper_open)
+
+    def test_gripper_floor_must_remain_below_the_approach(self):
+        self.t.minimum_gripper_height=.3
+        self.assertFalse(self.t._pick_and_place(self.d))
+        self.t._command_gripper.assert_not_called()
+        self.t._move_to_pose.assert_not_called()
+
+    def test_measured_object_heights_and_six_centimeter_tcp_floor_are_independent(self):
+        self.t.minimum_gripper_height = .06
+        for height, expected in ((.065, .16), (.12, .17), (.20, .21)):
+            with self.subTest(height=height):
+                self.d.object_height = height
+                self.d.pose.position.z = self.t.table_z + height/2
+                self.t._cartesian_to.reset_mock()
+                self.assertTrue(self.t._pick_and_place(self.d))
+                self.assertAlmostEqual(self.t._cartesian_to.call_args_list[0][0][0][2], expected)
 
     def test_invalid_release_height_is_rejected_before_grasping(self):
         self.t.minimum_place_z = self.t.table_z + self.t.preplace_height

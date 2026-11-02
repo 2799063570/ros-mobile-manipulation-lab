@@ -6,6 +6,8 @@
 #include <inspire_gripper/move_min.h>
 #include <inspire_gripper/set_es.h>
 #include <inspire_gripper/get_state.h>
+#include <inspire_gripper/get_openlimit.h>
+#include <inspire_gripper/get_copen.h>
 #include <control_msgs/JointTolerance.h>
 #include <moveit_msgs/Constraints.h>
 #include <moveit_msgs/JointConstraint.h>
@@ -17,6 +19,7 @@
 #include <algorithm>
 #include <cmath>
 #include <iterator>
+#include <sstream>
 
 namespace aubo_sorting_core
 {
@@ -149,7 +152,7 @@ bool SortingTask::planAndExecuteImpl(const std::string& description, double wris
   arm_->stop();
   arm_->clearPoseTargets();
   const bool success = executed;
-  if (!success)
+  if (!success && !stop_requested_.load())
     setFailure("EXECUTION_FAILED", description);
   return success;
 }
@@ -301,48 +304,74 @@ bool SortingTask::liftWithRecovery(double x, double y, const std::string& descri
   return result == HeightAttemptResult::Succeeded;
 }
 
+bool SortingTask::commandInspireGripper(double position)
+{
+  if (stop_requested_.load()) return false;
+  const bool opening=std::isfinite(position) && std::abs(position-gripper_open_)<1e-6;
+  const bool closing=std::isfinite(position) && std::abs(position-gripper_closed_)<1e-6;
+  if (!opening && !closing) {
+    setFailure("GRIPPER_FAILED","Inspire only supports full-open or force-close task commands");
+    return false;
+  }
+  bool accepted=false;
+  double maximum=0, last_open=std::numeric_limits<double>::quiet_NaN();
+  if (opening)
+  {
+    inspire_gripper::get_openlimit limits;
+    if (!inspire_open_limit_client_.call(limits) || !std::isfinite(limits.response.openmax) ||
+        !std::isfinite(limits.response.openmin) || limits.response.openmin<0 ||
+        limits.response.openmax>1000 || limits.response.openmax<=limits.response.openmin) {
+      setFailure("GRIPPER_FAILED","Cannot read valid Inspire opening limits");
+      return false;
+    }
+    maximum=limits.response.openmax;
+    if (stop_requested_.load()) return false;
+    inspire_gripper::move_max request;
+    request.request.speed=inspire_speed_;
+    accepted=inspire_open_client_.call(request) && request.response.movemax_accepted;
+  }
+  else {
+    inspire_gripper::move_min request;
+    request.request.speed=inspire_speed_;
+    request.request.power=inspire_force_;
+    accepted=inspire_close_client_.call(request) && request.response.movemin_accepted;
+  }
+  if (!accepted) {
+    setFailure("GRIPPER_FAILED","Inspire command rejected");
+    return false;
+  }
+  const auto deadline=ros::WallTime::now()+ros::WallDuration(inspire_motion_timeout_);
+  while (wallSleep(.1,stop_requested_) && ros::WallTime::now()<deadline) {
+    inspire_gripper::get_state status;
+    if (!inspire_state_client_.call(status) || status.response.error_code!=0) break;
+    const int motion=status.response.motion_state;
+    if (opening && motion==1) {
+      inspire_gripper::get_copen actual;
+      if (!inspire_current_open_client_.call(actual) || !std::isfinite(actual.response.curopen) ||
+          actual.response.curopen<0 || actual.response.curopen>1000) break;
+      last_open=actual.response.curopen;
+      if (std::abs(last_open-maximum)<=inspire_open_tolerance_) {
+        grasp_secured_.store(false);
+        ROS_INFO_STREAM("Inspire fully open: current="<<last_open<<", maximum="<<maximum);
+        return !stop_requested_.load();
+      }
+    }
+    else if (!opening && (motion==2 || motion==6)) return !stop_requested_.load();
+  }
+  inspire_gripper::set_es stop;
+  inspire_stop_client_.call(stop);
+  std::ostringstream reason;
+  reason<<"Inspire "<<(opening ? "full-open":"close")<<" failed or timed out";
+  if (opening && std::isfinite(last_open)) reason<<": current="<<last_open<<", maximum="<<maximum;
+  setFailure("GRIPPER_FAILED",reason.str());
+  return false;
+}
+
 bool SortingTask::commandGripperImpl(double position)
 {
   // 通过action通信请求夹爪的控制器执行目标位置
-  if (stop_requested_.load())
-    return false;
-  if (gripper_backend_ == "inspire")
-  {
-    bool accepted = false;
-    if (std::abs(position - gripper_open_) < 1e-6)
-    {
-      inspire_gripper::move_max request;
-      request.request.speed = inspire_speed_;
-      accepted = inspire_open_client_.call(request) && request.response.movemax_accepted;
-    }
-    else
-    {
-      inspire_gripper::move_min request;
-      request.request.speed = inspire_speed_;
-      request.request.power = inspire_force_;
-      accepted = inspire_close_client_.call(request) && request.response.movemin_accepted;
-    }
-    if (!accepted)
-    {
-      setFailure("GRIPPER_FAILED", "Inspire command rejected");
-      return false;
-    }
-    const bool opening = std::abs(position - gripper_open_) < 1e-6;
-    const auto deadline = ros::WallTime::now() + ros::WallDuration(inspire_motion_timeout_);
-    while (wallSleep(0.1, stop_requested_) && ros::WallTime::now() < deadline)
-    {
-      inspire_gripper::get_state status;
-      if (!inspire_state_client_.call(status) || status.response.error_code != 0)
-        break;
-      const int motion = status.response.motion_state;
-      if (opening ? motion == 1 : (motion == 2 || motion == 6))
-        return !stop_requested_.load();
-    }
-    inspire_gripper::set_es stop;
-    inspire_stop_client_.call(stop);
-    setFailure("GRIPPER_FAILED", "Inspire motion failed or timed out");
-    return false;
-  }
+  if (stop_requested_.load()) return false;
+  if (gripper_backend_=="inspire") return commandInspireGripper(position);
   control_msgs::FollowJointTrajectoryGoal goal;
   goal.trajectory.joint_names = {"joint1", "joint2"};
   const auto current = arm_->getCurrentState(2.0);
@@ -388,6 +417,7 @@ bool SortingTask::commandGripperImpl(double position)
               result ? result->error_string.c_str() : "");
     return false;
   }
+  if (std::abs(position-gripper_open_)<1e-6) grasp_secured_.store(false);
   return !stop_requested_.load();
 }
 

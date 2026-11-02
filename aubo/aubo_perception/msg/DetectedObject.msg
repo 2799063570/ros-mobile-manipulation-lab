@@ -13,3 +13,6 @@ bool grasp_geometry_valid
 # 深度高度经过桌面 + 物高校验才为 true；table 模式为 false。
 bool depth_valid
 float32 object_height
+# Convex detector rectangle projected onto the object's horizontal surface.
+# Coordinates use DetectedObjectArray.header.frame_id; empty means unavailable.
+geometry_msgs/Polygon footprint

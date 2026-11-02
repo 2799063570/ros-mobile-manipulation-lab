@@ -30,6 +30,8 @@ table_size: [0.70, 1.00, 0.20]
 object_height: 0.04
 # TCP 对准物体中心后再上移 1 cm，避免指尖与桌面发生接触。
 grasp_height_offset: 0.01
+# 仿真小方块需要接近中心；实机工位单独设置 0.06 m 下限。
+minimum_gripper_height: 0.0
 scene_update_timeout: 10.0
 
 # roll=pi 时 TCP 的 +Z 朝下，手部相机光轴与 TCP 的 +Z 方向一致。

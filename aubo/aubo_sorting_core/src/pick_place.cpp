@@ -1,6 +1,7 @@
 #include <aubo_sorting_core/sorting_task.hpp>
 #include "task_utils.hpp"
 #include <aubo_sorting_core/placement_height.hpp>
+#include <aubo_sorting_core/gripper_height.hpp>
 #include <algorithm>
 #include <cmath>
 
@@ -47,10 +48,15 @@ bool SortingTask::pickAndPlaceImpl(const aubo_perception::DetectedObject& detect
     close_command = gripper_open_ + (gripper_width_open_ - opening) /
         (gripper_width_open_ - gripper_width_closed_) * (gripper_closed_ - gripper_open_);
   }
-  const double grasp_z = center_z + grasp_height_offset_;
-  if (grasp_z <= table_z_ || grasp_z >= table_z_ + std::min(pregrasp_height_, lift_min_height_))
+  double grasp_z;
+  try
   {
-    setFailure("DETECTION_FAILED", "grasp height outside approach/lift clearance");
+    grasp_z=gripperDescentHeight(center_z+grasp_height_offset_,table_z_,minimum_gripper_height_,
+                                table_z_+std::min(pregrasp_height_,lift_min_height_));
+  }
+  catch (const std::invalid_argument& error)
+  {
+    setFailure("DETECTION_FAILED", error.what());
     return false;
   }
   // 短边为夹爪闭合方向；grasp_rpy.yaw 用于补偿 TCP 与夹爪轴的标定偏差。
@@ -62,7 +68,7 @@ bool SortingTask::pickAndPlaceImpl(const aubo_perception::DetectedObject& detect
   try
   {
     place_z = placementHeight(expected_center + grasp_height_offset_ + place_clearance_,
-                              minimum_place_z_, preplace_z);
+                              std::max(minimum_place_z_,table_z_+minimum_gripper_height_), preplace_z);
   }
   catch (const std::invalid_argument& error)
   {
@@ -71,15 +77,21 @@ bool SortingTask::pickAndPlaceImpl(const aubo_perception::DetectedObject& detect
   }
   ROS_INFO("Picking %s at [%.3f, %.3f, %.3f]", category.c_str(), object_x, object_y, grasp_z);
 
-  if (!validateReservedTarget() || !commandGripper(gripper_open_) ||
-      !moveToPose(makePose(object_x, object_y, table_z_ + pregrasp_height_),
+  if (!validateReservedTarget())
+    return false;
+  publishProgress("OPEN_GRIPPER", category);
+  if (!commandGripper(gripper_open_))
+    return false;
+  publishProgress("PREGRASP", category);
+  if (!moveToPose(makePose(object_x, object_y, table_z_ + pregrasp_height_),
                   category + " pre-grasp", true) ||
       !validateReservedTarget())
     return false;
   // The camera is most easily occluded and distorted during the vertical
   // approach, grasp and lift.  Keep receiving source heartbeats but do not let
   // these frames alter the instance queue.
-  queue_vision_phase_.store(QueueVisionPhase::MASKED);
+  setQueueVisionPhase(QueueVisionPhase::MASKED);
+  publishProgress("DESCEND", category);
   if (!cartesianTo(makePose(object_x, object_y, grasp_z), category + " grasp"))
     return false;
   const auto model = grasp_model_names_.find(category);// 根据类别查找抓取碰撞体名称
@@ -88,6 +100,7 @@ bool SortingTask::pickAndPlaceImpl(const aubo_perception::DetectedObject& detect
   if (continuous_sorting_ && use_grasp_attachment_)
     object_model_name = "nearest:" + object_model_name;
   attachment_attempted = use_grasp_attachment_;
+  publishProgress("GRASP", category);
   if (!setGraspAttachment(object_model_name, true))// 夹爪吸附目标物体
     return false;
   if (continuous_sorting_ && use_grasp_attachment_) {
@@ -101,13 +114,14 @@ bool SortingTask::pickAndPlaceImpl(const aubo_perception::DetectedObject& detect
   }
   // 夹爪夹紧后目标可能随手移动；此时才排除夹爪附近的检测，防止手中物体重新入队。
   grasp_secured_.store(true);
+  publishProgress("LIFT", category);
   if (!wallSleep(0.5, stop_requested_) ||
       !liftWithRecovery(object_x, object_y, category + " lift"))// 抬升到指定高度
     return false;
 
   // From the lifted pose to pre-place, cache other objects.  grasp_secured_
   // keeps the carried object and its camera-ray projection out of the queue.
-  queue_vision_phase_.store(QueueVisionPhase::COLLECT);
+  setQueueVisionPhase(QueueVisionPhase::COLLECT);
 
   const auto place = place_targets_.find(category);
   if (place == place_targets_.end())
@@ -117,15 +131,22 @@ bool SortingTask::pickAndPlaceImpl(const aubo_perception::DetectedObject& detect
   }
   double place_x = 0.0;
   double place_y = 0.0;
+  publishProgress("PREPLACE", category);
   if (!xyInTargetFrame(place_frame_, place->second, place_x, place_y) ||      // 将目标放置位置转换到目标坐标系下
       !moveToPose(makePose(place_x, place_y, preplace_z), category + " pre-place"))  // 移动到目标放置位置上方
     return false;
-  queue_vision_phase_.store(QueueVisionPhase::MASKED);
-  if (!cartesianTo(makePose(place_x, place_y, place_z), category + " place") || // 移动到目标放置位置
-      !commandGripper(gripper_open_) || !setGraspAttachment(object_model_name, false) || // 夹爪张开 释放吸附
+  setQueueVisionPhase(QueueVisionPhase::MASKED);
+  publishProgress("PLACE", category);
+  if (!cartesianTo(makePose(place_x, place_y, place_z), category + " place"))
+    return false;
+  publishProgress("RELEASE", category);
+  if (!commandGripper(gripper_open_) || !setGraspAttachment(object_model_name, false) || // 夹爪张开 释放吸附
       !wallSleep(0.5, stop_requested_))
     return false;
+  publishProgress("RETREAT", category);
   completed = cartesianTo(makePose(place_x, place_y, preplace_z), category + " retreat");
+  if (completed)
+    publishProgress("PICK_DONE", category);
   return completed; // 移动到目标放置位置上方
 }
 

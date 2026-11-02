@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- UI only: the sorting launch runs separately. -->
+  <arg name="task_node" default="/color_sorting_task"/>
+  <arg name="sorting_ns" default="/sorting"/>
+  <arg name="image_topic" default="/sorting/debug_image"/>
+  <node pkg="aubo_sorting_rqt" type="sorting_panel" name="sorting_panel" output="screen"
+        args="--task-node $(arg task_node) --sorting-ns $(arg sorting_ns) --image-topic $(arg image_topic)"/>
+</launch>

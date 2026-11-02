@@ -1,0 +1,11 @@
+<library path="src">
+  <class name="AuboSorting" type="aubo_sorting_rqt.plugin.SortingPlugin" base_class_type="rqt_gui_py::Plugin">
+    <description>Sorting workflow, instance queue, task controls and dynamic parameters.</description>
+    <qtgui>
+      <group><label>Robot Tools</label></group>
+      <label>AUBO 分拣工作台</label>
+      <icon type="theme">applications-engineering</icon>
+      <statustip>分拣过程可视化、实例队列、控制及在线调参</statustip>
+    </qtgui>
+  </class>
+</library>

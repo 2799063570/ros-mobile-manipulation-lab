@@ -4,7 +4,7 @@ project(aubo_sorting)
 find_package(catkin REQUIRED)
 catkin_package()
 
-install(DIRECTORY config launch models worlds
+install(DIRECTORY config docs launch models worlds
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})
 install(FILES README.md
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})

@@ -1,5 +1,9 @@
 # AUBO 固定机械臂颜色 / YOLO 抓取分拣
 
+启动入口已按核心组合、快捷预设、实测工位和 hybrid 分层整理，
+先看 [launch 启动索引](launch/README.md) 选择入口。原 `roslaunch aubo_sorting 文件名.launch`
+命令保持可用；XML include 请使用整理后的实际路径。
+
 使用 YOLO 与已有眼在手外标定，让夹爪低速朝下移动到物体上方进行对齐验证，见
 [`aubo_handeye_validation`](../aubo_handeye_validation/README.md)。该入口独立于分拣循环，提供规划预览、
 单次移动与停止服务，默认停在目标顶面上方 10 cm。
@@ -93,7 +97,7 @@ roslaunch aubo_sorting sorting_gazebo.launch height_mode:=depth
 ```
 
 `table_z` 与 `object_height` 由 launch 同时传给感知和任务；`perception_config` 提供
-工作区、类别物高与深度误差容限，`task_config` 提供 `sort_classes/place_targets`、
+工作区、物高来源、类别物高或深度测量范围，`task_config` 提供 `sort_classes/place_targets`、
 任务侧 `height_tolerance` 和夹爪配置。实机请设置 `use_grasp_attachment:=false`。
 眼在手外的真实相机话题与默认值不同可通过 `camera_namespace:=/实际相机` 覆盖。
 
@@ -119,14 +123,17 @@ MoveIt 负责抓取和放置，Gazebo 通用插件提高小物体夹持稳定性
 | 文件 | 职责 |
 | --- | --- |
 | `launch/sorting.launch` | 算法组合入口：加载检测器、几何计算和通用分拣任务 |
-| `launch/color_sorting.launch` | 颜色检测的便捷入口 |
-| `launch/yolo_sorting.launch` | YOLO 检测的便捷入口 |
-| `launch/eye_*_*_sorting.launch` | 眼在手上/眼在手外 × 颜色/YOLO 四种算法入口；复用已运行的 MoveIt、相机和控制器 |
+| `launch/presets/color_sorting.launch` | 颜色检测的便捷入口 |
+| `launch/presets/yolo_sorting.launch` | YOLO 检测的便捷入口 |
+| `launch/presets/eye_*_*_sorting.launch` | 眼在手上/眼在手外 × 颜色/YOLO 四种算法入口；复用已运行的 MoveIt、相机和控制器 |
 | `launch/sorting_gazebo.launch` | 固定机械臂仿真总入口：组合 Gazebo、MoveIt 和分拣算法 |
-| `launch/yolo_sorting_gazebo.launch` | YOLO 仿真便捷入口 |
-| `launch/eye_*_*_sorting_gazebo.launch` | 眼在手上/眼在手外 × 颜色/YOLO 四种 MoveIt 分拣仿真入口 |
+| `launch/presets/yolo_sorting_gazebo.launch` | YOLO 仿真便捷入口 |
+| `launch/presets/eye_*_*_sorting_gazebo.launch` | 眼在手上/眼在手外 × 颜色/YOLO 四种 MoveIt 分拣仿真入口 |
 | `launch/sorting_real.launch` | 实机共用总入口：组合硬件、MoveIt、D435i、Inspire 夹爪和分拣算法 |
-| `launch/eye_*_*_sorting_real.launch` | 眼在手上/眼在手外 × 颜色/YOLO 四种实机便捷入口 |
+| `launch/presets/eye_*_*_sorting_real.launch` | 通用实机快捷入口：眼在手上颜色 / YOLO，以及眼在手外颜色 |
+| `launch/scenarios/eye_to_hand_can_sorting_real.launch` | 实测三容器工位：按类别各处理一个，保留原单罐测试文件名 |
+| `launch/scenarios/eye_to_hand_yolo_sorting_real.launch` | 同一实测工位：连续实例分拣 |
+| `launch/hybrid/eye_*_hybrid_control_*.launch` | 眼在手上/眼在手外 × Gazebo/实机的混合控制入口 |
 | `config/`、`worlds/`、`models/` | 固定平台参数、仿真世界和分拣标记模型 |
 
 移动单工位场景由 `aubo_mobile_sorting` 负责；工位导航与任务切换由
@@ -302,7 +309,7 @@ roslaunch aubo_sorting eye_to_hand_yolo_sorting_real.launch \
 四个入口最终共用 `sorting_real.launch`，也可直接通过 `camera_mount:=eye_in_hand|eye_to_hand`
 和 `detector:=color|yolo` 选择模式。D435i 驱动启用彩色图、深度图及彩色对齐深度；
 其中 `eye_to_hand_yolo_sorting_real.launch` 默认复用下文实机三容器工位并连续分拣，
-通过 `eye_to_hand_can_sorting_real.launch` 加载桌面、支架、容器和 `real_observe`。
+通过 `eye_to_hand_can_sorting_real.launch` 加载桌面、支架、容器和 `real_sort_ready` 工作观察位。
 两种实机入口默认话题前缀均为 `/camera`，与随仓库标定中的
 `camera_color_optical_frame` 一致；眼在手上的相机安装 TF 由腕部 URDF 发布，
 眼在手外的基座到彩色光学坐标系 TF 由 `calibration_file` 发布。
@@ -355,8 +362,8 @@ roslaunch aubo_sorting sorting.launch gripper_backend:=inspire \
 
 | 入口 | 默认任务方式 |
 | --- | --- |
-| `eye_to_hand_can_sorting_real.launch` | 按 `bottle → can → box` 顺序各处理一个 |
-| `eye_to_hand_yolo_sorting_real.launch` | 连续分拣多个实例，同一类别可以有多个物体 |
+| `eye_to_hand_can_sorting_real.launch` | 从实例缓冲队列按入队顺序领取就绪物体 |
+| `eye_to_hand_yolo_sorting_real.launch` | 同一工位的 YOLO 快捷入口，使用相同实例队列 |
 
 连续分拣启动：
 
@@ -367,12 +374,18 @@ rosservice call /sorting/move_to_observation '{}'
 rosservice call /sorting/start '{}'
 ```
 
-该入口共享 `eye_to_hand_can_real.yaml` 中的实机抓放参数，并叠加
+两个入口共享 `eye_to_hand_can_real.yaml` 中的实机抓放参数，并叠加
 [`eye_to_hand_continuous_real.yaml`](config/eye_to_hand_continuous_real.yaml) 的实例队列参数。
 稳定确认使用 `target_cache_min_observations: 8`；每个实例独立编号、跟踪和领取。
-按类别优先级选取当前就绪目标，缺少 bottle 时可处理已经就绪的 can/box，
-不会因某个类别缺失而要求每类必须抓一个。
-可靠实例存在时继续领取；缺少实例才返回 `real_observe` 重建观测。
+按入队 ID 从小到大领取允许类别中的新鲜就绪实例，跳过尚未确认或过期的目标。
+`sort_classes: [bottle, can, box]` 只作为允许类别列表，不决定抓取顺序；
+例如先入队的 can 会先于后入队的 bottle 被抓取，同一类别可以连续抓取多个实例。
+缺少 bottle 不会阻塞已有 can/box，列表以外的类别不会进入待抓队列。
+同一物体被预测为多个类别时，结合中心距离和世界坐标投影框重叠做合并，保留高置信度数据。
+默认 `queue_merge_distance: 0.02` m、`queue_merge_overlap: 0.50`（交集 / 较小框面积），可在 rqt 空闲调参。
+预抓取接近时根据机器人 TF 判断遮挡；确认自身遮挡后冻结队列，下降/夹放阶段按流程屏蔽。
+相机失联、TF 缺失、目标超龄或已发现的真实位移仍会阻止下降；屏蔽不会放宽这些保护。
+可靠实例存在时继续领取；缺少实例才返回工作观察位 `real_sort_ready` 重建观测。
 只有在观察位收到至少 5 帧、持续 2 秒的有效空检测，才结束本轮并返回 `real_observe`。
 有效空检测指抓取区域内没有待处理实例，不要求容器中已经放下的物体消失。
 检测失联、无效深度或抓放失败会报错，不作为分拣完成的依据。
@@ -384,10 +397,12 @@ rosservice call /sorting/start '{}'
 默认仍等待服务触发运动。各类物体共用对应容器中心放置点，未增加自动堆叠或箱内摆放规划。
 
 `eye_to_hand_can_sorting_real.launch` 使用原实机桌面、固定相机、Inspire 夹爪，
-按 `bottle → can → box` 顺序各抓放一个，结束后回到 `real_observe`。
-文件名保留先前单罐测试入口，当前类别列表由任务 YAML 设置。
-该观察姿态来自 2026-10-30 的实机关节反馈，
-已写入固定平台的两份 SRDF；默认不自动运动。桌面和相机支架在任务未启动时也加入
+默认从缓冲队列连续领取允许类别中的就绪实例，确认抓取区域已空后回到 `real_observe`。
+文件名保留先前单罐测试入口，允许类别列表由任务 YAML 设置。
+工作观察/准备姿态使用更近的 `real_sort_ready`，TCP 为 `[-0.25,-0.45,0.25285] m`，
+结束姿态仍为 2026-10-30 实测的 `real_observe`。新的工作姿态来自离线逆解和参考场景检查，
+尚未实机执行验证；比较和检查范围见[实机工作观察位](docs/实机工作观察位.md)。
+两份固定平台 SRDF 均已包含这些姿态；默认不自动运动。桌面和相机支架在任务未启动时也加入
 规划场景，任务更新桌面时保留支架和容器。支架默认加载
 `aubo_planning/config/camera_stand_reference.yaml`，可用 `camera_stand_config` 覆盖。
 三个容器的放置点、外尺寸、底面高度、壁厚和最低放置 TCP 高度统一保存在
@@ -406,6 +421,12 @@ rosservice call /sorting/start '{}'
 上面的支架文件是原工位参考包络，换工位应传入实测文件。桌面顶高为 `0.00285 m`，
 XY 中心 `[-0.0442,-0.6707]`，物理尺寸 `0.74 × 0.93 × 0.20 m`，
 XY 碰撞余量 `0.02 m`；当前平躺 can 的物高（直径）配置为 `0.065 m`。
+`minimum_gripper_height: 0.06` 限制抓取和放置下降终点的 TCP 离桌高度，
+本工位最低为 `base_link` 下 `Z=0.06285 m`。低于该值的目标会抬高，高于该值保持原高度。
+它描述 `tcp_link` 控制点；可在空闲时通过 rqt“夹爪 TCP 最低离桌 / m”在线修改，
+参数必须低于预抓取、最低抬升及预放置高度。
+预抓取、释放和手动“夹爪全开”均使用 Inspire 最大限位，并回读实际开度确认到位后再继续。
+任务参数 `gripper_open: 0.0` 由后端映射为 `move_max`，不是夹爪协议开度 0。
 当前 `place_x/place_y` 命令行参数已由容器 YAML 替代。
 三个容器中心分别为 bottle `[-0.40,-0.18]`、can `[-0.42,-0.3375]`、
 box `[-0.42,-0.5425]`（米，`base_link`）。容器采用底板加四面侧壁，顶部开放；
@@ -414,11 +435,16 @@ box `[-0.42,-0.5425]`（米，`base_link`）。容器采用底板加四面侧壁
 
 容器 YAML 的 `minimum_place_z: 0.18` 是 `target_frame` 下的绝对 TCP Z 下限，
 本工位 `target_frame=base_link`。放置高度取
-`max(table_z + 物高/2 + grasp_height_offset + place_clearance, minimum_place_z)`。
+`max(table_z + 物高/2 + grasp_height_offset + place_clearance, minimum_place_z, table_z + minimum_gripper_height)`。
 它不改变抓取高度；预放置/退离 TCP 高度必须大于实际放置高度，否则在抓取前报配置错误。
 该值描述 TCP，不是物体底面或箱底。
-当前瓶子、物盒尚未分别测量物高，感知中的 `class_heights` 仍需按实际摆放姿态设置；
-缺省类别会沿用 `object_height=0.065 m`。容器配置完成不代表三类物体均已实机验证。
+当前实机感知设置 `object_height_source: depth`，三类物体均按各自检测框对应的对齐深度
+估计顶面 Z，以 `物高=顶面Z−table_z`、`中心Z=table_z+物高/2` 发布目标。
+测量范围默认 `0.005–0.30 m`，不再把瓶子、盒子都按 `0.065 m` 校验；
+`object_height/class_heights` 仅在切回 `configured` 物高来源时作为固定值。
+抓取 TCP Z 仍取 `max(中心Z+grasp_height_offset, table_z+0.06)`，6 cm 是 TCP 下限。
+拒绝日志会显示类别、像素位置、目标坐标系，以及测量值/期望值或测量范围；
+确认标定和有效深度后再调整范围。容器配置完成不代表三类物体均已实机验证。
 复用已运行的节点时，按实际情况追加 `start_robot:=false start_camera:=false
 start_gripper:=false start_perception:=false rviz:=false`；只看识别和场景可设置
 `start_task:=false`。停止使用 `/sorting/stop`。

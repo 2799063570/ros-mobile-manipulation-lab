@@ -91,10 +91,25 @@ launch 参数 `task_executable` 默认是 `sorting_task_cpp`；需要验证旧�
 
 ## 连续感知与实例队列
 
+可使用 [rqt 分拣工作台](../aubo_sorting_rqt/README.md) 查看过程和实例队列、调用任务控制、在线调参。
+`/sorting/progress` 发布观察、接近、下降、夹紧、抬升、放置、释放及退离的当前步骤。
+`target_cache_min_observations` 和 `queue_max_age` 与速度、加速度、XY 修正及检测超时共用
+dynamic_reconfigure 接口；执行中拒绝修改，队列设置改变后要求目标重新积累稳定观测。
+
 默认 `continuous_sorting: true`。感知回调只投递最新一帧；独立线程维护实例，机械臂
 操作线程顺序抓放。队列不积压图像，也不在运动期间持有目标锁。同类多个物体按
 类别和 XY 距离一对一匹配，短距离重复检测去重，多帧稳定后可领取。队列最多保留
 200 个实例，过期记录在新有效帧到来时清理；ID 在节点生命周期内不复用。
+`sort_classes` 只筛选允许类别；领取时按入队 ID 从小到大选择新鲜的就绪实例，
+类别列表顺序不影响领取顺序。未就绪、过期或类别不允许的目标不会阻塞后续就绪实例。
+
+重复实例按世界坐标和检测框投影合并：中心三维距离 ≤ `queue_merge_distance`（默认 0.02 m），
+且两个凸投影框的交集面积 / 较小框面积 ≥ `queue_merge_overlap`（默认 0.5）。
+框顶点来自 `DetectedObject.footprint`，和检测中心使用同一坐标系。
+同帧保留高检测置信度的完整数据，一帧最多计一次稳定观测；合并不会改变该组的 FIFO 入队位置。
+跨帧类别闪变沿用实例 ID，较低置信度的新类别不能立即取代旧类别；新类别胜出时重新确认，
+历史高置信度数据仍受 `queue_max_age` 限制。缺少投影框时不做跨类别合并。
+已预留实例的类别和抓放坐标保持冻结；相同物体的重分类不直接取消预留，真实位移仍触发保护。
 
 状态为 `candidate / ready / reserved / done / review`。领取时复制完整抓取信息，
 执行坐标冻结，其他物体继续更新。预抓取运动前和下降前复核检测流新鲜度及已观测位移，
@@ -104,6 +119,22 @@ launch 参数 `task_executable` 默认是 `sorting_task_cpp`；需要验证旧�
 被夹爪遮挡，原来的 10 秒普通目标有效期可能短于一次预抓取动作。若期间看到目标
 明显位移，或有效检测流中断超过 `queue_frame_max_age`，仍拒绝下降。这个宽限只
 适用于已预留目标，不允许领取过期的新目标。
+
+预抓取使用 `APPROACH` 阶段：按检测采集时间查询相机和机器人链路 TF，用
+`queue_occlusion_links` 原点间的胶囊包络（半径 `queue_occlusion_radius`，默认 0.06 m）
+判断机器人是否挡住相机到预留目标的视线。确认遮挡时冻结整个实例队列，只保留新鲜源帧心跳，
+不把遮挡框的类别/位置写回目标，也不把空检测当作桌面清空。可见时仍正常跟踪和检查位移。
+下降前允许已确认遮挡使用源帧心跳，但仍检查遮挡 TF 时效、预留目标最大年龄、已有位移故障和停止请求。
+这不能检测完全被挡住期间的外力移动；遮挡例外有 `queue_reserved_max_age` 上限，不会无限延长。
+相机帧可能比关节 TF 超前一个反馈周期。跟踪线程在队列锁外最多等待
+`queue_tf_wait_timeout`（默认 0.15 s），等同一图像采集时刻所需的相机、手臂及夹爪 TF 齐全。
+等待期间只保留当前帧和最新待处理帧；停止、阶段切换或源图像过期会取消等待。
+运动部件不回退到最新 TF，不重写图像时间戳；确实缺失的 TF 超时后仍触发原有下降前检查。
+下降/夹紧/抬升及放置/释放/退离使用 `MASKED` 阶段；切换阶段按源时间戳建立新纪元，丢弃推理迟到帧。
+实测工位配置提供 AUBO 手臂链路列表；其他机器人需配置自己的链路及包络半径。
+
+`DetectedObject.msg` 增加了投影框字段，修改后需重新编译，并同时重启感知、任务和 rqt 进程，
+避免旧消息 MD5 与新节点不一致。不会自动重启实机或触发运动。
 
 观察运动开始时建立新队列纪元，因此从初始位到观察位以及到位静止期间的
 有效帧都能累积稳定目标；进入连续分拣时不再二次清空。抓放完成后保留本轮安全
@@ -138,8 +169,11 @@ launch 参数 `task_executable` 默认是 `sorting_task_cpp`；需要验证旧�
 | `queue_stable_distance` | 0.015 | 位置稳定阈值 |
 | `queue_reserved_distance` | 0.035 | 已预留目标在预抓取运动中的位移判定阈值，须介于稳定和关联阈值之间 |
 | `queue_duplicate_distance` | 0.008 | 同帧去重半径，应小于物体间距 |
+| `queue_merge_distance` / `queue_merge_overlap` | 0.02 / 0.5 | 跨类别合并的中心三维距离上限及交集/较小框面积比例 |
+| `queue_occlusion_radius` / `queue_occlusion_links` | 0.06 / [end_effector_link] | 接近阶段遮挡判断的机器人胶囊半径与有序链路列表 |
 | `queue_max_age` | 10 | 目标最后可靠观测的有效期 |
 | `queue_frame_max_age` | 1 | 源图像及有效检测流的新鲜度上限 |
+| `queue_tf_wait_timeout` | 0.15 | 在队列锁外等待源时刻 TF 到齐的墙钟时间上限，不得超过 queue_frame_max_age |
 | `queue_reserved_max_age` | 30 | 已预留目标在预抓取运动中的最后观测有效期，必须不小于 `queue_max_age` |
 | `queue_confirmation_gap` | 1 | 超过此间隔重新累计确认 |
 | `queue_retention` | 30 | 未预留实例的保留时间 |
@@ -154,9 +188,14 @@ launch 参数 `task_executable` 默认是 `sorting_task_cpp`；需要验证旧�
 根据实测延迟设置 `queue_frame_max_age`，不能通过重写图像时间戳规避过期检查。
 
 `/sorting/target_cache` 连续模式输出 `schema_version: 2`，`targets` 的键由类别改成
-实例 ID，每项包含 `id/category/color/status/position/observations/confidence/age/picked`；
+实例 ID，每项包含 `id/category/color/status/position/observations/confidence/detection_confidence/stability/age/picked`；
 `color` 是为旧面板保留的 `category` 别名。
-`confidence` 是稳定确认进度，不是检测模型概率；第三方按颜色解析的面板需适配 ID。
+`detection_confidence` 是所选模型检测概率；`stability` 是稳定确认进度，旧字段 `confidence` 保留该进度含义。
+每项还包含缓存检测的 `grasp_geometry_valid/grasp_angle/grasp_width`。
+角度以顶层 `frame_id` 的 XY 平面为准，单位 rad；宽度为检测得到的夹取方向尺寸，单位 m。
+几何无效、数值非有限或宽度非正时，相应数值输出 JSON `null`。
+预留后的角度和宽度随执行快照冻结，与本次抓取使用的缓存检测一致。
+顶层还包含 `vision_phase/target_occluded/merged_detections_total`。第三方按颜色解析的面板需适配 ID。
 
 ### 重新编译和验证
 
@@ -210,10 +249,20 @@ C++ 实现内部使用 `enum class State`；`/sorting/state` 仍保留原字符�
 两端速度为零，默认运动时间 0.8 秒，可按仿真控制器响应调节。
 `gripper_backend=inspire` 仅支持 C++ 入口（推荐 `sorting_task_cpp`，兼容
 `color_sorting_task_cpp`），调用
-`/inspire_gripper/move_max`、`move_min`、`get_state`、`set_es`。
+`/inspire_gripper/move_max`、`move_min`、`get_state`、`get_openlimit`、`get_copen`、`set_es`。
 参数 `inspire_speed=500`、`inspire_force=100`、`inspire_motion_timeout=5.0` 可调整。
-张开等待状态 1；闭合等待状态 2 或 6；超时/异常调用停止服务。
+预抓取、放置释放和手动全开均发送 `move_max`，达到状态 1 后还需回读开度：
+实际开度与驱动最大限位的误差不超过 `inspire_open_tolerance`（默认 5，协议单位为 0–1000）才继续。
+闭合等待状态 2 或 6；超时/异常调用停止服务。`gripper_open: 0.0` 是任务层的张开端点，
+Inspire 后端将它映射到最大开度，并非发送协议开度 0。启动、停止或失败时不自动张开。
 `inspire_gripper/get_state.srv` 新增 `motion_state`，需要一起重新编译驱动和任务节点。
+
+`minimum_gripper_height` 是抓取及放置下降终点的最低 TCP 离桌高度，默认 `0.06 m`。
+抓取 Z 取 `max(物体中心Z + grasp_height_offset, table_z + minimum_gripper_height)`；
+放置还保留 `minimum_place_z` 的绝对高度下限。该参数必须小于预抓取、最低抬升及预放置高度，
+可在空闲时通过 dynamic_reconfigure/rqt 修改。它以 `end_effector_link`（实机为 `tcp_link`）
+控制点为准，不代表手指最低几何点，也不替代运动路径碰撞检查。已有小物体仿真 YAML
+显式设为 `0.0`，保留原来的低物体抓取高度。
 
 导航分拣停止恢复：已初始化且空闲时再次调用 `/sorting/stop`，会发布新的
 `STOPPED` 与 `base_locked=false`，供导航编排确认停止。C++ 初始化时检查配置的

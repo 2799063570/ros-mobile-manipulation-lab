@@ -34,6 +34,8 @@ table_collision_margin: 0.03
 object_height: 0.04
 # 抓取点相对物块中心抬高，保持与固定平台场景一致并避免指尖碰桌。
 grasp_height_offset: 0.01
+# 小方块仿真保留原抓取高度；实机工位使用 0.06 m 下限。
+minimum_gripper_height: 0.0
 scene_update_timeout: 10.0
 
 grasp_rpy: [3.141592653589793, 0.0, 0.0]

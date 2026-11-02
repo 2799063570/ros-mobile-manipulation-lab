@@ -33,6 +33,7 @@ def make_collision_object(frame_id, object_id, parts):
         raise ValueError("parts must contain at least one box")
 
     collision_object = CollisionObject()
+    collision_object.pose.orientation.w = 1.0
     collision_object.header.frame_id = frame_id
     collision_object.id = object_id
     collision_object.operation = CollisionObject.ADD

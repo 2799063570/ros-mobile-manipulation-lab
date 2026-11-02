@@ -1,9 +1,11 @@
 #include <aubo_sorting_core/sorting_task.hpp>
 #include <aubo_sorting_core/observation_tf.hpp>
+#include <aubo_sorting_core/occlusion_geometry.hpp>
 #include "task_utils.hpp"
 #include <tf/transform_datatypes.h>
 #include <chrono>
 #include <cmath>
+#include <limits>
 #include <sstream>
 
 namespace aubo_sorting_core
@@ -17,12 +19,92 @@ void SortingTask::resetInstanceQueue()
   queue_last_stamp_ = ros::Time();
   queue_last_frame_ = queue_last_source_frame_ = queue_empty_since_ = ros::WallTime();
   queue_empty_frames_ = 0;
+  queue_target_occluded_ = false;
+  queue_occlusion_checked_at_ = ros::WallTime();
+}
+
+void SortingTask::setQueueVisionPhase(QueueVisionPhase phase)
+{
+  std::lock_guard<std::mutex> lock(queue_mutex_);
+  if (queue_vision_phase_.load()==phase) return;
+  // Frames captured before a phase boundary must not arrive late and mutate
+  // the queue in the following phase (inference can take hundreds of ms).
+  queue_epoch_=ros::Time::now();
+  pending_detection_.reset();
+  queue_target_occluded_=false;
+  queue_occlusion_checked_at_=ros::WallTime();
+  if (phase==QueueVisionPhase::MASKED) queue_last_frame_=ros::WallTime();
+  queue_vision_phase_.store(phase);
+}
+
+bool SortingTask::reservedTargetOccluded(const aubo_perception::DetectedObjectArray& message)
+{
+  const auto found=std::find_if(instance_queue_.tracks().begin(),instance_queue_.tracks().end(),
+      [](const std::pair<const std::uint64_t,ObjectQueue::Track>& item) {
+        return item.second.status==ObjectQueue::Status::RESERVED;
+      });
+  if (found==instance_queue_.tracks().end() || message.sensor_frame.empty()) return false;
+  tf::StampedTransform transform;
+  lookupObservationTransform(tf_listener_,target_frame_,message.sensor_frame,message.header.stamp,false,transform);
+  const Point3 camera{{transform.getOrigin().x(),transform.getOrigin().y(),transform.getOrigin().z()}};
+  std::vector<Point3> links;
+  for (const auto& link:queue_occlusion_links_) {
+    lookupObservationTransform(tf_listener_,target_frame_,link,message.header.stamp,false,transform);
+    links.push_back({{transform.getOrigin().x(),transform.getOrigin().y(),transform.getOrigin().z()}});
+  }
+  const auto& sample=found->second.sample;
+  return robotOccludesTarget(camera,Point3{{sample.x,sample.y,sample.z}},links,queue_occlusion_radius_);
+}
+
+bool SortingTask::waitForInstanceTransforms(const aubo_perception::DetectedObjectArray& message,std::string& error)
+{
+  error.clear();
+  std::vector<ObservationTransformRequest> requests;
+  {
+    std::lock_guard<std::mutex> lock(queue_mutex_);
+    const auto phase=queue_vision_phase_.load();
+    const double age=(ros::Time::now()-message.header.stamp).toSec();
+    // These frames need no TF. The normal frame gate handles rejection and
+    // masked heartbeats without accidentally querying Time(0).
+    if (message.header.stamp.isZero() || message.header.stamp<=queue_epoch_ ||
+        message.header.stamp<=queue_last_stamp_ || age<0 || age>queue_frame_max_age_ ||
+        phase==QueueVisionPhase::DISABLED || phase==QueueVisionPhase::MASKED) return true;
+    State state;
+    { std::lock_guard<std::mutex> data_lock(data_mutex_); state=state_; }
+    if (state!=State::OBSERVING && state!=State::PICKING && state!=State::DETECTING &&
+        state!=State::READY && state!=State::SORTING) return true;
+    const auto add=[&requests](const std::string& to,const std::string& from,bool world) {
+      if (to!=from && !from.empty()) requests.emplace_back(to,from,world);
+    };
+    if (phase==QueueVisionPhase::APPROACH && !message.header.frame_id.empty() && !message.sensor_frame.empty()) {
+      add(target_frame_,message.sensor_frame,false);
+      for (const auto& link:queue_occlusion_links_) add(target_frame_,link,false);
+    }
+    if (message.observation_valid && !message.header.frame_id.empty()) {
+      add(target_frame_,message.header.frame_id,false);
+      add(table_frame_,target_frame_,true);
+      add(target_frame_,place_frame_,true);
+      if (state==State::PICKING && grasp_secured_.load()) {
+        add(target_frame_,end_effector_link_,false);
+        add(target_frame_,message.sensor_frame,false);
+      }
+    }
+  }
+  const auto cancelled=[this,&message] {
+    if (target_worker_shutdown_.load() || stop_requested_.load() || !ros::ok()) return true;
+    std::lock_guard<std::mutex> lock(queue_mutex_);
+    const double age=(ros::Time::now()-message.header.stamp).toSec();
+    return message.header.stamp<=queue_epoch_ || message.header.stamp<=queue_last_stamp_ ||
+        age<0 || age>queue_frame_max_age_ || queue_vision_phase_.load()==QueueVisionPhase::DISABLED;
+  };
+  return waitForObservationTransforms(tf_listener_,requests,message.header.stamp,queue_tf_wait_timeout_,cancelled,error);
 }
 
 void SortingTask::targetWorker()
 {
   while (!target_worker_shutdown_.load() && ros::ok())
   {
+    aubo_perception::DetectedObjectArrayConstPtr message;
     {
       std::unique_lock<std::mutex> lock(queue_mutex_);
       queue_condition_.wait_for(lock, std::chrono::milliseconds(100), [this] {
@@ -30,13 +112,34 @@ void SortingTask::targetWorker()
       });
       if (target_worker_shutdown_.load()) return;
       if (!pending_detection_) continue;
-      const auto message = pending_detection_;
+      message = pending_detection_;
       pending_detection_.reset();
-      // Serializes workspace changes too. TF lookups are non-waiting, and no robot
-      // planning, motion, or disk I/O is permitted under this mutex.
+    }
+    // TF may lag the camera by one joint-feedback interval. Keep one in-flight
+    // frame while the callback retains only the latest pending frame. No queue
+    // mutex is held while waiting, so stop/phase changes remain responsive.
+    std::string tf_error;
+    const bool transforms_ready=waitForInstanceTransforms(*message,tf_error);
+    {
+      std::unique_lock<std::mutex> lock(queue_mutex_);
+      if (!transforms_ready) {
+        if (!tf_error.empty() && message->header.stamp>queue_epoch_ &&
+            message->header.stamp>queue_last_stamp_ && !stop_requested_.load()) {
+          queue_last_frame_=ros::WallTime(); queue_target_occluded_=false;
+          queue_empty_since_=ros::WallTime(); queue_empty_frames_=0;
+          ROS_WARN_THROTTLE(2.0,"Instance tracker TF unavailable after %.0f ms at source time: %s",
+                            queue_tf_wait_timeout_*1000.,tf_error.c_str());
+        }
+        lock.unlock();
+        publishInstanceQueue();
+        continue;
+      }
+      // Phase/epoch/source age are checked again inside processInstanceFrame.
+      // The lookups here are non-waiting; no robot motion or IO under this lock.
       try { processInstanceFrame(*message); }
       catch (const std::exception& error) {
         queue_last_frame_ = ros::WallTime();
+        queue_target_occluded_=false;
         queue_empty_since_ = ros::WallTime();
         queue_empty_frames_ = 0;
         ROS_WARN_THROTTLE(2.0, "Instance tracker rejected frame: %s", error.what());
@@ -67,16 +170,34 @@ void SortingTask::processInstanceFrame(const aubo_perception::DetectedObjectArra
   if (stamp.isZero() || stamp <= queue_epoch_ || stamp <= queue_last_stamp_ ||
       !std::isfinite(age) || age < 0 || age > queue_frame_max_age_) return;
   queue_last_stamp_ = stamp;
+  const auto received=ros::WallTime::now();
+  const bool source_frame=!message.header.frame_id.empty() && !message.sensor_frame.empty();
+  if (vision_phase==QueueVisionPhase::MASKED) {
+    // A source-stamped frame with a known optical frame is still a camera
+    // heartbeat when the robot deliberately obscures depth/target geometry.
+    if (source_frame) queue_last_source_frame_=received;
+    queue_empty_frames_=0; queue_empty_since_=ros::WallTime();
+    return;
+  }
+  queue_target_occluded_=false;
+  if (vision_phase==QueueVisionPhase::APPROACH && source_frame) {
+    queue_target_occluded_=reservedTargetOccluded(message);
+    queue_occlusion_checked_at_=received;
+    if (queue_target_occluded_) {
+      queue_last_source_frame_=received;
+      queue_empty_frames_=0; queue_empty_since_=ros::WallTime();
+      return;
+    }
+  }
   if (!message.observation_valid || message.header.frame_id.empty()) {
+    queue_last_frame_=ros::WallTime();
     queue_empty_frames_ = 0;
     queue_empty_since_ = ros::WallTime();
     return;
   }
-  // This heartbeat remains meaningful during deliberately masked motion.  It
-  // lets a recent, already stable track be dispatched after placement without
-  // treating the intentional cache gap as a camera failure.
+  // Unmasked frames still require valid geometry. Masked heartbeats above
+  // never supply fresh geometry credit for dispatching the following target.
   queue_last_source_frame_ = ros::WallTime::now();
-  if (vision_phase == QueueVisionPhase::MASKED) return;
   tf::StampedTransform source_to_target, target_to_table, place_to_target, gripper, camera;
   const auto lookup = [this, &stamp](const std::string& to, const std::string& from,
                                      bool allow_recent_world_lag,
@@ -87,8 +208,8 @@ void SortingTask::processInstanceFrame(const aubo_perception::DetectedObjectArra
   lookup(target_frame_, message.header.frame_id, false, source_to_target);// 获取坐标系变换
   lookup(table_frame_, target_frame_, true, target_to_table);
   lookup(target_frame_, place_frame_, true, place_to_target);
-  // 抓取前必须继续跟踪预留目标；夹爪靠近时提前过滤会使它在下降前过期。
-  // 夹紧后才屏蔽夹爪邻域，避免手中物体再次入队。
+  // 无遮挡的接近阶段继续跟踪预留目标；确认自身遮挡时在上方冻结队列。
+  // 夹紧后额外屏蔽夹爪邻域，避免手中物体再次入队。
   tf::Vector3 gripper_projection;
   bool has_projection = false;
   // 是否需要屏蔽夹爪邻域 ： 抓取状态下 且 夹紧后
@@ -136,7 +257,17 @@ void SortingTask::processInstanceFrame(const aubo_perception::DetectedObjectArra
     if (excluded) continue;
     ObjectQueue::Sample sample;// 创建目标队列样本 
     sample.category = category;
+    if (!std::isfinite(object.confidence) || object.confidence<0 || object.confidence>1) { valid=false; continue; }
+    sample.confidence=object.confidence;
     sample.x = point.x(); sample.y = point.y(); sample.z = point.z();
+    for (const auto& corner:object.footprint.points) {
+      if (!std::isfinite(corner.x) || !std::isfinite(corner.y) || !std::isfinite(corner.z)) {valid=false; break;}
+      const tf::Vector3 projected=source_to_target*tf::Vector3(corner.x,corner.y,corner.z);
+      sample.footprint.push_back({{projected.x(),projected.y()}});
+    }
+    if (!object.footprint.points.empty() && (sample.footprint.size()!=4 || std::abs(signedArea(sample.footprint))<1e-10)) {
+      valid=false; continue;
+    }
     sample.payload = object;
     sample.payload.pose.position.x = point.x();
     sample.payload.pose.position.y = point.y();
@@ -148,11 +279,12 @@ void SortingTask::processInstanceFrame(const aubo_perception::DetectedObjectArra
         (height_mode_ != "depth" || (object.depth_valid &&
          std::abs(point.z() - (table_z_ + height / 2)) <= height_tolerance_)) &&
         (!(use_detected_angle_ || use_detected_width_) || object.grasp_geometry_valid);
-    if (use_detected_angle_) {
-      const auto axis = source_to_target.getBasis() * tf::Vector3(std::cos(object.grasp_angle), std::sin(object.grasp_angle), 0);
-      sample.payload.grasp_angle = std::atan2(axis.y(), axis.x());
-      sample.eligible = sample.eligible && std::isfinite(object.grasp_angle) && std::abs(axis.z()) < 0.1;
-    }
+    // Cached geometry is displayed in target_frame even when angle control is disabled.
+    const auto axis = source_to_target.getBasis() * tf::Vector3(std::cos(object.grasp_angle), std::sin(object.grasp_angle), 0);
+    const bool angle_valid = std::isfinite(object.grasp_angle) && std::abs(axis.z()) < 0.1;
+    sample.payload.grasp_angle = angle_valid ? std::atan2(axis.y(), axis.x()) :
+        std::numeric_limits<double>::quiet_NaN();
+    if (use_detected_angle_) sample.eligible = sample.eligible && angle_valid;
     if (use_detected_width_)
       sample.eligible = sample.eligible && std::isfinite(object.grasp_width) && object.grasp_width > 0 &&
           object.grasp_width <= gripper_width_open_ &&
@@ -204,9 +336,13 @@ bool SortingTask::validateReservedTarget()
       detail << "reserved target last seen " << now.toSec() - found->second.last_seen
              << " s ago (limit " << queue_reserved_max_age_ << " s)";
       reason = detail.str();
-    } else if (queue_last_frame_.isZero() ||
-               (now-queue_last_frame_).toSec() > queue_frame_max_age_)
-      reason = "valid observation stream unavailable before descent";
+    } else {
+      const bool known_occlusion=queue_vision_phase_.load()==QueueVisionPhase::APPROACH && queue_target_occluded_ &&
+          !queue_occlusion_checked_at_.isZero() && (now-queue_occlusion_checked_at_).toSec()<=queue_frame_max_age_;
+      const auto heartbeat=known_occlusion ? queue_last_source_frame_:queue_last_frame_;
+      if (heartbeat.isZero() || (now-heartbeat).toSec()>queue_frame_max_age_)
+        reason="valid observation stream unavailable before descent";
+    }
   }
   if (!reason.empty()) setFailure("DETECTION_FAILED", reason);
   return reason.empty() && !stop_requested_.load();
@@ -216,9 +352,14 @@ void SortingTask::publishInstanceQueue()
 {
   std::ostringstream stream;
   stream.precision(15);
-  stream << "{\"schema_version\":2,\"frame_id\":\"" << detail::jsonEscape(target_frame_) << "\",\"targets\":{";
+  stream << "{\"schema_version\":2,\"frame_id\":\"" << detail::jsonEscape(target_frame_) << '"';
   {
     std::lock_guard<std::mutex> lock(queue_mutex_);
+    const auto phase=queue_vision_phase_.load();
+    stream << ",\"vision_phase\":\"" << (phase==QueueVisionPhase::MASKED ? "masked" :
+        (phase==QueueVisionPhase::APPROACH ? "approach" : (phase==QueueVisionPhase::COLLECT ? "collect":"disabled")))
+        << "\",\"target_occluded\":" << (queue_target_occluded_ ? "true":"false")
+        << ",\"merged_detections_total\":" << instance_queue_.mergedDetectionsTotal() << ",\"targets\":{";
     bool first = true;
     const double now = ros::WallTime::now().toSec();
     for (const auto& item : instance_queue_.tracks()) {
@@ -230,8 +371,20 @@ void SortingTask::publishInstanceQueue()
              << "\",\"color\":\"" << detail::jsonEscape(track.sample.category)
              << "\",\"status\":\"" << ObjectQueue::statusName(track.status)
              << "\",\"position\":[" << track.sample.x << ',' << track.sample.y << ',' << track.sample.z
-             << "],\"observations\":" << track.observations
+             << "],\"grasp_geometry_valid\":" << (track.sample.payload.grasp_geometry_valid ? "true" : "false")
+             << ",\"grasp_angle\":";
+      if (track.sample.payload.grasp_geometry_valid && std::isfinite(track.sample.payload.grasp_angle))
+        stream << track.sample.payload.grasp_angle;
+      else stream << "null";
+      stream << ",\"grasp_width\":";
+      if (track.sample.payload.grasp_geometry_valid && std::isfinite(track.sample.payload.grasp_width) &&
+          track.sample.payload.grasp_width > 0)
+        stream << track.sample.payload.grasp_width;
+      else stream << "null";
+      stream << ",\"observations\":" << track.observations
+             << ",\"detection_confidence\":" << track.sample.confidence
              << ",\"confidence\":" << std::min(1.0, static_cast<double>(track.observations)/instance_queue_.min_observations)
+             << ",\"stability\":" << std::min(1.0, static_cast<double>(track.observations)/instance_queue_.min_observations)
              << ",\"age\":" << std::max(0.0, now-track.last_seen)
              << ",\"picked\":" << (track.status == ObjectQueue::Status::DONE ? "true" : "false") << '}';
     }
@@ -269,6 +422,7 @@ bool SortingTask::continuousSortingOperation()
           (now-queue_last_frame_).toSec() <= queue_frame_max_age_ && queue_empty_frames_ >= queue_empty_min_frames_;
     }
     if (reserved) {
+      setQueueVisionPhase(QueueVisionPhase::APPROACH);
       observation_ready_.store(false);
       publishState(State::PICKING, target.sample.category + " #" + std::to_string(target.id));
       publishInstanceQueue();
@@ -280,7 +434,6 @@ bool SortingTask::continuousSortingOperation()
       bool success = false;
       active_instance_id_ = target.id;
       grasp_secured_.store(false);
-      queue_vision_phase_.store(QueueVisionPhase::COLLECT);
       const auto clear_active = [this](void*) { active_instance_id_ = 0; };
       std::unique_ptr<void, decltype(clear_active)> active_guard(this, clear_active);
       try { success = refreshOctomap() && addTableCollision() && pickAndPlace(detected); }
@@ -293,6 +446,7 @@ bool SortingTask::continuousSortingOperation()
       {
         std::lock_guard<std::mutex> lock(queue_mutex_);
         instance_queue_.finish(target.id, success, ros::WallTime::now().toSec());
+        queue_target_occluded_=false;
         // Reject any masked frame still waiting in the one-frame worker slot,
         // while preserving safe tracks collected earlier in this pick/place.
         queue_epoch_ = ros::Time::now();

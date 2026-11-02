@@ -2,7 +2,8 @@
 import math
 import unittest
 import numpy as np
-from aubo_perception.grasp_geometry import center_height, rectangle_grasp, ray_plane, validate_modes
+from aubo_perception.grasp_geometry import (center_height, object_height_from_depth,
+                                           rectangle_grasp, ray_plane, validate_modes)
 
 
 class GeometryTest(unittest.TestCase):
@@ -25,6 +26,18 @@ class GeometryTest(unittest.TestCase):
         for z in (.10, .20, float('nan')):
             with self.assertRaises(ValueError):
                 center_height(z, .10, .04, .02)
+
+    def test_measured_height_is_surface_minus_table_with_bounded_noise_rejection(self):
+        for height in (.005, .065, .12, .20, .30):
+            with self.subTest(height=height):
+                self.assertAlmostEqual(object_height_from_depth(.1+height, .1, .005, .30), height)
+        for surface in (.1, .09, .41, float('nan'), float('inf')):
+            with self.subTest(surface=surface), self.assertRaises(ValueError):
+                object_height_from_depth(surface, .1, .005, .30)
+        with self.assertRaisesRegex(ValueError, 'height=0.40000.*allowed='):
+            object_height_from_depth(.5, .1, .005, .30)
+        with self.assertRaisesRegex(ValueError, 'surface_z=0.20000.*expected_z=0.14000'):
+            center_height(.2, .1, .04, .02)
 
     def test_table_projection_without_depth(self):
         point = ray_plane(60, 50, self.K, self.R, self.t, .14)

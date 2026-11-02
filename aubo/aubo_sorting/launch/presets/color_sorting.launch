@@ -1,0 +1,6 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Only select the detector; shared defaults belong to sorting.launch. -->
+  <arg name="detector" value="color"/>
+  <include file="$(find aubo_sorting)/launch/sorting.launch" pass_all_args="true"/>
+</launch>

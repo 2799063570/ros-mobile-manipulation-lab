@@ -1,0 +1,85 @@
+{
+  "name": "real_sort_ready",
+  "date": "2026-11-02",
+  "source": "offline URDF IK and reference-scene audit",
+  "measured_on_robot": false,
+  "live_execution_verified": false,
+  "frame_id": "base_link",
+  "tcp_link": "tcp_link",
+  "joint_names": [
+    "shoulder_joint",
+    "upperArm_joint",
+    "foreArm_joint",
+    "wrist1_joint",
+    "wrist2_joint",
+    "wrist3_joint"
+  ],
+  "positions": [
+    0.8254290354650716,
+    0.06605432167721761,
+    -1.671098875799711,
+    -0.16635319747695024,
+    -1.570797058382878,
+    -2.316163703519539
+  ],
+  "tcp_position": [
+    -0.25,
+    -0.45,
+    0.25285
+  ],
+  "tcp_rpy": [
+    3.141592653589793,
+    0.0,
+    1.5707963267948966
+  ],
+  "reference_pregrasp": {
+    "position": [
+      -0.0629832,
+      -0.674153,
+      0.20285
+    ],
+    "grasp_angle": 0.0,
+    "positions": [
+      1.2972192141926333,
+      0.4932305070797476,
+      -1.2500206157216092,
+      -0.17245112280256852,
+      -1.5707941091128004,
+      -1.8443726727314989
+    ]
+  },
+  "validation": {
+    "robot_model": "aubo_i5.xacro",
+    "gripper_joint_positions": [
+      0.0,
+      0.0
+    ],
+    "scene": [
+      "sorting_table with 0.02 m XY margin",
+      "camera_stand_reference.yaml",
+      "sorting_containers_real.yaml"
+    ],
+    "sampled_paths": [
+      "real_observe to real_sort_ready",
+      "real_sort_ready to reference_pregrasp"
+    ],
+    "maximum_joint_sample_step_rad": 0.01,
+    "path_states": 151,
+    "colliding_path_states": 0,
+    "camera_ray_samples": 344,
+    "occluded_camera_rays": 0,
+    "occlusion_capsule_radius_m": 0.06
+  },
+  "comparison": {
+    "real_observe": {
+      "tcp_distance_m": 0.5039826529142245,
+      "maximum_joint_change_rad": 1.4347407671847479,
+      "sum_joint_change_rad": 3.4001444029480417
+    },
+    "real_sort_ready": {
+      "tcp_distance_m": 0.2961753718512691,
+      "maximum_joint_change_rad": 0.4717910307880402,
+      "sum_joint_change_rad": 1.7979365295919296
+    }
+  }
+}

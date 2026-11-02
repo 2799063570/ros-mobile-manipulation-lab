@@ -12,14 +12,17 @@ table_collision_margin: 0.02
 object_height: 0.065
 height_tolerance: 0.02
 grasp_height_offset: 0.01
+minimum_gripper_height: 0.06  # tcp_link 抓取/放置下降终点至少高于桌面 6 cm
 grasp_rpy: [3.141592653589793, 0.0, 1.5707963267948966]
-observation_named_target: real_observe
-work_ready_named_target: real_observe
+# Closer working observation pose, derived from offline IK/reference-scene checks.
+# See real_sort_ready_reference.json; real_observe remains the measured finish pose.
+observation_named_target: real_sort_ready
+work_ready_named_target: real_sort_ready
 finish_named_target: real_observe
 auto_move_to_observation: false
 auto_start: false
-# One object of each class in order, then return to real_observe.
-continuous_sorting: false
+# Dispatch buffered instances in arrival order; this list only allows categories.
+continuous_sorting: true
 sort_classes: [bottle, can, box]
 target_cache_fallback_enabled: false
 detection_samples: 8
@@ -39,6 +42,7 @@ gripper_closed: 0.22
 inspire_speed: 300
 inspire_force: 100
 inspire_motion_timeout: 5.0
+inspire_open_tolerance: 5  # 协议开度单位；全开后需回读到最大限位附近
 use_grasp_attachment: false
 use_detected_angle: true
 use_detected_width: false

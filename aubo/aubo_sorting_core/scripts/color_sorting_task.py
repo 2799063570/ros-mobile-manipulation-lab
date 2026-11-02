@@ -89,6 +89,7 @@ class ColorSortingTask(object):
             "~work_ready_named_target", "work_ready"
         )
         self.pregrasp_height = float(rospy.get_param("~pregrasp_height", 0.25))
+        self.minimum_gripper_height = float(rospy.get_param("~minimum_gripper_height", 0.06))
         self.lift_height = float(rospy.get_param("~lift_height", 0.30))
         self.lift_min_height = float(rospy.get_param("~lift_min_height", self.lift_height))
         self.lift_height_step = float(rospy.get_param("~lift_height_step", 0.02))
@@ -102,6 +103,9 @@ class ColorSortingTask(object):
         self.preplace_height = float(rospy.get_param("~preplace_height", self.lift_height))
         if not math.isfinite(self.preplace_height) or self.preplace_height <= 0.0:
             raise ValueError("preplace_height must be finite and positive")
+        if (not math.isfinite(self.minimum_gripper_height) or self.minimum_gripper_height < 0
+                or self.minimum_gripper_height >= min(self.pregrasp_height, self.lift_min_height, self.preplace_height)):
+            raise ValueError("minimum_gripper_height must be below approach/lift heights")
         self.place_clearance = float(rospy.get_param("~place_clearance", 0.02))
         self.minimum_place_z = rospy.get_param("~minimum_place_z", None)
         if self.minimum_place_z is not None:
@@ -335,7 +339,7 @@ class ColorSortingTask(object):
                 self._configure_workspace_service,
             ),
         ]
-        self._publish_state("INITIALIZING", "waiting for Gazebo controllers")
+        self._publish_state("INITIALIZING", "waiting for controllers and gripper")
 
     def start(self):
         worker = threading.Thread(target=self._initialize)
@@ -1455,13 +1459,15 @@ class ColorSortingTask(object):
                 return False
             close_command = self.gripper_open + ((self.gripper_width_open-opening) /
                 (self.gripper_width_open-self.gripper_width_closed)) * (self.gripper_closed-self.gripper_open)
-        grasp_z = center_z + self.grasp_height_offset
-        if not self.table_z < grasp_z < self.table_z + min(self.pregrasp_height, self.lift_min_height):
+        nominal_grasp_z = center_z + self.grasp_height_offset
+        grasp_z = max(nominal_grasp_z, self.table_z + self.minimum_gripper_height)
+        if not self.table_z < nominal_grasp_z or not self.table_z < grasp_z < self.table_z + min(self.pregrasp_height, self.lift_min_height):
             self._set_failure("DETECTION_FAILED", "grasp height outside approach/lift clearance")
             return False
         self._active_grasp_angle = detected.grasp_angle if self.use_detected_angle else 0.0
         preplace_z = self.table_z + self.preplace_height
         place_z = expected_center + self.grasp_height_offset + self.place_clearance
+        place_z = max(place_z, self.table_z + self.minimum_gripper_height)
         if self.minimum_place_z is not None:
             place_z = max(place_z, self.minimum_place_z)
         if not math.isfinite(place_z) or preplace_z <= place_z:

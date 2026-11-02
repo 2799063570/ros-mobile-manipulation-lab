@@ -7,6 +7,8 @@
 #include <inspire_gripper/move_min.h>
 #include <inspire_gripper/set_es.h>
 #include <inspire_gripper/get_state.h>
+#include <inspire_gripper/get_openlimit.h>
+#include <inspire_gripper/get_copen.h>
 #include <std_msgs/Bool.h>
 #include <algorithm>
 #include <cmath>
@@ -45,6 +47,8 @@ SortingTask::SortingTask(ros::NodeHandle nh, ros::NodeHandle private_nh)
     inspire_close_client_ = nh_.serviceClient<inspire_gripper::move_min>("/inspire_gripper/move_min");
     inspire_state_client_ = nh_.serviceClient<inspire_gripper::get_state>("/inspire_gripper/get_state");
     inspire_stop_client_ = nh_.serviceClient<inspire_gripper::set_es>("/inspire_gripper/set_es");
+    inspire_open_limit_client_ = nh_.serviceClient<inspire_gripper::get_openlimit>("/inspire_gripper/get_openlimit");
+    inspire_current_open_client_ = nh_.serviceClient<inspire_gripper::get_copen>("/inspire_gripper/get_copen");
   }
 
   if (experiment_enabled_) {
@@ -53,6 +57,7 @@ SortingTask::SortingTask(ros::NodeHandle nh, ros::NodeHandle private_nh)
     experiment_audit_publisher_ = nh_.advertise<aubo_sorting_core::ExperimentAudit>("/sorting/experiment_audit", 5);
   }
   state_publisher_ = nh_.advertise<std_msgs::String>("/sorting/state", 1, true);// 状态机
+  progress_publisher_ = nh_.advertise<std_msgs::String>("/sorting/progress", 1, true);
   detection_summary_publisher_ = nh_.advertise<std_msgs::String>("/sorting/detection_summary", 1, true);// 检测结果汇总 例如：红1,绿0,蓝1
   base_lock_publisher_ = nh_.advertise<std_msgs::Bool>(base_lock_topic_, 1, true);// 机械臂是否在执行任务 移动底盘是否需要被锁住
   failure_publisher_ = nh_.advertise<std_msgs::String>(failure_topic_, 1, true);// 任务失败原因
@@ -92,7 +97,7 @@ SortingTask::SortingTask(ros::NodeHandle nh, ros::NodeHandle private_nh)
   std_msgs::String empty_failure;
   failure_publisher_.publish(empty_failure);
   publishTargetCache();// 发布目前检测到的结果
-  publishState(State::INITIALIZING, "waiting for Gazebo controllers");
+  publishState(State::INITIALIZING, "waiting for controllers and gripper");
 }
 
 SortingTask::~SortingTask()
@@ -153,7 +158,20 @@ void SortingTask::publishState(State state, const std::string& detail)
   if (!detail.empty())
     message.data += " | " + detail;
   state_publisher_.publish(message);
+  publishProgress(stateName(state), detail);
   ROS_INFO_STREAM("Sorting state: " << message.data);
+}
+
+void SortingTask::publishProgress(const std::string& phase, const std::string& description)
+{
+  std_msgs::String message;
+  std::ostringstream out;
+  out.precision(17);
+  out << "{\"phase\":\"" << detail::jsonEscape(phase)
+      << "\",\"description\":\"" << detail::jsonEscape(description)
+      << "\",\"wall_stamp\":" << ros::WallTime::now().toSec() << '}';
+  message.data = out.str();
+  progress_publisher_.publish(message);
 }
 
 void SortingTask::setFailure(const std::string& category, const std::string& detail)
@@ -200,7 +218,9 @@ void SortingTask::initialize()
       !(inspire_open_client_.waitForExistence(ros::Duration(gripper_server_timeout_)) &&
         inspire_close_client_.waitForExistence(ros::Duration(gripper_server_timeout_)) &&
         inspire_stop_client_.waitForExistence(ros::Duration(gripper_server_timeout_)) &&
-        inspire_state_client_.waitForExistence(ros::Duration(gripper_server_timeout_))))// 等待夹爪动作服务器启动
+        inspire_state_client_.waitForExistence(ros::Duration(gripper_server_timeout_)) &&
+        inspire_open_limit_client_.waitForExistence(ros::Duration(gripper_server_timeout_)) &&
+        inspire_current_open_client_.waitForExistence(ros::Duration(gripper_server_timeout_))))// 等待夹爪动作服务器启动
   {
     busy_.store(false);
     publishState(State::ERROR, "gripper action server unavailable");
@@ -424,6 +444,11 @@ void SortingTask::setupDynamicReconfigure()
   private_nh_.setParam("grasp_offset_y", grasp_offset_y_);
   private_nh_.setParam("velocity_scaling", velocity_scaling_);
   private_nh_.setParam("acceleration_scaling", acceleration_scaling_);
+  private_nh_.setParam("target_cache_min_observations", target_cache_min_observations_);
+  private_nh_.setParam("queue_max_age", instance_queue_.max_age);
+  private_nh_.setParam("queue_merge_distance", instance_queue_.merge_distance);
+  private_nh_.setParam("queue_merge_overlap", instance_queue_.merge_overlap);
+  private_nh_.setParam("minimum_gripper_height", minimum_gripper_height_);
   reconfigure_server_.reset(new dynamic_reconfigure::Server<SortingTaskConfig>(private_nh_));
   dynamic_reconfigure::Server<SortingTaskConfig>::CallbackType callback =
       [this](SortingTaskConfig& config, uint32_t level) { reconfigureCallback(config, level); };
@@ -434,13 +459,27 @@ void SortingTask::reconfigureCallback(SortingTaskConfig& config, uint32_t)
 {
   // startOperation() uses this mutex when claiming the only motion worker.
   std::lock_guard<std::mutex> lock(operation_mutex_);
+  std::lock_guard<std::mutex> queue_lock(queue_mutex_);
   const bool unchanged = config.detection_timeout == detection_timeout_ &&
       config.detection_samples == detection_samples_ &&
       config.grasp_offset_x == grasp_offset_x_ &&
       config.grasp_offset_y == grasp_offset_y_ &&
       config.velocity_scaling == velocity_scaling_ &&
-      config.acceleration_scaling == acceleration_scaling_;
-  if (busy_.load() || config.detection_timeout <= queue_empty_confirmation_)
+      config.acceleration_scaling == acceleration_scaling_ &&
+      config.target_cache_min_observations == target_cache_min_observations_ &&
+      config.queue_max_age == instance_queue_.max_age &&
+      config.queue_merge_distance==instance_queue_.merge_distance && config.queue_merge_overlap==instance_queue_.merge_overlap &&
+      config.minimum_gripper_height==minimum_gripper_height_;
+  const bool finite = std::isfinite(config.detection_timeout) && std::isfinite(config.grasp_offset_x) &&
+      std::isfinite(config.grasp_offset_y) && std::isfinite(config.velocity_scaling) &&
+      std::isfinite(config.acceleration_scaling) && std::isfinite(config.queue_max_age) &&
+      std::isfinite(config.queue_merge_distance) && std::isfinite(config.queue_merge_overlap) &&
+      std::isfinite(config.minimum_gripper_height);
+  if (busy_.load() || !finite || config.detection_timeout <= queue_empty_confirmation_ ||
+      config.queue_max_age > instance_queue_.retention || config.queue_max_age > queue_reserved_max_age_ ||
+      config.queue_merge_distance>instance_queue_.match_distance || config.queue_merge_distance<=0 ||
+      config.queue_merge_overlap<=0 || config.queue_merge_overlap>1 || config.minimum_gripper_height<0 ||
+      config.minimum_gripper_height>=std::min({pregrasp_height_,lift_min_height_,preplace_height_}))
   {
     config.detection_timeout = detection_timeout_;
     config.detection_samples = detection_samples_;
@@ -448,8 +487,13 @@ void SortingTask::reconfigureCallback(SortingTaskConfig& config, uint32_t)
     config.grasp_offset_y = grasp_offset_y_;
     config.velocity_scaling = velocity_scaling_;
     config.acceleration_scaling = acceleration_scaling_;
+    config.target_cache_min_observations = target_cache_min_observations_;
+    config.queue_max_age = instance_queue_.max_age;
+    config.queue_merge_distance=instance_queue_.merge_distance;
+    config.queue_merge_overlap=instance_queue_.merge_overlap;
+    config.minimum_gripper_height=minimum_gripper_height_;
     if (!unchanged)
-      ROS_WARN_THROTTLE(2.0, "Sorting parameters rejected: arm busy or detection timeout too short");
+      ROS_WARN_THROTTLE(2.0, "Sorting parameters rejected: task busy or invalid height/timeout/queue bounds");
     return;
   }
   detection_timeout_ = config.detection_timeout;
@@ -458,6 +502,16 @@ void SortingTask::reconfigureCallback(SortingTaskConfig& config, uint32_t)
   grasp_offset_y_ = config.grasp_offset_y;
   velocity_scaling_ = config.velocity_scaling;
   acceleration_scaling_ = config.acceleration_scaling;
+  minimum_gripper_height_=config.minimum_gripper_height;
+  if (target_cache_min_observations_ != config.target_cache_min_observations ||
+      instance_queue_.max_age != config.queue_max_age || instance_queue_.merge_distance!=config.queue_merge_distance ||
+      instance_queue_.merge_overlap!=config.queue_merge_overlap)
+    instance_queue_.invalidate();
+  target_cache_min_observations_ = config.target_cache_min_observations;
+  instance_queue_.min_observations = target_cache_min_observations_;
+  instance_queue_.max_age = config.queue_max_age;
+  instance_queue_.merge_distance=config.queue_merge_distance;
+  instance_queue_.merge_overlap=config.queue_merge_overlap;
   arm_->setMaxVelocityScalingFactor(velocity_scaling_);
   arm_->setMaxAccelerationScalingFactor(acceleration_scaling_);
 }

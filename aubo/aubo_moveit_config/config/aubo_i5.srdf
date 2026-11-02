@@ -69,6 +69,15 @@
         <joint name="wrist2_joint" value="-1.634069800377" />
         <joint name="wrist3_joint" value="-2.071427106857" />
     </group_state>
+    <!-- real_sort_ready: offline IK/reference-scene audit, 2026-11-02; not a measured robot pose. -->
+    <group_state name="real_sort_ready" group="aubo_i5">
+        <joint name="shoulder_joint" value="0.825429035465" />
+        <joint name="upperArm_joint" value="0.066054321677" />
+        <joint name="foreArm_joint" value="-1.671098875800" />
+        <joint name="wrist1_joint" value="-0.166353197477" />
+        <joint name="wrist2_joint" value="-1.570797058383" />
+        <joint name="wrist3_joint" value="-2.316163703520" />
+    </group_state>
     <group_state name="observe" group="aubo_i5">
         <joint name="foreArm_joint" value="0.06780" />
         <joint name="shoulder_joint" value="0.08648" />

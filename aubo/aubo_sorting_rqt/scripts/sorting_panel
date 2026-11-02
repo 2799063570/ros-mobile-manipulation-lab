@@ -1,0 +1,8 @@
+#!/usr/bin/env python3
+import sys
+from rqt_gui.main import Main
+from aubo_sorting_rqt.model import add_plugin_arguments
+
+if __name__ == '__main__':
+    sys.exit(Main().main(sys.argv, standalone='aubo_sorting_rqt/AuboSorting',
+                         plugin_argument_provider=add_plugin_arguments))

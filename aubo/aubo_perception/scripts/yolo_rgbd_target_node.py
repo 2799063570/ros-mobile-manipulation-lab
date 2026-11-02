@@ -22,11 +22,12 @@ try:
     from darknet_ros_msgs.msg import BoundingBoxes
 except ImportError:
     BoundingBoxes = None
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Point32
 from sensor_msgs.msg import CameraInfo, Image
 from std_msgs.msg import String, Float32
 from tf.transformations import quaternion_matrix
-from aubo_perception.grasp_geometry import validate_modes, center_height, ray_plane, rectangle_grasp
+from aubo_perception.grasp_geometry import (validate_modes, center_height, object_height_from_depth,
+                                           ray_plane, rectangle_grasp, rectangle_footprint)
 
 from aubo_perception.msg import DetectedObject, DetectedObjectArray, YoloDetectionArray
 
@@ -49,6 +50,16 @@ class YoloRgbdTargetNode(object):
         self.object_height = float(rospy.get_param("~object_height", 0.04))
         self.class_heights = rospy.get_param("~class_heights", {})
         self.height_tolerance = float(rospy.get_param("~height_tolerance", 0.02))
+        self.object_height_source = rospy.get_param("~object_height_source", "configured")
+        self.minimum_object_height = float(rospy.get_param("~minimum_object_height", 0.005))
+        self.maximum_object_height = float(rospy.get_param("~maximum_object_height", 0.30))
+        if self.object_height_source not in ("configured", "depth"):
+            raise ValueError("object_height_source must be configured or depth")
+        if self.object_height_source == "depth" and self.height_mode != "depth":
+            raise ValueError("object_height_source=depth requires height_mode=depth")
+        if (not all(math.isfinite(v) for v in (self.minimum_object_height, self.maximum_object_height))
+                or not 0 < self.minimum_object_height <= self.maximum_object_height):
+            raise ValueError("need 0 < minimum_object_height <= maximum_object_height")
         for height in self.class_heights.values():
             center_height(self.table_z + float(height), self.table_z, float(height), self.height_tolerance)
         self.boxes_topic = rospy.get_param(
@@ -335,14 +346,25 @@ class YoloRgbdTargetNode(object):
                     position = camera_pose.pose.position
                     point = rotation.dot([position.x, position.y, position.z]) + translation
                     surface_z = float(point[2])
-                    z = center_height(surface_z, self.table_z, object_height, self.height_tolerance)
                 else:
                     point = ray_plane(u, v, info.K, rotation, translation, surface_z)
-                    z = self.table_z + object_height/2
+                if not np.isfinite(point).all():
+                    raise ValueError("non-finite depth projection")
+                # A detection proved to be outside the pickup workspace cannot
+                # invalidate its observation merely because its height differs.
                 if any(not float(self.workspace.get("min_"+axis, -float("inf"))) <= float(point[i]) <=
                            float(self.workspace.get("max_"+axis, float("inf")))
                        for i, axis in enumerate(("x", "y"))):
                     continue
+                if self.height_mode == "depth":
+                    if self.object_height_source == "depth":
+                        object_height = object_height_from_depth(surface_z, self.table_z,
+                            self.minimum_object_height, self.maximum_object_height)
+                        z = self.table_z + object_height/2
+                    else:
+                        z = center_height(surface_z, self.table_z, object_height, self.height_tolerance)
+                else:
+                    z = self.table_z + object_height/2
                 width, yaw = rectangle_grasp(u, v,
                     float(getattr(box, "width", box.xmax-box.xmin)),
                     float(getattr(box, "height", box.ymax-box.ymin)), float(getattr(box, "angle", 0.0)),
@@ -359,10 +381,15 @@ class YoloRgbdTargetNode(object):
                 detected.object_height = object_height
                 detected.contour_area = max(0., box.xmax-box.xmin)*max(0., box.ymax-box.ymin)
                 detected.pixel_x, detected.pixel_y = int(round(u)), int(round(v))
+                detected.footprint.points = [Point32(x=float(p[0]), y=float(p[1]), z=float(p[2]))
+                    for p in rectangle_footprint(u, v, dimensions[0], dimensions[1], dimensions[2],
+                                                 info.K, rotation, translation, surface_z)]
                 output.objects.append(detected)
             except (ValueError, tf.Exception) as error:
                 output.observation_valid = False
-                rospy.logwarn_throttle(2.0, "Rejecting grasp target: %s", str(error))
+                rospy.logwarn_throttle(2.0,
+                    "Rejecting grasp target class=%s pixel=(%.1f, %.1f) frame=%s height_source=%s: %s",
+                    label, u, v, self.target_frame, self.object_height_source, str(error))
         if self.task_mode in ("sorting", "both"):
             self.detections_publisher.publish(output)
         if self.task_mode in ("servo", "both"):

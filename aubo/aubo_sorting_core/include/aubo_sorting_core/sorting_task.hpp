@@ -64,7 +64,7 @@ private:
     STOPPED };
   // Detection messages keep arriving throughout arm motion.  Only frames from
   // geometrically useful parts of the trajectory may update the instance queue.
-  enum class QueueVisionPhase { DISABLED, COLLECT, MASKED };
+  enum class QueueVisionPhase { DISABLED, COLLECT, APPROACH, MASKED };
   static const char* stateName(State state);
 
   using GripperClient = actionlib::SimpleActionClient<control_msgs::FollowJointTrajectoryAction>;
@@ -92,6 +92,10 @@ private:
   };
 
   void loadParameters();
+  void publishProgress(const std::string& phase, const std::string& description);
+  void setQueueVisionPhase(QueueVisionPhase phase);
+  bool reservedTargetOccluded(const aubo_perception::DetectedObjectArray& message);
+  bool waitForInstanceTransforms(const aubo_perception::DetectedObjectArray& message,std::string& error);
   bool runExperimentStage(const std::string& stage, const std::string& description,
                           const std::function<bool()>& operation);
   void experimentEvent(const std::string& kind, const std::string& stage,
@@ -101,6 +105,7 @@ private:
   bool planAndExecuteImpl(const std::string& description, double wrist1_limit);
   bool cartesianToImpl(const geometry_msgs::PoseStamped& pose, const std::string& description, bool complete);
   bool commandGripperImpl(double position);
+  bool commandInspireGripper(double position);
   bool refreshOctomapImpl();
   bool waitForObjectImpl(const std::string& category, const ros::WallTime& not_before,
                         aubo_perception::DetectedObject& detected);
@@ -201,6 +206,7 @@ private:
   std::string planner_id_, planning_service_;
   std::atomic<std::uint64_t> experiment_sequence_{0};
   ros::Publisher state_publisher_;
+  ros::Publisher progress_publisher_;
   ros::Publisher detection_summary_publisher_;
   ros::Publisher base_lock_publisher_;
   ros::Publisher failure_publisher_;
@@ -214,8 +220,10 @@ private:
   ros::Subscriber workspace_subscriber_;
   ros::ServiceClient clear_octomap_client_;
   ros::ServiceClient inspire_open_client_, inspire_close_client_, inspire_stop_client_, inspire_state_client_;
+  ros::ServiceClient inspire_open_limit_client_, inspire_current_open_client_;
   std::string gripper_backend_;
   int inspire_speed_{500}, inspire_force_{100};
+  int inspire_open_tolerance_{5};
   double inspire_motion_timeout_{5.0};
   std::vector<ros::ServiceServer> services_;
   std::unique_ptr<dynamic_reconfigure::Server<SortingTaskConfig>> reconfigure_server_;
@@ -260,6 +268,7 @@ private:
   double table_collision_margin_{0.0};
   double object_height_{0.04};
   double grasp_height_offset_{0.01};
+  double minimum_gripper_height_{0.06};
   double pregrasp_height_{0.25};
   double lift_height_{0.30};
   double lift_min_height_{0.30};
@@ -330,6 +339,11 @@ private:
   double queue_frame_max_age_{1.0}, queue_empty_confirmation_{2.0}, queue_reserved_max_age_{30.0};
   double queue_place_exclusion_radius_{0.08}, queue_gripper_exclusion_radius_{0.10};
   double queue_height_tolerance_{0.04};
+  double queue_occlusion_radius_{0.06};
+  double queue_tf_wait_timeout_{0.15};
+  std::vector<std::string> queue_occlusion_links_;
+  bool queue_target_occluded_{false}; // Protected by queue_mutex_.
+  ros::WallTime queue_occlusion_checked_at_;
   int queue_empty_min_frames_{5};
   std::mutex queue_mutex_;
   std::condition_variable queue_condition_;
