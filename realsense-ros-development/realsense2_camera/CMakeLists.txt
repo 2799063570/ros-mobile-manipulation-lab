@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
     roscpp
     sensor_msgs
     std_msgs
+    std_srvs
     nodelet
     cv_bridge
     image_transport
@@ -40,7 +41,17 @@ endif()
 if (WIN32)
 find_package(realsense2 CONFIG REQUIRED)
 else()
-find_package(realsense2 2.39.0)
+# Prefer the workspace-local SDK validated with D435i firmware 5.17.0.10.
+# An explicit -Drealsense2_DIR still takes precedence; other machines can use
+# their installed SDK without keeping a second catkin workspace.
+get_filename_component(_workspace_realsense2_config
+    "${CMAKE_CURRENT_SOURCE_DIR}/../../../local_deps/realsense2/cmake/realsense2"
+    ABSOLUTE)
+if(NOT DEFINED realsense2_DIR AND
+   EXISTS "${_workspace_realsense2_config}/realsense2Config.cmake")
+    set(realsense2_DIR "${_workspace_realsense2_config}" CACHE PATH "RealSense SDK config")
+endif()
+find_package(realsense2 2.50.0)
 endif()
 
 if(NOT realsense2_FOUND)
@@ -68,7 +79,13 @@ add_message_files(
     FILES
     IMUInfo.msg
     Extrinsics.msg
+    Metadata.msg
     )
+
+add_service_files(
+    FILES
+    DeviceInfo.srv
+)
 
 generate_messages(
     DEPENDENCIES

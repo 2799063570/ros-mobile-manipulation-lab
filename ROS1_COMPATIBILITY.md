@@ -66,15 +66,19 @@ sudo apt install /tmp/libprotobuf9v5_2.6.1-1.3_amd64.deb
 - `navigation-melodic/`
 - `teb_local_planner-melodic-devel/`
 - `depthimage_to_laserscan-melodic-devel/`
-- `realsense-ros-development/`
 - `slam_karto/`
 - `ros_tensorflow/`
 
-前五项由 rosdep/apt 提供对应发行版的软件包。RealSense D435i 是唯一支持的物理
+前四项由 rosdep/apt 提供对应发行版的软件包。RealSense D435i 是唯一支持的物理
 RGB-D 相机，`turn_on_wheeltec_robot/launch/wheeltec_camera.launch` 直接启动
 `realsense2_camera`。旧 Astra、USB 相机和语音/TensorFlow 示例不属于支持范围。
 
-上述六个目录仍保留源码快照和 `CATKIN_IGNORE`。2026-10-05 已将
+`realsense-ros-development/realsense2_camera` 已于 2026-11-02 升级至 2.3.2，
+直接在主工作空间构建。本机 SDK 2.56.5 放在工作空间 `local_deps/realsense2`，
+不属于 Git 仓库；旧相机模型和 ddynamic 源码分别屏蔽，依赖使用系统版本。
+构建方式见 [D435i 调试记录](aubo/aubo_perception/D435I_DEBUG.md#主工作空间驱动构建)。
+
+上述五个目录仍保留源码快照和 `CATKIN_IGNORE`。2026-10-05 已将
 `qt_ros_test/`、`xf_mic_asr_offline/`、`xf_mic_asr_offline_circle/`、`bodyreader/`、
 `tts_make/` 和 `ros_astra_camera/` 完整归档至仓库外，校验后移出当前工作树。
 历史使用说明中可能仍有这些旧功能的命令；它们不属于当前支持的运行入口。

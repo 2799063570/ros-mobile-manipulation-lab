@@ -4,10 +4,10 @@
 
 ## D435i 真机采集与识别调试
 
-先加载已经编译的兼容驱动工作区（它同时包含本工作区环境）：
+RealSense 兼容驱动已纳入主工作空间，统一加载：
 
 ```bash
-source /home/zlab/aubo/ros_mobile_manipulation_lab/realsense_noetic_ws/devel/setup.bash
+source /home/zlab/aubo/ros_mobile_manipulation_lab/devel/setup.bash
 # 仅相机：640×480、30 Hz，开启 RGB 对齐深度、同步和点云。
 roslaunch aubo_perception realsense_d435i.launch serial_no:=335222076553
 # 或直接启动相机 + 易拉罐识别，二选一，避免重复打开同一设备。
@@ -22,7 +22,9 @@ roslaunch aubo_perception realsense_debug.launch detector:=yolo \
 ```
 
 原系统 ROS 驱动链接 SDK 2.50.0，与本机固件 5.17.0.10 的 IMU 格式不兼容。
-独立工作区使用官方 ROS 驱动 2.3.2 源码，重新链接 SDK 2.56.5，保留系统安装。
+主工作空间的 `realsense-ros-development/realsense2_camera` 使用 ROS 驱动 2.3.2，
+链接工作空间 `local_deps/realsense2` 中的 SDK 2.56.5，保留系统安装。
+构建方式见 [D435I_DEBUG.md](D435I_DEBUG.md#主工作空间驱动构建)。
 需确认启动日志中 `Built with` 和 `Running with LibRealSense` 均为 `2.56.5`。
 `initial_reset` 会重置选定相机，勿在另一程序采集时执行。
 IMU 合并输出 `/camera/imu` 约 400 Hz；仍有默认 IMU 标定告警，

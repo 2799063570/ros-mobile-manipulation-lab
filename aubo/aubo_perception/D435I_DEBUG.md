@@ -6,10 +6,10 @@
 - Ubuntu 20.04，内核 `5.15.0-139-generic`，ROS Noetic。
 - USB：经 Hub 连接，实测链路速率 5000M，SDK 报告 USB 3.2。
 - 原 ROS 包：`/opt/ros/noetic/share/realsense2_camera`，版本 2.3.2，链接 SDK 2.50.0。
-- 最终驱动：官方 ROS 驱动 2.3.2 源码重新链接 SDK 2.56.5，保存在独立工作区
-  `/home/zlab/aubo/ros_mobile_manipulation_lab/realsense_noetic_ws`。
+- 最终驱动：ROS 驱动 2.3.2 源码重新链接 SDK 2.56.5。最初在独立工作空间验证，
+  2026-11-02 迁入主工作空间的 `src/realsense-ros-development/realsense2_camera`。
   SDK 使用 V4L2/HID 后端；原系统库、固件和设备标定均未覆盖。
-- 仓库内的 `realsense-ros-development` 是 2.2.18，目前不在 catkin 构建白名单中。
+- 仓库内原 2.2.18 驱动已升级；旧模型和 ddynamic 源码继续单独屏蔽，使用系统包。
 - 调试使用独立 master `http://localhost:11319`，未启动机械臂控制。
 
 RGB、RGB 对齐深度、点云、IMU 和现有 YOLO → RGB-D 几何程序已经通过实机验证。
@@ -58,11 +58,16 @@ RGB 和对齐深度时间戳差的 P95 为 0 ms，均使用 `camera_color_optica
 静止量级检查通过。需继续关注长时间运行及设备标定，不能把本次验收当作 IMU 精密标定
 或视觉惯性融合精度验证；硬件时钟复位、相机/IMU 同步精度也尚未量测。
 
-## 独立驱动构建
+## 主工作空间驱动构建
 
-`realsense_noetic_ws` 是本仓库外的本机依赖工作区，源码、SDK 和构建结果都保存在该目录。
-通过它的 `devel/setup.bash` 加载新驱动和原主工作区；仅加载原主工作区会回到旧驱动。
-不需要修改主工作区的构建白名单，也没有修改 `.bashrc` 或系统 APT 安装。
+2026-11-02 将已验证的驱动迁入现有 `src/realsense-ros-development/realsense2_camera`，
+参与主工作空间构建。SDK 与 CMake 配置保存在主工作空间的 `local_deps/realsense2/`，
+位于 Git 仓库（`src`）之外，无需上传二进制依赖，也不覆盖系统 SDK。
+只需加载主工作空间 `devel/setup.bash`，不再叠加独立相机工作空间。
+
+父目录不再有 `CATKIN_IGNORE`；旧 `realsense2_description` 和
+`ddynamic_reconfigure-kinetic-devel` 各自保留忽略标记，继续使用 Noetic 系统版本。
+迁移时的源码和旧独立工作空间备份保存在 `/home/zlab/aubo/local_backups/`。
 
 依赖来源：
 
@@ -71,19 +76,35 @@ RGB 和对齐深度时间戳差的 P95 为 0 ms，均使用 `camera_color_optica
 - SDK 官方 APT 包 `2.56.5-0~realsense.17053`，下载前在临时目录验证了官方源签名。
   运行库包 SHA256：`3d7102572f70ab0221f1c6340ec3f1390e51683672105e092cc787fe87e668ee`；
   开发包 SHA256：`a937b2c8e55032327a5d7b7c600be2262520129dc3343f5b9089c21b18f5108a`。
-- SDK 解包到 `sdk/usr`。`cmake/realsense2` 只引用共享库及匹配头文件，避免官方包导出的
-  未使用 DDS 静态目标缺少 fastcdr/fastrtps 导致 CMake 失败；ROS 驱动源码未修改。
+- SDK 解包到 `local_deps/realsense2/sdk/usr`；其 `cmake/realsense2` 只引用共享库及匹配头文件，
+  避免官方包导出的未使用 DDS 静态目标缺少 fastcdr/fastrtps 导致 CMake 失败。
+  驱动 CMake 优先发现该本机 SDK；C++ 驱动源码保持已验证版本。
 
 本机重新构建命令：
 
 ```bash
-source /home/zlab/aubo/ros_mobile_manipulation_lab/devel/setup.bash
-catkin_make -C /home/zlab/aubo/ros_mobile_manipulation_lab/realsense_noetic_ws \
+source /opt/ros/noetic/setup.bash
+source /home/zlab/moveit_ws/devel/setup.bash
+catkin_make -C /home/zlab/aubo/ros_mobile_manipulation_lab \
   -DPYTHON_EXECUTABLE=/usr/bin/python3 \
   -DEMPY_SCRIPT=/home/zlab/.local/bin/empy \
-  -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCATKIN_ENABLE_TESTING=OFF \
-  -Drealsense2_DIR=/home/zlab/aubo/ros_mobile_manipulation_lab/realsense_noetic_ws/cmake/realsense2 -j4
+  -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCATKIN_ENABLE_TESTING=OFF -j4 -l4
+source /home/zlab/aubo/ros_mobile_manipulation_lab/devel/setup.bash
+rospack find realsense2_camera
+# 应指向主工作空间 src/realsense-ros-development/realsense2_camera。
+ldd /home/zlab/aubo/ros_mobile_manipulation_lab/devel/lib/librealsense2_camera.so | rg librealsense2
+# 本机应解析到 local_deps/realsense2/sdk/usr 下的 2.56.5。
 ```
+
+## 迁移验收边界
+
+2026-10-26 的相机与 IMU 实测结果属于原驱动验证记录。2026-11-02 的迁移验收
+主工作空间 `catkin_make -j4 -l4` 通过，3 项 RealSense launch 测试通过。
+`rospack find realsense2_camera` 指向主工作空间源码，驱动动态链接到
+`local_deps/realsense2/sdk/usr/lib/x86_64-linux-gnu/librealsense2.so.2.56`。
+旧独立工作空间已归档至
+`/home/zlab/aubo/local_backups/workspace_consolidation_20261102_180135/realsense_noetic_ws`。
+没有重新启动相机或机械臂进行实机复测。
 
 ## 代码验证
 

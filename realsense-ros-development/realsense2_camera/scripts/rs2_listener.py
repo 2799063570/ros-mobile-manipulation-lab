@@ -2,6 +2,7 @@ import sys
 import time
 import rospy
 from sensor_msgs.msg import Image as msg_Image
+from sensor_msgs.msg import CompressedImage as msg_CompressedImage
 from sensor_msgs.msg import PointCloud2 as msg_PointCloud2
 import sensor_msgs.point_cloud2 as pc2
 from sensor_msgs.msg import Imu as msg_Imu
@@ -38,7 +39,7 @@ class CWaitForMessage:
         self.result = None
 
         self.break_timeout = False
-        self.timeout = params.get('timeout_secs', -1)
+        self.timeout = params.get('timeout_secs', -1) * 1e-3
         self.seq = params.get('seq', -1)
         self.time = params.get('time', None)
         self.node_name = params.get('node_name', 'rs2_listener')
@@ -116,7 +117,7 @@ class CWaitForMessage:
     def pointscloudCallback(self, theme_name):
         def _pointscloudCallback(data):
             self.prev_time = time.time()
-            print 'Got pointcloud: %d, %d' % (data.width, data.height)
+            print ('Got pointcloud: %d, %d' % (data.width, data.height))
 
             self.func_data[theme_name].setdefault('frame_counter', 0)
             self.func_data[theme_name].setdefault('avg', [])
@@ -143,7 +144,7 @@ class CWaitForMessage:
 
     def wait_for_message(self, params, msg_type=msg_Image):
         topic = params['topic']
-        print 'connect to ROS with name: %s' % self.node_name
+        print ('connect to ROS with name: %s' % self.node_name)
         rospy.init_node(self.node_name, anonymous=True)
 
         out_filename = params.get('filename', None)
@@ -151,7 +152,7 @@ class CWaitForMessage:
             self.fout = open(out_filename, 'w')
             if msg_type is msg_Imu:
                 col_w = 20
-                print 'Writing to file: %s' % out_filename
+                print ('Writing to file: %s' % out_filename)
                 columns = ['frame_number', 'frame_time(sec)', 'accel.x', 'accel.y', 'accel.z', 'gyro.x', 'gyro.y', 'gyro.z']
                 line = ('{:<%d}'*len(columns) % (col_w, col_w, col_w, col_w, col_w, col_w, col_w, col_w)).format(*columns) + '\n'
                 sys.stdout.write(line)
@@ -180,7 +181,7 @@ class CWaitForMessage:
         # tests_params = {<name>: {'callback', 'topic', 'msg_type', 'internal_params'}}
         self.func_data = dict([[theme_name, {}] for theme_name in themes])
 
-        print 'connect to ROS with name: %s' % self.node_name
+        print ('connect to ROS with name: %s' % self.node_name)
         rospy.init_node(self.node_name, anonymous=True)
         for theme_name in themes:
             theme = self.themes[theme_name]
@@ -216,7 +217,8 @@ class CWaitForMessage:
         self.prev_msg_data = data
 
         self.prev_time = time.time()
-        if any([self.seq > 0 and data.header.seq >= self.seq,
+        if any([self.seq < 0 and self.time is None, 
+                self.seq > 0 and data.header.seq >= self.seq,
                 self.time and data.header.stamp.secs == self.time['secs'] and data.header.stamp.nsecs == self.time['nsecs']]):
             self.result = data
             self.sub.unregister()
@@ -225,20 +227,20 @@ class CWaitForMessage:
 
 def main():
     if len(sys.argv) < 2 or '--help' in sys.argv or '/?' in sys.argv:
-        print 'USAGE:'
-        print '------'
-        print 'rs2_listener.py <topic | theme> [Options]'
-        print 'example: rs2_listener.py /camera/color/image_raw --time 1532423022.044515610 --timeout 3'
-        print 'example: rs2_listener.py pointscloud'
-        print ''
-        print 'Application subscribes on <topic>, wait for the first message matching [Options].'
-        print 'When found, prints the timestamp.'
+        print ('USAGE:')
+        print ('------')
+        print ('rs2_listener.py <topic | theme> [Options]')
+        print ('example: rs2_listener.py /camera/color/image_raw --time 1532423022.044515610 --timeout 3')
+        print ('example: rs2_listener.py pointscloud')
+        print ('')
+        print ('Application subscribes on <topic>, wait for the first message matching [Options].')
+        print ('When found, prints the timestamp.')
         print
-        print '[Options:]'
-        print '-s <sequential number>'
-        print '--time <secs.nsecs>'
-        print '--timeout <secs>'
-        print '--filename <filename> : write output to file'
+        print ('[Options:]')
+        print ('-s <sequential number>')
+        print ('--time <secs.nsecs>')
+        print ('--timeout <secs>')
+        print ('--filename <filename> : write output to file')
         exit(-1)
 
     # wanted_topic = '/device_0/sensor_0/Depth_0/image/data'
@@ -256,6 +258,8 @@ def main():
         except NameError as e:
             print ('theora_image_transport is not installed. \nType "sudo apt-get install ros-kinetic-theora-image-transport" to enable registering on messages of type theora.')
             raise
+    elif 'compressed' in wanted_topic:
+        msg_type = msg_CompressedImage
     else:
         msg_type = msg_Image
 
@@ -274,10 +278,14 @@ def main():
         msg_params.setdefault('topic', wanted_topic)
         res = msg_retriever.wait_for_message(msg_params, msg_type)
         rospy.loginfo('Got message: %s' % res.header)
+        if (hasattr(res, 'encoding')):
+            print ('res.encoding:', res.encoding)
+        if (hasattr(res, 'format')):
+            print ('res.format:', res.format)
     else:
         themes = [wanted_topic]
         res = msg_retriever.wait_for_messages(themes)
-        print res
+        print (res)
 
 
 if __name__ == '__main__':

@@ -2,13 +2,13 @@
 
 本文回答三个问题：每个包负责什么、应该从哪里启动、启动前还需要什么。
 包名以 `package.xml` 为准，而不是目录名。例如 `wheeltec_joy_control` 目录中的包名是 `wheeltec_joy`。
-当前清单覆盖 **46 个未被 `CATKIN_IGNORE` 屏蔽的包**，并在末尾单列保留的第三方源码。
+当前清单按功能组织随仓库提供且未被 `CATKIN_IGNORE` 屏蔽的包，并在末尾单列保留的第三方源码；不含本地忽略的研究算法包。
 “参与构建”不等于“所有功能均已验证可用”；硬件、模型权重和外部依赖仍需自行准备。
 
 按功能查找：[运行约定](#1-阅读与运行约定) · [固定机械臂](#2-aubo-固定机械臂11-个包) ·
 [复合机器人](#3-aubo-复合移动机器人9-个包) · [差速机器人](#4-简单差速机器人1-个包) ·
-[通用算法](#5-通用标定与算法组件5-个包) · [设备驱动](#6-传感器与夹爪驱动10-个包) ·
-[WheelTec](#7-wheeltec-参考应用与仿真10-个包) · [保留源码](#8-保留但默认不构建的第三方源码25-个包)。
+[通用算法](#5-通用标定与算法组件5-个包) · [设备驱动](#6-传感器与夹爪驱动11-个包) ·
+[WheelTec](#7-wheeltec-参考应用与仿真10-个包) · [保留源码](#8-保留但默认不构建的第三方源码24-个包)。
 
 ## 1. 阅读与运行约定
 
@@ -293,7 +293,7 @@ roslaunch turn_on_wheeltec_robot include/robot_pose_ekf.launch
 
 详细参考：[easy_handeye](../easy_handeye/README.md)、[标定 launch](../easy_handeye/easy_handeye/launch/README.md)、[RRT](../rrt_exploration/README.md)、[EKF](../robot_pose_ekf/README.md)。
 
-## 6. 传感器与夹爪驱动（10 个包）
+## 6. 传感器与夹爪驱动（11 个包）
 
 这些入口面向**真实设备**，通常只启动驱动，不包含机器人、地图或任务。
 先核对设备型号、串口别名、波特率、串口权限或网卡 / IP。不要给同一个串口启动两个驱动。
@@ -320,6 +320,13 @@ rostopic hz /scan
 rostopic hz /imu
 rostopic echo -n 1 /scan/header
 ```
+
+### RealSense 主工作空间驱动
+
+`realsense-ros-development/realsense2_camera`（2.3.2）直接参与主工作空间构建。
+本机使用 SDK 2.56.5，依赖在工作空间 `local_deps/realsense2`，只需加载主工作空间环境。
+采集入口为 `roslaunch aubo_perception realsense_d435i.launch`。
+详细构建见 [D435i 调试记录](../aubo/aubo_perception/D435I_DEBUG.md#主工作空间驱动构建)。
 
 ## 7. WheelTec 参考应用与仿真（10 个包）
 
@@ -407,7 +414,7 @@ rostopic echo -n 1 /scan/header
 - 前置与观察：当前主仓库未提供其所需的 `darknet_ros_msgs`；还要准备兼容检测节点、权重、相机 / 雷达和底盘，核对检测消息、话题及动作安全。
 - 位置：[旧动作包](../wheeltec_yolo_action)。
 
-## 8. 保留但默认不构建的第三方源码（25 个包）
+## 8. 保留但默认不构建的第三方源码（24 个包）
 
 以下目录或其父目录有 `CATKIN_IGNORE`。`catkin_make` 不会因此编译它们，
 `roslaunch` / `rospack` 找到的同名包可能来自 `/opt/ros` 或其他工作空间。
@@ -443,8 +450,7 @@ rostopic echo -n 1 /scan/header
 
 | 目录 / 包名 | 作用 | 运行与限制 |
 | --- | --- | --- |
-| `realsense-ros-development` / `realsense2_camera` | RealSense 真实 RGB-D 驱动 | 安装兼容的系统版本后可用 `roslaunch realsense2_camera rs_camera.launch`；需要真实设备及 librealsense，保留快照不默认构建 |
-| 同目录 / `realsense2_description` | 相机模型 / 网格 | 由相机 / 机器人模型加载，无独立采集节点 |
+| `realsense-ros-development` / `realsense2_description` | 相机模型 / 网格 | 由相机 / 机器人模型加载，无独立采集节点 |
 | 同目录 / `ddynamic_reconfigure` | 动态参数支持库 | RealSense 驱动依赖，无独立任务入口 |
 | `slam_karto` / `slam_karto` | Karto 二维激光 SLAM 节点 | 通过选择 Karto 的建图 launch 使用；需系统安装兼容版本及扫描、里程计 TF |
 | 同目录 / `open_karto` | Karto 算法库 | 由 slam_karto 链接，无独立节点 |

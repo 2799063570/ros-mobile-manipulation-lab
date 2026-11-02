@@ -1,6 +1,17 @@
 # Intel RealSense 设备的 ROS 驱动
 
-本目录包含 D400 系列、SR300 和 T265 跟踪模块的 ROS 1 功能包。ROS 2 用户应使用对应的 [ROS 2 分支](https://github.com/IntelRealSense/realsense-ros)。当前快照支持的 librealsense 版本为 v2.39.0，详情见 [`realsense2_camera` 发布记录](https://github.com/IntelRealSense/realsense-ros/releases)。
+本目录包含 D400 系列、SR300 和 T265 跟踪模块的 ROS 1 功能包。ROS 2 用户应使用对应的 [ROS 2 分支](https://github.com/IntelRealSense/realsense-ros)。当前 `realsense2_camera` 已升级至 2.3.2，最低 SDK 为 2.50.0；本机 D435i
+固件 5.17.0.10 使用已验证的 SDK 2.56.5。
+
+驱动直接参与主 catkin 工作空间构建，不再使用独立相机工作空间。CMake 优先查找
+`<workspace>/local_deps/realsense2/cmake/realsense2` 中的本机 SDK 配置，也支持
+`-Drealsense2_DIR=/path/to/config`。SDK 二进制位于 Git 仓库之外，不随源码提交。
+没有本机依赖目录时使用已安装的兼容 SDK；本机固件请保持 2.56.5。
+旧 `realsense2_description` 2.2.18 和 `ddynamic_reconfigure` 源码仅保留参考，
+分别使用 `CATKIN_IGNORE` 屏蔽，运行依赖由 ROS 系统包提供。
+详细构建和验证见 [D435i 调试记录](../aubo/aubo_perception/D435I_DEBUG.md#主工作空间驱动构建)。
+
+下面的安装说明为原第三方文档；SDK 版本以以上说明和实际固件兼容性为准。
 
 ## 安装
 
