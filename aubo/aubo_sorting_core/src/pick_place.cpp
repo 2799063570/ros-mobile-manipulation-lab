@@ -131,6 +131,18 @@ bool SortingTask::pickAndPlaceImpl(const aubo_perception::DetectedObject& detect
   }
   double place_x = 0.0;
   double place_y = 0.0;
+  if (use_place_object_yaw_)
+  {
+    // Keep the detected grasp orientation through the lift. Rotate only on the
+    // planned high transfer to pre-place, then hold it for descent and retreat.
+    // The gripper closes across the object's short axis (long-axis yaw + pi/2).
+    // Choose the nearest pi-equivalent angle to avoid an unnecessary half turn.
+    const double pi = std::acos(-1.0);
+    const double short_axis = std::remainder(place_object_yaw_, pi) + 0.5 * pi;
+    active_grasp_angle_ += std::remainder(short_axis - active_grasp_angle_, pi);
+    ROS_INFO("Placing %s with object long-axis yaw %.3f rad in %s",
+             category.c_str(), place_object_yaw_, target_frame_.c_str());
+  }
   publishProgress("PREPLACE", category);
   if (!xyInTargetFrame(place_frame_, place->second, place_x, place_y) ||      // 将目标放置位置转换到目标坐标系下
       !moveToPose(makePose(place_x, place_y, preplace_z), category + " pre-place"))  // 移动到目标放置位置上方

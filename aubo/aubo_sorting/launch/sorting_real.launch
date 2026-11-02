@@ -45,8 +45,12 @@
   <!-- 首次运行只启动节点；运动必须由服务显式触发。 -->
   <arg name="auto_move_to_observation" default="false"/>
   <arg name="auto_start" default="false"/>
-  <arg name="velocity_scaling" default="0.10"/>
-  <arg name="acceleration_scaling" default="0.10"/>
+  <arg name="velocity_scaling" default="0.60"/>
+  <arg name="acceleration_scaling" default="0.40"/>
+  <!-- Forward hardware capture through the real sorting scenario wrappers. -->
+  <arg name="record_motion" default="false"/>
+  <arg name="motion_bag_prefix" default="$(env HOME)/aubo_motion"/>
+  <arg name="motion_trace_capacity" default="120000"/>
 
   <include if="$(arg start_robot)" file="$(find aubo_ros_control)/launch/aubo_real_bringup.launch">
     <arg name="robot_ip" value="$(arg robot_ip)"/>
@@ -54,6 +58,9 @@
     <arg name="rviz_config" value="$(arg rviz_config)"/>
     <arg name="robot_xacro" value="$(arg robot_xacro)"/>
     <arg name="robot_srdf" value="$(arg robot_srdf)"/>
+    <arg name="record_motion" value="$(arg record_motion)"/>
+    <arg name="motion_bag_prefix" value="$(arg motion_bag_prefix)"/>
+    <arg name="motion_trace_capacity" value="$(arg motion_trace_capacity)"/>
   </include>
 
   <!-- Scene geometry must also load when reusing an existing MoveIt session. -->
@@ -114,7 +121,7 @@
     <arg name="use_grasp_attachment" value="false"/>
   </include>
 
-  <!-- 覆盖仿真任务 YAML 的较快速度；参数在节点启动前统一装载。 -->
+  <!-- 实机入口的速度参数在节点启动前统一覆盖任务 YAML。 -->
   <param name="/color_sorting_task/velocity_scaling" value="$(arg velocity_scaling)"/>
   <param name="/color_sorting_task/acceleration_scaling" value="$(arg acceleration_scaling)"/>
 </launch>

@@ -19,8 +19,8 @@
   <arg name="rqt" default="false"/>
   <arg name="gripper_port" default="/dev/serial/by-id/usb-1a86_USB_Serial-if00-port0"/>
   <arg name="object_height" default="0.065"/>
-  <arg name="velocity_scaling" default="0.10"/>
-  <arg name="acceleration_scaling" default="0.10"/>
+  <arg name="velocity_scaling" default="0.60"/>
+  <arg name="acceleration_scaling" default="0.40"/>
   <arg name="calibration_file" default="$(find aubo_ros_control)/config/aubo_realsense_handeye_eye_on_base.yaml"/>
 
   <include file="$(find aubo_sorting)/launch/sorting_real.launch" pass_all_args="true">

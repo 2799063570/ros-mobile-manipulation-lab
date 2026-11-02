@@ -1,5 +1,70 @@
 # SDK 点动：按时间线排查供点、缓冲与反向平滑
 
+## 2026-11-02 13:13:54：5 段 RViz 实机运动成功
+
+本次约 58.17 秒的 bag 与完整硬件 trace 显示 5 段 RViz 轨迹全部成功；用户反馈仍有抖动。
+10960 个 5 ms 指令样本无丢记录或栅格异常，V/A/J 差分峰值约 0.34965/0.39960/0.99902；
+未观测到活跃 MAC 归零、低于 5 点、SDK 调用失败或故障锁存。
+第 5 段 upperArm 的最大 JTC 位置差 0.14744 rad，达到 0.15 rad 阈值的 98.3%。
+目标与反馈的拟合相位差约 315–388 ms，表明排队/反馈时序对误差影响明显；
+它不是机械振幅的测量。原始反馈约 23.48 Hz，不能量化高频机械振动。
+实际 RViz 请求速度/加速度缩放均为 1.0；分拣节点处于 IDLE，尚未验证完整分拣流程。
+本次未修改控制参数，报告和图表保存在
+`/home/zlab/aubo/ros_mobile_manipulation_lab/records/moveit_review_20261102_131354/review.md`。
+
+## 2026-11-02：MoveIt 实机分拣 wrist3 路径超差
+
+本节对应 ros_control/JTC 分拣链，与下文 DirectSdk 点动链区分。
+本地 ROS 日志会话 `5c21e17a-d67a-11f1-9f9f-af1be762c4d1` 显示：
+13:05:49.410 收到执行请求，约 3.04 秒后 `wrist3_joint path error 0.151020`
+超过路径容差 0.15 rad（约 8.59°），动作以 `PATH_TOLERANCE_VIOLATED (-4)` 中止。
+GuardedJTC 先锁定供点，随后执行柜端停止和退出透传，13:05:52.636 收到两者应答。
+硬件节点是 required 节点，其退出引起整套 launch 关闭；后续的 spawner 服务不可用是退出过程的结果。
+规划已成功，目标采样约束 WARN 不是此次停止的直接触发点。
+
+此会话启动后即因推送超时切换为独立反馈查询，运行期间多次记录查询耗时 60–82 ms。
+这说明反馈查询长尾存在，但没有故障瞬间的反馈年龄、目标速度和队列记录，不能据此归因。
+当前 JTC 软件队列目标最多 40 点/200 ms，MAC 目标 50 点/250 ms；
+在途批次、反馈年龄还会影响 JTC 当前生成目标与反馈的相位差。
+这些是配置的名义跨度，不能将其相加当作已测得的固定执行延迟。
+局部恒速时位置差近似 `|v| × 延迟`，需要结合本次实际轨迹速度验证，
+不能仅凭 S 曲线缩短到 5.838 秒就断言速度过快或时序出错。
+
+分拣实机入口现已转发 `record_motion`、`motion_bag_prefix` 和 `motion_trace_capacity`，
+故障日志也输出该周期最大位置误差轴的目标位置、反馈位置及目标速度。
+没有改变运动参数、0.15 rad 容差或故障停机逻辑。下一次现场运行可使用：
+
+```bash
+# 在已 source 工作空间、按现场流程准备好运行的终端使用；不要与现有硬件节点重复启动。
+# 该入口启动分拣系统，动作仍由面板显式触发。
+capture_dir=$(mktemp -d "$HOME/aubo_sorting_failure_XXXXXXXX")
+roslaunch aubo_sorting eye_to_hand_yolo_sorting_real.launch \
+  record_motion:=true motion_bag_prefix:="$capture_dir/motion" \
+  motion_trace_capacity:=600000
+```
+
+trace 容量按 commands/RPC 各自计数；此设置提供 600000 个命令槽和 75000 个 RPC 槽。
+前者覆盖约 50 分钟的 200 Hz 连续保持/运动流，后者按查询/发送频率可能更早耗尽；
+超过容量会标记丢记录。建议只采集所需的复现窗口。ROS bag 同时保存 JTC 目标、反馈、结果及流控诊断；
+CSV 在硬件节点正常 shutdown 后导出。使用新目录可避免覆盖既有记录。
+若 `start_robot:=false` 复用已有硬件节点，应在该硬件节点的启动入口启用记录；
+分拣侧参数不会重新配置已经运行的节点。
+
+退出并完成文件写入后，离线分析（将占位路径换为实际文件）：
+
+```bash
+rosrun aubo_ros_control analyze_moveit_motion.py /实际目录/motion_实际时间.bag
+rosrun aubo_ros_control analyze_hardware_trace.py /实际目录/motion_hardware_capture_实际标识
+```
+
+第二条传 CSV 的公共前缀，不附加 `.commands.csv` 或 `.rpc.csv`。
+先比较故障前 JTC desired/actual/error 与目标速度，再结合反馈年龄、软件队列、
+MAC 水位及查询/发送耗时区分相位领先、供点异常和实际跟踪偏差。
+本次只有 ROS 文本日志，没有对应 bag/硬件 trace，根因和实机修复效果仍待采集验证。
+验证：GuardedJTC 编译通过；27 项模拟硬件流控/控制器回归通过，包括路径/终点超差后
+禁止供点和柜端停止应答检查；分拣 launch 的记录启停及 trace 参数透传解析通过。
+没有连接或驱动机械臂。
+
 ## 2026-10-25 10:09:53：实机采集正常完成
 
 用户反馈执行良好。本次 `logs/jog_timing_20261025_100953_t1eIlV/` 记录约62.39秒，

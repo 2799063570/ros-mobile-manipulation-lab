@@ -31,6 +31,10 @@ namespace aubo_sorting_core
     private_nh_.param<std::string>("height_mode", height_mode_, "table");
     private_nh_.param("use_detected_angle", use_detected_angle_, false);
     private_nh_.param("use_detected_width", use_detected_width_, false);
+    use_place_object_yaw_ = private_nh_.hasParam("place_object_yaw");
+    if (use_place_object_yaw_ &&
+        (!private_nh_.getParam("place_object_yaw", place_object_yaw_) || !std::isfinite(place_object_yaw_)))
+      throw std::runtime_error("place_object_yaw must be a finite angle in target_frame");
     private_nh_.param("height_tolerance", height_tolerance_, 0.02);
     private_nh_.param("gripper_width_open", gripper_width_open_, -1.0);
     private_nh_.param("gripper_width_closed", gripper_width_closed_, -1.0);

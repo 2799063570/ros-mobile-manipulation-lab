@@ -262,6 +262,8 @@ private:
   // 感知抓取参数仅在一次抓放期间生效，观察位姿仍使用原始 grasp_rpy。
   std::string height_mode_{"table"};
   bool use_detected_angle_{false}, use_detected_width_{false};
+  bool use_place_object_yaw_{false};
+  double place_object_yaw_{0.0}; // Object long-axis yaw in target_frame; gripper is pi-symmetric.
   double active_grasp_angle_{0.0}, height_tolerance_{0.02};
   double gripper_width_open_{-1.0}, gripper_width_closed_{-1.0}, width_close_scale_{0.9};
   double table_z_{0.14};

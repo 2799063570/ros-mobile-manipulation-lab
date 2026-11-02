@@ -14,8 +14,9 @@ aubo_i5_controller:
   constraints:
     goal_time: 2.0
     stopped_velocity_tolerance: 0.05
-    # 默认连续流预装 50 个 5 ms 点，名义延迟约 250 ms；通信/软件
-    # 排队还会增加延迟。保留现有容差，超差时应查供点而非继续放宽。
+    # 默认连续流预装 50 个 5 ms 点，名义跨度约 250 ms；另有最多
+    # 40 点/200 ms 软件队列，以及在途批次和反馈年龄。这些不是实测总延迟。
+    # 保留现有容差，超差时应记录目标/反馈/供点时序再定位。
     shoulder_joint: {trajectory: 0.15, goal: 0.05}
     upperArm_joint:  {trajectory: 0.15, goal: 0.05}
     foreArm_joint:   {trajectory: 0.15, goal: 0.05}

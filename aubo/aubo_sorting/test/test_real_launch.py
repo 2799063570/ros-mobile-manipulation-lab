@@ -151,8 +151,8 @@ class RealLaunchTest(unittest.TestCase):
         self.assertFalse(params['/color_sorting_task/use_grasp_attachment'])
         self.assertFalse(params['/color_sorting_task/auto_start'])
         self.assertFalse(params['/color_sorting_task/auto_move_to_observation'])
-        self.assertEqual(params['/color_sorting_task/velocity_scaling'], 0.1)
-        self.assertEqual(params['/color_sorting_task/acceleration_scaling'], 0.1)
+        self.assertEqual(params['/color_sorting_task/velocity_scaling'], 0.6)
+        self.assertEqual(params['/color_sorting_task/acceleration_scaling'], 0.4)
         self.assertEqual(params['/grasp_geometry/camera_info_topic'],
                          '/camera/color/camera_info')
         self.assertEqual(params['/color_sorting_task/sort_classes'],

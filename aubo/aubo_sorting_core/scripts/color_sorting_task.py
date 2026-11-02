@@ -55,6 +55,11 @@ class ColorSortingTask(object):
         self.height_mode = rospy.get_param("~height_mode", "table")
         self.use_detected_angle = bool(rospy.get_param("~use_detected_angle", False))
         self.use_detected_width = bool(rospy.get_param("~use_detected_width", False))
+        self.place_object_yaw = rospy.get_param("~place_object_yaw", None)
+        if self.place_object_yaw is not None:
+            self.place_object_yaw = float(self.place_object_yaw)
+            if not math.isfinite(self.place_object_yaw):
+                raise ValueError("place_object_yaw must be a finite angle in target_frame")
         self.height_tolerance = float(rospy.get_param("~height_tolerance", 0.02))
         self.gripper_width_open = float(rospy.get_param("~gripper_width_open", -1.0))
         self.gripper_width_closed = float(rospy.get_param("~gripper_width_closed", -1.0))
@@ -1513,6 +1518,9 @@ class ColorSortingTask(object):
         if place_xy is None:
             return False
         place_x, place_y = place_xy
+        if self.place_object_yaw is not None:
+            short_axis = math.remainder(self.place_object_yaw, math.pi) + math.pi/2
+            self._active_grasp_angle += math.remainder(short_axis-self._active_grasp_angle, math.pi)
         if not self._move_to_pose(
             self._pose(place_x, place_y, preplace_z), color + " pre-place"
         ):

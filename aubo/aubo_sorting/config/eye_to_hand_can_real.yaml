@@ -14,6 +14,8 @@ height_tolerance: 0.02
 grasp_height_offset: 0.01
 minimum_gripper_height: 0.06  # tcp_link 抓取/放置下降终点至少高于桌面 6 cm
 grasp_rpy: [3.141592653589793, 0.0, 1.5707963267948966]
+# 物体长轴在 base_link XY 平面内沿 X 轴放置；闭合轴沿 Y，抬升后在高位转正。
+place_object_yaw: 0.0
 # Closer working observation pose, derived from offline IK/reference-scene checks.
 # See real_sort_ready_reference.json; real_observe remains the measured finish pose.
 observation_named_target: real_sort_ready
@@ -40,7 +42,7 @@ gripper_backend: inspire
 gripper_open: 0.0
 gripper_closed: 0.22
 inspire_speed: 300
-inspire_force: 100
+inspire_force: 200  # 力控闭合力度：由 100 提高；协议范围 50–1000
 inspire_motion_timeout: 5.0
 inspire_open_tolerance: 5  # 协议开度单位；全开后需回读到最大限位附近
 use_grasp_attachment: false
@@ -49,7 +51,7 @@ use_detected_width: false
 grasp_offset_x: 0.0
 grasp_offset_y: 0.0
 planning_time: 12.0
-velocity_scaling: 0.50
+velocity_scaling: 0.60
 acceleration_scaling: 0.40
 scene_update_timeout: 10.0
 moveit_server_timeout: 30.0

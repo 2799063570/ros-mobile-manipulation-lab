@@ -25,7 +25,7 @@ class GraspTest(unittest.TestCase):
                 pregrasp_height=.22, preplace_height=.28, lift_min_height=.18,
                 place_clearance=.02, minimum_place_z=None, place_frame='base_link', place_targets={'red':[.4, .2]},
                 minimum_gripper_height=0.,
-                grasp_model_names={}, _active_grasp_angle=0.).items():
+                grasp_model_names={}, _active_grasp_angle=0., place_object_yaw=None).items():
             setattr(t, key, value)
         t._pose = lambda x,y,z: (x,y,z,t._active_grasp_angle)
         t._xy_in_target_frame = lambda frame, xy: xy
@@ -49,6 +49,42 @@ class GraspTest(unittest.TestCase):
         self.assertEqual(self.t._category(self.d), 'can')
         self.d.class_name = ''
         self.assertEqual(self.t._category(self.d), 'red')
+
+    def test_place_long_axis_aligns_x_after_lift_and_holds_through_release(self):
+        self.t.place_object_yaw = 0.
+        def lift(*args):
+            self.assertAlmostEqual(self.t._active_grasp_angle, self.d.grasp_angle)
+            return True
+        self.t._lift_with_recovery.side_effect = lift
+        self.assertTrue(self.t._pick_and_place(self.d))
+        # Pickup follows the measured angle; pre-place, descent and retreat use Y closure.
+        self.assertAlmostEqual(self.t._move_to_pose.call_args_list[0][0][0][3], .7)
+        self.assertAlmostEqual(self.t._move_to_pose.call_args_list[1][0][0][3], math.pi/2)
+        for call in self.t._cartesian_to.call_args_list[1:]:
+            self.assertAlmostEqual(call[0][0][3], math.pi/2)
+        self.assertEqual(self.t._active_grasp_angle, 0.)
+
+    def test_place_uses_nearest_parallel_orientation_and_supports_y_axis(self):
+        for pickup, target in ((-1.4, 0.), (1.4, math.pi/2), (.7, math.pi)):
+            with self.subTest(pickup=pickup, target=target):
+                self.d.grasp_angle = pickup
+                self.t.place_object_yaw = target
+                self.assertTrue(self.t._pick_and_place(self.d))
+                angle = self.t._move_to_pose.call_args_list[-1][0][0][3]
+                self.assertAlmostEqual(math.remainder(angle-target-math.pi/2, math.pi), 0.)
+                self.assertLessEqual(abs(angle-pickup), math.pi/2)
+
+    def test_lift_failure_does_not_rotate_for_placement_or_release(self):
+        self.t.place_object_yaw = 0.
+        self.t._lift_with_recovery.return_value = False
+        self.assertFalse(self.t._pick_and_place(self.d))
+        self.assertEqual(self.t._move_to_pose.call_count, 1)
+        self.assertEqual(self.t._command_gripper.call_count, 2)  # Open then close; no release.
+        self.assertEqual(self.t._active_grasp_angle, 0.)
+
+    def test_unconfigured_place_keeps_pickup_angle(self):
+        self.assertTrue(self.t._pick_and_place(self.d))
+        self.assertAlmostEqual(self.t._move_to_pose.call_args_list[-1][0][0][3], .7)
 
     def test_minimum_place_z_does_not_change_grasp_height(self):
         self.t.minimum_place_z = .18

@@ -107,6 +107,13 @@ roslaunch aubo_sorting sorting_gazebo.launch height_mode:=depth
 `gripper_open/gripper_closed` 对应关系后，使用 `use_detected_width:=true`。
 `width_close_scale` 默认 0.90。当前宽度换算只用于 trajectory 夹爪后端。
 
+实机工位使用 `place_object_yaw: 0.0`，将物体长轴沿 `target_frame=base_link` 的 X 轴放置，
+与 Y 轴垂直。抓取和抬升沿用检测角度；高位转移到预放置点时转正，随后固定方向下降、松爪及退离。
+夹爪沿物体短轴闭合，因此此时闭合方向沿 Y；TCP 姿态仍叠加 `grasp_rpy` 的夹爪轴标定偏置。
+方向按 π 周期取最近等效姿态，减少不必要的半圈转动；不要求物体头尾朝向 +X。
+`place_object_yaw` 单位为弧度，设为 `1.5707963267948966` 可沿 Y 放置；未配置时保留抓取方向。
+修改后需重启任务节点生效。
+
 原颜色节点的 `use_depth` 不再控制新入口的抓取 Z；统一使用 `height_mode`。
 旧场景配置里 `projection_plane_z/object_center_z` 等仅属于旧节点的参数也不再决定新入口几何。
 
@@ -322,7 +329,7 @@ roslaunch aubo_sorting eye_to_hand_yolo_sorting_real.launch \
 同时发布相机光学帧。如果相机或夹爪驱动已单独运行，分别设置
 `start_camera:=false` 或 `start_gripper:=false`，确保话题和服务名称仍与分拣配置一致。
 默认不自动移动到观察位，也不自动开始分拣；验证现场后可显式调用
-`/sorting/move_to_observation` 和 `/sorting/start`。默认速度与加速度比例均为 0.1，
+`/sorting/move_to_observation` 和 `/sorting/start`。实机入口默认速度比例为 0.6、加速度比例为 0.4，
 可通过 `velocity_scaling`、`acceleration_scaling` 覆盖。
 
 桌面上用于接收物体的开口盒可以作为 MoveIt 障碍物加入：

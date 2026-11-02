@@ -3,6 +3,7 @@
 #include <aubo_ros_control/aubo_hardware_interface.h>
 #include <joint_trajectory_controller/joint_trajectory_controller.h>
 #include <trajectory_interface/quintic_spline_segment.h>
+#include <cmath>
 
 namespace aubo_ros_control
 {
@@ -25,8 +26,19 @@ public:
             // Main loop calls write() AFTER update(): latch first, so even the
             // point calculated in this failing update cannot enter the queue.
             hardware_->requestExecutionStop();
-            ROS_ERROR("[AuboJTC] 轨迹执行失败 (%d)，已锁定供点；执行柜端停止，需重启后才能运动",
-                      active->preallocated_result_->error_code);
+            // Keep the exact failing update observable even when the 50 Hz
+            // controller state publisher has not published this sample yet.
+            std::size_t worst = 0;
+            for (std::size_t i = 1; i < joint_names_.size(); ++i)
+                if (std::fabs(state_error_.position[i]) > std::fabs(state_error_.position[worst]))
+                    worst = i;
+            ROS_ERROR("[AuboJTC] 轨迹执行失败 (%d): %s；最大位置误差轴 %s: "
+                      "desired=%.6f actual=%.6f error=%.6f rad desired_velocity=%.6f rad/s；"
+                      "已锁定供点；执行柜端停止，需重启后才能运动",
+                      active->preallocated_result_->error_code,
+                      active->preallocated_result_->error_string.c_str(), joint_names_[worst].c_str(),
+                      desired_state_.position[worst], current_state_.position[worst],
+                      state_error_.position[worst], desired_state_.velocity[worst]);
         }
     }
 
