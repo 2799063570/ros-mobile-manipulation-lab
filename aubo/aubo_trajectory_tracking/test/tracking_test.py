@@ -3,6 +3,7 @@ import math
 import time
 import threading
 import unittest
+import json
 import rospy
 import rostest
 from sensor_msgs.msg import JointState
@@ -26,6 +27,7 @@ class TrackingTest(unittest.TestCase):
         self.readiness = ''
         self.tracking_samples = []
         self.reference = None
+        self.run_metadata = {}
         self.feedback_on = True
         self.state_on = True
         self.feedback_nan = False
@@ -36,6 +38,7 @@ class TrackingTest(unittest.TestCase):
         self.subs = [rospy.Subscriber('/test/jog/command', TwistStamped, self.command),
                      rospy.Subscriber('/trajectory_tracking/state', String, self.status),
                      rospy.Subscriber('/trajectory_tracking/reference_path', Path, self.path),
+                     rospy.Subscriber('/trajectory_tracking/run_metadata', String, self.metadata),
                      rospy.Subscriber('/trajectory_tracking/readiness', String, self.ready_status),
                      rospy.Subscriber('/trajectory_tracking/samples', Float64MultiArray, self.sample)]
         self.last = time.monotonic()
@@ -82,6 +85,9 @@ class TrackingTest(unittest.TestCase):
     def path(self, msg):
         self.reference = msg
 
+    def metadata(self, msg):
+        self.run_metadata = json.loads(msg.data)
+
     def plant(self, event):
         with self.lock:
             now = time.monotonic()
@@ -120,11 +126,18 @@ class TrackingTest(unittest.TestCase):
         time.sleep(.15)
 
     def begin(self):
+        expected_kp = rospy.get_param('/trajectory_tracking/kp')
+        old_run = self.run_metadata.get('run_start_ns', '')
         res = self.preview()
         self.assertTrue(res.success, res.message)
+        # Frozen run labels must survive edits between preview and start.
+        rospy.set_param('/trajectory_tracking/kp', expected_kp+.1)
         res = self.start()
         self.assertTrue(res.success, res.message)
         self.wait(lambda: self.state.startswith('RUNNING'))
+        self.wait(lambda: self.run_metadata.get('run_start_ns', '') != old_run)
+        self.assertEqual(float(self.run_metadata['parameters']['kp']), expected_kp)
+        rospy.set_param('/trajectory_tracking/kp', expected_kp)
 
     def test_tracking_and_guards(self):
         self.wait(lambda: self.readiness.startswith('PREVIEW_READY:'))

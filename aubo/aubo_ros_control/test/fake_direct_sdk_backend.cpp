@@ -186,7 +186,6 @@ void DirectSdkBackend::outputLoop()
     }
     if (started && observed == 0) { fail("simulated MAC underflow"); break; }
     const auto deficit = timing.wanted(observed * kDof);
-    if (started && !pacer.started()) pacer.start(Clock::now(), deficit);
     if (started && deficit == 0) pacer.discard(Clock::now());
     const auto wanted = started ? pacer.allowance(deficit, Clock::now()) : deficit;
     if (wanted == 0) continue;
@@ -252,7 +251,7 @@ void DirectSdkBackend::outputLoop()
         fail("simulated physical MAC exceeded capacity with cached diagnosis");
       transport->batches.publish(batch);
     };
-    if (!started) first_send = Clock::now();
+    if (!started) { first_send = Clock::now(); pacer.start(first_send); }
     MotionTimingTrace::Event send_event;
     if (timing_trace_)
     {

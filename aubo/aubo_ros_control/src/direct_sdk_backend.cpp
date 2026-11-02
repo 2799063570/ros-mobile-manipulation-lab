@@ -377,9 +377,15 @@ bool DirectSdkBackend::healthyAt(Clock::time_point checked_at)
   {
     if (!flow_->healthy(checked_at))
     {
-      stopOutput("诊断超时、计数失效或轨迹积压超限");
-      ROS_ERROR("[sdk/jog] 异步流量保护故障=%d，未消费点数保守上界=%zu",
-                static_cast<int>(flow_->fault()), flow_->upperBound());
+      const auto fault = flow_->fault();
+      stopOutput(fault == SdkFlowControl::Fault::DiagnosisTimeout ?
+          "MAC 诊断看门狗超时（有效响应间隔或单次查询耗时达到上限）" :
+          "MAC 流控计数失效或观测/预留超限", fault);
+      // SequentialMac is an observed count plus reservations, not a certified
+      // bound on physical unconsumed points. Sending does not refresh diagnosis.
+      ROS_ERROR("[sdk/jog] 流控故障=%d，诊断看门狗=%.1f ms，MAC账面占用=%zu 点；"
+                "发送成功不刷新诊断时钟，MAC无硬件执行时间戳",
+                static_cast<int>(fault), diagnosis_timeout_ * 1000.0, flow_->upperBound());
       return false;
     }
     const auto now = std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -605,8 +611,6 @@ void DirectSdkBackend::jogOutputLoop()
       continue;
     }
     const auto deficit = timing.wanted(mac_scalars);
-    if (started && !pacer.started())
-      pacer.start(Clock::now(), deficit);
     if (deficit == 0)
     {
       if (started) pacer.discard(Clock::now());
@@ -715,6 +719,8 @@ void DirectSdkBackend::jogOutputLoop()
       return;
     }
     const auto send_started = Clock::now();
+    if (!started)
+      pacer.start(send_started);
     const auto send_ns = steadyNs();
     send_started_ns_.store(send_ns);
     if (!started)

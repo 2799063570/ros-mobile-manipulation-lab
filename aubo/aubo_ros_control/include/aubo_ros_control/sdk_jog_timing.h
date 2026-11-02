@@ -49,11 +49,13 @@ public:
   using Time = Clock::time_point;
   explicit SdkPointPacer(std::size_t maximum_credit) : maximum_(maximum_credit) {}
 
-  void start(Time now, std::size_t credit = 0)
+  // The initial preload is the only free burst. Start this clock at its SDK
+  // send boundary; a later MAC observation must never mint production credit.
+  void start(Time now)
   {
     started_ = true;
     updated_ = now;
-    credit_ = std::min(maximum_, credit);
+    credit_ = 0;
   }
   bool started() const { return started_; }
   std::size_t allowance(std::size_t deficit, Time now)

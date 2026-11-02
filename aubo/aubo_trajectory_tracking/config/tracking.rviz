@@ -1,67 +1,292 @@
 Panels:
   - Class: rviz/Displays
+    Help Height: 70
     Name: Displays
+    Property Tree Widget:
+      Expanded: ~
+      Splitter Ratio: 0.5
+    Tree Height: 427
   - Class: rviz/Views
+    Expanded:
+      - /Current View1
     Name: Views
+    Splitter Ratio: 0.5
+Preferences:
+  PromptSaveOnExit: true
+Toolbars:
+  toolButtonStyle: 2
 Visualization Manager:
   Class: ""
-  Global Options:
-    Fixed Frame: base_link
-    Background Color: 24; 29; 39
-    Frame Rate: 30
   Displays:
-    - Class: rviz/Grid
-      Name: Workspace grid
-      Enabled: true
-      Cell Size: 0.1
-      Plane Cell Count: 20
+    - Alpha: 0.5
+      Cell Size: 0.10000000149011612
+      Class: rviz/Grid
       Color: 65; 75; 90
-    - Class: rviz/RobotModel
+      Enabled: true
+      Line Style:
+        Line Width: 0.029999999329447746
+        Value: Lines
+      Name: Workspace grid
+      Normal Cell Count: 0
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Plane: XY
+      Plane Cell Count: 20
+      Reference Frame: <Fixed Frame>
+      Value: true
+    - Alpha: 0.75
+      Class: rviz/RobotModel
+      Collision Enabled: false
+      Enabled: true
+      Links:
+        All Links Enabled: true
+        Expand Joint Details: false
+        Expand Link Details: false
+        Expand Tree: false
+        Link Tree Style: Links in Alphabetic Order
+        Link1:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        Link2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        base_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        camera_color_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_color_optical_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_depth_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_depth_optical_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        foreArm_Link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        gripper_base_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        gripper_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        hand_camera_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        hand_camera_mount_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        hand_camera_optical_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        shoulder_Link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        tcp_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        upperArm_Link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        world:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        wrist1_Link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wrist2_Link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wrist3_Link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
       Name: AUBO actual robot
-      Enabled: true
       Robot Description: robot_description
-      Alpha: 0.75
-    - Class: rviz/Path
-      Name: Reference - cyan
-      Enabled: true
-      Topic: /trajectory_tracking/reference_path
+      TF Prefix: ""
+      Update Interval: 0
+      Value: true
+      Visual Enabled: true
+    - Alpha: 1
+      Buffer Length: 1
+      Class: rviz/Path
       Color: 30; 220; 230
-      Line Style: Billboards
-      Line Width: 0.003
-      Buffer Length: 1
-      Pose Style: None
-    - Class: rviz/Path
-      Name: Recommended start curve - purple
       Enabled: true
-      Topic: /trajectory_preparation/candidate_path
+      Head Diameter: 0.30000001192092896
+      Head Length: 0.20000000298023224
+      Length: 0.30000001192092896
+      Line Style: Billboards
+      Line Width: 0.003000000026077032
+      Name: Reference - cyan
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Pose Color: 255; 85; 255
+      Pose Style: None
+      Queue Size: 10
+      Radius: 0.029999999329447746
+      Shaft Diameter: 0.10000000149011612
+      Shaft Length: 0.10000000149011612
+      Topic: /trajectory_tracking/reference_path
+      Unreliable: false
+      Value: true
+    - Alpha: 1
+      Buffer Length: 1
+      Class: rviz/Path
       Color: 190; 100; 255
-      Line Style: Billboards
-      Line Width: 0.002
-      Buffer Length: 1
-      Pose Style: None
-    - Class: rviz/Path
-      Name: Actual TCP - orange
       Enabled: true
-      Topic: /trajectory_tracking/actual_path
-      Color: 255; 145; 40
+      Head Diameter: 0.30000001192092896
+      Head Length: 0.20000000298023224
+      Length: 0.30000001192092896
       Line Style: Billboards
-      Line Width: 0.002
-      Buffer Length: 1
+      Line Width: 0.0020000000949949026
+      Name: Recommended start curve - purple
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Pose Color: 255; 85; 255
       Pose Style: None
+      Queue Size: 10
+      Radius: 0.029999999329447746
+      Shaft Diameter: 0.10000000149011612
+      Shaft Length: 0.10000000149011612
+      Topic: /trajectory_preparation/candidate_path
+      Unreliable: false
+      Value: true
+    - Alpha: 1
+      Buffer Length: 1
+      Class: rviz/Path
+      Color: 255; 145; 40
+      Enabled: true
+      Head Diameter: 0.30000001192092896
+      Head Length: 0.20000000298023224
+      Length: 0.30000001192092896
+      Line Style: Billboards
+      Line Width: 0.0020000000949949026
+      Name: Actual TCP - orange
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Pose Color: 255; 85; 255
+      Pose Style: None
+      Queue Size: 10
+      Radius: 0.029999999329447746
+      Shaft Diameter: 0.10000000149011612
+      Shaft Length: 0.10000000149011612
+      Topic: /trajectory_tracking/actual_path
+      Unreliable: false
+      Value: true
     - Class: rviz/MarkerArray
-      Name: Target error and status
       Enabled: true
       Marker Topic: /trajectory_tracking/markers
+      Name: Target error and status
+      Namespaces:
+        tracking: true
+      Queue Size: 100
+      Value: true
     - Class: rviz/TF
-      Name: Coordinate frames
       Enabled: false
+      Filter (blacklist): ""
+      Filter (whitelist): ""
+      Frame Timeout: 15
+      Frames:
+        All Enabled: true
+      Marker Alpha: 1
+      Marker Scale: 1
+      Name: Coordinate frames
+      Show Arrows: true
+      Show Axes: true
+      Show Names: true
+      Tree:
+        {}
+      Update Interval: 0
+      Value: false
+  Enabled: true
+  Global Options:
+    Background Color: 24; 29; 39
+    Default Light: true
+    Fixed Frame: base_link
+    Frame Rate: 30
+  Name: root
+  Tools:
+    - Class: rviz/MoveCamera
+  Value: true
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 1.7
-      Pitch: 0.45
-      Yaw: 0.8
-      Focal Point: {X: 0, Y: 0, Z: 0.45}
+      Distance: 0.8971442580223083
+      Enable Stereo Rendering:
+        Stereo Eye Separation: 0.05999999865889549
+        Stereo Focal Distance: 1
+        Swap Stereo Eyes: false
+        Value: false
+      Field of View: 0.7853981852531433
+      Focal Point:
+        X: -0.4152206480503082
+        Y: -0.6028072237968445
+        Z: 0.32189008593559265
+      Focal Shape Fixed Size: true
+      Focal Shape Size: 0.05000000074505806
+      Invert Z Axis: false
+      Name: Current View
+      Near Clip Distance: 0.009999999776482582
+      Pitch: 0.589999794960022
+      Target Frame: <Fixed Frame>
+      Yaw: 4.313158988952637
+    Saved: ~
 Window Geometry:
-  Width: 1280
-  Height: 800
+  Displays:
+    collapsed: false
+  Height: 1016
+  Hide Left Dock: false
+  Hide Right Dock: false
+  QMainWindow State: 000000ff00000000fd0000000100000000000001a70000039efc0200000002fb000000100044006900730070006c006100790073010000003d0000022e000000c900fffffffb0000000a0056006900650077007301000002710000016a000000a400ffffff0000058b0000039e00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  Views:
+    collapsed: false
+  Width: 1848
+  X: 72
+  Y: 27

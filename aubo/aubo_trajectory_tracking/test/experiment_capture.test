@@ -1,0 +1,9 @@
+<launch>
+  <!-- Transport fixture only; no SDK, jog backend, Gazebo or motion services. -->
+  <arg name="output" default="/tmp/aubo_tracking_capture_test"/>
+  <rosparam param="/trajectory_tracking">{jog_ns: /capture_fixture/jog, joint_states_topic: /capture_fixture/joints, duration: 2.0, kp: 9.0}</rosparam>
+  <param name="/experiment_capture_test/output" value="$(arg output)"/>
+  <node pkg="aubo_trajectory_tracking" type="tracking_experiment.py" name="capture_observer" output="screen"
+        args="record --output &quot;$(arg output)&quot; --runs 2 --tail-seconds 0.2"/>
+  <test test-name="experiment_capture" pkg="aubo_trajectory_tracking" type="experiment_capture_test.py" time-limit="25" launch-prefix="/usr/bin/python3"/>
+</launch>

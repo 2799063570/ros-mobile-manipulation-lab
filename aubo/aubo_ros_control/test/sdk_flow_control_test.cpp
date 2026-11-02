@@ -92,6 +92,27 @@ void startupReadiness()
                "explicit one-way arming, unchanged moving watchdog, nonempty/failure rejection\n";
 }
 
+void combinedSendAndQueryGap()
+{
+  // 2026-11-02 14:20:23: the last accepted MAC was 46 points; a successful
+  // 88.63ms refill was followed by a still-pending query. The aggregate gap
+  // exceeded 150ms even though neither individual call had reached 150ms.
+  SdkFlowControl flow(60, .15, at(0), SdkFlowControl::Policy::SequentialMac);
+  initialize(flow, 276);
+  require(flow.reserve(4, at(1)), "Four-point observed refill rejected");
+  require(flow.healthy(at(89)) && flow.completeSend(4), "Successful 89ms send rejected");
+  const auto next = flow.beginQuery(at(90));
+  require(static_cast<bool>(next), "Next serial query rejected before timeout");
+  require(flow.healthy(at(149)), "Combined send/query gap expired before 150ms");
+  require(!flow.healthy(at(150)) && flow.fault() == Fault::DiagnosisTimeout,
+          "Successful send incorrectly refreshed the diagnosis clock");
+  require(flow.upperBound() == 50, "Wall time incorrectly manufactured MAC capacity");
+  require(!flow.acceptReply(next, 240, at(157)), "Late query revived a timed-out stream");
+  require(!flow.reserve(4, at(158)), "Timed-out stream accepted another refill");
+  std::cout << "PASS: observed 89ms send plus pending 60ms query expires aggregate 150ms diagnosis gap; "
+               "late reply cannot resume output\n";
+}
+
 // Model real buffer consumption, a single diagnostic connection, and a paced
 // sender (by default two points per ten milliseconds). Every slow reply reports the
 // EARLIEST possible snapshot (at request start), not a convenient fresh count.
@@ -156,6 +177,7 @@ int main()
   try
   {
     startupReadiness();
+    combinedSendAndQueryGap();
     // A slow diagnosis cannot return credit merely because time passed.
     SdkFlowControl no_clock_credit(60, 0.15, at(0));
     require(!no_clock_credit.reserve(1, at(0)), "Uninitialized stream allowed sends");

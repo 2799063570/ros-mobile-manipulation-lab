@@ -337,11 +337,14 @@ public:
     ik_.reset(new KDL::ChainIkSolverPos_NR_JL(chain_,lo,hi,*fk_,*vel_,150,1e-6));
     scene_.reset(new planning_scene_monitor::PlanningSceneMonitor("robot_description"));
     if(!scene_->getPlanningScene() || !scene_->getRobotModel()->getJointModelGroup(group_)) throw std::runtime_error("Missing planning scene or group");
-    std::string scene_topic,initial_service,topic;
+    std::string scene_topic,initial_service,topic,scene_joint_topic;
     jog.param<std::string>("planning_scene_topic",scene_topic,"/planning_scene"); jog.param<std::string>("initial_scene_service",initial_service,"");
     tracker_.param<std::string>("joint_states_topic",topic,"/cartesian_jog/sdk_joint_states");
+    // Use the jog scene's full model state (including the gripper). Keep raw
+    // six-axis feedback below for motion freshness checks: the relay republishes.
+    jog.param<std::string>("scene_joint_states_topic",scene_joint_topic,topic);
     scene_->startSceneMonitor(scene_topic); scene_->startWorldGeometryMonitor("/collision_object","/planning_scene_world",false);
-    scene_->startStateMonitor(topic);
+    scene_->startStateMonitor(scene_joint_topic);
     if(!initial_service.empty() && !scene_->requestPlanningSceneState(initial_service)) throw std::runtime_error("Cannot fetch initial planning scene");
     joints_sub_=nh_.subscribe<sensor_msgs::JointState>(topic,1,[this](const sensor_msgs::JointState::ConstPtr& msg){
       std::lock_guard<std::mutex> lock(mutex_);

@@ -31,6 +31,7 @@
 #include <memory>
 #include <mutex>
 #include <stdexcept>
+#include <sstream>
 #include <string>
 #include <thread>
 #include <vector>
@@ -305,7 +306,17 @@ private:
            (lower_[i] < bounds.min_position_ || upper_[i] > bounds.max_position_)) ||
           (bounds.velocity_bounded_ && velocity_limits_[i] > bounds.max_velocity_) ||
           (bounds.acceleration_bounded_ && acceleration_limits_[i] > bounds.max_acceleration_))
-        throw std::runtime_error("Jog limits exceed model limits: " + names_[i]);
+      {
+        std::ostringstream message;
+        message << "Jog limits exceed model limits: " << names_[i]
+                << "; configured/model position=[" << lower_[i] << "," << upper_[i]
+                << "]/[" << bounds.min_position_ << "," << bounds.max_position_ << "] rad"
+                << ", velocity=" << velocity_limits_[i] << "/" << bounds.max_velocity_ << " rad/s"
+                << ", acceleration=" << acceleration_limits_[i] << "/" << bounds.max_acceleration_ << " rad/s^2";
+        // Emit before constructor unwinding tears down the scene/listeners.
+        ROS_ERROR_STREAM("[cartesian_jog] " << message.str());
+        throw std::runtime_error(message.str());
+      }
     }
     scene_->startSceneMonitor(scene_topic_);
     // 场景通过 planning_scene/world/collision_object 输入；不在点动节点里启动点云建图。

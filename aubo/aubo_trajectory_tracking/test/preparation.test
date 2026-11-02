@@ -18,8 +18,14 @@
     <param name="adaptive_damping" value="$(arg adaptive_damping)"/>
     <param name="backend" value="gazebo"/>
     <param name="joint_states_topic" value="/preparation_test/joints"/>
-    <param name="scene_joint_states_topic" value="/preparation_test/joints"/>
+    <param name="scene_joint_states_topic" value="/preparation_test/scene_joints"/>
     <rosparam param="gazebo_command_topics">[/preparation_test/q0, /preparation_test/q1, /preparation_test/q2, /preparation_test/q3, /preparation_test/q4, /preparation_test/q5]</rosparam>
+  </node>
+  <!-- Mirror real hardware: raw arm feedback plus fixed gripper model state. -->
+  <node name="preparation_joint_state_relay" pkg="joint_state_publisher" type="joint_state_publisher">
+    <remap from="joint_states" to="/preparation_test/scene_joints"/>
+    <rosparam param="source_list">[/preparation_test/joints]</rosparam>
+    <rosparam param="zeros">{joint1: 0.0, joint2: 0.0}</rosparam>
   </node>
   <include file="$(find aubo_trajectory_tracking)/launch/tracking.launch">
     <arg name="acceleration_ff_time" value="$(arg acceleration_ff_time)"/>

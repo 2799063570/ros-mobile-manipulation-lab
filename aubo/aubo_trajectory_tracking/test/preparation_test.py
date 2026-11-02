@@ -14,6 +14,7 @@ from nav_msgs.msg import Path
 from moveit_msgs.msg import PlanningScene, CollisionObject
 from shape_msgs.msg import SolidPrimitive
 from geometry_msgs.msg import Pose
+from rosgraph_msgs.msg import Log
 from std_srvs.srv import Trigger
 
 
@@ -26,9 +27,11 @@ class PreparationTest(unittest.TestCase):
         self.tracker = ''
         self.bottom = ''
         self.candidate = None
+        self.actual_path = None
         self.samples = []
         self.joint_samples = []
         self.servo_samples = []
+        self.incomplete_state_warnings = []
         self.names = ['shoulder_joint', 'upperArm_joint', 'foreArm_joint',
                       'wrist1_joint', 'wrist2_joint', 'wrist3_joint']
         self.scene_pub = rospy.Publisher('/planning_scene', PlanningScene, queue_size=1)
@@ -39,9 +42,11 @@ class PreparationTest(unittest.TestCase):
                       rospy.Subscriber('/trajectory_tracking/state', String, self.track_state),
                       rospy.Subscriber('/cartesian_jog/state', String, self.bottom_state),
                       rospy.Subscriber('/trajectory_preparation/candidate_path', Path, self.path),
+                      rospy.Subscriber('/trajectory_tracking/actual_path', Path, self.actual_trace),
                       rospy.Subscriber('/trajectory_tracking/samples', Float64MultiArray, self.sample),
                       rospy.Subscriber('/trajectory_tracking/joint_samples', Float64MultiArray, self.joint_sample),
-                      rospy.Subscriber('/trajectory_tracking/servo_samples', Float64MultiArray, self.servo_sample)]
+                      rospy.Subscriber('/trajectory_tracking/servo_samples', Float64MultiArray, self.servo_sample),
+                      rospy.Subscriber('/rosout', Log, self.rosout)]
         self.timer = rospy.Timer(rospy.Duration(.01), self.plant)
         for name in ('analyze', 'move', 'check_current', 'stop'):
             rospy.wait_for_service('/trajectory_preparation/'+name, 20)
@@ -60,10 +65,14 @@ class PreparationTest(unittest.TestCase):
         with self.lock:
             self.q = [q+.7*(desired-q) for q, desired in zip(self.q, self.commanded)]
             msg = JointState()
-            msg.name = self.names + ['joint1', 'joint2']
-            msg.position = list(self.q) + [0., 0.]
+            msg.name = self.names
+            msg.position = list(self.q)
         msg.header.stamp = rospy.Time.now()
         self.pub.publish(msg)
+
+    def rosout(self, msg):
+        if msg.name == '/trajectory_preparation' and 'Missing joint1, joint2' in msg.msg:
+            self.incomplete_state_warnings.append(msg.msg)
 
     def prep_state(self, msg):
         self.preparation = msg.data
@@ -76,6 +85,9 @@ class PreparationTest(unittest.TestCase):
 
     def path(self, msg):
         self.candidate = msg
+
+    def actual_trace(self, msg):
+        self.actual_path = msg
 
     def sample(self, msg):
         if not msg.data:
@@ -103,6 +115,10 @@ class PreparationTest(unittest.TestCase):
         self.fail('Timeout: '+self.preparation+' / '+self.tracker)
 
     def test_search_move_and_tracking(self):
+        # Moving a recommended start first stops tracking, before any preview.
+        self.assertTrue(self.call('stop', '/trajectory_tracking').success)
+        self.wait(lambda: self.actual_path is not None)
+        self.assertEqual(self.actual_path.header.frame_id, 'base_link')
         # Test the user's 80 mm / 55 s circle against the actual AUBO kinematics.
         rospy.set_param('/trajectory_tracking/radius', .08)
         rospy.set_param('/trajectory_tracking/duration', 55.)
@@ -188,6 +204,8 @@ class PreparationTest(unittest.TestCase):
         rospy.set_param('/trajectory_tracking/duration', 200.)
         result = self.call('check_current')
         self.assertFalse(result.success, 'Must reject an unreachable fixed-orientation path')
+        self.assertEqual(self.incomplete_state_warnings, [],
+                         'Preparation must monitor relayed full-model state, not raw arm feedback')
 
 
 if __name__ == '__main__':

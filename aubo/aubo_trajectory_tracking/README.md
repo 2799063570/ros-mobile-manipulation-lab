@@ -45,6 +45,24 @@ roslaunch aubo_trajectory_tracking tracking.launch
 
 同一套机械臂只能运行一套点动后端；使用本包时关闭点动面板、串口遥控和其他速度指令发布源。开始时检查一个指令订阅者，但这不是多个发布者之间的仲裁协议。所有入口均支持 `panel:=false rviz:=false`。自定义上层配置使用 `config:=/绝对路径/tracking.yaml`，实机底层配置使用 `jog_config:=...`。
 
+准备节点的完整模型监控复用 `/aubo_cartesian_jog/scene_joint_states_topic`；实机默认是
+`/joint_states`，由 relay 补齐固定的 `joint1=joint2=0`。用于运动反馈和新鲜度检查的
+六轴数据仍来自 `/trajectory_tracking/joint_states_topic`，避免 relay 重发掩盖原始反馈过期。
+
+实机 SDK 时延排查可从本入口启用底层时序记录（每次使用新的文件名）：
+
+```bash
+roslaunch aubo_trajectory_tracking tracking_real.launch \
+  timing_trace_path:=/tmp/tracking_timing_run01.csv
+```
+
+退出后按 [TIMING_DIAGNOSIS.md](../aubo_ros_control/TIMING_DIAGNOSIS.md) 离线分析。
+2026-11-02 日志中的停机由第 21408 批 SDK 发送超过 100 ms 预算触发；该批最终
+`ret=0`、耗时 102.76 ms，停流后成功返回不会恢复供点。此前 MAC 查询耗时 58.99 ms，
+本批生成耗时 4.90 ms。`Missing joint1, joint2` 是准备节点原先监控六轴话题造成的独立问题；
+修正状态话题不代表 SDK 时延已解决。现有日志无法进一步区分 SDK 内部等待、网络、控制柜处理
+或主机调度，需要联合时序记录分析。上层禁用未确认及 `required` 节点退出后的整组关闭是后续结果。
+
 ## 操作
 
 1. 查看面板“准备状态”，等待关节反馈和点动节点就绪、底层状态为 `DISABLED`。未就绪时会显示具体原因（反馈无效/过期、时钟异常、底层状态超时或未禁用），预览和开始按钮按条件开放。机械臂当前位置应有足够工作空间且避开奇异位形；本包不会自动调整起始关节姿态，移动起点必须显式点击。
@@ -118,6 +136,10 @@ Gazebo 入口已设置非零初始关节姿态以避开零位伸直奇异位形�
 
 ## 可视化与接口
 
+自动按轮次采集 TCP、六轴和链路诊断并比较 PID/前馈参数，见 [实验采集与对比](EXPERIMENTS.md)。
+`tracking_experiment.py record` 只订阅数据，不会自动开始、停止或调参；每轮保存冻结参数、CSV、
+原始反馈/指令及日志，结束采集后生成对比图和重复统计。故障和缺数据记录会保留并标注。
+
 RViz 默认配置包含机械臂模型、网格、青色参考路径、橙色实际 TCP 路径、黄色目标点、红色误差线和状态文字。面板显示运行时间、即时/峰值/RMS 位置误差及估计实际 TCP 速度。实际路径最多保留最近 10000 个采样点，参考路径为 1001 个点；统计覆盖本次运行及末点收敛阶段。
 
 | 接口 | 类型 / 内容 |
@@ -140,6 +162,8 @@ RViz 默认配置包含机械臂模型、网格、青色参考路径、橙色实
 | `/trajectory_tracking/joint_samples` | 34 项，时间对齐的六轴生成目标、实际位置、误差及速度，详见控制分析 |
 | `/trajectory_tracking/servo_samples` | 14 项，逆解/限速/平滑链路诊断，详见控制分析 |
 | `/trajectory_tracking/run_start` | `std_msgs/Header`，本轮运行起点时间；预览清零 |
+| `/trajectory_tracking/run_metadata` | `std_msgs/String`，锁存 JSON，本轮实际冻结参数、起点/姿态与运行起点纳秒；供只读采集器关联 |
+| `/trajectory_tracking/command_telemetry` | `geometry_msgs/TwistStamped`，外环指令的只读副本；采集器订阅此处，不占用运动话题订阅者 |
 | `/trajectory_tracking/metrics` | `Float64MultiArray`，`[elapsed_s, error_m, peak_m, rms_m, actual_speed_m_s]` |
 
 无界面示例（先启动节点）：

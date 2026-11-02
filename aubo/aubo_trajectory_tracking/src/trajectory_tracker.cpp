@@ -18,6 +18,8 @@
 #include <vector>
 #include <sstream>
 #include <iomanip>
+#include <boost/property_tree/ptree.hpp>
+#include <boost/property_tree/json_parser.hpp>
 #include "tracking_curve.h"
 #include "tracking_control.h"
 
@@ -28,7 +30,7 @@ static double age(Time t) { return std::chrono::duration<double>(Clock::now()-t)
 class Tracker
 {
   ros::NodeHandle nh_, pn_{"~"};
-  ros::Publisher cmd_, state_pub_, readiness_pub_, metrics_, samples_pub_, run_start_pub_, reference_pub_, actual_pub_, markers_;
+  ros::Publisher cmd_, command_telemetry_pub_, state_pub_, readiness_pub_, metrics_, samples_pub_, run_start_pub_, run_metadata_pub_, reference_pub_, actual_pub_, markers_;
   ros::Subscriber joints_, jog_state_sub_;
   ros::ServiceClient enable_, preflight_;
   bool check_feasibility_{true};
@@ -55,6 +57,32 @@ class Tracker
   bool feedback_valid_{false}, have_feedback_{false}, previewed_{false}, active_{false}, owned_{false};
 
   Curve load() { return loadCurve(pn_); }
+  void publishRunMetadata()
+  {
+    // Report the preview-frozen curve, never the mutable parameter server.
+    boost::property_tree::ptree data, parameters, origin, orientation;
+    data.put("schema_version", 1);
+    data.put("run_start_ns", std::to_string(run_stamp_.toNSec()));
+    data.put("base_link", base_); data.put("tool_link", tool_);
+    parameters.put("shape", curve_.shape); parameters.put("plane", curve_.plane);
+    parameters.put("waves", curve_.waves); parameters.put("cycles", curve_.cycles);
+    parameters.put("velocity_window", velocity_window_duration_);
+    parameters.put("feedback_timeout", feedback_timeout_); parameters.put("state_timeout", state_timeout_);
+    for(const auto& entry : std::vector<std::pair<std::string,double>>{
+        {"radius",curve_.radius},{"amplitude",curve_.amplitude},{"length",curve_.length},
+        {"duration",curve_.duration},{"kp",curve_.kp},{"ki",curve_.ki},{"kd",curve_.kd},
+        {"acceleration_ff_time",curve_.acceleration_ff_time},{"correction_fraction",curve_.correction_fraction},
+        {"max_speed",curve_.speed},{"max_error",curve_.error},{"max_extent",curve_.extent},
+        {"settle_tolerance",curve_.tolerance},{"settle_speed",curve_.settle_speed},{"settle_timeout",curve_.settle_timeout}})
+      parameters.put(entry.first, entry.second);
+    for(int i=0;i<3;++i) {boost::property_tree::ptree v; v.put("",origin_[i]); origin.push_back({"",v});}
+    double x,y,z,w; actual_.M.GetQuaternion(x,y,z,w);
+    for(double q : {x,y,z,w}) {boost::property_tree::ptree v; v.put("",q); orientation.push_back({"",v});}
+    data.add_child("parameters",parameters); data.add_child("origin_m",origin);
+    data.add_child("start_orientation_xyzw",orientation);
+    std::ostringstream output; boost::property_tree::write_json(output,data,false);
+    std_msgs::String message; message.data=output.str(); run_metadata_pub_.publish(message);
+  }
   std::string healthIssue() const
   {
     if(!feedback_valid_) return "关节反馈无效："+feedback_issue_;
@@ -101,6 +129,7 @@ class Tracker
   {
     geometry_msgs::TwistStamped msg; msg.header.frame_id=base_; msg.header.stamp=ros::Time::now();
     msg.twist.linear.x=v.x(); msg.twist.linear.y=v.y(); msg.twist.linear.z=v.z(); cmd_.publish(msg);
+    command_telemetry_pub_.publish(msg);
   }
   bool disable()
   {
@@ -218,7 +247,8 @@ class Tracker
       command();
       if(jog_state_.find("FAULT")==0 || age(warmup_time_)>1.0) finish("FAULT","Enable confirmation failed");
       else if(age(warmup_time_)>=0.3 && (jog_state_=="ENABLED_IDLE" || jog_state_=="JOGGING") && state_time_>warmup_time_) {
-        run_stamp_=now; std_msgs::Header run; run.stamp=now; run_start_pub_.publish(run); state_="RUNNING"; detail_="Tracking with feedforward + TCP position correction";
+        run_stamp_=now; publishRunMetadata();
+        std_msgs::Header run; run.stamp=now; run_start_pub_.publish(run); state_="RUNNING"; detail_="Tracking with feedforward + TCP position correction";
       }
       visualize(); return;
     }
@@ -272,6 +302,7 @@ public:
   Tracker()
   {
     pn_.param<std::string>("base_link",base_,"base_link"); pn_.param<std::string>("tool_link",tool_,"tcp_link");
+    reference_.header.frame_id=trace_.header.frame_id=base_;
     pn_.param<std::string>("jog_ns",jog_ns_,"/cartesian_jog");
     pn_.param("velocity_window",velocity_window_duration_,0.08);
     if(!std::isfinite(velocity_window_duration_) || velocity_window_duration_<0.02 || velocity_window_duration_>0.25)
@@ -287,9 +318,12 @@ public:
       joint_names_.push_back(chain_.getSegment(i).getJoint().getName());
     fk_.reset(new KDL::ChainFkSolverPos_recursive(chain_));
     cmd_=nh_.advertise<geometry_msgs::TwistStamped>(jog_ns_+"/command",1);
+    // Observers use this copy so the single execution-subscriber guard remains valid.
+    command_telemetry_pub_=pn_.advertise<geometry_msgs::TwistStamped>("command_telemetry",100);
     state_pub_=pn_.advertise<std_msgs::String>("state",1,true);
     readiness_pub_=pn_.advertise<std_msgs::String>("readiness",1,true); metrics_=pn_.advertise<std_msgs::Float64MultiArray>("metrics",1);
     run_start_pub_=pn_.advertise<std_msgs::Header>("run_start",1,true);
+    run_metadata_pub_=pn_.advertise<std_msgs::String>("run_metadata",1,true);
     samples_pub_=pn_.advertise<std_msgs::Float64MultiArray>("samples",50);
     reference_pub_=pn_.advertise<nav_msgs::Path>("reference_path",1,true); actual_pub_=pn_.advertise<nav_msgs::Path>("actual_path",1,true);
     markers_=pn_.advertise<visualization_msgs::MarkerArray>("markers",1);

@@ -71,7 +71,6 @@ void stream(int send_ms, int diagnosis_ms, bool accept_late, bool consume = true
     if (active && !confirmed) { advance(1); continue; }
     if (active) require(raw > 0, "Observed an empty established stream");
     const auto deficit = timing.wanted(raw);
-    if (batches && !pacer.started()) pacer.start(at(now), deficit);
     if (batches && deficit == 0) pacer.discard(at(now));
     const auto wanted = batches && use_pacer ? pacer.allowance(deficit, at(now)) : deficit;
     if (wanted != 0)
@@ -79,6 +78,7 @@ void stream(int send_ms, int diagnosis_ms, bool accept_late, bool consume = true
       advance(1);  // point generation is not free
       require(flow.reserve(wanted, at(now)), "Credit reservation failed");
       require(!batches || !use_pacer || pacer.reserve(wanted, at(now)), "Producer rate allowance missing");
+      if (!batches) pacer.start(at(now));
       if (!accept_late) accept(wanted);
       // Replay the user's fast first send, then sustained slow sends.
       const int latency = batches == 0 ? (second_send_ms ? 22 : 17) :
@@ -157,6 +157,26 @@ int main()
     paced.discard(at(10000));
     require(paced.allowance(50, at(10000)) == 0, "Full MAC retained stale production credit");
 
+    // 2026-11-02 trace: first send 50 points / 13.126923 ms; first nonzero
+    // reply at +18.779834 ms reports only 96 scalars (16 points). The old
+    // initialization granted all 34 missing points, then sent at +25.290672 ms.
+    // MAC has no sampling timestamp: this deficit is not evidence that 34
+    // points were consumed, and must not create a second free production burst.
+    SdkPointPacer startup(50);
+    startup.start(at(0));
+    const auto first_reply = at(0) + std::chrono::nanoseconds(18779834);
+    const auto old_second_send = at(0) + std::chrono::nanoseconds(25290672);
+    const auto observed_deficit = timing.wanted(96);
+    require(observed_deficit == 34, "Real startup MAC replay differs");
+    require(startup.allowance(observed_deficit, first_reply) == 0,
+            "First partial MAC snapshot minted a startup burst");
+    require(startup.allowance(observed_deficit, old_second_send) == 5,
+            "Startup production credit differs from elapsed 5ms periods");
+    require(!startup.reserve(34, old_second_send), "Replayed 34-point startup burst admitted");
+    require(startup.reserve(5, old_second_send), "Bounded startup refill rejected");
+    require(startup.allowance(observed_deficit, old_second_send) == 0,
+            "Repeated partial MAC snapshot replenished production credit");
+
     // Replay the real failure: target 300 scalars, then MAC reports 306.
     // It must stop REFILLING, not terminate the node, while retaining 360 cap.
     SdkFlowControl observed(60, 0.15, at(0), SdkFlowControl::Policy::SequentialMac);
@@ -196,7 +216,7 @@ int main()
     stopped.stop();
     require(!stopped.completeSend(50) && !stopped.reserve(1, at(132)), "Late reply revived flow");
     require(stopped.inFlight() == 50 && stopped.upperBound() == 50, "Late reply released capacity");
-    std::cout << "PASS: 30s streams at 60/89/90ms send, 20/25/60ms diagnosis, early/late acceptance, paused consumer, 300/306/360/361-scalar replay, serialized RPCs, 20ms cached MAC, 200ms startup delay, rate-limit negative control, 119ms second-send timeout-only negative control and late-result latch\n";
+    std::cout << "PASS: 30s streams at 60/89/90ms send, 20/25/60ms diagnosis, early/late acceptance, paused consumer, 300/306/360/361-scalar replay, serialized RPCs, 20ms cached MAC, 200ms startup delay, rate-limit negative control, 119ms second-send timeout-only negative control, 50/16/34-point real startup replay and late-result latch\n";
   }
   catch (const std::exception& error)
   {

@@ -37,12 +37,14 @@ joint_names: [shoulder_joint, upperArm_joint, foreArm_joint,
 joint_lower_limits: [-3.04, -1.0471976, -3.04, -3.04, -3.04, -3.04]
 joint_upper_limits: [ 3.04,  1.0471976,  3.04,  3.04,  3.04,  3.04]
 joint_velocity_limits: [0.25, 0.25, 0.25, 0.35, 0.35, 0.35]
-joint_acceleration_limits: [0.60, 0.60, 0.60, 0.80, 0.80, 0.80]
+# 不得超过 planning_context 加载的 joint_limits.yaml（前三轴 0.4、腕部 0.6）。
+joint_acceleration_limits: [0.40, 0.40, 0.40, 0.60, 0.60, 0.60]
 joint_jerk_limits: [8.0, 8.0, 8.0, 12.0, 12.0, 12.0]
 
 # SDK 消费周期固定 5 ms；300 标量 = 50 个六轴点 / 250 ms 名义前瞻。
 # 同一SDK连接查询/发送；缺口至少4点（20ms）才补，且生产额度按200点/s积累。
 # 该额度只限制生成速率，不作为控制柜已消费的证据；仍必须满足MAC实测限额。
+# 首批预填后从该批发送开始积累额度；首个非零MAC缺口不额外授予额度。
 # 单次 SDK 发送预算仍为 100 ms，反馈和诊断看门狗仍为 150 ms。
 # 松手/取消不能撤回已提交点，停止还包括前瞻、输入心跳和减速尾段。
 sdk_mac_buffer_target: 300

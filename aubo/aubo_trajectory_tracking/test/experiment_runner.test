@@ -1,0 +1,8 @@
+<launch>
+  <!-- Private ROS fake plant only: no SDK connection or real hardware node. -->
+  <param name="robot_description" textfile="$(find aubo_trajectory_tracking)/test/xyz.urdf"/>
+  <param name="/aubo_cartesian_jog/backend" value="gazebo"/>
+  <rosparam param="/trajectory_tracking">{shape: circle, plane: xy, cycles: 1, radius: 0.001, duration: 2.0, max_speed: 0.03, kp: 2.0, ki: 0.0, kd: 0.0, acceleration_ff_time: 0.1, settle_tolerance: 0.0003, settle_timeout: 5.0, check_feasibility: true, tool_link: tcp, joint_states_topic: /runner_fixture/joints, jog_ns: /cartesian_jog}</rosparam>
+  <node pkg="aubo_trajectory_tracking" type="trajectory_tracker_node" name="trajectory_tracking" output="screen"/>
+  <test pkg="aubo_trajectory_tracking" type="experiment_runner_fixture.py" test-name="experiment_runner" name="aubo_cartesian_jog" time-limit="75" launch-prefix="/usr/bin/python3"/>
+</launch>

@@ -1,0 +1,8 @@
+<launch>
+  <!-- Read-only observer only. Does not launch hardware or request motion. -->
+  <arg name="output" default="$(env HOME)/.ros/tracking_experiments"/>
+  <arg name="label" default=""/>
+  <arg name="runs" default="0"/>
+  <node pkg="aubo_trajectory_tracking" type="tracking_experiment.py" name="tracking_experiment_capture"
+        output="screen" args="record --output &quot;$(arg output)&quot; --label &quot;$(arg label)&quot; --runs $(arg runs)"/>
+</launch>
