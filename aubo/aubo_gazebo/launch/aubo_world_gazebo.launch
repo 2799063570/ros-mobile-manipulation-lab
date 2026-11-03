@@ -10,6 +10,7 @@
     <arg name="x_pos" default="0.0"/>
     <arg name="y_pos" default="0.0"/>
     <arg name="z_pos" default="0.0"/>
+    <arg name="spawn_joint_args" default=""/>
     <!-- 运行gazebo仿真环境 通过导入empty_world.launch并参数赋值<arg name="world_name" value="$(arg world_name)" /> -->
     <include file="$(find gazebo_ros)/launch/empty_world.launch">
         <arg name="world_name" value="$(arg world_name)" />
@@ -27,5 +28,5 @@
         
     <!-- 在gazebo中加载机器人模型 向gazebo_ros发出服务请求 添加urdf到gazebo中-->
     <node pkg="gazebo_ros" type="spawn_model" name="spawn_urdf" 
-          args="-urdf -model aubo_i5 -param robot_description -x $(arg x_pos) -y $(arg y_pos) -z $(arg z_pos)"/> 
+          args="-urdf -model aubo_i5 -param robot_description -x $(arg x_pos) -y $(arg y_pos) -z $(arg z_pos) $(arg spawn_joint_args)"/>
 </launch>

@@ -110,6 +110,55 @@ class PanelTest(unittest.TestCase):
             with self.assertRaises((ValueError, TypeError)):
                 model.queue_rows(document)
 
+    def test_planner_selection_applies_strings_and_preserves_draft_until_reply(self):
+        data = self.data()
+        data.update(planners={'ompl': ['RRTConnect', 'RRTstar'], 'nsg': ['NSG']}, default_pipeline='ompl')
+        data['config'].update(planning_pipeline='', planner_id='')
+        self.widget.render(data)
+        self.assertTrue(self.widget.pipeline_combo.isEnabled())
+        self.assertGreaterEqual(self.widget.planner_combo.findData('RRTConnect'), 0)
+        with mock.patch.object(self.widget, '_fill_planners', wraps=self.widget._fill_planners) as fill:
+            self.widget.render(data)
+            fill.assert_not_called()  # Periodic rendering must not reset an open popup.
+        self.widget.pipeline_combo.setCurrentIndex(self.widget.pipeline_combo.findData('nsg'))
+        self.widget.planner_combo.setCurrentIndex(self.widget.planner_combo.findData('NSG'))
+        self.widget.render(data)
+        self.assertEqual(self.widget.pipeline_combo.currentData(), 'nsg')
+        self.assertEqual(self.widget.planner_combo.currentData(), 'NSG')
+        self.assertIn('MoveIt 默认', self.widget.planner_actual.text())
+        requests = []
+        self.widget.parameters_requested.connect(requests.append)
+        self.widget.apply_button.click()
+        self.assertEqual(requests[-1]['planning_pipeline'], 'nsg')
+        self.assertEqual(requests[-1]['planner_id'], 'NSG')
+        self.widget.configuration(data['config'], force=True)
+        self.assertEqual(self.widget.pipeline_combo.currentData(), '')
+        self.assertEqual(self.widget.planner_combo.currentData(), '')
+        self.assertEqual(model.parameter_changes({'planner_id': 'NSG'}, {'planner_id': ''}), ['planner_id'])
+        self.assertEqual(model.parameter_changes({'planner_id': ''}, {'planner_id': ''}), [])
+
+    def test_algorithm_controls_require_loaded_planners_idle_and_new_backend(self):
+        data = self.data()
+        data.update(planners={'ompl': ['RRTConnect']}, default_pipeline='ompl')
+        self.widget.render(data)
+        self.assertFalse(self.widget.pipeline_combo.isEnabled())
+        data['config'].update(planning_pipeline='ompl', planner_id='RRTConnect')
+        self.widget.render(data)
+        self.assertTrue(self.widget.pipeline_combo.isEnabled())
+        for update in ({'state': 'PICKING'}, {'pending': True}, {'connected': False},
+                       {'planners': {}}, {'external_planning_service': '/external'},
+                       {'hardware_at': time.monotonic(), 'hardware': {'stream_fault_latched': 'true'}}):
+            self.widget.render(dict(data, **update))
+            self.assertFalse(self.widget.pipeline_combo.isEnabled(), update)
+            self.assertFalse(self.widget.planner_combo.isEnabled(), update)
+
+    def test_planner_options_filter_other_groups_and_use_short_ids(self):
+        options = model.planner_options([
+            NS(pipeline_id='ompl', planner_ids=['aubo_i5', 'aubo_i5[RRTConnect]',
+                                               'gripper[RRT]', 'aubo_i5[RRTstar]']),
+            NS(pipeline_id='nsg', planner_ids=['NSG'])], 'aubo_i5')
+        self.assertEqual(options, {'ompl': ['RRTConnect', 'RRTstar'], 'nsg': ['NSG']})
+
     def test_cached_grasp_geometry_uses_degrees_and_millimeters_with_unknown_values(self):
         cases = [
             ({'grasp_geometry_valid': True, 'grasp_angle': math.pi/6, 'grasp_width': .064}, ('30.0', '64.0')),
@@ -178,6 +227,22 @@ class BridgeTest(unittest.TestCase):
         applied = next(value for kind, value in events if kind == 'applied')
         self.assertEqual(applied['rejected'], ['velocity_scaling'])
         self.assertEqual(applied['accepted']['velocity_scaling'], .1)
+
+    def test_planner_discovery_is_read_only_and_clears_stale_options_on_failure(self):
+        with mock.patch('aubo_sorting_rqt.bridge.rospy.get_param',
+                        side_effect=lambda name, default: {'/test_task/planning_group': 'aubo_i5',
+                                                          '/move_group/default_planning_pipeline': 'nsg'}.get(name, default)), \
+                mock.patch('aubo_sorting_rqt.bridge.rospy.wait_for_service'), \
+                mock.patch('aubo_sorting_rqt.bridge.rospy.ServiceProxy') as proxy:
+            proxy.return_value.return_value = NS(planner_interfaces=[NS(pipeline_id='nsg', planner_ids=['NSG'])])
+            self.bridge._discover_planners()
+            self.assertEqual(proxy.call_args.args[0], '/query_planner_interface')
+            self.assertEqual(self.bridge.snapshot()['planners'], {'nsg': ['NSG']})
+            self.assertEqual(self.bridge.snapshot()['default_pipeline'], 'nsg')
+            proxy.return_value.side_effect = RuntimeError('offline')
+            self.bridge._discover_planners()
+            self.assertEqual(self.bridge.snapshot()['planners'], {})
+            self.assertIn('offline', self.bridge.snapshot()['planner_error'])
 
 
 if __name__ == '__main__':

@@ -8,22 +8,25 @@ import rosservice
 from cv_bridge import CvBridge
 from diagnostic_msgs.msg import DiagnosticArray
 from dynamic_reconfigure.client import Client
+from moveit_msgs.srv import QueryPlannerInterfaces
 from python_qt_binding.QtCore import QObject, Signal
 from python_qt_binding.QtGui import QImage
 from sensor_msgs.msg import Image
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
 
-from .model import ACTIONS, parameter_changes, queue_rows
+from .model import ACTIONS, parameter_changes, planner_options, queue_rows
 
 
 class RosBridge(QObject):
     event = Signal(str, object)
 
-    def __init__(self, task_node, sorting_ns, image_topic, hardware_topic):
+    def __init__(self, task_node, sorting_ns, image_topic, hardware_topic,
+                 planner_service='/query_planner_interface'):
         super(RosBridge, self).__init__()
         self.task_node = task_node.rstrip('/')
         self.sorting_ns = sorting_ns.rstrip('/')
+        self.planner_service = planner_service
         self._lock = threading.RLock()
         self._closed = threading.Event()
         self._data = {'state': '', 'summary': '', 'failure': '', 'rows': [],
@@ -151,9 +154,25 @@ class RosBridge(QObject):
                 self._put(cell={key: rospy.get_param(self.task_node + '/' + key, None)
                                 for key in ('sort_classes', 'table_center', 'table_size',
                                             'continuous_sorting', 'target_frame')})
+                self._discover_planners()
             except Exception:
                 self._put(services=set())
             self._closed.wait(2.)
+
+    def _discover_planners(self):
+        try:
+            external = rospy.get_param(self.task_node + '/planning_service', '')
+            self._put(external_planning_service=external)
+            rospy.wait_for_service(self.planner_service, timeout=.5)
+            response = rospy.ServiceProxy(self.planner_service, QueryPlannerInterfaces)()
+            group = rospy.get_param(self.task_node + '/planning_group', 'aubo_i5')
+            options = planner_options(response.planner_interfaces, group)
+            default = rospy.get_param('/move_group/default_planning_pipeline', '')
+            if not default and len(options) == 1:
+                default = next(iter(options))
+            self._put(planners=options, default_pipeline=default, planner_error='')
+        except Exception as error:
+            self._put(planners={}, planner_error='无法读取 MoveIt 算法列表：{}'.format(error))
 
     def command(self, name):
         if name not in {key for key, _ in ACTIONS}:

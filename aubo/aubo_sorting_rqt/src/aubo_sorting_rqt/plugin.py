@@ -6,7 +6,7 @@ from python_qt_binding.QtWidgets import QFileDialog
 from rqt_gui_py.plugin import Plugin
 
 from .bridge import RosBridge
-from .model import ACTIONS, PARAMETERS, STATES, add_plugin_arguments, state_code
+from .model import ACTIONS, PARAMETERS, PLANNER_PARAMETERS, STATES, add_plugin_arguments, state_code
 from .widget import SortingWidget
 
 
@@ -23,7 +23,8 @@ class SortingPlugin(Plugin):
         if context.serial_number() > 1:
             self._widget.setWindowTitle('{} ({})'.format(self._widget.windowTitle(), context.serial_number()))
         context.add_widget(self._widget)
-        self._bridge = RosBridge(args.task_node, args.sorting_ns, args.image_topic, args.hardware_topic)
+        self._bridge = RosBridge(args.task_node, args.sorting_ns, args.image_topic, args.hardware_topic,
+                                 args.planner_service)
         self._bridge.event.connect(self._event)
         self._widget.command_requested.connect(self._command)
         self._widget.parameters_requested.connect(self._bridge.apply)
@@ -79,7 +80,8 @@ class SortingPlugin(Plugin):
         if path:
             try:
                 with open(path, 'w') as stream:
-                    yaml.safe_dump({key: config[key] for key, *_ in PARAMETERS if key in config}, stream, allow_unicode=True)
+                    keys = [key for key, *_ in PARAMETERS] + list(PLANNER_PARAMETERS)
+                    yaml.safe_dump({key: config[key] for key in keys if key in config}, stream, allow_unicode=True)
                 self._widget.log('已导出服务器实际参数：'+path)
             except OSError as error:
                 self._widget.log('导出失败：'+str(error))

@@ -34,6 +34,7 @@ SortingTask::SortingTask(ros::NodeHandle nh, ros::NodeHandle private_nh)
   arm_->setEndEffectorLink(end_effector_link_);
   arm_->setPoseReferenceFrame(target_frame_);
   arm_->setPlanningTime(planning_time_);
+  arm_->setPlanningPipelineId(planning_pipeline_);
   if (!planner_id_.empty()) arm_->setPlannerId(planner_id_);
   arm_->setNumPlanningAttempts(10);
   arm_->setMaxVelocityScalingFactor(velocity_scaling_);
@@ -438,6 +439,8 @@ bool SortingTask::homeOperation()
 void SortingTask::setupDynamicReconfigure()
 {
   // Seed the server with the YAML values already loaded by loadParameters().
+  private_nh_.setParam("planning_pipeline", planning_pipeline_);
+  private_nh_.setParam("planner_id", planner_id_);
   private_nh_.setParam("detection_timeout", detection_timeout_);
   private_nh_.setParam("detection_samples", detection_samples_);
   private_nh_.setParam("grasp_offset_x", grasp_offset_x_);
@@ -460,6 +463,33 @@ void SortingTask::reconfigureCallback(SortingTaskConfig& config, uint32_t)
   // startOperation() uses this mutex when claiming the only motion worker.
   std::lock_guard<std::mutex> lock(operation_mutex_);
   std::lock_guard<std::mutex> queue_lock(queue_mutex_);
+  const bool planner_changed = config.planning_pipeline != planning_pipeline_ || config.planner_id != planner_id_;
+  bool planner_valid = true;
+  if (planner_changed && !busy_.load())
+  {
+    // Query the running plugins; unknown IDs can otherwise silently fall back.
+    std::vector<moveit_msgs::PlannerInterfaceDescription> interfaces;
+    planner_valid = planning_service_.empty() && arm_->getInterfaceDescriptions(interfaces);
+    if (planner_valid)
+    {
+      std::string pipeline = config.planning_pipeline.empty() ?
+          arm_->getDefaultPlanningPipelineId() : config.planning_pipeline;
+      if (pipeline.empty() && interfaces.size() == 1)
+        pipeline = interfaces.front().pipeline_id;
+      planner_valid = false;
+      for (const auto& interface : interfaces)
+      {
+        if (interface.pipeline_id != pipeline) continue;
+        planner_valid = config.planner_id.empty();
+        for (const auto& id : interface.planner_ids)
+          planner_valid = planner_valid ||
+              (id == config.planner_id && (id.find('[') == std::string::npos ||
+                                          id.compare(0, group_name_.size() + 1, group_name_ + "[") == 0)) ||
+              id == group_name_ + "[" + config.planner_id + "]";
+        break;
+      }
+    }
+  }
   const bool unchanged = config.detection_timeout == detection_timeout_ &&
       config.detection_samples == detection_samples_ &&
       config.grasp_offset_x == grasp_offset_x_ &&
@@ -469,18 +499,20 @@ void SortingTask::reconfigureCallback(SortingTaskConfig& config, uint32_t)
       config.target_cache_min_observations == target_cache_min_observations_ &&
       config.queue_max_age == instance_queue_.max_age &&
       config.queue_merge_distance==instance_queue_.merge_distance && config.queue_merge_overlap==instance_queue_.merge_overlap &&
-      config.minimum_gripper_height==minimum_gripper_height_;
+      config.minimum_gripper_height==minimum_gripper_height_ && !planner_changed;
   const bool finite = std::isfinite(config.detection_timeout) && std::isfinite(config.grasp_offset_x) &&
       std::isfinite(config.grasp_offset_y) && std::isfinite(config.velocity_scaling) &&
       std::isfinite(config.acceleration_scaling) && std::isfinite(config.queue_max_age) &&
       std::isfinite(config.queue_merge_distance) && std::isfinite(config.queue_merge_overlap) &&
       std::isfinite(config.minimum_gripper_height);
-  if (busy_.load() || !finite || config.detection_timeout <= queue_empty_confirmation_ ||
+  if (busy_.load() || !planner_valid || !finite || config.detection_timeout <= queue_empty_confirmation_ ||
       config.queue_max_age > instance_queue_.retention || config.queue_max_age > queue_reserved_max_age_ ||
       config.queue_merge_distance>instance_queue_.match_distance || config.queue_merge_distance<=0 ||
       config.queue_merge_overlap<=0 || config.queue_merge_overlap>1 || config.minimum_gripper_height<0 ||
       config.minimum_gripper_height>=std::min({pregrasp_height_,lift_min_height_,preplace_height_}))
   {
+    config.planning_pipeline = planning_pipeline_;
+    config.planner_id = planner_id_;
     config.detection_timeout = detection_timeout_;
     config.detection_samples = detection_samples_;
     config.grasp_offset_x = grasp_offset_x_;
@@ -493,7 +525,7 @@ void SortingTask::reconfigureCallback(SortingTaskConfig& config, uint32_t)
     config.queue_merge_overlap=instance_queue_.merge_overlap;
     config.minimum_gripper_height=minimum_gripper_height_;
     if (!unchanged)
-      ROS_WARN_THROTTLE(2.0, "Sorting parameters rejected: task busy or invalid height/timeout/queue bounds");
+      ROS_WARN_THROTTLE(2.0, "Sorting parameters rejected: task busy, unavailable planner/external planning service, or invalid height/timeout/queue bounds");
     return;
   }
   detection_timeout_ = config.detection_timeout;
@@ -503,6 +535,14 @@ void SortingTask::reconfigureCallback(SortingTaskConfig& config, uint32_t)
   velocity_scaling_ = config.velocity_scaling;
   acceleration_scaling_ = config.acceleration_scaling;
   minimum_gripper_height_=config.minimum_gripper_height;
+  if (planner_changed)
+  {
+    planning_pipeline_ = config.planning_pipeline;
+    planner_id_ = config.planner_id;
+    // Changing the pipeline clears MoveGroupInterface's planner ID.
+    arm_->setPlanningPipelineId(planning_pipeline_);
+    arm_->setPlannerId(planner_id_);
+  }
   if (target_cache_min_observations_ != config.target_cache_min_observations ||
       instance_queue_.max_age != config.queue_max_age || instance_queue_.merge_distance!=config.queue_merge_distance ||
       instance_queue_.merge_overlap!=config.queue_merge_overlap)

@@ -203,7 +203,7 @@ private:
   bool experiment_enabled_{false}, revalidate_trajectories_{false};
   double trajectory_audit_step_{0.02};
   std::string experiment_run_id_, experiment_condition_, experiment_scene_id_;
-  std::string planner_id_, planning_service_;
+  std::string planning_pipeline_, planner_id_, planning_service_;
   std::atomic<std::uint64_t> experiment_sequence_{0};
   ros::Publisher state_publisher_;
   ros::Publisher progress_publisher_;

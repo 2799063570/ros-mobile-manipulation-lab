@@ -177,6 +177,7 @@ namespace aubo_sorting_core
                                    "/sorting/workspace_update");
     private_nh_.param("planning_time", planning_time_, 12.0);
     private_nh_.param<std::string>("planner_id", planner_id_, "");
+    private_nh_.param<std::string>("planning_pipeline", planning_pipeline_, "");
     private_nh_.param<std::string>("planning_service", planning_service_, "");
     private_nh_.param("experiment_enabled", experiment_enabled_, false);
     private_nh_.param("revalidate_trajectories", revalidate_trajectories_, false);

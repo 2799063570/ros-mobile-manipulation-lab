@@ -10,6 +10,7 @@
   <exec_depend>cv_bridge</exec_depend>
   <exec_depend>diagnostic_msgs</exec_depend>
   <exec_depend>dynamic_reconfigure</exec_depend>
+  <exec_depend>moveit_msgs</exec_depend>
   <exec_depend>python_qt_binding</exec_depend>
   <exec_depend>python3-yaml</exec_depend>
   <exec_depend>rospy</exec_depend>

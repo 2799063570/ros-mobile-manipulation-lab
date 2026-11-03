@@ -7,6 +7,7 @@
   <arg name="robot_xacro" default="aubo_i5_with_camera.xacro"/>
   <arg name="robot_srdf" default="aubo_i5_with_camera.srdf"/>
   <arg name="use_sensor_manager" default="false"/>
+  <arg name="pipeline" default="ompl"/>
   <arg name="publish_camera_stand" default="false"/>
   <arg name="camera_stand_config" default="$(find aubo_planning)/config/camera_stand_reference.yaml"/>
   <arg name="publish_sorting_box" default="false"/>
@@ -30,6 +31,7 @@
   <arg name="motion_source" default="move_group"/>
   <arg name="enable_motion_control"
        value="$(eval {'move_group': true, 'teach_pendant': false}[arg('motion_source')])"/>
+  <arg name="allow_trajectory_execution" default="$(arg enable_motion_control)"/>
 
   <!-- 先建立真机 ros_control 通道，并由该入口统一加载 URDF/SRDF。 -->
   <include file="$(find aubo_ros_control)/launch/aubo_control.launch">
@@ -62,8 +64,9 @@
   <!-- 示教器模式仍启动 move_group 供规划/可视化使用，但关闭轨迹执行，
        从而不会向未加载的 aubo_i5_controller 下发动作。 -->
   <include file="$(find aubo_moveit_config)/launch/move_group.launch">
+    <arg name="pipeline" value="$(arg pipeline)"/>
     <arg name="load_robot_description" value="false"/>
-    <arg name="allow_trajectory_execution" value="$(arg enable_motion_control)"/>
+    <arg name="allow_trajectory_execution" value="$(eval arg('enable_motion_control') and arg('allow_trajectory_execution'))"/>
     <arg name="fake_execution" value="false"/>
     <arg name="robot_xacro" value="$(arg robot_xacro)"/>
     <arg name="robot_srdf" value="$(arg robot_srdf)"/>

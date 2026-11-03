@@ -6,13 +6,13 @@ import time
 from python_qt_binding.QtCore import Qt, Signal, QRectF
 from python_qt_binding.QtGui import QColor, QPainter, QPen
 from python_qt_binding.QtWidgets import (
-    QAbstractItemView, QDoubleSpinBox, QFormLayout, QFrame, QGridLayout,
+    QAbstractItemView, QComboBox, QDoubleSpinBox, QFormLayout, QFrame, QGridLayout,
     QGroupBox, QHBoxLayout, QHeaderView, QLabel, QPlainTextEdit, QPushButton,
-    QSpinBox, QSplitter, QTableWidget, QTableWidgetItem, QTabWidget,
+    QScrollArea, QSpinBox, QSplitter, QTableWidget, QTableWidgetItem, QTabWidget,
     QVBoxLayout, QWidget,
 )
 
-from .model import ACTIONS, IDLE_STATES, PARAMETERS, PHASES, QUEUE_STATES, STATES, available_actions, process_step, state_code
+from .model import ACTIONS, IDLE_STATES, PARAMETERS, PLANNER_PARAMETERS, PHASES, QUEUE_STATES, STATES, available_actions, process_step, state_code
 
 COLORS = {'bottle': '#059669', 'can': '#0284c7', 'box': '#b45309'}
 
@@ -99,6 +99,8 @@ class SortingWidget(QWidget):
         self._filling = False
         self._rows = None
         self._config = {}
+        self._planners = {}
+        self._default_pipeline = ''
         self.setStyleSheet('''
             QWidget#AuboSortingPanel { background: #edf3f7; color: #233a4c; }
             QGroupBox { background: white; border: 1px solid #d8e2ea; border-radius: 7px;
@@ -212,7 +214,25 @@ class SortingWidget(QWidget):
         note = QLabel('在空闲、就绪或停止后应用。执行中的任务保持当前参数；以下“实际值”以服务器返回结果为准。')
         note.setWordWrap(True)
         layout.addWidget(note)
-        grid = QGridLayout()
+        algorithms = QGroupBox('运动规划算法选择')
+        form = QFormLayout(algorithms)
+        self.pipeline_combo = QComboBox()
+        self.planner_combo = QComboBox()
+        self.pipeline_combo.setEnabled(False)
+        self.planner_combo.setEnabled(False)
+        self.planner_actual = QLabel('尚未连接')
+        self.planner_note = QLabel('等待读取 MoveIt 已加载的规划算法。')
+        self.planner_note.setWordWrap(True)
+        form.addRow('规划管线', self.pipeline_combo)
+        form.addRow('具体算法', self.planner_combo)
+        form.addRow('服务器实际选择', self.planner_actual)
+        form.addRow(self.planner_note)
+        self.pipeline_combo.currentIndexChanged.connect(self._pipeline_changed)
+        self.planner_combo.currentIndexChanged.connect(self._mark_dirty)
+        self._fill_planners('', '')
+        layout.addWidget(algorithms)
+        parameter_body = QWidget()
+        grid = QGridLayout(parameter_body)
         grid.addWidget(QLabel('参数'), 0, 0)
         grid.addWidget(QLabel('编辑值'), 0, 1)
         grid.addWidget(QLabel('服务器实际值'), 0, 2)
@@ -231,12 +251,15 @@ class SortingWidget(QWidget):
             grid.addWidget(QLabel(label), index, 0)
             grid.addWidget(editor, index, 1)
             grid.addWidget(self.actual[key], index, 2)
-        layout.addLayout(grid)
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setWidget(parameter_body)
+        layout.addWidget(scroll, 1)
         row = QHBoxLayout()
         self.apply_button = QPushButton('应用在线参数')
         self.apply_button.setEnabled(False)
-        self.apply_button.clicked.connect(lambda: self.parameters_requested.emit(
-            {key: editor.value() for key, editor in self.editors.items() if key in self._config}))
+        self.apply_button.clicked.connect(self._request_parameters)
         refresh = QPushButton('读取实际值 / 放弃编辑')
         refresh.clicked.connect(self.refresh_requested.emit)
         export = QPushButton('导出参数记录 YAML')
@@ -249,8 +272,40 @@ class SortingWidget(QWidget):
         self.parameter_note = QLabel('等待在线参数服务器。')
         self.parameter_note.setWordWrap(True)
         layout.addWidget(self.parameter_note)
-        layout.addStretch()
-        self.tabs.addTab(page, '在线调参')
+        self.tabs.addTab(page, '在线调参与算法')
+
+    @staticmethod
+    def _combo_choices(combo, choices, selected, default_label):
+        blocked = combo.blockSignals(True)
+        combo.clear()
+        combo.addItem(default_label, '')
+        for value in choices:
+            combo.addItem(value, value)
+        if selected and combo.findData(selected) < 0:
+            combo.addItem(selected + '（未在列表中）', selected)
+        combo.setCurrentIndex(max(0, combo.findData(selected)))
+        combo.blockSignals(blocked)
+
+    def _fill_planners(self, pipeline=None, planner=None):
+        if pipeline is None:
+            pipeline = self.pipeline_combo.currentData() or ''
+        if planner is None:
+            planner = self.planner_combo.currentData() or ''
+        default_label = 'MoveIt 默认' + ('（{}）'.format(self._default_pipeline) if self._default_pipeline else '')
+        self._combo_choices(self.pipeline_combo, sorted(self._planners), pipeline, default_label)
+        self._combo_choices(self.planner_combo, self._planners.get(pipeline or self._default_pipeline, []),
+                            planner, '管线默认算法')
+
+    def _pipeline_changed(self, *args):
+        self._fill_planners(planner='')
+        self._mark_dirty()
+
+    def _request_parameters(self):
+        values = {key: editor.value() for key, editor in self.editors.items() if key in self._config}
+        if self.pipeline_combo.isEnabled():
+            values.update(planning_pipeline=self.pipeline_combo.currentData() or '',
+                          planner_id=self.planner_combo.currentData() or '')
+        self.parameters_requested.emit(values)
 
     def _history(self):
         page = QWidget()
@@ -278,6 +333,16 @@ class SortingWidget(QWidget):
                 self.actual[key].setText(str(config[key]))
                 if force or not self._dirty:
                     editor.setValue(config[key])
+        if all(key in config for key in PLANNER_PARAMETERS):
+            self.planner_actual.setText('{} / {}'.format(config['planning_pipeline'] or 'MoveIt 默认',
+                                                        config['planner_id'] or '管线默认算法'))
+            if force or not self._dirty:
+                # Do not rebuild an open dropdown on the 5 Hz render timer.
+                if (force or self.pipeline_combo.currentData() != config['planning_pipeline'] or
+                        self.planner_combo.currentData() != config['planner_id']):
+                    self._fill_planners(config['planning_pipeline'], config['planner_id'])
+        else:
+            self.planner_actual.setText('当前节点未提供算法在线参数')
         self._filling = False
         if force:
             self._dirty = False
@@ -330,13 +395,34 @@ class SortingWidget(QWidget):
         for key, button in self.buttons.items():
             button.setEnabled(enabled[key] and key in services)
         config = data.get('config', {})
+        planners = data.get('planners', {})
+        default_pipeline = data.get('default_pipeline', '')
+        if planners != self._planners or default_pipeline != self._default_pipeline:
+            self._planners = planners
+            self._default_pipeline = default_pipeline
+            self._fill_planners()
         if config:
             self.configuration(config)
         else:
             self._config = {}
             for label in self.actual.values():
                 label.setText('尚未连接')
+            self.planner_actual.setText('尚未连接')
         idle = connected and state in IDLE_STATES and not data.get('pending') and not fault
+        supported = all(key in config for key in PLANNER_PARAMETERS)
+        external = data.get('external_planning_service', '')
+        self.pipeline_combo.setEnabled(idle and supported and bool(planners) and not external)
+        selected_pipeline = self.pipeline_combo.currentData() or default_pipeline
+        self.planner_combo.setEnabled(self.pipeline_combo.isEnabled() and selected_pipeline in planners)
+        if external:
+            planner_note = '当前使用外部规划服务 {}；请通过原启动入口配置算法。'.format(external)
+        elif not supported:
+            planner_note = '算法在线切换需要编译并重启新版分拣节点。'
+        elif not planners:
+            planner_note = data.get('planner_error') or '等待读取 MoveIt 已加载的规划算法。'
+        else:
+            planner_note = '选择后点击“应用在线参数”。仅列出 MoveIt 已加载的算法；NSG 需先加载对应管线。'
+        self.planner_note.setText(planner_note)
         for key, editor in self.editors.items():
             editor.setEnabled(idle and key in config)
         self.apply_button.setEnabled(idle and bool(config))

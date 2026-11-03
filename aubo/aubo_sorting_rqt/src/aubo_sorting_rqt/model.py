@@ -33,6 +33,7 @@ PARAMETERS = (
     ('queue_merge_distance', '重复目标合并距离 / m', .001, .04, .001, 3),
     ('queue_merge_overlap', '较小框面积重叠比例', .05, 1., .05, 2),
 )
+PLANNER_PARAMETERS = ('planning_pipeline', 'planner_id')
 
 
 def add_plugin_arguments(parser):
@@ -40,6 +41,28 @@ def add_plugin_arguments(parser):
     parser.add_argument('--sorting-ns', default='/sorting')
     parser.add_argument('--image-topic', default='/sorting/debug_image')
     parser.add_argument('--hardware-topic', default='/aubo_i5/aubo_hw_node/flow_diagnostics')
+    parser.add_argument('--planner-service', default='/query_planner_interface')
+
+
+def planner_options(interfaces, group):
+    """Keep global IDs and this group's IDs, using the short ID MoveIt expects."""
+    result = {}
+    for interface in interfaces:
+        pipeline = interface.pipeline_id
+        if not pipeline:
+            continue
+        ids = set()
+        for planner in interface.planner_ids:
+            if planner == group:
+                continue  # Group-only configuration is the pipeline default.
+            if '[' in planner:
+                if not planner.startswith(group + '[') or not planner.endswith(']'):
+                    continue
+                planner = planner[len(group) + 1:-1]
+            if planner:
+                ids.add(planner)
+        result[pipeline] = sorted(ids)
+    return result
 
 
 def state_code(message):
@@ -94,9 +117,12 @@ def queue_rows(message):
 
 
 def parameter_changes(requested, accepted):
+    def matches(value, actual):
+        if isinstance(value, str) or isinstance(actual, str):
+            return value == actual
+        return math.isclose(float(value), float(actual), rel_tol=1e-9, abs_tol=1e-9)
     return [key for key, value in requested.items()
-            if key not in accepted or not math.isclose(float(value), float(accepted[key]),
-                                                       rel_tol=1e-9, abs_tol=1e-9)]
+            if key not in accepted or not matches(value, accepted[key])]
 
 
 def process_step(state, progress=None):

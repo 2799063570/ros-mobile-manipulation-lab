@@ -25,7 +25,11 @@ class BackendReconfigureTest(unittest.TestCase):
 #include <memory>
 #include <mutex>
 #define ROS_WARN_THROTTLE(...) ((void)0)
+namespace moveit_msgs {
+struct PlannerInterfaceDescription {std::string pipeline_id; std::vector<std::string> planner_ids;};
+}
 struct SortingTaskConfig {
+  std::string planning_pipeline, planner_id;
   double detection_timeout{15}, grasp_offset_x{0}, grasp_offset_y{0};
   double velocity_scaling{.1}, acceleration_scaling{.1}, queue_max_age{3};
   double queue_merge_distance{.02}, queue_merge_overlap{.5};
@@ -34,11 +38,24 @@ struct SortingTaskConfig {
 };
 struct FakeArm {
   int calls{0};
+  int queries{0};
+  bool available{true};
+  std::string pipeline, planner;
+  bool getInterfaceDescriptions(std::vector<moveit_msgs::PlannerInterfaceDescription>& result) {
+    ++queries;
+    result = {{"ompl", {"aubo_i5", "aubo_i5[RRTConnect]", "aubo_i5[RRTstar]", "gripper[RRT]"}},
+              {"nsg", {"NSG"}}};
+    return available;
+  }
+  std::string getDefaultPlanningPipelineId() {return "ompl";}
+  void setPlanningPipelineId(const std::string& value) {pipeline=value;planner.clear();}
+  void setPlannerId(const std::string& value) {planner=value;}
   void setMaxVelocityScalingFactor(double) { ++calls; }
   void setMaxAccelerationScalingFactor(double) { ++calls; }
 };
 class SortingTask {
 public:
+  std::string planning_pipeline_, planner_id_, planning_service_, group_name_{"aubo_i5"};
   std::mutex operation_mutex_, queue_mutex_;
   std::atomic<bool> busy_{false};
   double detection_timeout_{15}, grasp_offset_x_{0}, grasp_offset_y_{0};
@@ -87,6 +104,44 @@ int main() {
   config.minimum_gripper_height=.08;
   task.reconfigureCallback(config,0);
   assert(task.minimum_gripper_height_==.08 && task.arm_->calls==calls+2);
+  config.planning_pipeline="nsg"; config.planner_id="NSG";
+  task.reconfigureCallback(config,0);
+  assert(task.planning_pipeline_=="nsg" && task.planner_id_=="NSG");
+  assert(task.arm_->pipeline=="nsg" && task.arm_->planner=="NSG");
+  task.busy_.store(true);
+  const int queries=task.arm_->queries;
+  config.planning_pipeline="ompl";config.planner_id="RRTConnect";
+  task.reconfigureCallback(config,0);
+  assert(config.planning_pipeline=="nsg" && config.planner_id=="NSG");
+  assert(task.arm_->queries==queries);
+  task.busy_.store(false);
+  config.planning_pipeline="ompl";config.planner_id="unknown";
+  task.reconfigureCallback(config,0);
+  assert(config.planning_pipeline=="nsg" && config.planner_id=="NSG");
+  config.planning_pipeline="missing";config.planner_id="";
+  task.reconfigureCallback(config,0);
+  assert(config.planning_pipeline=="nsg");
+  task.planning_service_="/external";
+  config.planning_pipeline="ompl";config.planner_id="RRTConnect";
+  task.reconfigureCallback(config,0);
+  assert(config.planning_pipeline=="nsg");
+  task.planning_service_.clear();task.arm_->available=false;
+  config.planning_pipeline="ompl";config.planner_id="RRTConnect";
+  task.reconfigureCallback(config,0);
+  assert(config.planning_pipeline=="nsg");
+  task.arm_->available=true;
+  config.planning_pipeline="ompl";config.planner_id="gripper[RRT]";
+  task.reconfigureCallback(config,0);
+  assert(config.planning_pipeline=="nsg");
+  config.planning_pipeline="ompl";config.planner_id="RRTConnect";
+  task.reconfigureCallback(config,0);
+  assert(task.arm_->pipeline=="ompl" && task.arm_->planner=="RRTConnect");
+  config.planning_pipeline="";config.planner_id="RRTstar";
+  task.reconfigureCallback(config,0);
+  assert(task.arm_->pipeline.empty() && task.arm_->planner=="RRTstar");
+  config.planning_pipeline="nsg";config.planner_id="";
+  task.reconfigureCallback(config,0);
+  assert(task.arm_->pipeline=="nsg" && task.arm_->planner.empty());
 }
 '''
         with tempfile.TemporaryDirectory(prefix='sorting_reconfigure_') as folder:

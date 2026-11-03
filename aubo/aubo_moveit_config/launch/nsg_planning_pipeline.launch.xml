@@ -1,0 +1,16 @@
+<launch>
+  <arg name="capabilities" default=""/>
+  <arg name="disable_capabilities" default=""/>
+  <!-- Keep both planners selectable in RViz; NSG is the native default. -->
+  <param name="default_planning_pipeline" value="nsg"/>
+  <param name="planning_plugin" value="nsg_rrt_minimal/NSGPlanner"/>
+  <param name="request_adapters" value=""/>
+  <group ns="planning_pipelines/nsg">
+    <param name="planning_plugin" value="nsg_rrt_minimal/NSGPlanner"/>
+    <!-- The backend already returns a timed, spline-validated trajectory. -->
+    <param name="request_adapters" value=""/>
+  </group>
+  <include ns="planning_pipelines/ompl" file="$(find aubo_moveit_config)/launch/ompl_planning_pipeline.launch.xml"/>
+  <param name="capabilities" value="$(arg capabilities) nsg_rrt_minimal/ExecuteTrajectoryAction"/>
+  <param name="disable_capabilities" value="$(arg disable_capabilities) move_group/MoveGroupExecuteTrajectoryAction"/>
+</launch>
