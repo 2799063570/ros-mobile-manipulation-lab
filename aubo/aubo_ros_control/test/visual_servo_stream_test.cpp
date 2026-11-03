@@ -5,6 +5,25 @@
 namespace vsi = aubo_ros_control::visual_servo_internal;
 vsi::JointPoint filled(double value) { vsi::JointPoint p; p.fill(value); return p; }
 
+TEST(VisualServoStream, CollisionGuardChecksBrakingTailWithoutAdvancingStream)
+{
+  vsi::VisualServoStream stream(filled(.35), filled(.4), filled(8), filled(-3), filled(3));
+  stream.initialize(filled(0));
+  for (int i = 0; i < 200; ++i) stream.step(filled(.3));
+  const auto position = stream.position(), velocity = stream.velocity();
+  const double obstacle = position[0] + .01;
+  EXPECT_LT(position[0], obstacle);  // The candidate alone is clear.
+  EXPECT_FALSE(stream.safeStop([&](const vsi::JointPoint& q) {
+    return q[0] < obstacle;
+  }, .002));
+  unsigned samples = 0;
+  EXPECT_TRUE(stream.safeStop([&](const vsi::JointPoint&) { ++samples; return true; }, .002));
+  EXPECT_GT(samples, 2u);
+  EXPECT_EQ(position, stream.position());
+  EXPECT_EQ(velocity, stream.velocity());
+  EXPECT_FALSE(stream.safeStop([](const vsi::JointPoint&) { return false; }, .002));
+}
+
 TEST(VisualServoStream, ReversalAndStopKeepDiscreteDerivativeBounds)
 {
   vsi::VisualServoStream stream(filled(.5), filled(.8), filled(8), filled(-10), filled(10));

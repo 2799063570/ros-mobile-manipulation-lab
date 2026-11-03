@@ -8,6 +8,7 @@
 #include <dynamic_reconfigure/server.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <moveit_msgs/GetMotionPlan.h>
+#include <moveit/planning_scene_monitor/planning_scene_monitor.h>
 #include <ros/ros.h>
 #include <sensor_msgs/JointState.h>
 #include <std_msgs/Bool.h>
@@ -49,6 +50,8 @@ public:
 
   // SDK 后端运行期间是否仍保持健康；Gazebo 后端始终返回 true。
   bool healthy() const;
+  void requestStop();
+  bool stopped();
 
 private:
   using JointPoint = visual_servo_internal::JointPoint;
@@ -81,6 +84,8 @@ private:
   std::size_t readQueueCapacity();
   bool loadParameters();
   bool initializeKinematics();
+  bool initializeCollisionScene();
+  bool streamCollisionFree(const visual_servo_internal::VisualServoStream& stream);
   bool setupGazeboPublishers();
   void setupDynamicReconfigure();
   void reconfigureCallback(VisualServoConfig &config, uint32_t level);
@@ -158,6 +163,8 @@ private:
   CommandQueue queue_;
   bool on_demand_output_{false};
   bool stream_armed_{false};
+  bool shutting_down_{false}, collision_check_{true};
+  double collision_resolution_{0.002};
   std::unique_ptr<visual_servo_internal::VisualServoStream> stream_;
   JointPoint stream_target_{};
   double stream_feedback_timeout_{0.15}, stream_target_timeout_{0.04};
@@ -206,7 +213,7 @@ private:
   KDL::Chain chain_; // 机械臂运动学链 从 base_link_ 到 control_link_ 的链
   std::unique_ptr<KDL::ChainFkSolverPos_recursive> fk_solver_;
   std::unique_ptr<KDL::ChainJntToJacSolver> jacobian_solver_;
-  std::unique_ptr<DirectSdkBackend> sdk_;
+  planning_scene_monitor::PlanningSceneMonitorPtr collision_scene_;
 
   // 多线程回调共享状态及对应互斥量。
   std::mutex target_mutex_, joint_mutex_, control_mutex_;
@@ -230,6 +237,9 @@ private:
   std::vector<ros::Publisher> gazebo_publishers_;
   ros::Timer control_timer_, output_timer_, sdk_state_timer_;
   std::unique_ptr<ReconfigureServer> reconfigure_server_;
+  // Join the point-generator thread before its referenced state is destroyed,
+  // including when construction throws after the SDK connection starts.
+  std::unique_ptr<DirectSdkBackend> sdk_;
 };
 
 } // namespace aubo_ros_control

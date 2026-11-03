@@ -4,6 +4,9 @@
 先看 [launch 启动索引](launch/README.md) 选择入口。原 `roslaunch aubo_sorting 文件名.launch`
 命令保持可用；XML include 请使用整理后的实际路径。
 
+当前工位的独立 SDK 视觉伺服测试使用 `eye_to_hand_yolo_servo_test_real.launch`，
+默认低速、禁用且停在观测表面上方 15 cm，见[实机视觉伺服测试步骤](../../docs/AUBO眼在手外视觉伺服实机测试.md)。
+
 使用 YOLO 与已有眼在手外标定，让夹爪低速朝下移动到物体上方进行对齐验证，见
 [`aubo_handeye_validation`](../aubo_handeye_validation/README.md)。该入口独立于分拣循环，提供规划预览、
 单次移动与停止服务，默认停在目标顶面上方 10 cm。

@@ -1,0 +1,12 @@
+# Low-speed position-only commissioning with the saved /camera calibration.
+camera_link: camera_color_optical_frame
+linear_gain: 0.30
+max_linear_velocity: 0.01
+max_angular_velocity: 0.03
+use_orientation_control: false
+# Depth target is the visible object surface; hover 15 cm above that point.
+target_offset: [0.0, 0.0, 0.15]
+loss_strategy: stop
+collision_check: true
+planning_scene_topic: /move_group/monitored_planning_scene
+initial_scene_service: /get_planning_scene

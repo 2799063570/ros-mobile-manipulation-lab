@@ -1,0 +1,12 @@
+<launch>
+  <!-- Actual robot geometry and limits, position-topic backend only. -->
+  <include file="$(find aubo_moveit_config)/launch/planning_context.launch">
+    <arg name="load_robot_description" value="true"/>
+    <arg name="robot_xacro" value="aubo_i5.xacro"/>
+    <arg name="robot_srdf" value="aubo_i5.srdf"/>
+  </include>
+  <test test-name="visual_servo_real_model" pkg="aubo_ros_control"
+        type="visual_servo_startup_test.py" time-limit="30">
+    <param name="real_model" value="true"/>
+  </test>
+</launch>

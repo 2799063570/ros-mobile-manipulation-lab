@@ -16,7 +16,7 @@
   <arg name="start_perception" default="true"/>
   <arg name="start_task" default="true"/>
   <arg name="rviz" default="true"/>
-  <arg name="rqt" default="false"/>
+  <arg name="rqt" default="true"/>
   <arg name="gripper_port" default="/dev/serial/by-id/usb-1a86_USB_Serial-if00-port0"/>
   <arg name="object_height" default="0.065"/>
   <arg name="velocity_scaling" default="0.60"/>

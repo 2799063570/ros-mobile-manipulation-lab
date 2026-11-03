@@ -2,13 +2,19 @@
 """Production PBVS frontend with a delayed, local SDK boundary and 5ms cabinet."""
 import collections
 import math
+import os
+import signal
 import threading
 import time
 import unittest
+import xmlrpc.client
 
 import rospy
 import rostest
 from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import Pose
+from moveit_msgs.msg import CollisionObject
+from shape_msgs.msg import SolidPrimitive
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64MultiArray, String
 from std_srvs.srv import SetBool, Trigger
@@ -151,8 +157,70 @@ class StreamTest(unittest.TestCase):
             time.sleep(2.0)
             self.assertTrue(reset().success)
 
+            if rospy.get_param('~collision_check', False):
+                scene_pub = rospy.Publisher('/collision_object', CollisionObject,
+                                            queue_size=1, latch=True)
+                with lock:
+                    boundary = sum(points[-1]) + .12
+                    control['goal'] = boundary + .20
+                obstacle = CollisionObject()
+                obstacle.header.frame_id, obstacle.id = 'base_link', 'stream_test_wall'
+                obstacle.operation = CollisionObject.ADD
+                obstacle.primitives = [SolidPrimitive(type=SolidPrimitive.BOX,
+                                                       dimensions=[.04, .2, .2])]
+                pose = Pose()
+                pose.position.x, pose.orientation.w = boundary + .03, 1.0
+                obstacle.primitive_poses = [pose]
+                scene_pub.publish(obstacle)
+                time.sleep(.3)
+                self.assertTrue(enable(True).success)
+                deadline = time.monotonic() + 6
+                while time.monotonic() < deadline and states[-1] != 'HOLD':
+                    time.sleep(.02)
+                self.assertEqual('HOLD', states[-1], 'collision guard never latched')
+                time.sleep(1.5)
+                with lock:
+                    self.assertLess(sum(points[-1]), boundary + 1e-6)
+                    self.assertLess(max(abs(a-b) for a,b in zip(points[-1],points[-30])), 1e-5)
+                self.assertFalse(enable(True).success)
+                self.assertTrue(enable(False).success)
+                obstacle.operation = CollisionObject.REMOVE
+                scene_pub.publish(obstacle)
+                time.sleep(.3)
+                self.assertTrue(reset().success)
+
+            if rospy.get_param('~exercise_shutdown', False):
+                with lock:
+                    control['goal'] = sum(joints) + .25
+                self.assertTrue(enable(True).success)
+                time.sleep(.7)
+                with lock:
+                    self.assertGreater(max(abs(a-b)/.005 for a,b in zip(points[-1],points[-2])), .001)
+                    shutdown_begin = len(points)
+                code, _, uri = rospy.get_master().lookupNode('/visual_stream_controller')
+                self.assertEqual(code, 1)
+                code, _, pid = xmlrpc.client.ServerProxy(uri).getPid(rospy.get_name())
+                self.assertEqual(code, 1)
+                os.kill(pid, getattr(signal, rospy.get_param('~shutdown_signal', 'SIGINT')))
+                time.sleep(.1)
+                self.assertFalse(enable(True).success, 'shutdown accepted a new enable request')
+                deadline = time.monotonic() + 5
+                exited = False
+                while time.monotonic() < deadline:
+                    try:
+                        os.kill(pid, 0)
+                    except ProcessLookupError:
+                        exited = True
+                        break
+                    time.sleep(.02)
+                self.assertTrue(exited, 'controller did not finish graceful shutdown')
+                with lock:
+                    self.assertGreater(len(points), shutdown_begin)
+                    self.assertLess(max(abs(a-b)/.005 for a,b in zip(points[-1],points[-2])), 1.1e-6)
+
             with lock:
                 recorded = list(points)
+            limits = rospy.get_param('/visual_stream_controller')
             previous, old_v, old_a = (0.0,)*6, [0.0]*6, [0.0]*6
             for point in recorded:
                 for i in range(6):
@@ -160,9 +228,9 @@ class StreamTest(unittest.TestCase):
                     velocity = (point[i]-previous[i])/.005
                     acceleration = (velocity-old_v[i])/.005
                     jerk = (acceleration-old_a[i])/.005
-                    self.assertLessEqual(abs(velocity), (.5 if i<3 else .7)+1e-7)
-                    self.assertLessEqual(abs(acceleration), (.8 if i<3 else 1.2)+1e-6)
-                    self.assertLessEqual(abs(jerk), (8 if i<3 else 12)+1e-4)
+                    self.assertLessEqual(abs(velocity), limits['joint_velocity_limits'][i]+1e-7)
+                    self.assertLessEqual(abs(acceleration), limits['joint_acceleration_limits'][i]+1e-6)
+                    self.assertLessEqual(abs(jerk), limits['joint_jerk_limits'][i]+1e-4)
                     old_v[i], old_a[i] = velocity, acceleration
                 previous = point
         finally:

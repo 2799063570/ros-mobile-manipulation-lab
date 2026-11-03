@@ -3,11 +3,17 @@
   <arg name="send_delay_ms" default="90"/>
   <arg name="accept_late" default="true"/>
   <arg name="trace_path" default=""/>
+  <arg name="collision_check" default="false"/>
+  <arg name="exercise_shutdown" default="false"/>
+  <arg name="shutdown_signal" default="SIGINT"/>
   <param name="robot_description" textfile="$(find aubo_ros_control)/test/hybrid_test.urdf"/>
+  <param name="robot_description_semantic" textfile="$(find aubo_ros_control)/test/hybrid_test.srdf"/>
   <!-- Test implementation: no SDK login/startup or hardware connection. -->
   <node pkg="aubo_ros_control" type="aubo_visual_servo_fake_sdk_node"
-        name="visual_stream_controller" required="true" output="screen">
+        name="visual_stream_controller" required="$(eval not arg('exercise_shutdown'))" output="screen">
     <rosparam file="$(find aubo_ros_control)/config/visual_servo_common.yaml"/>
+    <!-- Synthetic fixture: collision coverage is enabled separately. -->
+    <param name="collision_check" value="$(arg collision_check)"/>
     <param name="backend" value="sdk"/>
     <param name="servo_mode" value="$(arg mode)"/>
     <param name="camera_link" value="tcp_link"/>
@@ -26,7 +32,10 @@
     <rosparam param="desired_target_rpy">[0.0, 0.0, 0.0]</rosparam>
   </node>
   <test test-name="visual_servo_stream" pkg="aubo_ros_control"
-        type="visual_servo_stream_test.py" time-limit="40">
+        type="visual_servo_stream_test.py" time-limit="50">
     <param name="mode" value="$(arg mode)"/>
+    <param name="collision_check" value="$(arg collision_check)"/>
+    <param name="exercise_shutdown" value="$(arg exercise_shutdown)"/>
+    <param name="shutdown_signal" value="$(arg shutdown_signal)"/>
   </test>
 </launch>

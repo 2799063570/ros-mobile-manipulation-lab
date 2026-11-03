@@ -287,10 +287,14 @@ if(CATKIN_ENABLE_TESTING)
     aubo_cartesian_jog_fake_sdk_node cartesian_jog_ros_control_integration_test)
   catkin_install_python(PROGRAMS test/hybrid_control_test.py
     test/visual_servo_stream_test.py
+    test/visual_servo_startup_test.py
     test/visual_servo_visualization_test.py
     DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
   add_rostest(test/hybrid_control.test)
   add_rostest(test/visual_servo_stream.test DEPENDENCIES aubo_visual_servo_fake_sdk_node)
+  add_rostest(test/visual_servo_safety.test DEPENDENCIES aubo_visual_servo_fake_sdk_node)
+  add_rostest(test/visual_servo_startup.test DEPENDENCIES aubo_visual_servo_fake_sdk_node)
+  add_rostest(test/visual_servo_real_model.test DEPENDENCIES aubo_visual_servo_node)
   add_rostest(test/visual_servo_visualization.test DEPENDENCIES aubo_visual_servo_visualization_node)
   add_rostest(test/initial_observation.test)
   catkin_add_gtest(visual_servo_common_test

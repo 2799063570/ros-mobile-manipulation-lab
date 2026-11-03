@@ -29,10 +29,17 @@ joint_names: [shoulder_joint, upperArm_joint, foreArm_joint,
               wrist1_joint, wrist2_joint, wrist3_joint]
 joint_lower_limits: [-3.04, -1.0471976, -3.04, -3.04, -3.04, -3.04]
 joint_upper_limits: [ 3.04,  1.0471976,  3.04,  3.04,  3.04,  3.04]
-joint_velocity_limits: [0.50, 0.50, 0.50, 0.70, 0.70, 0.70]
-joint_acceleration_limits: [0.80, 0.80, 0.80, 1.20, 1.20, 1.20]
+# Must not exceed robot_description_planning/joint_limits.
+joint_velocity_limits: [0.35, 0.35, 0.35, 0.50, 0.50, 0.50]
+joint_acceleration_limits: [0.40, 0.40, 0.40, 0.60, 0.60, 0.60]
 joint_jerk_limits: [8.0, 8.0, 8.0, 12.0, 12.0, 12.0]
 joint_limit_margin: 0.08
+# Independent on-demand PBVS: check candidate points and their braking tails.
+# Known obstacles must be published to this scene; no implicit depth mapping.
+collision_check: true
+collision_resolution: 0.002
+planning_scene_topic: /planning_scene
+initial_scene_service: ""
 
 target_timeout: 0.20
 loss_strategy: coast

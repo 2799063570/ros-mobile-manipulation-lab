@@ -1,8 +1,11 @@
 <launch>
   <param name="robot_description" textfile="$(find aubo_ros_control)/test/hybrid_test.urdf"/>
+  <param name="robot_description_semantic" textfile="$(find aubo_ros_control)/test/hybrid_test.srdf"/>
   <node pkg="aubo_ros_control" type="aubo_visual_servo_node"
         name="aubo_visual_servo" required="true">
     <rosparam file="$(find aubo_ros_control)/config/visual_servo_common.yaml"/>
+    <!-- Synthetic fixture: collision coverage is enabled separately. -->
+    <param name="collision_check" value="false"/>
     <param name="servo_mode" value="eye_in_hand"/>
     <param name="camera_link" value="tcp_link"/>
     <param name="control_link" value="tcp_link"/>

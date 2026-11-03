@@ -84,6 +84,31 @@ public:
   }
 
   bool initialized() const { return initialized_; }
+  // Check the current point and its complete zero-input braking tail. The
+  // caller supplies a scene snapshot so all samples use the same world.
+  template <typename StateSafe>
+  bool safeStop(StateSafe state_safe, double resolution) const
+  {
+    if (!initialized_ || !std::isfinite(resolution) || resolution <= 0.0)
+      return false;
+    auto braking = *this;
+    JointPoint last_checked = position_;
+    for (unsigned step = 0; step <= 600; ++step)
+    {
+      double travel = 0.0;
+      for (std::size_t i = 0; i < kDof; ++i)
+        travel = std::max(travel, std::abs(braking.position()[i] - last_checked[i]));
+      if (step == 0 || braking.settled() || travel >= resolution || step == 600)
+      {
+        if (!state_safe(braking.position())) return false;
+        last_checked = braking.position();
+      }
+      if (braking.settled()) return true;
+      braking.step(JointPoint{});
+    }
+    return false;
+  }
+
   bool braking() const { return braking_; }
   bool settled() const
   {

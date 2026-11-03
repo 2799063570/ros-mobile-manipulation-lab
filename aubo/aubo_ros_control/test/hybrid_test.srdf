@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<robot name="hybrid_test">
+  <group name="aubo_i5"><chain base_link="base_link" tip_link="tcp_link"/></group>
+</robot>

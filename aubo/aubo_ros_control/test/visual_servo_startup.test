@@ -1,0 +1,6 @@
+<launch>
+  <param name="robot_description" textfile="$(find aubo_ros_control)/test/hybrid_test.urdf"/>
+  <param name="robot_description_semantic" textfile="$(find aubo_ros_control)/test/hybrid_test.srdf"/>
+  <test test-name="visual_servo_startup" pkg="aubo_ros_control"
+        type="visual_servo_startup_test.py" time-limit="40"/>
+</launch>

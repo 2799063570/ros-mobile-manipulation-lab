@@ -10,6 +10,7 @@
 | 启动通用实机分拣环境 | [sorting_real.launch](sorting_real.launch) | 颜色、眼在手上；等待显式运动指令 |
 | 使用当前实测的眼在手外三容器工位，连续分拣 | [eye_to_hand_yolo_sorting_real.launch](scenarios/eye_to_hand_yolo_sorting_real.launch) | YOLO、深度定位、实例队列；等待显式运动指令 |
 | 同一实测工位，按缓冲队列分拣 | [eye_to_hand_can_sorting_real.launch](scenarios/eye_to_hand_can_sorting_real.launch) | 按入队顺序领取就绪实例，允许 bottle / can / box；等待显式运动指令 |
+| 同一工位，测试 YOLO 实机局部视觉伺服 | [eye_to_hand_yolo_servo_test_real.launch](scenarios/eye_to_hand_yolo_servo_test_real.launch) | 10 mm/s、表面上方 15 cm、默认禁用；[测试步骤](../../../docs/AUBO眼在手外视觉伺服实机测试.md) |
 | MoveIt 接近 + 局部视觉伺服的 hybrid 控制 | [hybrid/](hybrid/) | 选择眼在手上 / 眼在手外、Gazebo / 实机入口 |
 
 ## 目录分工
@@ -20,7 +21,7 @@ launch/
 ├── sorting_gazebo.launch   # Gazebo + MoveIt + sorting.launch
 ├── sorting_real.launch     # 实机硬件 + MoveIt + 相机 + 夹爪 + sorting.launch
 ├── presets/                # 14 个通用快捷入口，仅选择检测器 / 相机安装方式
-├── scenarios/              # 2 个实测三容器工位入口，含工位几何和任务覆盖
+├── scenarios/              # 实测工位分拣及局部视觉伺服测试入口
 └── hybrid/                 # 4 个混合控制入口，复用 aubo_ros_control
 ```
 

@@ -27,11 +27,13 @@
 
 #include <Eigen/Dense>
 #include <Eigen/Geometry>
+#include <moveit/robot_model_loader/robot_model_loader.h>
 
 #include <algorithm>
 #include <array>
 #include <atomic>
 #include <clocale>
+#include <csignal>
 #include <cmath>
 #include <limits>
 #include <memory>
@@ -40,6 +42,9 @@
 #include <vector>
 
 namespace {
+volatile std::sig_atomic_t stop_requested = 0;
+void requestShutdown(int) { stop_requested = 1; }
+
 using aubo_ros_control::visual_servo_internal::applyDeadband;
 using aubo_ros_control::visual_servo_internal::clampValue;
 using aubo_ros_control::visual_servo_internal::CommandQueue;
@@ -172,6 +177,10 @@ VisualServo::VisualServo()
       valid_ = false;
       return;
     }
+    if (collision_check_ && !initializeCollisionScene()) {
+      valid_ = false;
+      return;
+    }
     if (backend_ == "sdk" && enabled_) {
       ROS_WARN("[visual_servo] SDK按需输出启动保持禁用，等待显式使能和新视觉目标");
       enabled_ = false;
@@ -268,6 +277,29 @@ bool VisualServo::healthy() const {
   return backend_ != "sdk" || (sdk_ && sdk_->healthy());
 }
 
+void VisualServo::requestStop() {
+  std::lock_guard<std::mutex> lock(control_mutex_);
+  shutting_down_ = true;
+  enabled_ = false;
+  resetHybrid();
+  queue_.clear();
+  if (on_demand_output_) updateStreamTarget(JointPoint{});
+  last_tracking_velocity_.setZero();
+  transitionTo(on_demand_output_ && !stream_->settled() ?
+               ServoState::STOPPING : ServoState::DISABLED);
+}
+
+bool VisualServo::stopped() {
+  std::lock_guard<std::mutex> lock(control_mutex_);
+  if (!on_demand_output_) return true;
+  if (!stream_->initialized() || (sdk_ && !stream_armed_)) return true;
+  JointPoint feedback;
+  if (!stream_->settled() || !streamFeedback(feedback)) return false;
+  for (std::size_t i = 0; i < kDof; ++i)
+    if (std::abs(stream_->position()[i] - feedback[i]) > 0.005) return false;
+  return true;
+}
+
 std::size_t VisualServo::readQueueCapacity() {
   int capacity = 80;
   private_nh_.param<int>("command_queue_capacity", capacity, 80);// 获取参数服务器中 控制队列的长度
@@ -328,6 +360,14 @@ bool VisualServo::loadParameters() {
   private_nh_.param<bool>("initial_search_enabled", initial_search_enabled_,
                           servo_mode_ == "eye_in_hand");// 是否机械臂初始化到观察姿态
   private_nh_.param<bool>("start_enabled", enabled_, false);// 是否启动视觉伺服器
+  private_nh_.param("collision_check", collision_check_, true);
+  private_nh_.param("collision_resolution", collision_resolution_, 0.002);
+  if (!std::isfinite(collision_resolution_) || collision_resolution_ <= 0.0 ||
+      collision_resolution_ > 0.01 || !std::isfinite(joint_limit_margin_) ||
+      joint_limit_margin_ < 0.0) {
+    ROS_ERROR("[visual_servo] 无效关节余量或碰撞采样步长");
+    return false;
+  }
   
   if (servo_mode_ != "eye_in_hand" && servo_mode_ != "eye_to_hand") {
     ROS_ERROR("[visual_servo] servo_mode 必须是 eye_in_hand 或 eye_to_hand");
@@ -544,9 +584,76 @@ bool VisualServo::initializeKinematics() {
               chain_.getNrOfJoints());
     return false;
   }
+  std::size_t index = 0;
+  for (const auto& segment : chain_.segments) {
+    if (segment.getJoint().getType() == KDL::Joint::None) continue;
+    if (segment.getJoint().getName() != joint_names_.at(index++)) {
+      ROS_ERROR("[visual_servo] joint_names 必须与KDL链关节顺序一致");
+      return false;
+    }
+  }
+  // Load the same URDF + planning overrides as MoveIt, without loading IK
+  // plugins. The SDK does not enforce these project-level bounds for us.
+  robot_model_loader::RobotModelLoader loader("robot_description", false);
+  const auto model = loader.getModel();
+  if (!model) return false;
+  for (std::size_t i = 0; i < kDof; ++i) {
+    const auto* joint = model->getJointModel(joint_names_[i]);
+    if (!joint || joint->getVariableCount() != 1) return false;
+    const auto& bounds = joint->getVariableBounds().front();
+    if (!std::isfinite(lower_limits_[i]) || !std::isfinite(upper_limits_[i]) ||
+        lower_limits_[i] + joint_limit_margin_ >= upper_limits_[i] - joint_limit_margin_ ||
+        !std::isfinite(velocity_limits_[i]) || velocity_limits_[i] <= 0.0 ||
+        !std::isfinite(acceleration_limits_[i]) || acceleration_limits_[i] <= 0.0 ||
+        (bounds.position_bounded_ && (lower_limits_[i] < bounds.min_position_ - 1e-7 ||
+                                     upper_limits_[i] > bounds.max_position_ + 1e-7)) ||
+        (bounds.velocity_bounded_ && velocity_limits_[i] > bounds.max_velocity_ + 1e-7) ||
+        (bounds.acceleration_bounded_ && acceleration_limits_[i] > bounds.max_acceleration_ + 1e-7)) {
+      ROS_ERROR("[visual_servo] 关节 %s 配置限额无效或超过模型限额："
+                "q=[%.6f,%.6f]/[%.6f,%.6f] margin=%.3f V=%.3f/%.3f A=%.3f/%.3f",
+                joint_names_[i].c_str(), lower_limits_[i], upper_limits_[i],
+                bounds.min_position_, bounds.max_position_, joint_limit_margin_,
+                velocity_limits_[i], bounds.max_velocity_,
+                acceleration_limits_[i], bounds.max_acceleration_);
+      return false;
+    }
+  }
   fk_solver_.reset(new KDL::ChainFkSolverPos_recursive(chain_));
   jacobian_solver_.reset(new KDL::ChainJntToJacSolver(chain_));
   return true;
+}
+
+bool VisualServo::initializeCollisionScene() {
+  if (!nh_.hasParam("robot_description_semantic")) {
+    ROS_ERROR("[visual_servo] 碰撞检查需要 robot_description_semantic");
+    return false;
+  }
+  collision_scene_.reset(new planning_scene_monitor::PlanningSceneMonitor("robot_description"));
+  if (!collision_scene_->getPlanningScene()) return false;
+  std::string topic, service;
+  private_nh_.param<std::string>("planning_scene_topic", topic, "/planning_scene");
+  private_nh_.param<std::string>("initial_scene_service", service, "");
+  collision_scene_->startSceneMonitor(topic);
+  collision_scene_->startWorldGeometryMonitor("/collision_object", "/planning_scene_world", false);
+  collision_scene_->startStateMonitor("/joint_states");
+  collision_scene_->setStateUpdateFrequency(50.0);
+  if (!service.empty() && !collision_scene_->requestPlanningSceneState(service)) {
+    ROS_ERROR("[visual_servo] 无法获取初始完整碰撞场景");
+    return false;
+  }
+  return true;
+}
+
+bool VisualServo::streamCollisionFree(const visual_servo_internal::VisualServoStream& stream) {
+  if (!collision_scene_) return true;
+  planning_scene_monitor::LockedPlanningSceneRO scene(collision_scene_);
+  moveit::core::RobotState state(scene->getCurrentState());
+  return stream.safeStop([&](const JointPoint& position) {
+    for (std::size_t i = 0; i < kDof; ++i)
+      state.setVariablePosition(joint_names_[i], position[i]);
+    state.update();
+    return !scene->isStateColliding(state);
+  }, collision_resolution_);
 }
 
 bool VisualServo::setupGazeboPublishers() {
@@ -657,16 +764,22 @@ bool VisualServo::setEnabled(std_srvs::SetBool::Request &request,
                              std_srvs::SetBool::Response &response) {
   // 接收rviz端发送的服务请求
   std::lock_guard<std::mutex> control_lock(control_mutex_);
+  if (request.data && shutting_down_) {
+    response.success = false;
+    response.message = "controller is shutting down";
+    return true;
+  }
   if (on_demand_output_) {
     JointPoint feedback;
     bool caught_up = streamFeedback(feedback) && stream_->initialized() && stream_->settled();
     if (caught_up)
       for (std::size_t i=0; i<kDof; ++i)
         caught_up &= std::abs(feedback[i] - stream_->position()[i]) <= 0.01;
+    if (request.data && caught_up) caught_up = streamCollisionFree(*stream_);
     if (request.data && (safety_stop_.load() || !caught_up ||
                         (sdk_ && (!sdk_->healthy() || !sdk_->armMotion())))) {
       response.success = false;
-      response.message = "not ready: require fresh feedback, settled output, reset fault and SDK readiness";
+      response.message = "not ready: require fresh feedback, settled collision-free output, reset fault and SDK readiness";
       return true;
     }
     enabled_ = request.data;
@@ -724,6 +837,7 @@ bool VisualServo::reset(std_srvs::Trigger::Request &,
     if (ready)
       for (std::size_t i=0; i<kDof; ++i)
         ready &= std::abs(feedback[i] - stream_->position()[i]) <= 0.01;
+    if (ready) ready = streamCollisionFree(*stream_);
     if (!ready || (sdk_ && !sdk_->healthy())) {
       response.success = false;
       response.message = "disable and wait for fresh, settled feedback; SDK transport faults require restart";
@@ -1310,7 +1424,18 @@ bool VisualServo::generateStreamPointLocked(JointPoint& point, PointTiming* timi
               fresh, following_error, target_stale);
   JointPoint wanted = stream_target_;
   if (!enabled_ || safety_stop_.load() || target_stale) wanted.fill(0.0);
-  point = stream_->step(wanted);
+  auto candidate = *stream_;
+  candidate.step(wanted);
+  if (!streamCollisionFree(candidate)) {
+    if (!safety_stop_.exchange(true))
+      ROS_ERROR("[visual_servo] 候选点或制动尾段碰撞，锁存并减速");
+    // Keep continuity with the previously checked braking tail. A newly
+    // appearing obstacle cannot retract points already in the cabinet.
+    candidate = *stream_;
+    candidate.step(JointPoint{});
+  }
+  *stream_ = std::move(candidate);
+  point = stream_->position();
   if (stream_->braking() && !safety_stop_.exchange(true))
     ROS_ERROR("[visual_servo] 关节制动余量不足，锁存并减速");
   command_position_ = point;
@@ -1328,19 +1453,33 @@ bool VisualServo::generateStreamPointLocked(JointPoint& point, PointTiming* timi
 } // namespace aubo_ros_control
 
 int main(int argc, char **argv) {
-  setlocale(LC_ALL, "");
-  ros::init(argc, argv, "visual_servo");
+  setlocale(LC_CTYPE, "");
+  ros::init(argc, argv, "visual_servo", ros::init_options::NoSigintHandler);
+  std::signal(SIGINT, requestShutdown);
+  std::signal(SIGTERM, requestShutdown);
   aubo_ros_control::VisualServo servo;
   if (!servo.valid())
     return 1;
   ros::AsyncSpinner spinner(3);
   spinner.start();
-  ros::Rate monitor(10.0);
-  while (ros::ok() && servo.healthy())
+  ros::WallRate monitor(50.0);
+  while (ros::ok() && servo.healthy() && !stop_requested)
     monitor.sleep();
-  const bool backend_failed = ros::ok();
+  const bool backend_failed = !servo.healthy();
   if (backend_failed)
     ROS_ERROR("[visual_servo] 后端失效，节点退出");
+  servo.requestStop();
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(3);
+  while (ros::ok() && servo.healthy() && !servo.stopped() &&
+         std::chrono::steady_clock::now() < deadline)
+    monitor.sleep();
+  const bool stop_confirmed = ros::ok() && servo.healthy() && servo.stopped();
+  if (stop_confirmed)
+    ros::WallDuration(0.40).sleep();  // Nominal drain margin, not a hardware acknowledgement.
+  else if (!backend_failed)
+    ROS_ERROR("[visual_servo] 退出时未确认平滑停车完成");
+  const bool normal = stop_confirmed && servo.healthy();
+  spinner.stop();
   ros::shutdown();
-  return backend_failed ? 1 : 0;
+  return backend_failed || !normal ? 1 : 0;
 }

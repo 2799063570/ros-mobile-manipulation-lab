@@ -1,0 +1,6 @@
+<launch>
+  <include file="$(find aubo_ros_control)/test/visual_servo_stream.test">
+    <arg name="collision_check" value="true"/>
+    <arg name="exercise_shutdown" value="true"/>
+  </include>
+</launch>
