@@ -1,0 +1,29 @@
+<launch>
+  <param name="robot_description" textfile="$(find aubo_ros_control)/test/hybrid_test.urdf"/>
+  <param name="robot_description_semantic" textfile="$(find aubo_ros_control)/test/hybrid_test.srdf"/>
+  <node pkg="aubo_ros_control" type="aubo_visual_servo_node" name="aubo_visual_servo" required="true">
+    <rosparam file="$(find aubo_ros_control)/config/visual_servo_common.yaml"/>
+    <param name="backend" value="gazebo"/>
+    <param name="servo_mode" value="eye_to_hand"/>
+    <param name="collision_check" value="false"/>
+    <param name="initial_search_enabled" value="true"/>
+    <param name="use_orientation_control" value="false"/>
+    <param name="loss_strategy" value="coast_then_open"/>
+    <param name="coast_duration" value="0.15"/>
+    <param name="coast_decay_time" value="0.05"/>
+    <param name="recovery_delay" value="0.05"/>
+    <param name="reacquire_hold_time" value="0.05"/>
+    <param name="search_timeout" value="12.0"/>
+    <param name="open_posture_gain" value="2.0"/>
+    <param name="search_velocity_limit" value="0.08"/>
+    <param name="observation_joint_tolerance" value="0.003"/>
+    <rosparam param="initial_search_posture">[0.06, 0, 0, 0, 0, 0]</rosparam>
+    <rosparam param="recovery_posture">[0.06, 0, 0, 0, 0, 0]</rosparam>
+    <rosparam param="target_offset">[0, 0, 0]</rosparam>
+    <rosparam param="desired_target_position">[0, 0, 0]</rosparam>
+    <rosparam param="desired_target_rpy">[0, 0, 0]</rosparam>
+    <rosparam param="gazebo_command_topics">[/observation/q0, /observation/q1, /observation/q2, /observation/q3, /observation/q4, /observation/q5]</rosparam>
+  </node>
+  <test test-name="eye_to_hand_observation" pkg="aubo_ros_control"
+        type="eye_to_hand_observation_test.py" time-limit="60"/>
+</launch>

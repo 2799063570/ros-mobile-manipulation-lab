@@ -1,0 +1,9 @@
+<launch>
+  <!-- UI only. No SDK connection, automatic enable or parameter writes. -->
+  <arg name="controller_node" default="/aubo_visual_servo"/>
+  <arg name="servo_ns" default="/visual_servo"/>
+  <arg name="image_topic" default="/visual_servo/debug_image"/>
+  <arg name="geometry_node" default="/grasp_geometry"/>
+  <node pkg="aubo_sorting_rqt" type="visual_servo_panel" name="visual_servo_panel" output="screen"
+        args="--controller-node $(arg controller_node) --servo-ns $(arg servo_ns) --image-topic $(arg image_topic) --geometry-node $(arg geometry_node)"/>
+</launch>

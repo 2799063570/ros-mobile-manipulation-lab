@@ -4,6 +4,7 @@
   <!-- mode_config 决定眼在手上/眼在手外误差模型，backend 决定仿真/真机执行链。 -->
   <arg name="mode_config"/>
   <arg name="override_config" default=""/>
+  <arg name="observation_config" default=""/>
   <arg name="backend" default="gazebo"/>
   <arg name="robot_ip" default="192.168.1.2"/>
   <arg name="target_topic" default="/visual_servo/target_pose"/>
@@ -30,6 +31,7 @@
               command="load"/>
     <rosparam file="$(arg mode_config)" command="load"/>
     <rosparam if="$(eval arg('override_config') != '')" file="$(arg override_config)" command="load"/>
+    <rosparam if="$(eval arg('observation_config') != '')" file="$(arg observation_config)" command="load"/>
     <rosparam if="$(arg hybrid_enabled)" file="$(arg hybrid_config)" command="load"/>
     <param name="hybrid_enabled" value="$(arg hybrid_enabled)"/>
     <param name="hybrid_lock_pregrasp_path" value="$(arg hybrid_lock_pregrasp_path)"/>

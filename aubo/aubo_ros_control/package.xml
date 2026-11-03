@@ -27,6 +27,7 @@
   <depend>moveit_ros_planning</depend>
   <depend>shape_msgs</depend>
   <test_depend>rostest</test_depend>
+  <test_depend>roslaunch</test_depend>
   <depend>trajectory_msgs</depend>
   <depend>visualization_msgs</depend>
   <depend>pluginlib</depend>

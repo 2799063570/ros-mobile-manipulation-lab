@@ -1,5 +1,13 @@
 # AUBO 统一视觉位置伺服
 
+眼在手外实机统一启动 `roslaunch aubo_ros_control eye_to_hand_visual_servo_real.launch`。
+默认同时打开 rqt 视觉伺服调试台，采用 YOLO `can`、固定相机 `/camera`、SDK 按需输出，
+机械臂默认禁用。`detector:=color target_label:=red` 可显式选择原 HSV 感知，
+`start_perception:=false` 可复用外部目标；参数与实际测试步骤见
+[实机视觉伺服测试](../../docs/AUBO眼在手外视觉伺服实机测试.md)。
+当前实机入口使能后先到已记录的观测位，跟踪保持该 TCP 朝向；目标丢失后衰减、
+停稳再返回相同关节位。采集依据及状态流程见[固定观测位与丢失回位](../../docs/眼在手外观测姿态与丢失回位.md)。
+
 2026-11-03：视觉运动限额对齐当前模型，新增启动顺序/限额校验；独立按需 PBVS
 默认检查碰撞和制动尾段，并在 SIGINT/SIGTERM 正常退出时等待减速。
 参数、适用范围和测试见[限额、碰撞与退出优化](../../docs/视觉伺服限额碰撞与退出优化.md)。
@@ -100,8 +108,8 @@ Gazebo 腕部相机使用 `1280×720` 分辨率和 80° 水平视场角；真实
 
 ## 初始化、遮挡与目标丢失
 
-- 眼在手上在第一次看到目标前进入 `SEARCH_INITIAL`，缓慢移动到经过相机光轴验证的
-  `initial_search_posture`；目标出现后立即进入 `TRACKING`。丢失后的可选恢复动作使用
+- 眼在手上使能后先进入 `SEARCH_INITIAL`，缓慢移动到经过相机光轴验证的
+  `initial_search_posture`；到位停稳后等待新目标，再进入 `TRACKING`。丢失后的可选恢复动作使用
   独立的 `recovery_posture`，两者不再复用通用 `open_posture`。默认丢失策略为
   `coast_then_open` 且 `coast_duration: 0.0`：目标超时后先原地保持
   `recovery_delay`，持续丢失才向观测姿态移动；移动中重新识别到目标会先刹停，连续
@@ -113,11 +121,14 @@ Gazebo 腕部相机使用 `1280×720` 分辨率和 80° 水平视场角；真实
   `TRACKING` 仅表示持续收到有效目标。误差在死区内持续
   `alignment_hold_time` 后进入 `ALIGNED`，停止积分并保持当前位置；只有误差超过
   `position_deadband * alignment_release_multiplier` 才会恢复 `TRACKING`。
-- 眼在手外不需要机械臂搜索。`target_offset` 默认包含横向避遮挡分量和抓取上方的
-  高度分量，使机械臂尽量不挡住相机到目标的视线。实际工位必须标定方向和大小。
+- 眼在手外实机统一入口使能后进入 `MOVE_TO_OBSERVATION`，到保存的六关节位并停稳。
+  `target_offset` 为 `[0, 0, 0.15] m`，姿态闭环保持记录的 TCP 朝向；目标丢失后
+  `COAST` 衰减，零速度等待停稳，再进入 `RETURN_TO_OBSERVATION` 返回保存位。
+  返回途中重现的目标不会打断回位；到位后只接受此后采集的新目标。
 - 两种模式都拒绝超时目标。状态依次可能为 `TRACKING`、`ALIGNED`、`COAST`、
-  `SEARCH_RECOVERY`、`HOLD`。眼在手外默认保持；眼在手上会在丢失后回到观测姿态
-  重新搜索，但已进入 `ALIGNED` 后的目标丢失只会保持，不会回退搜索。
+  `SEARCH_RECOVERY` 或 `RETURN_TO_OBSERVATION`、`HOLD`。`coast_then_open` 策略
+  在 `ALIGNED` 后丢失也允许恢复动作；`stop` 策略保持。碰撞、反馈或通信故障停止，
+  不执行自动回位。
 - 检测器在目标或深度无效时不发布旧位姿；否则看门狗无法识别目标丢失。
 - 检测器先用 `minimum_contour_area` / `maximum_contour_area` 过滤像素轮廓，再结合
   深度和相机内参计算投影物理面积。默认

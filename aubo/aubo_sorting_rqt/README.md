@@ -1,5 +1,10 @@
 # AUBO 分拣 rqt 工作台
 
+同包新增 **AUBO 视觉伺服调试台**，用于独立 PBVS 的画面、误差曲线、启停、在线调参和相机视线/姿态草稿。
+运行 `rosrun aubo_sorting_rqt visual_servo_panel`，使用方法和姿态依据见
+[视觉伺服调试台与避遮挡姿态](docs/visual_servo_workbench.md)。
+实机 YOLO 伺服测试入口默认 `rqt:=true`；打开界面不自动使能或写参数。
+
 界面连接现有分拣任务。打开和关闭界面均不会启动、停止机械臂或改写任务参数。
 
 ```bash

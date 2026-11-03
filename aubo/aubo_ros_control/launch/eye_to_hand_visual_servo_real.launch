@@ -1,73 +1,130 @@
 <?xml version="1.0"?>
 <launch>
-  <!-- 眼在手外视觉伺服真机入口：固定相机感知，AUBO SDK 直接控制机械臂。 -->
-  <!-- 首次调试保持 auto_start=false，并确认相机外参和 target_offset 方向。 -->
+  <!-- Unified eye-to-hand real PBVS: camera, perception, scene, SDK and rqt. -->
+  <!-- Motion stays disabled until an explicit UI/service enable request. -->
   <arg name="robot_ip" default="192.168.1.2"/>
-  <arg name="camera_serial_no" default=""/>
-  <arg name="calibration_file"
-       default="$(find aubo_ros_control)/config/aubo_realsense_handeye_eye_on_base.yaml"/>
+  <arg name="connect_robot" default="true"/>
   <arg name="start_camera" default="true"/>
+  <arg name="camera_serial_no" default=""/>
+  <arg name="camera_initial_reset" default="false"/>
+  <arg name="camera_fps" default="30"/>
+  <arg name="calibration_file" default="$(find aubo_ros_control)/config/aubo_realsense_handeye_eye_on_base.yaml"/>
   <arg name="start_perception" default="true"/>
+  <arg name="detector" default="yolo"/>
   <arg name="target_label" default="red"/>
+  <arg name="target_class" default="$(eval arg('target_label') if arg('detector') == 'color' else 'can')"/>
   <arg name="auto_start" default="false"/>
-  <arg name="rviz" default="false"/>
   <arg name="visualization" default="true"/>
   <arg name="on_demand_output" default="true"/>
-  <arg name="timing_trace_path" default=""/>
   <arg name="hybrid_enabled" default="false"/>
   <arg name="hybrid_config" default="$(find aubo_ros_control)/config/hybrid_control.yaml"/>
   <arg name="sdk_mac_buffer_target"
        default="$(eval 300 if arg('on_demand_output') and not arg('hybrid_enabled') else 60)"/>
+  <arg name="python" default="/home/zlab/anaconda3/envs/yolo/bin/python"/>
+  <arg name="model_path" default="/home/zlab/deepL/code/ultralytics-main-modify/weights/GC-yolo.pt"/>
+  <arg name="perception_config" default="$(find aubo_perception)/config/visual_servo_eye_to_hand_real.yaml"/>
+  <arg name="controller_config"
+       default="$(eval '' if arg('hybrid_enabled') else find('aubo_ros_control') + '/config/visual_servo_eye_to_hand_test_real.yaml')"/>
+  <arg name="observation_config"
+       default="$(eval '' if arg('hybrid_enabled') else find('aubo_ros_control') + '/config/visual_servo_eye_to_hand_observation.yaml')"/>
+  <arg name="camera_stand_config" default="$(find aubo_planning)/config/camera_stand_reference.yaml"/>
+  <arg name="containers_config" default="$(find aubo_planning)/config/sorting_containers_real.yaml"/>
+  <arg name="rviz" default="false"/>
+  <arg name="rqt" default="true"/>
+  <arg name="record_data" default="true"/>
+  <arg name="bag_prefix" default="/tmp/aubo_visual_servo"/>
+  <arg name="timing_trace_path" default=""/>
 
-  <!-- 使用无腕部相机的模型，防止外部相机模式下误启动手部传感器和重复话题。 -->
   <include file="$(find aubo_moveit_config)/launch/planning_context.launch">
     <arg name="load_robot_description" value="true"/>
     <arg name="robot_xacro" value="aubo_i5.xacro"/>
     <arg name="robot_srdf" value="aubo_i5.srdf"/>
   </include>
-  <node name="robot_state_publisher" pkg="robot_state_publisher"
-        type="robot_state_publisher" output="screen"/>
-  <node name="aubo_visual_joint_state_relay" pkg="joint_state_publisher"
-        type="joint_state_publisher" output="screen">
+  <node pkg="robot_state_publisher" type="robot_state_publisher"
+        name="robot_state_publisher" output="screen"/>
+  <node if="$(arg connect_robot)" pkg="joint_state_publisher" type="joint_state_publisher"
+        name="aubo_visual_joint_state_relay" output="screen">
     <rosparam param="source_list">[/visual_servo/sdk_joint_states]</rosparam>
     <rosparam param="zeros">{joint1: 0.0, joint2: 0.0}</rosparam>
   </node>
 
-  <!-- 固定相机入口同时负责 RealSense 数据和已标定静态 TF。 -->
-  <include if="$(arg start_camera)"
-           file="$(find aubo_ros_control)/launch/eye_to_hand_camera_real.launch">
+  <include if="$(arg start_camera)" file="$(find aubo_ros_control)/launch/eye_to_hand_camera_real.launch">
     <arg name="serial_no" value="$(arg camera_serial_no)"/>
+    <!-- Must match tracking_base_frame in the supplied calibration. -->
+    <arg name="camera_name" value="camera"/>
     <arg name="calibration_file" value="$(arg calibration_file)"/>
+    <arg name="enable_pointcloud" value="false"/>
+    <arg name="initial_reset" value="$(arg camera_initial_reset)"/>
+    <arg name="fps" value="$(arg camera_fps)"/>
   </include>
-  <!-- 感知模块可单独关闭，以便接入其他兼容 /visual_servo/target_pose 的检测器。 -->
-  <node if="$(arg start_perception)" name="rgbd_visual_target"
-        pkg="aubo_perception" type="rgbd_visual_target_node.py" output="screen">
-    <rosparam file="$(find aubo_perception)/config/rgbd_target_eye_to_hand.yaml"
-              command="load"/>
-    <param name="target_label" value="$(arg target_label)"/>
+  <include if="$(eval arg('start_perception') and arg('detector') == 'yolo')"
+           file="$(find aubo_perception)/launch/grasp_perception.launch">
+    <arg name="camera_mount" value="eye_to_hand"/>
+    <arg name="camera_namespace" value="/camera"/>
+    <arg name="detector" value="yolo"/>
+    <arg name="task_mode" value="servo"/>
+    <arg name="selected_class" value="$(arg target_class)"/>
+    <arg name="servo_controls" value="true"/>
+    <arg name="annotated_image_topic" value="/visual_servo/debug_image"/>
+    <arg name="height_mode" value="depth"/>
+    <arg name="table_z" value="0.00285"/>
+    <arg name="object_height" value="0.065"/>
+    <arg name="config" value="$(arg perception_config)"/>
+    <arg name="python" value="$(arg python)"/>
+    <arg name="model_path" value="$(arg model_path)"/>
+  </include>
+
+  <!-- Retain the HSV frontend for existing color/hybrid callers. -->
+  <node if="$(eval arg('start_perception') and arg('detector') == 'color')"
+        pkg="aubo_perception" type="rgbd_visual_target_node.py" name="rgbd_visual_target" output="screen">
+    <rosparam file="$(find aubo_perception)/config/rgbd_target_eye_to_hand.yaml"/>
+    <param name="color_topic" value="/camera/color/image_raw"/>
+    <param name="aligned_depth_topic" value="/camera/aligned_depth_to_color/image_raw"/>
+    <param name="camera_info_topic" value="/camera/color/camera_info"/>
+    <param name="target_label" value="$(arg target_class)"/>
     <param name="start_enabled" value="$(arg auto_start)"/>
   </node>
-  <!-- SDK 后端会独占机械臂控制通道，不能同时运行 aubo_hw_node。 -->
-  <include file="$(find aubo_ros_control)/launch/visual_servo_core.launch">
-    <arg name="mode_config"
-         value="$(find aubo_ros_control)/config/visual_servo_eye_to_hand.yaml"/>
-    <arg name="backend" value="sdk"/>
-    <arg name="visualization" value="$(arg visualization)"/>
-    <arg name="on_demand_output" value="$(arg on_demand_output)"/>
-    <arg name="timing_trace_path" value="$(arg timing_trace_path)"/>
-    <arg name="sdk_mac_buffer_target" value="$(arg sdk_mac_buffer_target)"/>
-    <arg name="robot_ip" value="$(arg robot_ip)"/>
-    <arg name="joint_states_topic" value="/visual_servo/sdk_joint_states"/>
-    <arg name="start_enabled" value="$(arg auto_start)"/>
-    <arg name="hybrid_enabled" value="$(arg hybrid_enabled)"/>
-    <arg name="hybrid_config" value="$(arg hybrid_config)"/>
-  </include>
-  <!-- Hybrid mode uses MoveIt for planning only; the servo owns all output. -->
-  <include if="$(arg rviz)" file="$(find aubo_ros_control)/launch/visual_servo_view.launch"/>
-  <include if="$(arg hybrid_enabled)" file="$(find aubo_moveit_config)/launch/move_group.launch">
+
+  <!-- Scene services only: no MoveIt trajectory execution or hardware driver. -->
+  <include file="$(find aubo_moveit_config)/launch/move_group.launch">
     <arg name="load_robot_description" value="false"/>
     <arg name="robot_xacro" value="aubo_i5.xacro"/>
     <arg name="robot_srdf" value="aubo_i5.srdf"/>
     <arg name="allow_trajectory_execution" value="false"/>
   </include>
+  <node pkg="aubo_planning" type="publish_camera_stand.py" name="real_servo_table"
+        output="screen" required="true">
+    <param name="frame_id" value="base_link"/>
+    <param name="object_id" value="sorting_table"/>
+    <rosparam param="parts">
+      - {name: table, size: [0.78, 0.97, 0.20], center: [-0.0442, -0.6707, -0.09715]}
+    </rosparam>
+  </node>
+  <include file="$(find aubo_planning)/launch/publish_camera_stand.launch">
+    <arg name="config" value="$(arg camera_stand_config)"/>
+  </include>
+  <include file="$(find aubo_planning)/launch/publish_sorting_containers.launch">
+    <arg name="config" value="$(arg containers_config)"/>
+  </include>
+
+  <include if="$(arg connect_robot)" file="$(find aubo_ros_control)/launch/visual_servo_core.launch">
+    <arg name="mode_config" value="$(find aubo_ros_control)/config/visual_servo_eye_to_hand.yaml"/>
+    <arg name="override_config" value="$(arg controller_config)"/>
+    <arg name="observation_config" value="$(arg observation_config)"/>
+    <arg name="backend" value="sdk"/>
+    <arg name="robot_ip" value="$(arg robot_ip)"/>
+    <arg name="joint_states_topic" value="/visual_servo/sdk_joint_states"/>
+    <arg name="start_enabled" value="$(arg auto_start)"/>
+    <arg name="hybrid_enabled" value="$(arg hybrid_enabled)"/>
+    <arg name="hybrid_config" value="$(arg hybrid_config)"/>
+    <arg name="on_demand_output" value="$(arg on_demand_output)"/>
+    <arg name="sdk_mac_buffer_target" value="$(arg sdk_mac_buffer_target)"/>
+    <arg name="visualization" value="$(arg visualization)"/>
+    <arg name="timing_trace_path" value="$(arg timing_trace_path)"/>
+  </include>
+  <param if="$(arg connect_robot)" name="/aubo_visual_servo/camera_link" value="camera_color_optical_frame"/>
+  <include if="$(arg rviz)" file="$(find aubo_ros_control)/launch/visual_servo_view.launch"/>
+  <include if="$(arg rqt)" file="$(find aubo_sorting_rqt)/launch/visual_servo_panel.launch"/>
+  <node if="$(arg record_data)" pkg="rosbag" type="record" name="visual_servo_test_record"
+        args="-o $(arg bag_prefix) /visual_servo/target_pose /visual_servo/target_label /visual_servo/target_confidence /visual_servo/state /visual_servo/status /visual_servo/sdk_joint_states /tf /tf_static /rosout" output="screen"/>
 </launch>

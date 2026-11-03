@@ -25,6 +25,7 @@ except ImportError:
 from geometry_msgs.msg import PoseStamped, Point32
 from sensor_msgs.msg import CameraInfo, Image
 from std_msgs.msg import String, Float32
+from std_srvs.srv import SetBool, SetBoolResponse, Trigger, TriggerResponse
 from tf.transformations import quaternion_matrix
 from aubo_perception.grasp_geometry import (validate_modes, center_height, object_height_from_depth,
                                            ray_plane, rectangle_grasp, rectangle_footprint)
@@ -84,6 +85,12 @@ class YoloRgbdTargetNode(object):
         self.target_frame = rospy.get_param("~target_frame", "base_link")
         self.selected_class = rospy.get_param("~selected_class", "")
         validate_modes(self.task_mode, self.height_mode, self.camera_mount, self.selected_class)
+        # Explicitly enabled by the standalone servo workbench. Sorting keeps
+        # its existing interface and does not create these global services.
+        self._servo_controls = bool(rospy.get_param("~servo_controls", False)) and self.task_mode == 'servo'
+        self._vision_lock = threading.RLock()
+        self._enabled = bool(rospy.get_param("~start_enabled", True))
+        self._vision_epoch = rospy.Time(0)
         center_height(self.table_z + self.object_height, self.table_z,
                       self.object_height, self.height_tolerance)
         self.class_aliases = rospy.get_param("~class_aliases", {})
@@ -127,6 +134,13 @@ class YoloRgbdTargetNode(object):
             self.boxes_topic, YoloDetectionArray if self.backend == "ultralytics" else BoundingBoxes,
             self._boxes_callback, queue_size=1
         )
+        if self._servo_controls:
+            self._state_publisher = rospy.Publisher('/visual_servo/perception_state', String, queue_size=1, latch=True)
+            self._selection_subscriber = rospy.Subscriber('/visual_servo/target_selection', String,
+                                                          self._select_target, queue_size=1)
+            self._enable_service = rospy.Service('/visual_servo/perception/set_enabled', SetBool, self._set_enabled)
+            self._reset_service = rospy.Service('/visual_servo/perception/reset', Trigger, self._reset)
+            self._perception_state('SEARCHING' if self._enabled else 'DISABLED')
         rospy.loginfo(
             "YOLO RGB-D bridge: %s + %s -> %s",
             self.boxes_topic,
@@ -145,6 +159,47 @@ class YoloRgbdTargetNode(object):
             self._depth_cache.append(message)
 
     def _boxes_callback(self, message):
+        if getattr(self, '_servo_controls', False):
+            with self._vision_lock:
+                stamp = getattr(message, 'image_header', message.header).stamp
+                if not self._enabled or stamp <= self._vision_epoch:
+                    return
+                self._process_boxes(message)
+        else:
+            self._process_boxes(message)
+
+    def _perception_state(self, state, detail=''):
+        if self._servo_controls:
+            self._state_publisher.publish(String(data='{}|{}|{}'.format(state, self.selected_class, detail)))
+
+    def _invalidate_servo_target(self):
+        self._vision_epoch = rospy.Time.now()
+        self.target_label_publisher.publish(String(data=''))
+        self.target_confidence_publisher.publish(Float32(data=0.))
+
+    def _select_target(self, message):
+        label = message.data.strip().lower()
+        if not label or len(label) > 64 or any(c in label for c in ('|', '\n', '\r')):
+            return
+        with self._vision_lock:
+            self.selected_class = label
+            self._invalidate_servo_target()
+            self._perception_state('SEARCHING' if self._enabled else 'DISABLED', '等待切换后的新图像')
+
+    def _set_enabled(self, request):
+        with self._vision_lock:
+            self._enabled = request.data
+            self._invalidate_servo_target()
+            self._perception_state('SEARCHING' if self._enabled else 'DISABLED')
+        return SetBoolResponse(success=True, message='perception enabled' if request.data else 'perception disabled')
+
+    def _reset(self, request):
+        with self._vision_lock:
+            self._invalidate_servo_target()
+            self._perception_state('SEARCHING' if self._enabled else 'DISABLED', '等待复位后的新图像')
+        return TriggerResponse(success=True, message='waiting for a new source image')
+
+    def _process_boxes(self, message):
         image_header = getattr(message, "image_header", message.header)
         box_stamp = image_header.stamp
         if box_stamp == rospy.Time(0):
@@ -254,6 +309,8 @@ class YoloRgbdTargetNode(object):
         if self.task_mode in ("servo", "both"):
             self.target_label_publisher.publish(String(data=""))
             self.target_confidence_publisher.publish(Float32(data=0.0))
+            if getattr(self, '_servo_controls', False):
+                self._perception_state('SEARCHING' if self._enabled else 'DISABLED')
 
     def _callback(self, boxes_message, depth_message):
         with self._info_lock:
@@ -398,10 +455,14 @@ class YoloRgbdTargetNode(object):
                 self.target_confidence_publisher.publish(Float32(data=confidence))
                 self.target_pose_publisher.publish(camera_pose)
                 self.target_label_publisher.publish(String(data=label))
+                if self._servo_controls:
+                    self._perception_state('DETECTED')
             else:
                 # Pose 不重发旧值；控制器必须按源时间戳检查目标超时。
                 self.target_label_publisher.publish(String(data=""))
                 self.target_confidence_publisher.publish(Float32(data=0.0))
+                if self._servo_controls:
+                    self._perception_state('SEARCHING' if self._enabled else 'DISABLED')
 
 
 def main():

@@ -177,6 +177,8 @@ target_include_directories(aubo_visual_servo_visualization_node PRIVATE include 
 target_link_libraries(aubo_visual_servo_visualization_node ${catkin_LIBRARIES} ${orocos_kdl_LIBRARIES})
 
 if(CATKIN_ENABLE_TESTING)
+  add_test(NAME real_visual_servo_launch_test COMMAND ${PYTHON_EXECUTABLE}
+    ${CMAKE_CURRENT_SOURCE_DIR}/test/real_visual_servo_launch_test.py)
   add_test(NAME moveit_motion_analysis_test COMMAND ${PYTHON_EXECUTABLE}
     ${CMAKE_CURRENT_SOURCE_DIR}/test/moveit_motion_analysis_test.py)
   add_test(NAME hardware_trace_analysis_test COMMAND ${PYTHON_EXECUTABLE}
@@ -286,6 +288,7 @@ if(CATKIN_ENABLE_TESTING)
   add_rostest(test/cartesian_jog_sdk50.test DEPENDENCIES
     aubo_cartesian_jog_fake_sdk_node cartesian_jog_ros_control_integration_test)
   catkin_install_python(PROGRAMS test/hybrid_control_test.py
+    test/eye_to_hand_observation_test.py
     test/visual_servo_stream_test.py
     test/visual_servo_startup_test.py
     test/visual_servo_visualization_test.py
@@ -297,6 +300,7 @@ if(CATKIN_ENABLE_TESTING)
   add_rostest(test/visual_servo_real_model.test DEPENDENCIES aubo_visual_servo_node)
   add_rostest(test/visual_servo_visualization.test DEPENDENCIES aubo_visual_servo_visualization_node)
   add_rostest(test/initial_observation.test)
+  add_rostest(test/eye_to_hand_observation.test DEPENDENCIES aubo_visual_servo_node)
   catkin_add_gtest(visual_servo_common_test
     test/visual_servo_common_test.cpp
     src/visual_servo_common.cpp)

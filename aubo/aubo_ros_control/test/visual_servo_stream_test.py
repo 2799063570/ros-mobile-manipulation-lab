@@ -18,6 +18,7 @@ from shape_msgs.msg import SolidPrimitive
 from sensor_msgs.msg import JointState
 from std_msgs.msg import Float64MultiArray, String
 from std_srvs.srv import SetBool, Trigger
+from dynamic_reconfigure.client import Client
 
 
 class StreamTest(unittest.TestCase):
@@ -93,6 +94,13 @@ class StreamTest(unittest.TestCase):
             self.assertIn('TRACKING', states)
             self.assertGreater(len(points), 100)
             self.assertGreater(sum(joints), .01)
+            parameters = Client('/visual_stream_controller', timeout=2.)
+            actual = parameters.get_configuration(timeout=1.)
+            rejected = parameters.update_configuration(dict(target_offset_x=.03, use_orientation_control=True))
+            self.assertEqual(rejected['target_offset_x'], actual['target_offset_x'])
+            self.assertEqual(rejected['use_orientation_control'], actual['use_orientation_control'])
+            tuned = parameters.update_configuration(dict(angular_gain=.55))
+            self.assertAlmostEqual(tuned['angular_gain'], .55)
             with lock:
                 control['goal'] = -.15
                 reversal_index = len(points)
@@ -137,6 +145,9 @@ class StreamTest(unittest.TestCase):
             time.sleep(2.0)
             self.assertIn('STOPPING', states)
             self.assertEqual('DISABLED', states[-1])
+            accepted = parameters.update_configuration(dict(target_offset_x=.001))
+            self.assertAlmostEqual(accepted['target_offset_x'], .001)
+            parameters.update_configuration(dict(target_offset_x=actual['target_offset_x']))
             self.assertTrue(reset().success)
             with lock:
                 frozen = points[-1]
@@ -234,6 +245,7 @@ class StreamTest(unittest.TestCase):
                     old_v[i], old_a[i] = velocity, acceleration
                 previous = point
         finally:
+            if 'parameters' in locals(): parameters.close()
             timer.shutdown()
             batch_sub.unregister()
             state_sub.unregister()

@@ -4,6 +4,7 @@
 #include <QApplication>
 #include <QLabel>
 #include <QGroupBox>
+#include <QComboBox>
 #include <QTimer>
 #include <boost/make_shared.hpp>
 #include <chrono>
@@ -17,6 +18,10 @@ struct VisualServoPanelTestAccess {
   }
   static std::size_t samples(const VisualServoPanel& p) {return p.error_plot_->sampleCount();}
   static void stale(VisualServoPanel& p) { p.checkTelemetryFreshness(); }
+  static QString showYoloCategory(VisualServoPanel& p) {
+    p.showPerceptionState("DETECTED|can|YOLO");
+    return p.target_combo_->currentData().toString();
+  }
   static void preparePreview(VisualServoPanel& p) {
     p.readiness_timer_->stop();
     p.showServoState("TRACKING"); p.showPerceptionState("DETECTED|red|离线合成数据");
@@ -47,6 +52,10 @@ TEST(VisualServoView, QueuedTelemetryInvalidationAndBoundedPlot) {
   }
   std::this_thread::sleep_for(std::chrono::milliseconds(150));
   EXPECT_EQ(0,selections.load());  // Opening the view must not change the target.
+  EXPECT_EQ(QString("can"),VisualServoPanelTestAccess::showYoloCategory(panel));
+  QApplication::processEvents();
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  EXPECT_EQ(0,selections.load());  // Read-back of a YOLO label never publishes selection.
   VisualServoStatus s;
   s.header.frame_id="base_link"; s.error_frame="base_link";
   s.state="TRACKING"; s.feedback_valid=s.target_valid=s.error_valid=true;

@@ -1,0 +1,8 @@
+#!/usr/bin/env python3
+import sys
+from rqt_gui.main import Main
+from aubo_sorting_rqt.servo_model import add_servo_arguments
+
+if __name__ == '__main__':
+    sys.exit(Main().main(sys.argv, standalone='aubo_sorting_rqt/AuboVisualServo',
+                         plugin_argument_provider=add_servo_arguments))

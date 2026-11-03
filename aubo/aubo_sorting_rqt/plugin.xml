@@ -8,4 +8,13 @@
       <statustip>分拣过程可视化、实例队列、控制及在线调参</statustip>
     </qtgui>
   </class>
+  <class name="AuboVisualServo" type="aubo_sorting_rqt.servo_plugin.ServoPlugin" base_class_type="rqt_gui_py::Plugin">
+    <description>Visual servo controls, feedback, dynamic tuning and camera sight-line preview.</description>
+    <qtgui>
+      <group><label>Robot Tools</label></group>
+      <label>AUBO 视觉伺服调试台</label>
+      <icon type="theme">applications-engineering</icon>
+      <statustip>视觉伺服启停、在线参数、误差曲线和姿态视线预览</statustip>
+    </qtgui>
+  </class>
 </library>

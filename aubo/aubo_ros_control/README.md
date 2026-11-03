@@ -1,5 +1,20 @@
 # aubo_ros_control
 
+眼在手外实机位置伺服的统一入口：
+
+```bash
+roslaunch aubo_ros_control eye_to_hand_visual_servo_real.launch \
+  camera_serial_no:=335222076553 camera_initial_reset:=true
+```
+
+同时启动固定相机、已标定 TF、YOLO 深度目标、碰撞场景、SDK 控制和 rqt 视觉伺服调试台。
+默认跟踪 `can`，速度上限10 mm/s、表面上方150 mm、启动禁用，需在界面显式使能。
+使能后先到记录的六关节观测位，跟踪保持记录的 TCP 朝向；目标丢失后速度衰减、
+停稳再回到同一位。配置及采集依据见[固定观测位与丢失回位](../../docs/眼在手外观测姿态与丢失回位.md)。
+`target_class:=bottle/box` 切换初始类别，`rviz:=true` 加开三维视图，`rqt:=false` 关闭调试台。
+`connect_robot:=false` 可只检查相机与目标；不会加载 SDK 控制节点。
+使用步骤见[实机视觉伺服测试](../../docs/AUBO眼在手外视觉伺服实机测试.md)。
+
 末端 XYZ 连续点动入口为 `cartesian_jog_gazebo.launch` / `cartesian_jog_real.launch`，
 附带中文 C++/Qt 操作窗口、基/工具坐标系切换和速度/加速度/jerk 平滑。
 接口、参数、停止行为和验证限制见 [CARTESIAN_JOG.md](CARTESIAN_JOG.md)。

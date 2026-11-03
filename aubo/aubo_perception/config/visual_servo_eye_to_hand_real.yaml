@@ -1,0 +1,16 @@
+# Fixed-camera servo uses the measured visible surface point, not a grasp centre.
+target_frame: base_link
+table_z: 0.00285
+object_height: 0.065
+object_height_source: depth
+minimum_object_height: 0.005
+maximum_object_height: 0.30
+height_tolerance: 0.02
+minimum_probability: 0.60
+minimum_depth: 0.10
+maximum_depth: 2.50
+depth_scale_16u: 0.001
+maximum_depth_age: 0.08
+depth_cache_size: 90
+roi_scale: 0.45
+class_aliases: {}

@@ -502,8 +502,8 @@ void VisualServoPanel::showServoState(const QString& text)
     translated = tr("正在执行规划轨迹，接近视觉伺服范围");
     phase = tr("阶段 1 / 轨迹接近");
     color = "#3569a8";
-  } else if (text == "SEARCH_INITIAL") {
-    translated = tr("正在移动到腕部相机观察位");
+  } else if (text == "SEARCH_INITIAL" || text == "MOVE_TO_OBSERVATION") {
+    translated = tr("正在移动到保存的观察位");
     phase = tr("准备 / 移动到观察位");
     color = "#00838f";
   } else if (text == "TRACKING") {
@@ -518,8 +518,8 @@ void VisualServoPanel::showServoState(const QString& text)
     translated = tr("目标短暂丢失 / 减速滑行");
     phase = tr("安全过渡");
     color = "#b07d18";
-  } else if (text == "SEARCH_RECOVERY") {
-    translated = tr("目标丢失 / 重新搜索");
+  } else if (text == "SEARCH_RECOVERY" || text == "RETURN_TO_OBSERVATION") {
+    translated = tr("目标丢失 / 返回保存的观察位");
     phase = tr("恢复阶段");
     color = "#b07d18";
   } else if (text == "HOLD") {
@@ -541,7 +541,12 @@ void VisualServoPanel::showPerceptionState(const QString& text)
   const QString state = text.section('|', 0, 0);
   const QString label = text.section('|', 1, 1);
   const QString detail = text.section('|', 2);
-  const int selected=target_combo_->findData(label);
+  int selected=target_combo_->findData(label);
+  if (selected<0 && !label.isEmpty() && label.size()<=64) {
+    const QSignalBlocker block(target_combo_);
+    target_combo_->addItem(label,label);
+    selected=target_combo_->findData(label);
+  }
   if (selected>=0) {
     const QSignalBlocker block(target_combo_);
     target_combo_->setCurrentIndex(selected);

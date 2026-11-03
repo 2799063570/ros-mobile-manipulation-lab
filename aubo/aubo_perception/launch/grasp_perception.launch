@@ -15,6 +15,7 @@
   <arg name="height_mode" default="table" doc="table | depth"/>
   <!-- servo/both 必须指定目标类别，例如 red；sorting 不按此参数筛掉其他类别。 -->
   <arg name="selected_class" default=""/>
+  <arg name="servo_controls" default="false"/>
   <!-- 配置文件提供几何阈值、颜色范围和模型选项；下面的显式 param 会覆盖 YAML 中同名设置。 -->
   <arg name="config" default="$(find aubo_perception)/config/grasp_pipeline.yaml"/>
   <arg name="colors_config" default="$(find aubo_perception)/config/colors.yaml"/>
@@ -73,6 +74,7 @@
     <param name="height_mode" value="$(arg height_mode)"/>
     <param name="camera_mount" value="$(arg camera_mount)"/>
     <param name="selected_class" value="$(arg selected_class)"/>
+    <param name="servo_controls" value="$(arg servo_controls)"/>
     <param name="boxes_topic" value="$(arg boxes_topic)"/>
     <param name="aligned_depth_topic" value="$(arg depth_topic)"/>
     <param name="camera_info_topic" value="$(arg camera_info_topic)"/>

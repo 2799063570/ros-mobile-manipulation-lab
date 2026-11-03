@@ -75,6 +75,8 @@ private:
     ALIGNED,
     COAST,
     SEARCH_RECOVERY,
+    MOVE_TO_OBSERVATION,
+    RETURN_TO_OBSERVATION,
     HOLD
   };
 
@@ -103,6 +105,9 @@ private:
 
   // 状态决策、PBVS 速度求解及周期控制输出。
   ServoState selectState(bool fresh_target, double target_age);
+  bool outputStopped(const JointPoint& feedback) const;
+  bool observationReached(const JointPoint& feedback, const JointPoint& posture) const;
+  void clearObservationTarget();
   Eigen::VectorXd trackingVelocity(const JointPoint &position,
                                    const geometry_msgs::Pose &target,
                                    Eigen::Vector3d *raw_position_error,
@@ -133,6 +138,8 @@ private:
 
   bool hybrid_enabled_{false}, hybrid_pending_{false}, hybrid_fault_{false};
   bool hybrid_near_{false}, observation_complete_{false};
+  bool returning_to_observation_{false};
+  Clock::time_point observation_return_started_{};
   bool hybrid_orientation_control_{false};
   bool hybrid_vertical_approach_{false};
   bool hybrid_lock_pregrasp_path_{false};
@@ -191,6 +198,7 @@ private:
   double minimum_safe_target_distance_{0.0};
   double search_timeout_{8.0}, open_posture_gain_{0.7},
       search_velocity_limit_{0.2};
+  double observation_joint_tolerance_{0.005};
   double feedback_blend_{0.0396};
   double tracking_velocity_filter_alpha_{0.3276};
   bool use_orientation_control_{false}, initial_search_enabled_{false},
@@ -219,6 +227,7 @@ private:
   std::mutex target_mutex_, joint_mutex_, control_mutex_;
   geometry_msgs::Pose target_pose_;
   ros::Time last_target_time_, last_joint_time_;
+  ros::Time observation_target_after_;
   bool have_target_{false}, have_joint_state_{false},
       integrator_initialized_{false};
   bool have_ever_tracked_{false};
