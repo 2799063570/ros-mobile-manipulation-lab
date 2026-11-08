@@ -1,0 +1,304 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" width="140mm" height="252mm" viewBox="150 100 700 1260" version="1.1" role="img" aria-labelledby="figure-title figure-description">
+  <title id="figure-title">AUBO nominal DH frames with gripper TCP — editable vector drawing</title>
+  <desc id="figure-description">Zero joint angles; DH frame 0 equals base_link. All visible elements are editable vector paths, lines, polygons and live text. No raster images. Geometry from URDF, exact pi nominal fixed rotations; body is schematic.</desc>
+  <g id="background" inkscape:groupmode="layer" inkscape:label="Background">
+    <rect x="150" y="100" width="700" height="1260" fill="white" />
+  </g>
+  <g id="robot-and-gripper" stroke="#343a40" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" inkscape:groupmode="layer" inkscape:label="Robot and gripper">
+    <g id="base-pedestal">
+      <path d="M 564.0,1241.0 A 86,17 0 0 1 736.0,1241.0 L 736.0,1260.0 A 86,17 0 0 1 564.0,1260.0 Z" fill="#e5e8eb" />
+      <ellipse cx="650.0" cy="1241.0" rx="86" ry="17" fill="#fafafa" />
+      <ellipse cx="585.0" cy="1242.0" rx="2.7" ry="2.7" fill="#d5d8db" stroke-width="0.9" />
+      <line x1="583.7" y1="1242.0" x2="586.3" y2="1242.0" stroke-width="0.7" />
+      <ellipse cx="715.0" cy="1242.0" rx="2.7" ry="2.7" fill="#d5d8db" stroke-width="0.9" />
+      <line x1="713.7" y1="1242.0" x2="716.3" y2="1242.0" stroke-width="0.7" />
+    </g>
+    <g id="joint-1-base">
+      <path d="M 597.5,1088.0 A 52.5,9 0 0 1 702.5,1088.0 L 702.5,1233.0 A 52.5,9 0 0 1 597.5,1233.0 Z" fill="#f1f2f3" />
+      <ellipse cx="650.0" cy="1088.0" rx="52.5" ry="9" fill="#fafafa" />
+      <path d="M 604.5,1093.0 L 604.5,1230.0" fill="none" stroke="#c2c6cb" stroke-width="1" />
+      <path d="M 695.5,1093.0 L 695.5,1230.0" fill="none" stroke="#c2c6cb" stroke-width="1" />
+      <path d="M 597.5,1226.0 A 52.5,9 0 0 0 702.5,1226.0" fill="none" stroke="#8c939a" stroke-width="0.9" />
+    </g>
+    <g id="joint-2-shoulder">
+      <path d="M 510.5,1074.0 L 662.0,1074.0 A 10,54.0 0 0 1 662.0,1182.0 L 510.5,1182.0 A 10,54.0 0 0 1 510.5,1074.0 Z" fill="#f1f2f3" />
+      <ellipse cx="662.0" cy="1128.0" rx="10" ry="54.0" fill="#e5e8eb" />
+      <line x1="515.5" y1="1081.0" x2="657.0" y2="1081.0" stroke="#bac0c5" stroke-width="0.9" />
+      <line x1="515.5" y1="1175.0" x2="657.0" y2="1175.0" stroke="#bac0c5" stroke-width="0.9" />
+    </g>
+    <g id="shoulder-cover">
+      <ellipse cx="510.5" cy="1128.0" rx="18" ry="52" fill="#e7eaed" />
+      <ellipse cx="505.5" cy="1128.0" rx="12" ry="42" fill="#f8f9fa" />
+      <ellipse cx="503.5" cy="1098.0" rx="2.7" ry="2.7" fill="#d5d8db" stroke-width="0.9" />
+      <line x1="502.2" y1="1098.0" x2="504.8" y2="1098.0" stroke-width="0.7" />
+      <ellipse cx="503.5" cy="1158.0" rx="2.7" ry="2.7" fill="#d5d8db" stroke-width="0.9" />
+      <line x1="502.2" y1="1158.0" x2="504.8" y2="1158.0" stroke-width="0.7" />
+    </g>
+    <g id="link-2-upper-arm">
+      <path d="M 495.5,770.0 A 33.0,9 0 0 1 561.5,770.0 L 561.5,1076.0 A 33.0,9 0 0 1 495.5,1076.0 Z" fill="#f1f2f3" />
+      <ellipse cx="528.5" cy="770.0" rx="33.0" ry="9" fill="#fafafa" />
+      <path d="M 502.5,775.0 L 502.5,1073.0" fill="none" stroke="#c2c6cb" stroke-width="1" />
+      <path d="M 554.5,775.0 L 554.5,1073.0" fill="none" stroke="#c2c6cb" stroke-width="1" />
+      <path d="M 495.5,1069.0 A 33.0,9 0 0 0 561.5,1069.0" fill="none" stroke="#8c939a" stroke-width="0.9" />
+    </g>
+    <g id="joint-3-elbow">
+      <path d="M 480.5,687.0 Q 485.5,659.0 519.5,659.0 L 678.0,659.0 Q 703.0,679.0 703.0,727.0 Q 697.0,776.0 645.0,778.0 L 523.5,778.0 Q 477.5,772.0 480.5,687.0 Z" fill="#f1f2f3" />
+      <ellipse cx="486.5" cy="720.0" rx="13" ry="46" fill="#e0e4e7" />
+      <ellipse cx="482.5" cy="720.0" rx="8" ry="36" fill="#f8f9fa" />
+      <path d="M 615.0,672.0 Q 597.0,743.0 532.5,764.0" fill="none" stroke="#9ea5ac" stroke-width="1" />
+      <ellipse cx="480.5" cy="694.0" rx="2.7" ry="2.7" fill="#d5d8db" stroke-width="0.9" />
+      <line x1="479.2" y1="694.0" x2="481.8" y2="694.0" stroke-width="0.7" />
+      <ellipse cx="480.5" cy="746.0" rx="2.7" ry="2.7" fill="#d5d8db" stroke-width="0.9" />
+      <line x1="479.2" y1="746.0" x2="481.8" y2="746.0" stroke-width="0.7" />
+    </g>
+    <g id="link-3-forearm">
+      <path d="M 616.0,395.0 A 34.0,9 0 0 1 684.0,395.0 L 684.0,663.0 A 34.0,9 0 0 1 616.0,663.0 Z" fill="#f1f2f3" />
+      <ellipse cx="650.0" cy="395.0" rx="34.0" ry="9" fill="#fafafa" />
+      <path d="M 623.0,400.0 L 623.0,660.0" fill="none" stroke="#c2c6cb" stroke-width="1" />
+      <path d="M 677.0,400.0 L 677.0,660.0" fill="none" stroke="#c2c6cb" stroke-width="1" />
+      <path d="M 616.0,656.0 A 34.0,9 0 0 0 684.0,656.0" fill="none" stroke="#8c939a" stroke-width="0.9" />
+    </g>
+    <g id="joint-4-wrist-1">
+      <path d="M 509.5,294.0 L 675.0,294.0 A 10,50.0 0 0 1 675.0,394.0 L 509.5,394.0 A 10,50.0 0 0 1 509.5,294.0 Z" fill="#f1f2f3" />
+      <ellipse cx="675.0" cy="344.0" rx="10" ry="50.0" fill="#e5e8eb" />
+      <line x1="514.5" y1="301.0" x2="670.0" y2="301.0" stroke="#bac0c5" stroke-width="0.9" />
+      <line x1="514.5" y1="387.0" x2="670.0" y2="387.0" stroke="#bac0c5" stroke-width="0.9" />
+    </g>
+    <g id="wrist-1-seams">
+      <ellipse cx="668.0" cy="344.0" rx="10" ry="46" fill="none" stroke="#7d858d" stroke-width="0.8" />
+      <ellipse cx="673.0" cy="344.0" rx="10" ry="46" fill="none" stroke="#7d858d" stroke-width="0.8" />
+    </g>
+    <g id="joint-5-wrist-2">
+      <path d="M 483.5,215.5 A 45.0,9 0 0 1 573.5,215.5 L 573.5,366.0 A 45.0,9 0 0 1 483.5,366.0 Z" fill="#f1f2f3" />
+      <ellipse cx="528.5" cy="215.5" rx="45.0" ry="9" fill="#fafafa" />
+      <path d="M 490.5,220.5 L 490.5,363.0" fill="none" stroke="#c2c6cb" stroke-width="1" />
+      <path d="M 566.5,220.5 L 566.5,363.0" fill="none" stroke="#c2c6cb" stroke-width="1" />
+      <path d="M 483.5,359.0 A 45.0,9 0 0 0 573.5,359.0" fill="none" stroke="#8c939a" stroke-width="0.9" />
+    </g>
+    <g id="joint-6-wrist-3">
+      <path d="M 439.5,203.5 L 544.5,203.5 A 10,38.0 0 0 1 544.5,279.5 L 439.5,279.5 A 10,38.0 0 0 1 439.5,203.5 Z" fill="#f1f2f3" />
+      <ellipse cx="544.5" cy="241.5" rx="10" ry="38.0" fill="#e5e8eb" />
+      <line x1="444.5" y1="210.5" x2="539.5" y2="210.5" stroke="#bac0c5" stroke-width="0.9" />
+      <line x1="444.5" y1="272.5" x2="539.5" y2="272.5" stroke="#bac0c5" stroke-width="0.9" />
+    </g>
+    <g id="wrist-3-rings">
+      <ellipse cx="450.5" cy="241.5" rx="7" ry="37" fill="none" stroke="#8d959d" stroke-width="0.9" />
+      <ellipse cx="455.5" cy="241.5" rx="7" ry="37" fill="none" stroke="#8d959d" stroke-width="0.9" />
+      <ellipse cx="509.5" cy="241.5" rx="7" ry="37" fill="none" stroke="#8d959d" stroke-width="0.9" />
+      <ellipse cx="514.5" cy="241.5" rx="7" ry="37" fill="none" stroke="#8d959d" stroke-width="0.9" />
+    </g>
+    <g id="flange">
+      <path d="M 429.5,198.5 L 441.5,198.5 L 441.5,284.5 L 429.5,284.5 Z" fill="#d7dce1" />
+      <ellipse cx="435.5" cy="209.5" rx="2.7" ry="2.7" fill="#d5d8db" stroke-width="0.9" />
+      <line x1="434.2" y1="209.5" x2="436.8" y2="209.5" stroke-width="0.7" />
+      <ellipse cx="435.5" cy="273.5" rx="2.7" ry="2.7" fill="#d5d8db" stroke-width="0.9" />
+      <line x1="434.2" y1="273.5" x2="436.8" y2="273.5" stroke-width="0.7" />
+    </g>
+    <g id="gripper-housing">
+      <path d="M 372.5,189.5 L 427.5,196.5 L 427.5,286.5 L 372.5,293.5 L 362.5,278.5 L 362.5,204.5 Z" fill="#e2e6ea" />
+      <path d="M 381.5,199.5 L 412.5,205.5 L 412.5,277.5 L 381.5,283.5 Z" fill="#fafafa" stroke="#879099" stroke-width="0.9" />
+      <ellipse cx="375.5" cy="208.5" rx="2.7" ry="2.7" fill="#d5d8db" stroke-width="0.9" />
+      <line x1="374.2" y1="208.5" x2="376.8" y2="208.5" stroke-width="0.7" />
+      <ellipse cx="375.5" cy="274.5" rx="2.7" ry="2.7" fill="#d5d8db" stroke-width="0.9" />
+      <line x1="374.2" y1="274.5" x2="376.8" y2="274.5" stroke-width="0.7" />
+    </g>
+    <g id="gripper-finger-upper">
+      <path d="M 371.5,212.5 L 279.5000000000001,212.5 L 263.5000000000001,208.5 L 263.5000000000001,191.5 L 289.5000000000001,189.5 L 372.5,189.5 Z" fill="#d0d6dc" />
+      <path d="M 266.5000000000001,207.5 L 304.5000000000001,207.5 L 304.5000000000001,197.5 L 266.5000000000001,197.5 Z" fill="#9ca5ad" stroke="none" />
+    </g>
+    <g id="gripper-finger-lower">
+      <path d="M 371.5,270.5 L 279.5000000000001,270.5 L 263.5000000000001,274.5 L 263.5000000000001,291.5 L 289.5000000000001,293.5 L 372.5,293.5 Z" fill="#d0d6dc" />
+      <path d="M 266.5000000000001,275.5 L 304.5000000000001,275.5 L 304.5000000000001,285.5 L 266.5000000000001,285.5 Z" fill="#9ca5ad" stroke="none" />
+    </g>
+  </g>
+  <g id="axis-extensions" inkscape:groupmode="layer" inkscape:label="Axis extensions">
+    <line x1="528.5" y1="720.0" x2="650.0" y2="720.0" stroke="#8e969f" stroke-width="1" stroke-dasharray="5 5" opacity="0.65" />
+    <line x1="528.5" y1="344.0" x2="650.0" y2="344.0" stroke="#8e969f" stroke-width="1" stroke-dasharray="5 5" opacity="0.65" />
+  </g>
+  <g id="coordinate-frames" inkscape:groupmode="layer" inkscape:label="DH coordinate frames">
+    <g id="frame-0" data-origin-base-m="0.000000000 0.000000000 0.000000000" data-frame-convention="standard-DH-nominal-zero">
+      <g id="axis-0-x">
+        <line x1="650.0" y1="1250.0" x2="613.990130281219" y2="1278.6232297764668" stroke="#c53737" stroke-width="2.6" />
+        <polygon points="608.5103674979263,1282.9789386554944 614.2851944310887,1274.1731806590456 618.3920056598861,1279.339814140436" fill="#c53737" />
+        <text x="604.5103674979263" y="1299.9789386554944" fill="#c53737" stroke="none" font-family="Times New Roman, STIX Two Text, serif" font-size="21" font-style="italic">x<tspan baseline-shift="sub" font-size="70%">0</tspan>
+        </text>
+      </g>
+      <g id="axis-0-y">
+        <line x1="650.0" y1="1250.0" x2="696.0" y2="1250.0" stroke="#218244" stroke-width="2.6" />
+        <polygon points="703.0,1250.0 693.0,1253.3 693.0,1246.7" fill="#218244" />
+        <text x="707.0" y="1237.0" fill="#218244" stroke="none" font-family="Times New Roman, STIX Two Text, serif" font-size="21" font-style="italic">y<tspan baseline-shift="sub" font-size="70%">0</tspan>
+        </text>
+      </g>
+      <g id="axis-0-z">
+        <line x1="650.0" y1="1250.0" x2="650.0" y2="1204.0" stroke="#2858b5" stroke-width="2.6" />
+        <polygon points="650.0,1197.0 653.3,1207.0 646.7,1207.0" fill="#2858b5" />
+        <text x="654.0" y="1192.0" fill="#2858b5" stroke="none" font-family="Times New Roman, STIX Two Text, serif" font-size="21" font-style="italic">z<tspan baseline-shift="sub" font-size="70%">0</tspan>
+        </text>
+      </g>
+      <ellipse cx="650.0" cy="1250.0" rx="4.1" ry="4.1" fill="#1b2025" stroke="white" stroke-width="0.8" id="origin-0" />
+      <text x="658.0" y="1272.0" fill="#17191c" stroke="none" font-family="Times New Roman, STIX Two Text, serif" font-size="20" font-style="italic">O<tspan baseline-shift="sub" font-size="70%">0</tspan>
+      </text>
+    </g>
+    <g id="frame-1" data-origin-base-m="0.000000000 0.000000000 0.122000000" data-frame-convention="standard-DH-nominal-zero">
+      <g id="axis-1-x">
+        <line x1="650.0" y1="1128.0" x2="613.990130281219" y2="1156.6232297764668" stroke="#c53737" stroke-width="2.6" />
+        <polygon points="608.5103674979263,1160.9789386554944 614.2851944310887,1152.1731806590456 618.3920056598861,1157.339814140436" fill="#c53737" />
+        <text x="604.5103674979263" y="1177.9789386554944" fill="#c53737" stroke="none" font-family="Times New Roman, STIX Two Text, serif" font-size="21" font-style="italic">x<tspan baseline-shift="sub" font-size="70%">1</tspan>
+        </text>
+      </g>
+      <g id="axis-1-y">
+        <line x1="650.0" y1="1128.0" x2="650.0" y2="1082.0" stroke="#218244" stroke-width="2.6" />
+        <polygon points="650.0,1075.0 653.3,1085.0 646.7,1085.0" fill="#218244" />
+        <text x="654.0" y="1070.0" fill="#218244" stroke="none" font-family="Times New Roman, STIX Two Text, serif" font-size="21" font-style="italic">y<tspan baseline-shift="sub" font-size="70%">1</tspan>
+        </text>
+      </g>
+      <g id="axis-1-z">
+        <line x1="650.0" y1="1128.0" x2="604.0" y2="1128.0" stroke="#2858b5" stroke-width="2.6" />
+        <polygon points="597.0,1128.0 607.0,1124.7 607.0,1131.3" fill="#2858b5" />
+        <text x="589.0" y="1120.0" fill="#2858b5" stroke="none" font-family="Times New Roman, STIX Two Text, serif" font-size="21" font-style="italic">z<tspan baseline-shift="sub" font-size="70%">1</tspan>
+        </text>
+      </g>
+      <ellipse cx="650.0" cy="1128.0" rx="4.1" ry="4.1" fill="#1b2025" stroke="white" stroke-width="0.8" id="origin-1" />
+      <text x="658.0" y="1150.0" fill="#17191c" stroke="none" font-family="Times New Roman, STIX Two Text, serif" font-size="20" font-style="italic">O<tspan baseline-shift="sub" font-size="70%">1</tspan>
+      </text>
+    </g>
+    <g id="frame-2" data-origin-base-m="0.000000000 0.000000000 0.530000000" data-frame-convention="standard-DH-nominal-zero">
+      <g id="axis-2-x">
+        <line x1="650.0" y1="720.0" x2="650.0" y2="674.0" stroke="#c53737" stroke-width="2.6" />
+        <polygon points="650.0,667.0 653.3,677.0 646.7,677.0" fill="#c53737" />
+        <text x="654.0" y="662.0" fill="#c53737" stroke="none" font-family="Times New Roman, STIX Two Text, serif" font-size="21" font-style="italic">x<tspan baseline-shift="sub" font-size="70%">2</tspan>
+        </text>
+      </g>
+      <g id="axis-2-y">
+        <line x1="650.0" y1="720.0" x2="613.990130281219" y2="748.6232297764669" stroke="#218244" stroke-width="2.6" />
+        <polygon points="608.5103674979263,752.9789386554945 614.2851944310887,744.1731806590457 618.3920056598861,749.339814140436" fill="#218244" />
+        <text x="604.5103674979263" y="769.9789386554945" fill="#218244" stroke="none" font-family="Times New Roman, STIX Two Text, serif" font-size="21" font-style="italic">y<tspan baseline-shift="sub" font-size="70%">2</tspan>
+        </text>
+      </g>
+      <g id="axis-2-z">
+        <line x1="650.0" y1="720.0" x2="696.0" y2="720.0" stroke="#2858b5" stroke-width="2.6" />
+        <polygon points="703.0,720.0 693.0,723.3 693.0,716.7" fill="#2858b5" />
+        <text x="707.0" y="715.0" fill="#2858b5" stroke="none" font-family="Times New Roman, STIX Two Text, serif" font-size="21" font-style="italic">z<tspan baseline-shift="sub" font-size="70%">2</tspan>
+        </text>
+      </g>
+      <ellipse cx="650.0" cy="720.0" rx="4.1" ry="4.1" fill="#1b2025" stroke="white" stroke-width="0.8" id="origin-2" />
+      <text x="658.0" y="742.0" fill="#17191c" stroke="none" font-family="Times New Roman, STIX Two Text, serif" font-size="20" font-style="italic">O<tspan baseline-shift="sub" font-size="70%">2</tspan>
+      </text>
+    </g>
+    <g id="frame-3" data-origin-base-m="0.000000000 0.000000000 0.906000000" data-frame-convention="standard-DH-nominal-zero">
+      <g id="axis-3-x">
+        <line x1="650.0" y1="344.0" x2="650.0" y2="298.0" stroke="#c53737" stroke-width="2.6" />
+        <polygon points="650.0,291.0 653.3,301.0 646.7,301.0" fill="#c53737" />
+        <text x="654.0" y="286.0" fill="#c53737" stroke="none" font-family="Times New Roman, STIX Two Text, serif" font-size="21" font-style="italic">x<tspan baseline-shift="sub" font-size="70%">3</tspan>
+        </text>
+      </g>
+      <g id="axis-3-y">
+        <line x1="650.0" y1="344.0" x2="686.009869718781" y2="315.3767702235331" stroke="#218244" stroke-width="2.6" />
+        <polygon points="691.4896325020737,311.0210613445055 685.7148055689113,319.82681934095433 681.6079943401139,314.66018585956397" fill="#218244" />
+        <text x="695.4896325020737" y="306.0210613445055" fill="#218244" stroke="none" font-family="Times New Roman, STIX Two Text, serif" font-size="21" font-style="italic">y<tspan baseline-shift="sub" font-size="70%">3</tspan>
+        </text>
+      </g>
+      <g id="axis-3-z">
+        <line x1="650.0" y1="344.0" x2="604.0" y2="344.0" stroke="#2858b5" stroke-width="2.6" />
+        <polygon points="597.0,344.0 607.0,340.7 607.0,347.3" fill="#2858b5" />
+        <text x="589.0" y="336.0" fill="#2858b5" stroke="none" font-family="Times New Roman, STIX Two Text, serif" font-size="21" font-style="italic">z<tspan baseline-shift="sub" font-size="70%">3</tspan>
+        </text>
+      </g>
+      <ellipse cx="650.0" cy="344.0" rx="4.1" ry="4.1" fill="#1b2025" stroke="white" stroke-width="0.8" id="origin-3" />
+      <text x="658.0" y="366.0" fill="#17191c" stroke="none" font-family="Times New Roman, STIX Two Text, serif" font-size="20" font-style="italic">O<tspan baseline-shift="sub" font-size="70%">3</tspan>
+      </text>
+    </g>
+    <g id="frame-4" data-origin-base-m="0.000000000 -0.121500000 0.906000000" data-frame-convention="standard-DH-nominal-zero">
+      <g id="axis-4-x">
+        <line x1="528.5" y1="344.0" x2="558.2472836807322" y2="320.35472322813604" stroke="#c53737" stroke-width="2.6" />
+        <polygon points="563.7270464640249,315.99901434910845 557.9522195308624,324.8047723455573 553.845408302065,319.63813886416693" fill="#c53737" />
+        <text x="567.7270464640249" y="310.99901434910845" fill="#c53737" stroke="none" font-family="Times New Roman, STIX Two Text, serif" font-size="21" font-style="italic">x<tspan baseline-shift="sub" font-size="70%">4</tspan>
+        </text>
+      </g>
+      <g id="axis-4-y">
+        <line x1="528.5" y1="344.0" x2="490.5" y2="344.0" stroke="#218244" stroke-width="2.6" />
+        <polygon points="483.5,344.0 493.5,340.7 493.5,347.3" fill="#218244" />
+        <text x="475.5" y="336.0" fill="#218244" stroke="none" font-family="Times New Roman, STIX Two Text, serif" font-size="21" font-style="italic">y<tspan baseline-shift="sub" font-size="70%">4</tspan>
+        </text>
+      </g>
+      <g id="axis-4-z">
+        <line x1="528.5" y1="344.0" x2="528.5" y2="306.0" stroke="#2858b5" stroke-width="2.6" />
+        <polygon points="528.5,299.0 531.8,309.0 525.2,309.0" fill="#2858b5" />
+        <text x="532.5" y="294.0" fill="#2858b5" stroke="none" font-family="Times New Roman, STIX Two Text, serif" font-size="21" font-style="italic">z<tspan baseline-shift="sub" font-size="70%">4</tspan>
+        </text>
+      </g>
+      <ellipse cx="528.5" cy="344.0" rx="4.1" ry="4.1" fill="#1b2025" stroke="white" stroke-width="0.8" id="origin-4" />
+      <text x="536.5" y="366.0" fill="#17191c" stroke="none" font-family="Times New Roman, STIX Two Text, serif" font-size="20" font-style="italic">O<tspan baseline-shift="sub" font-size="70%">4</tspan>
+      </text>
+    </g>
+    <g id="frame-5" data-origin-base-m="0.000000000 -0.121500000 1.008500000" data-frame-convention="standard-DH-nominal-zero">
+      <g id="axis-5-x">
+        <line x1="528.5" y1="241.5" x2="498.7527163192679" y2="265.14527677186396" stroke="#c53737" stroke-width="2.6" />
+        <polygon points="493.27295353597515,269.50098565089155 499.0477804691375,260.6952276544427 503.15459169793496,265.86186113583307" fill="#c53737" />
+        <text x="489.27295353597515" y="286.50098565089155" fill="#c53737" stroke="none" font-family="Times New Roman, STIX Two Text, serif" font-size="21" font-style="italic">x<tspan baseline-shift="sub" font-size="70%">5</tspan>
+        </text>
+      </g>
+      <g id="axis-5-y">
+        <line x1="528.5" y1="241.5" x2="528.5" y2="203.5" stroke="#218244" stroke-width="2.6" />
+        <polygon points="528.5,196.5 531.8,206.5 525.2,206.5" fill="#218244" />
+        <text x="532.5" y="191.5" fill="#218244" stroke="none" font-family="Times New Roman, STIX Two Text, serif" font-size="21" font-style="italic">y<tspan baseline-shift="sub" font-size="70%">5</tspan>
+        </text>
+      </g>
+      <g id="axis-5-z">
+        <line x1="528.5" y1="241.5" x2="490.5" y2="241.5" stroke="#2858b5" stroke-width="2.6" />
+        <polygon points="483.5,241.5 493.5,238.2 493.5,244.8" fill="#2858b5" />
+        <text x="475.5" y="233.5" fill="#2858b5" stroke="none" font-family="Times New Roman, STIX Two Text, serif" font-size="21" font-style="italic">z<tspan baseline-shift="sub" font-size="70%">5</tspan>
+        </text>
+      </g>
+      <ellipse cx="528.5" cy="241.5" rx="4.1" ry="4.1" fill="#1b2025" stroke="white" stroke-width="0.8" id="origin-5" />
+      <text x="536.5" y="263.5" fill="#17191c" stroke="none" font-family="Times New Roman, STIX Two Text, serif" font-size="20" font-style="italic">O<tspan baseline-shift="sub" font-size="70%">5</tspan>
+      </text>
+    </g>
+    <g id="frame-6" data-origin-base-m="-0.000000000 -0.215500000 1.008500000" data-frame-convention="standard-DH-nominal-zero">
+      <g id="axis-6-x">
+        <line x1="434.5" y1="241.5" x2="404.7527163192679" y2="265.14527677186396" stroke="#c53737" stroke-width="2.6" />
+        <polygon points="399.27295353597515,269.50098565089155 405.0477804691375,260.6952276544427 409.15459169793496,265.86186113583307" fill="#c53737" />
+        <text x="395.27295353597515" y="286.50098565089155" fill="#c53737" stroke="none" font-family="Times New Roman, STIX Two Text, serif" font-size="21" font-style="italic">x<tspan baseline-shift="sub" font-size="70%">6</tspan>
+        </text>
+      </g>
+      <g id="axis-6-y">
+        <line x1="434.5" y1="241.5" x2="434.5" y2="203.5" stroke="#218244" stroke-width="2.6" />
+        <polygon points="434.5,196.5 437.8,206.5 431.2,206.5" fill="#218244" />
+        <text x="438.5" y="191.5" fill="#218244" stroke="none" font-family="Times New Roman, STIX Two Text, serif" font-size="21" font-style="italic">y<tspan baseline-shift="sub" font-size="70%">6</tspan>
+        </text>
+      </g>
+      <g id="axis-6-z">
+        <line x1="434.5" y1="241.5" x2="396.5" y2="241.5" stroke="#2858b5" stroke-width="2.6" />
+        <polygon points="389.5,241.5 399.5,238.2 399.5,244.8" fill="#2858b5" />
+        <text x="381.5" y="233.5" fill="#2858b5" stroke="none" font-family="Times New Roman, STIX Two Text, serif" font-size="21" font-style="italic">z<tspan baseline-shift="sub" font-size="70%">6</tspan>
+        </text>
+      </g>
+      <ellipse cx="434.5" cy="241.5" rx="4.1" ry="4.1" fill="#1b2025" stroke="white" stroke-width="0.8" id="origin-6" />
+      <text x="442.5" y="263.5" fill="#17191c" stroke="none" font-family="Times New Roman, STIX Two Text, serif" font-size="20" font-style="italic">O<tspan baseline-shift="sub" font-size="70%">6</tspan>
+      </text>
+    </g>
+    <g id="frame-TCP" data-origin-base-m="-0.000000000 -0.335500000 1.008500000" data-frame-convention="standard-DH-nominal-zero">
+      <g id="axis-TCP-x">
+        <line x1="314.5000000000001" y1="241.5" x2="278.49013028121914" y2="270.1232297764669" stroke="#c53737" stroke-width="2.6" />
+        <polygon points="273.0103674979264,274.4789386554945 278.7851944310887,265.67318065904567 282.8920056598862,270.83981414043603" fill="#c53737" />
+        <text x="269.0103674979264" y="291.4789386554945" fill="#c53737" stroke="none" font-family="Times New Roman, STIX Two Text, serif" font-size="21" font-style="italic">x<tspan baseline-shift="sub" font-size="70%">TCP</tspan>
+        </text>
+      </g>
+      <g id="axis-TCP-y">
+        <line x1="314.5000000000001" y1="241.5" x2="314.5000000000001" y2="195.5" stroke="#218244" stroke-width="2.6" />
+        <polygon points="314.5000000000001,188.5 317.8000000000001,198.5 311.2000000000001,198.5" fill="#218244" />
+        <text x="318.5000000000001" y="183.5" fill="#218244" stroke="none" font-family="Times New Roman, STIX Two Text, serif" font-size="21" font-style="italic">y<tspan baseline-shift="sub" font-size="70%">TCP</tspan>
+        </text>
+      </g>
+      <g id="axis-TCP-z">
+        <line x1="314.5000000000001" y1="241.5" x2="268.5000000000001" y2="241.49999999999997" stroke="#2858b5" stroke-width="2.6" />
+        <polygon points="261.5000000000001,241.49999999999997 271.5000000000001,238.19999999999996 271.5000000000001,244.79999999999998" fill="#2858b5" />
+        <text x="253.5000000000001" y="233.49999999999997" fill="#2858b5" stroke="none" font-family="Times New Roman, STIX Two Text, serif" font-size="21" font-style="italic">z<tspan baseline-shift="sub" font-size="70%">TCP</tspan>
+        </text>
+      </g>
+      <ellipse cx="314.5000000000001" cy="241.5" rx="4.1" ry="4.1" fill="#e78b23" stroke="white" stroke-width="0.8" id="origin-TCP" />
+      <text x="321.5000000000001" y="262.5" font-family="Times New Roman, serif" font-style="italic" font-size="19" fill="#20252a">TCP</text>
+    </g>
+  </g>
+</svg>

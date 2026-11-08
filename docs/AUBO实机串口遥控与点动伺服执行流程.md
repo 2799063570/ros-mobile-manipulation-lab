@@ -1,12 +1,12 @@
 # AUBO 实机串口遥控与点动伺服执行流程
 
-整理日期：2026-10-25；计算与误差分析补充：2026-10-30；运动学模型推导补充：2026-11-02。本文依据当前仓库源码，入口为
+整理日期：2026-10-25；计算与误差分析补充：2026-10-30；运动学模型推导补充：2026-11-02；DH入门与两关节变换补充：2026-11-04；正运动学过程改为直接矩阵连乘。本文依据当前仓库源码，入口为
 [`cartesian_remote_real.launch`](../aubo/aubo_remote_bridge/launch/cartesian_remote_real.launch)。
 本文梳理默认 `backend=sdk` 的程序调用、状态机、控制算法、线程时序和参数；不代表完成了新的实机验证。
 
 本文的计算分成三个层次：**遥控输入的理想值、当前算法生成的轨迹值、实机测量值**。前两者可以从代码离线复算；第三者需要采集反馈或外部测量，文中的演算数字均不作为实机精度结论。
 
-需要按计算顺序阅读时，可依次查看：第4.7～4.9节的深度/速度/位移换算，第6.7～6.10节的URDF、DH、雅可比与逆解（第6.7.4～6.7.9节给出完整闭式模型及六输入六输出列向量，第6.8.3～6.8.5节给出求导过程），第7.4～7.5节的积分和增益，第8.7节的实际下发，以及第15～16节的误差计算和离线复算程序。
+需要按计算顺序阅读时，可依次查看：第4.7～4.9节的深度/速度/位移换算，第6.7～6.10节的URDF、DH、雅可比与逆解（第6.7.5～6.7.8节按单级矩阵→直接连乘→最终4×4结果组织，第6.7.9节提取六输入六输出列向量，第6.8.3～6.8.5节给出求导过程），第7.4～7.5节的积分和增益，第8.7节的实际下发，以及第15～16节的误差计算和离线复算程序。
 
 ## 1. 总体职责与运行链路
 
@@ -498,6 +498,34 @@ qdot_target = qdot_raw × min(scale_sing, scale_vel, 所有scale_limit_i)
 
 ### 6.7 依据实际URDF建立机器人运动学模型
 
+**统一参数基准（2026-11-04）。** 本文以仓库 `aubo/aubo_description/urdf/` 下的文件为唯一模型数据来源。六轴几何、零位固定旋转及关节正轴取自 [`arm.xacro`](../aubo/aubo_description/urdf/arm.xacro)；法兰安装关系取自当前默认入口 [`aubo_i5_with_camera.xacro`](../aubo/aubo_description/urdf/aubo_i5_with_camera.xacro)；夹爪和TCP取自 [`jiazhua.urdf`](../aubo/aubo_description/urdf/jiazhua.urdf)。坐标链统一为 `base_link→tcp_link`，长度用m、角度用rad，关节顺序为 `shoulder_joint、upperArm_joint、foreArm_joint、wrist1_joint、wrist2_joint、wrist3_joint`，q使用ROS关节角，不扣除HOME角。
+
+**数值计算保留URDF原始xyz、rpy和axis；第6.7.2节DH表及两张配图是从同一几何提取的标准DH手算近似。** 其中几何长度一致，固定旋转近似为整倍数π/2；不能把这张简化DH表宣称为与原始URDF逐位精确相等的另一套控制模型。需要与KDL/TF对照时，使用第6.7.1节原始URDF连乘，不使用近似闭式公式替代。SDK历史日志和参考图片的尺寸不覆盖URDF，本次也不修改URDF本身或控制柜参数。
+
+#### 6.7.0 建模流程：由DH矩阵直接计算TCP位姿
+
+**先看坐标系在机械臂上的位置。** 下图按本文理想化标准DH模型的全零关节角绘制，仅保留一台机械臂、夹爪及 `{0}～{6}`和TCP坐标轴。三轴颜色为X红、Y绿、Z蓝；坐标系原点以三轴交点为准，其中 `{0}`与 `base_link`重合。DH原点可能位于关节转轴的延长线上，并不一定在关节外壳中心；图中坐标系不能直接当成URDF各link的TF坐标系。
+
+![AUBO机械臂、夹爪与DH坐标系位置的论文简洁版示意图](images/aubo_dh_frames_paper.png)
+
+[可编辑SVG线稿](images/aubo_dh_frames_editable.svg) · [矢量图预览](images/aubo_dh_frames_editable_preview.png) · [编辑说明](images/aubo_dh_frames_editable.README.md)。SVG中的机械臂轮廓、夹爪、坐标轴和文字均可单独编辑；线稿采用同一DH约定，外形作了简化。
+
+当前模型中 `{6}=wrist3_Link=gripper_base_link`，三者原点和方向重合；`gripper_link=tcp_link`位于 `{6}`局部 `+Z`方向120 mm处，方向与 `{6}`相同。TCP是两指之间的工具参考点，不是某一根手指的关节原点；夹爪两个手指的活动支链不参与机械臂到TCP的主链连乘。全零位时 `{6}`原点为 `(0,-0.2155,1.0085) m`，TCP为 `(0,-0.3355,1.0085) m`，所以这120 mm沿基坐标−Y方向展开。图中结构非比例，准确数值以下文矩阵及URDF定义为准。
+
+**本节采用直接矩阵连乘。** 建模顺序为：坐标系定义 → 标准DH参数表 → 六个单级变换矩阵 → 按关节顺序连乘 → 右乘夹爪TCP固定变换 → 读取最终4×4矩阵中的位置与姿态。
+
+标准DH中 `θi=qi+θ0i`，四步变换为 `Rz(θi) Tz(di) Tx(ai) Rx(αi)`；θ0i是固定零位偏置，ai、di为长度参数，αi为轴间扭角。坐标系构建按此顺序理解，点坐标的列向量运算则从最右侧开始作用。
+
+两个关节之间直接相乘即可。例如本机前两级为：
+
+```text
+A1(q1) = Rz(q1) Tz(0.122) Rx(π/2)
+A2(q2) = Rz(q2+π/2) Tx(0.408) Rx(π)
+⁰T₂ = A1(q1) A2(q2)
+```
+
+同样的方法用于全部六轴，不必先逐项求各级原点的XYZ或拆解腕部轴方向。DH参数和各级矩阵见第6.7.2、6.7.5节，完整计算顺序见第6.7.6节，最终矩阵见第6.7.7节。第6.8节的雅可比分析是在正运动学结果上进一步求导，用于速度逆解。
+
 #### 6.7.1 坐标、单位及精确的连乘定义
 
 以下只建模 `base_link→tcp_link` 的六个活动关节。关节角 `q1…q6` 顺序同第11节，单位rad；平移单位m。采用列向量、右手系，`⁰T₆`将第6坐标系的坐标变换到基坐标系。
@@ -523,7 +551,17 @@ Ti(qi) = Oi × Rz(qi)                    # 六个关节axis均为局部(0,0,1)
 
 URDF的关节坐标系允许任意固定RPY，因此不能把这里的xyz、rpy直接逐行抄成DH表。首先要按上述顺序相乘；惯性坐标、visual mesh偏移不参与这条关节运动学连乘。
 
-#### 6.7.2 一组与本仓库模型对应的标准DH参数
+**以URDF为准时，前两个关节的实际变换顺序。** 记 `U1、U2`为URDF相邻link变换，区别于重选坐标系后的DH矩阵 `A1、A2`。直接代入文件原值：
+
+```text
+U1(q1) = Tz(0.122) Rz(3.1416) Rz(q1)
+U2(q2) = Ty(0.1215) Ry(-1.5708) Rx(-1.5708) Rz(q2)
+⁰T_upperArm = U1(q1) U2(q2)
+```
+
+构建URDF子坐标系时，先附加origin的固定平移，再按 `Rz(yaw) Ry(pitch) Rx(roll)`附加固定旋转，最后绕已建立的局部Z轴旋转qi。这里的固定RPY、关节运动与标准DH的四步分解是不同表示，不能直接混用它们的中间坐标系；若计算一个点的列向量，仍从矩阵乘积最右侧开始作用。默认KDL实际读取这条原始URDF链。
+
+#### 6.7.2 统一标准DH参数：URDF几何的手算近似
 
 为方便手算，把URDF中的 `3.1416/1.5708` 理想化为 `π/π/2`，忽略约 `1e-15` 的导出残差，重新选择DH中间坐标系。采用**标准DH**，明确顺序为：
 
@@ -543,14 +581,16 @@ Ai =  [ sinθ   cosθ cosα  -cosθ sinα   a sinθ ]
 
 下表是一组经连乘核对的参数，**只对应本文选定的坐标系，不是SDK的DH字段表，也不是改进DH表**：
 
-| i | `ai`，m | `αi`，rad | `di`，m | `θ0i`，rad | `θi` |
-| --- | --- | --- | --- | --- | --- |
-| 1 | 0 | `+π/2` | 0.122 | 0 | `q1` |
-| 2 | 0.408 | `+π` | 0 | `+π/2` | `q2+π/2` |
-| 3 | 0.376 | `+π` | 0 | 0 | `q3` |
-| 4 | 0 | `+π/2` | 0.1215 | `+π/2` | `q4+π/2` |
-| 5 | 0 | `+π/2` | 0.1025 | `+π` | `q5+π` |
-| 6 | 0 | 0 | 0.094 | 0 | `q6` |
+| i | `ai`，m | `αi`，rad | `di`，m | `θ0i`，rad | `θi` | 非零长度的URDF来源 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 1 | 0 | `+π/2` | 0.122 | 0 | `q1` | `shoulder_joint/origin.xyz.z` |
+| 2 | 0.408 | `+π` | 0 | `+π/2` | `q2+π/2` | `foreArm_joint/origin.xyz.x` |
+| 3 | 0.376 | `+π` | 0 | 0 | `q3` | `wrist1_joint/origin.xyz.x` |
+| 4 | 0 | `+π/2` | 0.1215 | `+π/2` | `q4+π/2` | `upperArm_joint/origin.xyz.y`，重选DH原点后移到d4 |
+| 5 | 0 | `+π/2` | 0.1025 | `+π` | `q5+π` | `wrist2_joint/origin.xyz.y` |
+| 6 | 0 | 0 | 0.094 | 0 | `q6` | `-wrist3_joint/origin.xyz.y` |
+
+工具不并入上述六行DH表，统一使用URDF固定链：`ee_link_joint`为恒等变换，`gripper_joint`沿局部Z平移0.120 m，`tcp_joint`为恒等变换。因此 `Ttool=Tz(0.120)`，闭式位置中的 `ℓ=d6+0.120=0.214 m`。不能把0.214 m当成机械臂第6轴自身的d6，也不能再叠加一次夹爪长度。
 
 构造方法是令 `z(i-1)` 与第i个关节正轴重合，以相邻关节轴公法线确定 `xi`，再用关节零位下的坐标系关系确定θ偏置。平行轴的公法线原点有选择自由，因此URDF中第2行的0.1215 m可以在这套DH坐标选择中出现在第4行的d；中间坐标系不必与URDF link坐标系同名同向。
 
@@ -582,6 +622,8 @@ p_tcp(0) = (0, -0.3355, 1.0085) m
 DhParam: 0.408000,0.376000,0.098500,0.121500,0.102500,0.094000
 ```
 
+**这段仅保留为历史记录，不属于本文统一参数表，不参与离线模型或配图计算；本文d1固定采用当前URDF的0.122 m。**
+
 SDK头文件[`AuboRobotMetaType.h`](../aubo/aubo_sdk/include/aubo_driver/AuboRobotMetaType.h)的 `RobotDhPara` 字段顺序为 `A3,A4,D1,D2,D5,D6`；该历史日志中的第三个几何数值0.0985 m与本仓库URDF首轴高度0.122 m相差 **0.0235 m=23.5 mm**。历史日志不是本次对当前控制柜的重新读取，且仅凭这些数值不能确定两套基座原点、零位约定和标定是否相同。
 
 若只在同一模型中把首个 `Tz(0.122)` 改为 `Tz(0.0985)`，所有TCP绝对位置的基座Z都会平移−23.5 mm，位置差分和几何雅可比不变；这是该单一改动的数学结果。**不能据此断言真实机械臂有23.5 mm定位误差**，也不能直接把URDF改成SDK第三个数值。
@@ -590,7 +632,7 @@ SDK头文件[`AuboRobotMetaType.h`](../aubo/aubo_sdk/include/aubo_driver/AuboRob
 
 #### 6.7.4 从物理关节轴到DH坐标系：建模依据
 
-下面第6.7.4～6.7.8节将第6.7.2节的**理想化几何模型**逐项展开；原始URDF小数模型仍按第6.7.1节计算。为避免“长度、角度、积分步长”混用，先固定符号：
+下面第6.7.4～6.7.8节给出第6.7.2节的**理想化几何模型**的坐标依据、单级矩阵、直接连乘及最终结果；原始URDF小数模型仍按第6.7.1节计算。为避免“长度、角度、积分步长”混用，先固定符号：
 
 | 符号 | 本模型数值 | 几何含义 |
 | --- | --- | --- |
@@ -704,198 +746,111 @@ Ttool = [0 1 0  0 ]
         [0 0 0  1 ]
 ```
 
-例如A2的平移不是简单的 `(a2,0,0)`，而是 `(-a2 sin q2,a2 cos q2,0)`；原因是标准DH中的 `Tx(a2)`位于 `Rz(q2+π/2)`之后，平移方向随该角度转动。
+六个Ai及工具矩阵均为4×4齐次变换；直接使用完整矩阵相乘即可，计算顺序见下一节。
 
-设 `Di=[Ri,pi;0,1]`，每一级都按同一规则递推：
+#### 6.7.6 六轴矩阵连乘与夹爪TCP固定变换
+
+将第6.7.5节的六个矩阵按关节顺序相乘，首先得到 `base_link→wrist3_Link` 的位姿：
+
+$$
+{}^{base}T_6(q)=A_1(q_1)A_2(q_2)A_3(q_3)A_4(q_4)A_5(q_5)A_6(q_6).
+$$
+
+当前 `{0}`与 `base_link`重合，故 `⁽base⁾T₀=I`。第6坐标系与 `wrist3_Link`、`gripper_base_link`重合；TCP沿其局部+Z偏移0.120 m且方向相同，因此：
+
+$$
+{}^6T_{TCP}=T_z(0.120)=
+\begin{bmatrix}
+1&0&0&0\\
+0&1&0&0\\
+0&0&1&0.120\\
+0&0&0&1
+\end{bmatrix}.
+$$
+
+完整正运动学直接写为：
+
+$$
+\boxed{{}^{base}T_{TCP}(q)=A_1(q_1)A_2(q_2)A_3(q_3)A_4(q_4)A_5(q_5)A_6(q_6)\,{}^6T_{TCP}.}
+$$
+
+计算时令T从单位矩阵开始，逐个右乘；这与一次性写出整个乘积完全相同：
 
 ```text
-R0=I，p0=0
-Ri = Ri-1 × R(Ai)
-pi = pi-1 + Ri-1 × p(Ai)
+T = I4
+for i = 1…6:
+    T = T × Ai(qi)
+T = T × Ttool
+R_tcp = T[0:3, 0:3]                 # TCP三轴在base_link中的方向
+p_tcp = T[0:3, 3]                   # TCP在base_link中的位置，m
 ```
 
-这里 `p(Ai)`是在**前一级DH坐标系**中表示的平移列，必须乘 `Ri-1`之后才能与基坐标中的 `pi-1`相加。
+`Ttool`必须右乘，表示沿末端局部Z平移；不能直接给基座位置的Z分量加0.120。DH表中 `d6=0.094 m`保持不变，夹爪只额外计算一次0.120 m。整个正运动学计算无需另行分析每级位置分量或轴方向；第16节程序按此顺序直接复算。
 
-#### 6.7.6 分段相乘：前三轴与腕部偏置
+#### 6.7.7 矩阵连乘的最终4×4结果
 
-定义角度组合：
+下面直接给出第6.7.6节乘积化简后的结果。定义三角函数简写和角度组合：
 
 ```text
-ψ = q2-q3
-γ = q2-q3+q4 = ψ+q4
+ci=cos(qi)，si=sin(qi)
+ψ=q2-q3，γ=q2-q3+q4
 cψ=cosψ，sψ=sinψ，cγ=cosγ，sγ=sinγ
-m = a2 s2 + a3 sψ
-z3 = d1 + a2 c2 + a3 cψ
+h1=c1 c5 cγ-s1 s5
+h2=s1 c5 cγ+c1 s5
+ℓ=d6+lt=0.094+0.120=0.214 m
 ```
 
-先算A1A2，再乘A3，利用和差角公式化简：
+则从 `base_link`到 `tcp_link`的完整矩阵为：
+
+$$
+\boxed{
+{}^{base}T_{TCP}(q)=
+\begin{bmatrix}
+c_6h_1-s_6c_1s_\gamma & -s_6h_1-c_6c_1s_\gamma & c_1s_5c_\gamma+s_1c_5 & x(q)\\
+c_6h_2-s_6s_1s_\gamma & -s_6h_2-c_6s_1s_\gamma & s_1s_5c_\gamma-c_1c_5 & y(q)\\
+c_6c_5s_\gamma+s_6c_\gamma & -s_6c_5s_\gamma+c_6c_\gamma & s_5s_\gamma & z(q)\\
+0&0&0&1
+\end{bmatrix}.}
+$$
+
+最后一列的TCP位置直接为，长度单位m：
 
 ```text
-         [-c1 s2   c1 c2  -s1   -a2 c1 s2 ]
-A1 A2 =  [-s1 s2   s1 c2   c1   -a2 s1 s2 ]
-         [   c2       s2    0    d1+a2 c2  ]
-         [    0        0    0        1     ]
-
-              [-c1 sψ  -c1 cψ   s1   -c1 m ]
-D3=A1 A2 A3 = [-s1 sψ  -s1 cψ  -c1   -s1 m ]
-              [   cψ     -sψ     0      z3  ]
-              [    0       0     0       1  ]
+x(q) = -c1(0.408 s2+0.376 sψ+0.1025 sγ)
+       +0.1215 s1+0.214(c1 s5 cγ+s1 c5)
+y(q) = -s1(0.408 s2+0.376 sψ+0.1025 sγ)
+       -0.1215 c1+0.214(s1 s5 cγ-c1 c5)
+z(q) = 0.122+0.408 c2+0.376 cψ+0.1025 cγ+0.214 s5 sγ
 ```
 
-例如第3级旋转的 `(1,1)`元素为：
+前三列组成旋转矩阵R，分别表示TCP的X、Y、Z轴在基坐标中的方向；最后一列前三项是TCP位置。R满足 `RᵀR=I`、`det(R)=+1`。如果只计算六轴乘积 `⁰T₆`而不加入夹爪，旋转部分不变，只需将位置公式中的0.214替换为0.094。
+
+为便于第6.8节对同一结果求雅可比，保留以下**等价简写**；它们不是矩阵相乘前必须执行的计算步骤：
 
 ```text
-(-c1 s2)c3 + (c1 c2)s3
-= -c1(s2 c3-c2 s3)
-= -c1 sin(q2-q3)
+er=[c1,s1,0]ᵀ，eθ=[-s1,c1,0]ᵀ，ez=[0,0,1]ᵀ
+ρ=-a2 s2-a3 sψ-d5 sγ+ℓ s5 cγ
+η=d4+ℓ c5
+z=d1+a2 c2+a3 cψ+d5 cγ+ℓ s5 sγ
+p_tcp=ρ er-η eθ+z ez
+x=c1ρ+s1η，y=s1ρ-c1η
+n=R的第三列=[c1 s5 cγ+s1 c5, s1 s5 cγ-c1 c5, s5 sγ]ᵀ
 ```
 
-第3级位置的X分量则为：
+上述结果对应本文标准DH手算近似，原始URDF数值计算仍按第6.7.1节。当前TCP在末轴轴线上，因此q6不改变TCP位置，但会改变旋转矩阵。若工具存在横向偏移或固定旋转，则应以实际完整 `⁶T_TCP`重新相乘，不能继续仅使用 `Tz(0.120)`。
+
+#### 6.7.8 HOME位姿代入与姿态误差
+
+直接将本系统HOME关节角 `q=[0,0,1.6292,0,1.6628,0]ᵀ rad`代入六个Ai并连乘。六轴到法兰的结果为：
 
 ```text
--a2 c1 s2 + (-c1 s2)(a3 c3) + (c1 c2)(a3 s3)
-= -c1[a2 sin q2 + a3 sin(q2-q3)]
+             [0.005362725   0.998294990  -0.058123607   0.472220534]
+⁰T₆_HOME ≈ [0.995770647   0            0.091873931  -0.112863850]
+             [0.091717285  -0.058370476  -0.994072848   0.408626879]
+             [0            0             0             1          ]
 ```
 
-继续乘A4，得到：
-
-```text
-      [-c1 cγ   s1  -c1 sγ]
-R4 =  [-s1 cγ  -c1  -s1 sγ]
-      [  -sγ     0      cγ ]
-
-p3 = [-c1 m, -s1 m, z3]ᵀ
-p4 = p3 + d4 × [s1,-c1,0]ᵀ
-```
-
-第5轴的正方向是R4第三列：
-
-```text
-z4 = [-c1 sγ,-s1 sγ,cγ]ᵀ
-p5 = p4 + d5 z4
-```
-
-这里 `z4`是DH第4坐标系的Z轴，即第5个活动关节轴；不要与标量位置分量 `z3`混淆。为书写第6轴方向，先定义两个基座水平单位向量：
-
-```text
-er = [ c1, s1,0]ᵀ
-eθ = [-s1, c1,0]ᵀ
-ez = [  0,  0,1]ᵀ
-```
-
-则第6轴正方向为：
-
-```text
-n = s5 cγ er - c5 eθ + s5 sγ ez
-  = [c1 s5 cγ+s1 c5,
-     s1 s5 cγ-c1 c5,
-     s5 sγ]ᵀ
-
-p6 = p5 + d6 n
-p_tcp = p6 + lt n = p5 + ℓ n
-```
-
-注意 `d4`沿第4轴、`d5`沿第5轴、`d6+lt`沿第6轴，方向不同，不能把这三个长度直接标量相加后作为一根竖直连杆。
-
-#### 6.7.7 TCP位置的闭式运动学模型
-
-把前面的平移项收集到径向、切向和竖直三个方向，定义：
-
-```text
-ρ = -a2 s2 - a3 sψ - d5 sγ + ℓ s5 cγ
-η =  d4 + ℓ c5
-z =  d1 + a2 c2 + a3 cψ + d5 cγ + ℓ s5 sγ
-```
-
-ρ是水平径向的**有符号投影系数**，不保证非负；η是沿负eθ的投影系数，不是误差。TCP位置为：
-
-```text
-p_tcp(q) = ρ er - η eθ + z ez
-
-x(q) = c1 ρ + s1 η
-     = -c1[a2 s2+a3 sψ+d5 sγ] + d4 s1
-       + ℓ[c1 s5 cγ+s1 c5]
-
-y(q) = s1 ρ - c1 η
-     = -s1[a2 s2+a3 sψ+d5 sγ] - d4 c1
-       + ℓ[s1 s5 cγ-c1 c5]
-
-z(q) = d1+a2 c2+a3 cψ+d5 cγ+ℓ s5 sγ
-```
-
-代入长度数值后，位置模型就是：
-
-```text
-ρ = -0.408 sin(q2) - 0.376 sin(q2-q3)
-    -0.1025 sin(q2-q3+q4) + 0.214 sin(q5) cos(q2-q3+q4)
-η =  0.1215 + 0.214 cos(q5)
-z =  0.122 + 0.408 cos(q2) + 0.376 cos(q2-q3)
-    +0.1025 cos(q2-q3+q4) + 0.214 sin(q5) sin(q2-q3+q4)
-x = cos(q1) ρ + sin(q1) η
-y = sin(q1) ρ - cos(q1) η
-```
-
-由这个具体模型可以直接判断：
-
-- `q1`将整个水平位置绕基座Z轴旋转，`x²+y²=ρ²+η²`，但不改变z。
-- 第2、3、4轴通过 `q2`、`q2-q3`、`q2-q3+q4`共同决定伸展和高度。
-- `q5`改变第6轴方向，因此通过ℓ影响TCP位置。
-- `q6`不出现在位置公式中，因为当前TCP在第6轴轴线上；它仍改变TCP姿态。
-
-若真实工具有横向偏移，例如工具向量为 `(tx,ty,tz)`，就必须使用 `p_tcp=p6+R6[tx,ty,tz]ᵀ`，不能继续使用 `ℓ=d6+lt`这一简化；此时q6通常也会改变TCP位置。
-
-#### 6.7.8 姿态模型、完整4×4模型与HOME代入
-
-只给出XYZ还不是六轴机器人的完整位姿模型。A1～A5连乘的旋转可以写成三个基坐标单位列向量：
-
-```text
-u = c5 cγ er + s5 eθ + c5 sγ ez
-  = [c1 c5 cγ-s1 s5,
-     s1 c5 cγ+c1 s5,
-     c5 sγ]ᵀ
-
-w = -sγ er + cγ ez
-  = [-c1 sγ,-s1 sγ,cγ]ᵀ
-
-n = s5 cγ er - c5 eθ + s5 sγ ez
-```
-
-其中 `R5=[u,w,n]`，`u×w=n`。第6关节只在u、w张成的平面内转动X/Y轴，局部Z轴n不变：
-
-```text
-R_tcp = R6 = R5 Rz(q6)
-      = [c6 u+s6 w, -s6 u+c6 w, n]
-
-               [c6 ux+s6 wx  -s6 ux+c6 wx  nx  x(q)]
-⁰T_tcp(q) =    [c6 uy+s6 wy  -s6 uy+c6 wy  ny  y(q)]
-               [c6 uz+s6 wz  -s6 uz+c6 wz  nz  z(q)]
-               [     0             0       0    1 ]
-```
-
-这里 `ux,uy,uz`等表示列向量的三个基坐标分量。旋转矩阵应满足 `RᵀR=I`、`det(R)=+1`；六个关节矩阵均为刚体变换，所以连乘后也满足这一性质。
-
-代入本系统HOME角度 `[0,0,1.6292,0,1.6628,0] rad`，先得到：
-
-```text
-ψ = γ = -1.6292 rad
-ρ ≈ 0.465245701 m
-η ≈ 0.101838979 m
-z ≈ 0.289338138 m
-```
-
-逐级累乘的DH原点为：
-
-| 累乘阶段 | 基坐标X，m | 基坐标Y，m | 基坐标Z，m |
-| --- | --- | --- | --- |
-| D1=A1 | 0 | 0 | 0.122000000 |
-| D2=A1A2 | 0 | 0 | 0.530000000 |
-| D3=A1A2A3 | 0.375358916 | 0 | 0.508052701 |
-| D4=D3A4 | 0.375358916 | -0.121500000 | 0.508052701 |
-| D5=D4A5 | 0.477684153 | -0.121500000 | 0.502069727 |
-| D6=D5A6 | 0.472220534 | -0.112863850 | 0.408626879 |
-| TCP=D6Ttool | 0.465245701 | -0.101838979 | 0.289338138 |
-
-最终得到：
+再右乘 `Tz(0.120)`，最终得到 `base_link→tcp_link`：
 
 ```text
                [0.005362725   0.998294990  -0.058123607   0.465245701]
@@ -903,6 +858,8 @@ z ≈ 0.289338138 m
                [0.091717285  -0.058370476  -0.994072848   0.289338138]
                [0            0             0             1          ]
 ```
+
+因此HOME点的TCP位置为 `(0.465245701,-0.101838979,0.289338138) m`，姿态由左上3×3子矩阵给出。
 
 这是**理想化DH模型**的结果。第6.8节及第6.9节的数值使用保留小数的原始URDF，其HOME位置为 `(0.465246109,-0.101841441,0.289336120) m`；两组数字的微小差异来自建模输入的理想化，不能将不同模型的数值混为同一次矩阵运算。
 
@@ -952,7 +909,7 @@ R = Rz(χ) Ry(θ) Rx(φ)
 
 矩阵将TCP坐标转换到基坐标；采用列向量相乘时最右侧Rx先作用。不能只写“输出三个角度”而不规定这套旋转顺序，也不能将输出RPY误认为基坐标到TCP的反向旋转。
 
-记第6.7.8节旋转矩阵的元素为 `Rij(q)`，并令 `k=sqrt(R11²+R21²)`。非欧拉奇异姿态下，按主值分支提取：
+记第6.7.7节最终矩阵左上3×3部分的元素为 `Rij(q)`，并令 `k=sqrt(R11²+R21²)`。非欧拉奇异姿态下，按主值分支提取：
 
 ```text
 φ(q) = atan2(R32(q), R33(q))
@@ -976,11 +933,11 @@ X=f(q)= [  z  ]  =  [ d1+a2 cos(q2)+a3 cosψ+d5 cosγ+ℓ sin(q5) sinγ         
 ρ = -a2 sin(q2)-a3 sinψ-d5 sinγ+ℓ sin(q5) cosγ
 η = d4+ℓ cos(q5)
 
-R11 = c6 ux+s6 wx，R21 = c6 uy+s6 wy，R31 = c6 uz+s6 wz
-R32 = -s6 uz+c6 wz，R33 = nz
+R11 = c6 h1-s6 c1 sγ，R21 = c6 h2-s6 s1 sγ
+R31 = c6 c5 sγ+s6 cγ，R32 = -s6 c5 sγ+c6 cγ，R33 = s5 sγ
 ```
 
-`u,w,n`是第6.7.8节已经展开的q函数，长度参数为第6.7.4节的数值，因此该式只需要六个关节角作为运动输入。它是**列向量形式的非线性函数**；由于含有sin、cos与atan2，不能写成一个固定6×6常数矩阵乘q。这里6×1输出是完整位姿的一种参数表示，4×4齐次矩阵仍用于坐标变换。
+上述Rij及 `h1、h2、ρ、η`均已在第6.7.7节定义，长度参数为第6.7.4节的数值，因此该式只需要六个关节角作为运动输入。它是**列向量形式的非线性函数**；由于含有sin、cos与atan2，不能写成一个固定6×6常数矩阵乘q。这里6×1输出是完整位姿的一种参数表示，4×4齐次矩阵仍用于坐标变换。
 
 **HOME点的六输入、六输出数值。** 使用同一理想化DH模型：
 
@@ -1933,7 +1890,7 @@ trace在内存记录，节点正常退出并join所有写入线程后才导出CS
 
 下面程序只读取本地URDF/xacro的XML关节字段并执行NumPy计算，不导入ROS、不连接SDK、不发布运动。依赖Python 3和NumPy。将代码保存为临时文件后，在仓库 `src/` 目录运行；也可将仓库 `src/` 绝对路径作为第一个参数。
 
-程序同时检查：URDF与DH的逐关节固定坐标变换关系、展开矩阵与DH连乘及闭式位姿的一致性、闭式雅可比与几何叉乘的一致性、原始URDF解析雅可比与位置/旋转中心差分的一致性，RPY提取后旋转重建、欧拉奇异分支、六维解析雅可比，以及DLS线性系统残差；并打印HOME六维输出与各级原点、第6.9及7.4节的数值。只检查运动学和积分，不执行碰撞检查、线程时序、流控或实机验证。
+程序从URDF读取六轴和工具长度，DH表、闭式位姿、闭式雅可比共用这些几何变量，不另行写死第二套长度；α和θ偏置采用第6.7.2节已验证的标准DH坐标约定。程序先检查原始axis、平移布局和固定旋转仍适用于此推导，再检查：理想化URDF与DH的逐关节固定坐标变换关系、展开矩阵与DH连乘及闭式位姿的一致性、闭式雅可比与几何叉乘的一致性、原始URDF解析雅可比与位置/旋转中心差分的一致性，RPY提取后旋转重建、欧拉奇异分支、六维解析雅可比，以及DLS线性系统残差；并打印参数来源、HOME六维输出与各级原点、第6.9及7.4节的数值。只检查运动学和积分，不执行碰撞检查、线程时序、流控或实机验证。
 
 ```python
 from pathlib import Path
@@ -1966,13 +1923,34 @@ def transform(r=None, p=(0., 0., 0.)):
 
 
 xml = ET.parse(URDF).getroot()
-origins = []
+origins, joint_xyz = [], []
 for name in NAMES:
-    origin = xml.find("joint[@name='%s']/origin" % name)
+    joint = xml.find("joint[@name='%s']" % name)
+    assert joint.attrib["type"] == "revolute"
+    assert np.array_equal(np.fromstring(joint.find("axis").attrib["xyz"], sep=" "),
+                          [0., 0., 1.]), "关节轴改变，需重新推导DH"
+    origin = joint.find("origin")
     xyz = np.fromstring(origin.attrib["xyz"], sep=" ")
     roll, pitch, yaw = np.fromstring(origin.attrib["rpy"], sep=" ")
     r = rotation("z", yaw) @ rotation("y", pitch) @ rotation("x", roll)
+    ideal_r = np.round(r)
+    assert np.max(np.abs(r-ideal_r)) < 2e-5, "固定旋转改变，不能直接沿用π/2近似"
+    assert np.array_equal(ideal_r.T @ ideal_r, np.eye(3))
+    assert np.linalg.det(ideal_r) == 1
+    joint_xyz.append(xyz)
     origins.append(transform(r, xyz))
+
+# 唯一长度来源：原始URDF。以下提取仅适用于本文已验证的关节布局。
+D1 = joint_xyz[0][2]
+A2_LEN = joint_xyz[2][0]
+A3_LEN = joint_xyz[3][0]
+D4 = joint_xyz[1][1]
+D5 = joint_xyz[4][1]
+D6 = -joint_xyz[5][1]
+expected_xyz = np.array([[0, 0, D1], [0, D4, 0], [A2_LEN, 0, 0],
+                         [A3_LEN, 0, 0], [0, D5, 0], [0, -D6, 0]])
+assert np.allclose(joint_xyz, expected_xyz, atol=1e-12, rtol=0), "平移布局改变，需重建DH"
+assert min(D1, A2_LEN, A3_LEN, D4, D5, D6) > 0
 # 读取当前模型的三个固定工具变换，避免漏掉TCP偏置。
 gripper_xml = ET.parse(ROOT / "aubo/aubo_description/urdf/jiazhua.urdf").getroot()
 arm_xml = ET.parse(ROOT / "aubo/aubo_description/urdf/aubo_i5_with_camera.xacro").getroot()
@@ -1984,7 +1962,11 @@ for tree, name in [(arm_xml, "ee_link_joint"),
     roll, pitch, yaw = np.fromstring(origin.attrib["rpy"], sep=" ")
     tool = tool @ transform(rotation("z", yaw) @ rotation("y", pitch)
                             @ rotation("x", roll), xyz)
-assert np.allclose(tool, transform(p=(0, 0, .12)), atol=1e-12, rtol=0)
+TOOL_LENGTH = tool[2, 3]
+assert np.allclose(tool, transform(p=(0, 0, TOOL_LENGTH)), atol=1e-12, rtol=0), "工具不再同轴，需重推闭式模型"
+ELL = D6 + TOOL_LENGTH
+print("URDF几何 d1,a2,a3,d4,d5,d6,lt (m):",
+      [D1, A2_LEN, A3_LEN, D4, D5, D6, TOOL_LENGTH])
 
 
 def forward(q, ideal=False):
@@ -2008,13 +1990,14 @@ def jacobian(q, ideal=False):
                             for z, o in zip(axes, points)])
 
 
-# 本文标准DH：a, alpha, d, theta_offset。
-DH = [(0, np.pi/2, .122, 0),
-      (.408, np.pi, 0, np.pi/2),
-      (.376, np.pi, 0, 0),
-      (0, np.pi/2, .1215, np.pi/2),
-      (0, np.pi/2, .1025, np.pi),
-      (0, 0, .094, 0)]
+# URDF几何的标准DH手算近似：a, alpha, d, theta_offset。
+# 数值计算基准仍是forward(q)，这里将固定旋转理想化为整倍数π/2。
+DH = [(0, np.pi/2, D1, 0),
+      (A2_LEN, np.pi, 0, np.pi/2),
+      (A3_LEN, np.pi, 0, 0),
+      (0, np.pi/2, D4, np.pi/2),
+      (0, np.pi/2, D5, np.pi),
+      (0, 0, D6, 0)]
 
 
 def forward_dh(q):
@@ -2031,17 +2014,17 @@ def expanded_matrices(q):
     s1, s2, s3, s4, s5, s6 = np.sin(q)
     return [
         np.array([[c1, 0, s1, 0], [s1, 0, -c1, 0],
-                  [0, 1, 0, .122], [0, 0, 0, 1]]),
-        np.array([[-s2, c2, 0, -.408*s2], [c2, s2, 0, .408*c2],
+                  [0, 1, 0, D1], [0, 0, 0, 1]]),
+        np.array([[-s2, c2, 0, -A2_LEN*s2], [c2, s2, 0, A2_LEN*c2],
                   [0, 0, -1, 0], [0, 0, 0, 1]]),
-        np.array([[c3, s3, 0, .376*c3], [s3, -c3, 0, .376*s3],
+        np.array([[c3, s3, 0, A3_LEN*c3], [s3, -c3, 0, A3_LEN*s3],
                   [0, 0, -1, 0], [0, 0, 0, 1]]),
         np.array([[-s4, 0, c4, 0], [c4, 0, s4, 0],
-                  [0, 1, 0, .1215], [0, 0, 0, 1]]),
+                  [0, 1, 0, D4], [0, 0, 0, 1]]),
         np.array([[-c5, 0, -s5, 0], [-s5, 0, c5, 0],
-                  [0, 1, 0, .1025], [0, 0, 0, 1]]),
+                  [0, 1, 0, D5], [0, 0, 0, 1]]),
         np.array([[c6, -s6, 0, 0], [s6, c6, 0, 0],
-                  [0, 0, 1, .094], [0, 0, 0, 1]])]
+                  [0, 0, 1, D6], [0, 0, 0, 1]])]
 
 
 def closed_terms(q):
@@ -2052,13 +2035,13 @@ def closed_terms(q):
     cp, sp = np.cos(psi), np.sin(psi)
     cg, sg = np.cos(gamma), np.sin(gamma)
     c5, s5 = np.cos(q5), np.sin(q5)
-    rho = -.408*np.sin(q2)-.376*sp-.1025*sg+.214*s5*cg
-    eta = .1215+.214*c5
-    height = .122+.408*np.cos(q2)+.376*cp+.1025*cg+.214*s5*sg
+    rho = -A2_LEN*np.sin(q2)-A3_LEN*sp-D5*sg+ELL*s5*cg
+    eta = D4+ELL*c5
+    height = D1+A2_LEN*np.cos(q2)+A3_LEN*cp+D5*cg+ELL*s5*sg
     return er, et, ez, cp, sp, cg, sg, c5, s5, rho, eta, height
 
 
-# 第6.7.7～6.7.8节直接给出的闭式位姿，不调用DH连乘。
+# 第6.7.7节最终矩阵的等价闭式位姿，不调用DH连乘。
 def forward_closed(q):
     er, et, ez, cp, sp, cg, sg, c5, s5, rho, eta, height = closed_terms(q)
     u = c5*cg*er+s5*et+c5*sg*ez
@@ -2098,17 +2081,17 @@ def pose_vector(q, ideal=False):
 def jacobian_closed(q):
     er, et, ez, cp, sp, cg, sg, c5, s5, rho, eta, height = closed_terms(q)
     q2 = q[1]
-    rho2 = -.408*np.cos(q2)-.376*cp-.1025*cg-.214*s5*sg
-    rho3 = .376*cp+.1025*cg+.214*s5*sg
-    rho4 = -.1025*cg-.214*s5*sg
+    rho2 = -A2_LEN*np.cos(q2)-A3_LEN*cp-D5*cg-ELL*s5*sg
+    rho3 = A3_LEN*cp+D5*cg+ELL*s5*sg
+    rho4 = -D5*cg-ELL*s5*sg
     zeta2 = rho
-    zeta3 = .376*sp+.1025*sg-.214*s5*cg
-    zeta4 = -.1025*sg+.214*s5*cg
+    zeta3 = A3_LEN*sp+D5*sg-ELL*s5*cg
+    zeta4 = -D5*sg+ELL*s5*cg
     linear = np.column_stack((eta*er+rho*et,
                               rho2*er+zeta2*ez,
                               rho3*er+zeta3*ez,
                               rho4*er+zeta4*ez,
-                              .214*(c5*cg*er+s5*et+c5*sg*ez),
+                              ELL*(c5*cg*er+s5*et+c5*sg*ez),
                               np.zeros(3)))
     angular = np.column_stack((ez, -et, et, -et, -sg*er+cg*ez,
                                s5*cg*er-c5*et+s5*sg*ez))
@@ -2119,8 +2102,8 @@ def jacobian_closed(q):
 ma = np.array([[-1, 0, 0], [0, 0, 1], [0, 1, 0]])
 mb = np.diag([1, -1, -1])
 mc = np.array([[1, 0, 0], [0, 0, -1], [0, 1, 0]])
-changes = [np.eye(4), transform(ma), transform(mb, (.408, 0, -.1215)),
-           transform(mb, (.376, 0, .1215)), transform(ma), transform(mc), np.eye(4)]
+changes = [np.eye(4), transform(ma), transform(mb, (A2_LEN, 0, -D4)),
+           transform(mb, (A3_LEN, 0, D4)), transform(ma), transform(mc), np.eye(4)]
 
 
 rng = np.random.default_rng(20261030)
@@ -2261,5 +2244,7 @@ python3 /tmp/aubo_jog_math_example.py \
 ```
 
 2026-11-02从文档提取上述程序运行：100组采样的DH/理想URDF最大矩阵元素差约 `7.77e-16`，闭式位姿/DH连乘最大元素差约 `6.94e-16`，闭式/几何雅可比最大元素差约 `3.33e-16`，逐关节Ci变换关系检查通过；HOME点原始URDF雅可比与中心差分的最大数值差约 `8.57e-11`，新增的100组姿态RPY重建及pitch=±π/2分支检查通过，HOME点解析雅可比与六维输出中心差分的最大差约 `1.68e-10`；DLS残差检查通过，四点积分结果与第7.4节一致。
+
+2026-11-04统一参数来源后重新提取并运行本节程序，全部断言通过。从当前URDF读取到 `d1,a2,a3,d4,d5,d6,lt=[0.122,0.408,0.376,0.1215,0.1025,0.094,0.120] m`；与修改前程序进行100组角度对照，原始URDF计算结果未变，DH连乘、闭式位姿及闭式雅可比在 `1e-14`容差内一致。理想DH与理想URDF最大矩阵元素差约 `7.49e-16`；HOME点理想DH减原始URDF的TCP位置差为 `(-0.000408141,0.002461937,0.002017596) mm`。这一区别来自固定旋转理想化，原始URDF仍是数值基准。
 
 其中 `/tmp/aubo_jog_math_example.py`是自行保存上面代码的路径，不是仓库已有控制脚本。若模型、工具或参数修改，必须重新计算并更新文中的表格；离线结果吻合只表示这些计算可以复现，不表示实机执行性能已通过验证。
