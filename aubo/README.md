@@ -45,6 +45,13 @@
 手眼标定结果验证集中在 [`aubo_handeye_validation`](aubo_handeye_validation/README.md)，
 直接复用驱动、MoveIt 和感知模块，不依赖分拣应用或分拣状态机。
 
+## 云端与手机网页
+
+[`aubo_cloud_bridge`](aubo_cloud_bridge/README.md) 提供 ThingsBoard Cloud 接入：
+上传分拣状态、步骤、队列和故障，配套可导入的电脑/手机网页工作台。
+远程任务通过已有 `/sorting/*` 服务执行；设备凭据从本机文件读取，默认只读接入。
+注册、部署、仪表盘导入和启用远程任务的步骤见该包说明。
+
 ## 源码阅读入口
 
 建议按“启动参数 → 感知消息 → 任务状态 → 执行动作”的顺序阅读：

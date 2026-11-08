@@ -1,0 +1,10 @@
+# MQTT endpoint from ThingsBoard Cloud > Device > Check connectivity.
+# Override host via launch; never put device access tokens in ROS parameters.
+port: 8883
+tls: true
+ca_file: ""                  # Empty = system CA trust store; certificate verification stays on.
+keepalive: 30
+publish_interval: 2.0       # Wall clock; unaffected by paused Gazebo /clock.
+service_wait: 1.0
+# Local disk; duplicate command IDs remain consumed across bridge restarts.
+journal_path: "~/.local/state/aubo_cloud_bridge/commands.sqlite3"

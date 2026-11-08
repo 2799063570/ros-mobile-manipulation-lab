@@ -1,0 +1,189 @@
+#!/usr/bin/env python3
+"""ThingsBoard Cloud MQTT adapter. No robot launch, SDK login or automatic motion."""
+import os
+import re
+import ssl
+import threading
+import time
+import uuid
+from pathlib import Path
+
+import paho.mqtt.client as mqtt
+import rosgraph
+import rospy
+from std_msgs.msg import String
+from std_srvs.srv import Trigger
+
+from aubo_cloud_bridge.commands import Dispatcher
+from aubo_cloud_bridge.protocol import (CommandJournal, Telemetry, METHODS,
+                                       TELEMETRY_TOPIC, RPC_PREFIX, RESPONSE_PREFIX,
+                                       decode_json, encode_json)
+
+
+class Bridge:
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.shutdown = threading.Event()
+        self.session = ''
+        self.available = False
+        self.health_checked = 0.0
+        self.last_command = '{}'
+        self.telemetry = Telemetry()
+        self.ns = rospy.get_param('~sorting_ns', '/sorting').rstrip('/')
+        self.enabled = rospy.get_param('~enable_commands', False)
+        self.interval = float(rospy.get_param('~publish_interval', 2.0))
+        self.service_wait = float(rospy.get_param('~service_wait', 1.0))
+        if not .5 <= self.interval <= 60 or not .1 <= self.service_wait <= 5:
+            raise ValueError('invalid publish interval or service wait')
+        journal_path = Path(os.path.expanduser(rospy.get_param('~journal_path')))
+        journal_path.parent.mkdir(parents=True, exist_ok=True)
+        journal = CommandJournal(str(journal_path))
+        token_path = Path(os.path.expanduser(rospy.get_param('~token_file')))
+        token = token_path.read_text(encoding='utf-8').strip()
+        if not token or any(ch.isspace() for ch in token):
+            raise ValueError('invalid token file')
+        # Ubuntu 20.04 apt ships Paho 1.x; also support the versioned Paho 2.x API.
+        if hasattr(mqtt, 'CallbackAPIVersion'):
+            self.client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
+                                      client_id='aubo-' + uuid.uuid4().hex, clean_session=True)
+            self.client.on_disconnect = self.on_disconnect_v2
+        else:
+            self.client = mqtt.Client(client_id='aubo-' + uuid.uuid4().hex, clean_session=True)
+            self.client.on_disconnect = self.on_disconnect_v1
+        self.client.username_pw_set(token)
+        self.client.max_queued_messages_set(8)
+        self.client.max_inflight_messages_set(4)
+        self.client.reconnect_delay_set(min_delay=1, max_delay=30)
+        if not rospy.get_param('~tls', True):
+            raise ValueError('TLS is required for the cloud bridge')
+        ca_file = rospy.get_param('~ca_file', '') or None
+        self.client.tls_set(ca_certs=ca_file, cert_reqs=ssl.CERT_REQUIRED)
+        self.client.on_connect = self.on_connect
+        self.client.on_message = self.on_message
+        self.dispatcher = Dispatcher(journal, self.execute, self.reply, self.report,
+                                     self.context, enabled=self.enabled)
+        self.subscribers = [rospy.Subscriber(self.ns + '/' + kind, String,
+                            self.ros_message, callback_args=kind, queue_size=1)
+                            for kind in ('state', 'progress', 'failure', 'detection_summary', 'target_cache')]
+        host = rospy.get_param('~host')
+        if not isinstance(host, str) or not re.fullmatch(r'[A-Za-z0-9.-]+', host):
+            raise ValueError('host must be an MQTT hostname without https://')
+        self.client.connect_async(host, int(rospy.get_param('~port', 8883)),
+                                  int(rospy.get_param('~keepalive', 30)))
+        self.client.loop_start()
+
+    def ros_message(self, message, kind):
+        try:
+            self.telemetry.update(kind, message.data)
+        except (ValueError, TypeError, OverflowError):
+            rospy.logwarn_throttle(10, 'Cloud bridge ignored malformed %s message', kind)
+
+    def on_connect(self, client, userdata, flags, reason_code, properties=None):
+        if reason_code != 0:
+            rospy.logwarn('ThingsBoard MQTT connection refused; check endpoint and local token file')
+            return
+        with self.lock:
+            self.session = uuid.uuid4().hex
+        # Clean MQTT session, no persistent/offline command backlog.
+        client.subscribe(RPC_PREFIX + '+', qos=1)
+        rospy.loginfo('ThingsBoard connected; remote task commands %s', 'enabled' if self.enabled else 'disabled')
+
+    def disconnected(self):
+        with self.lock:
+            self.session = ''
+
+    def on_disconnect_v1(self, client, userdata, rc):
+        self.disconnected()
+
+    def on_disconnect_v2(self, client, userdata, flags, reason_code, properties):
+        self.disconnected()
+
+    def context(self):
+        with self.lock:
+            return self.session, (self.available and time.monotonic() - self.health_checked < max(10, self.interval * 3)
+                                  and not self.shutdown.is_set())
+
+    def on_message(self, client, userdata, message):
+        if not message.topic.startswith(RPC_PREFIX):
+            return
+        request_id = message.topic[len(RPC_PREFIX):]
+        if not re.fullmatch(r'[0-9]{1,32}', request_id):
+            return
+        try:
+            if len(message.payload) > 4096:
+                raise ValueError('RPC too large')
+            document = decode_json(message.payload)
+        except (ValueError, UnicodeError):
+            self.reply(request_id, {'status': 'rejected', 'reason': 'malformed_rpc'})
+            return
+        self.dispatcher.submit(request_id, document, retained=message.retain)
+
+    def execute(self, method, guard):
+        service = self.ns + '/' + method
+        rospy.wait_for_service(service, timeout=self.service_wait)
+        if not guard():
+            return False, 'expired, disconnected or superseded by stop before service call'
+        # This call can block in ROS. At most one motion and one independent stop
+        # worker exist; neither blocks the MQTT network loop or telemetry loop.
+        response = rospy.ServiceProxy(service, Trigger)()
+        return response.success, response.message
+
+    def reply(self, request_id, result):
+        if self.client.is_connected():
+            # QoS 0 avoids delayed response queue replay into a new MQTT session.
+            self.client.publish(RESPONSE_PREFIX + request_id, encode_json(result), qos=0, retain=False)
+
+    def report(self, result):
+        with self.lock:
+            self.last_command = encode_json({**result, 'wall_stamp_ms': int(time.time() * 1000)})
+
+    def run(self):
+        master = rosgraph.Master(rospy.get_name())
+        while not rospy.is_shutdown() and not self.shutdown.is_set():
+            try:
+                publishers, _, services = master.getSystemState()
+                published = {name for name, nodes in publishers if nodes}
+                provided = {name for name, nodes in services if nodes}
+                available = (self.ns + '/state' in published and
+                             all(self.ns + '/' + method in provided for method in METHODS))
+            except Exception:
+                available = False
+            with self.lock:
+                self.available = available
+                self.health_checked = time.monotonic()
+                session, last_command = self.session, self.last_command
+            if session and self.client.is_connected():
+                values = self.telemetry.snapshot()
+                values.update(bridge_session=session, sorting_available=available,
+                              commands_enabled=self.enabled, last_command=last_command,
+                              bridge_wall_ms=int(time.time() * 1000), bridge_version='0.1.0')
+                # Publish the latest snapshot only. No offline sample backlog.
+                self.client.publish(TELEMETRY_TOPIC, encode_json(values), qos=0, retain=False)
+            self.shutdown.wait(self.interval)
+
+    def close(self):
+        self.shutdown.set()
+        self.disconnected()
+        self.client.disconnect()
+        self.client.loop_stop()
+
+
+def main():
+    rospy.init_node('aubo_cloud_bridge')
+    bridge = None
+    try:
+        bridge = Bridge()
+        rospy.on_shutdown(bridge.close)
+        bridge.run()
+    except Exception as error:
+        # Never print exception content: network libraries may include credentials.
+        rospy.logerr('Cloud bridge stopped (%s). Check host, token file, CA and writable journal path.', type(error).__name__)
+        return 1
+    finally:
+        if bridge is not None:
+            bridge.close()
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

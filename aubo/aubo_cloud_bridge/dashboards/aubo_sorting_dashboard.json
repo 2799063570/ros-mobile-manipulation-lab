@@ -1,0 +1,220 @@
+{
+  "title": "AUBO 智能分拣云工作台",
+  "configuration": {
+    "description": "Import AUBO widget bundle first, then bind alias to one device.",
+    "widgets": {
+      "a1b0c100-0000-4000-8000-000000000002": {
+        "id": "a1b0c100-0000-4000-8000-000000000002",
+        "typeFullFqn": "tenant.aubo_sorting_console",
+        "type": "latest",
+        "sizeX": 24,
+        "sizeY": 26,
+        "row": 0,
+        "col": 0,
+        "config": {
+          "title": "智能分拣工作台",
+          "showTitle": false,
+          "padding": "0px",
+          "backgroundColor": "#f2f5f9",
+          "color": "#17263a",
+          "dropShadow": false,
+          "enableFullscreen": true,
+          "settings": {},
+          "actions": {},
+          "datasources": [
+            {
+              "type": "entity",
+              "entityAliasId": "a1b0c100-0000-4000-8000-000000000001",
+              "dataKeys": [
+                {
+                  "name": "bridge_wall_ms",
+                  "label": "bridge_wall_ms",
+                  "type": "timeseries",
+                  "settings": {},
+                  "color": "#195ed8"
+                },
+                {
+                  "name": "bridge_session",
+                  "label": "bridge_session",
+                  "type": "timeseries",
+                  "settings": {},
+                  "color": "#195ed8"
+                },
+                {
+                  "name": "commands_enabled",
+                  "label": "commands_enabled",
+                  "type": "timeseries",
+                  "settings": {},
+                  "color": "#195ed8"
+                },
+                {
+                  "name": "sorting_available",
+                  "label": "sorting_available",
+                  "type": "timeseries",
+                  "settings": {},
+                  "color": "#195ed8"
+                },
+                {
+                  "name": "state",
+                  "label": "state",
+                  "type": "timeseries",
+                  "settings": {},
+                  "color": "#195ed8"
+                },
+                {
+                  "name": "state_detail",
+                  "label": "state_detail",
+                  "type": "timeseries",
+                  "settings": {},
+                  "color": "#195ed8"
+                },
+                {
+                  "name": "phase",
+                  "label": "phase",
+                  "type": "timeseries",
+                  "settings": {},
+                  "color": "#195ed8"
+                },
+                {
+                  "name": "description",
+                  "label": "description",
+                  "type": "timeseries",
+                  "settings": {},
+                  "color": "#195ed8"
+                },
+                {
+                  "name": "failure",
+                  "label": "failure",
+                  "type": "timeseries",
+                  "settings": {},
+                  "color": "#195ed8"
+                },
+                {
+                  "name": "detection_summary",
+                  "label": "detection_summary",
+                  "type": "timeseries",
+                  "settings": {},
+                  "color": "#195ed8"
+                },
+                {
+                  "name": "target_cache",
+                  "label": "target_cache",
+                  "type": "timeseries",
+                  "settings": {},
+                  "color": "#195ed8"
+                },
+                {
+                  "name": "target_cache_age_s",
+                  "label": "target_cache_age_s",
+                  "type": "timeseries",
+                  "settings": {},
+                  "color": "#195ed8"
+                },
+                {
+                  "name": "queue_total",
+                  "label": "queue_total",
+                  "type": "timeseries",
+                  "settings": {},
+                  "color": "#195ed8"
+                },
+                {
+                  "name": "queue_candidate",
+                  "label": "queue_candidate",
+                  "type": "timeseries",
+                  "settings": {},
+                  "color": "#195ed8"
+                },
+                {
+                  "name": "queue_ready",
+                  "label": "queue_ready",
+                  "type": "timeseries",
+                  "settings": {},
+                  "color": "#195ed8"
+                },
+                {
+                  "name": "queue_reserved",
+                  "label": "queue_reserved",
+                  "type": "timeseries",
+                  "settings": {},
+                  "color": "#195ed8"
+                },
+                {
+                  "name": "queue_done",
+                  "label": "queue_done",
+                  "type": "timeseries",
+                  "settings": {},
+                  "color": "#195ed8"
+                },
+                {
+                  "name": "queue_review",
+                  "label": "queue_review",
+                  "type": "timeseries",
+                  "settings": {},
+                  "color": "#195ed8"
+                },
+                {
+                  "name": "last_command",
+                  "label": "last_command",
+                  "type": "timeseries",
+                  "settings": {},
+                  "color": "#195ed8"
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "entityAliases": {
+      "a1b0c100-0000-4000-8000-000000000001": {
+        "id": "a1b0c100-0000-4000-8000-000000000001",
+        "alias": "AUBO 分拣设备",
+        "filter": {
+          "type": "deviceType",
+          "resolveMultiple": false,
+          "deviceType": "aubo_sorting",
+          "deviceNameFilter": ""
+        }
+      }
+    },
+    "states": {
+      "default": {
+        "name": "分拣工作台",
+        "root": true,
+        "layouts": {
+          "main": {
+            "widgets": {
+              "a1b0c100-0000-4000-8000-000000000002": {
+                "sizeX": 24,
+                "sizeY": 26,
+                "row": 0,
+                "col": 0
+              }
+            },
+            "gridSettings": {
+              "columns": 24,
+              "margin": 0,
+              "backgroundColor": "#f2f5f9",
+              "mobileAutoFillHeight": true,
+              "mobileRowHeight": 70
+            }
+          }
+        }
+      }
+    },
+    "settings": {
+      "stateControllerId": "entity",
+      "showTitle": false,
+      "showDashboardTimewindow": false
+    },
+    "timewindow": {
+      "realtime": {
+        "timewindowMs": 60000
+      },
+      "aggregation": {
+        "type": "NONE",
+        "limit": 200
+      }
+    }
+  }
+}

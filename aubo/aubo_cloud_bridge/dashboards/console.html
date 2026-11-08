@@ -1,0 +1,25 @@
+<main class="aubo-console">
+  <header><div><span class="eyebrow">AUBO / CLOUD WORKSTATION</span><h1>智能分拣工作台</h1></div><span class="badge" [class.online]="vm.fresh">{{vm.link}}</span></header>
+  <p class="muted">{{vm.updated}} · {{vm.controlMode}}</p>
+  <section class="metrics">
+    <article><label>任务状态</label><strong>{{vm.state}}</strong><small>{{vm.detail}}</small></article>
+    <article><label>当前步骤</label><strong>{{vm.phase || '等待数据'}}</strong><small>{{vm.description}}</small></article>
+    <article><label>当前队列</label><strong>{{vm.total}} <em>个目标</em></strong><small>可领取 {{vm.ready}} / 执行中 {{vm.reserved}}</small></article>
+    <article><label>本轮流程完成</label><strong>{{vm.done}}</strong><small>队列快照计数；不代表实物验证成功</small></article>
+  </section>
+  <section class="panel"><h2>任务控制</h2><div class="controls">
+    <button (click)="send('move_to_observation')" [disabled]="!vm.canMove">前往观察位</button>
+    <button class="primary" (click)="send('start')" [disabled]="!vm.canStart">开始分拣</button>
+    <button (click)="send('home')" [disabled]="!vm.canMove">返回结束位</button>
+    <button class="stop" (click)="send('stop')" [disabled]="!vm.canStop">停止任务</button>
+  </div><p class="muted">{{vm.rpcMessage || '观察并确认目标后再开始。软件停止不能替代现场硬件急停。'}}</p>
+    <p class="result">最近指令：{{vm.lastCommand}}</p>
+  </section>
+  <section class="panel"><h2>目标实例 <span class="muted">{{vm.queueAge}}</span></h2>
+    <div class="table-wrap"><table><thead><tr><th>ID</th><th>类别</th><th>队列状态</th><th>检测置信度</th></tr></thead><tbody>
+      <tr *ngFor="let row of vm.rows"><td>#{{row.id}}</td><td>{{row.category}}</td><td>{{row.label}}</td><td>{{row.confidence}}</td></tr>
+      <tr *ngIf="!vm.rows.length"><td colspan="4">暂无目标数据</td></tr>
+    </tbody></table></div>
+  </section>
+  <section class="panel"><h2>诊断信息</h2><p class="failure">{{vm.failure || '暂无故障报告'}}</p><p class="muted">{{vm.summary}}</p><p class="muted">桥接在线仅说明云链路正常；ROS 接口注册状态不等于机械臂已就绪。状态与队列保留最后快照，请结合更新时间判断。</p></section>
+</main>
