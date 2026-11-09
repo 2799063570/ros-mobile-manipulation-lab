@@ -1,0 +1,321 @@
+{
+  "version": "1.0",
+  "profile": {
+    "ProductId": "YOUR_PRODUCT_ID"
+  },
+  "properties": [
+    {
+      "id": "state",
+      "name": "state",
+      "desc": "",
+      "required": false,
+      "mode": "r",
+      "define": {
+        "type": "string",
+        "min": "0",
+        "max": "64"
+      }
+    },
+    {
+      "id": "state_detail",
+      "name": "state_detail",
+      "desc": "",
+      "required": false,
+      "mode": "r",
+      "define": {
+        "type": "string",
+        "min": "0",
+        "max": "512"
+      }
+    },
+    {
+      "id": "phase",
+      "name": "phase",
+      "desc": "",
+      "required": false,
+      "mode": "r",
+      "define": {
+        "type": "string",
+        "min": "0",
+        "max": "128"
+      }
+    },
+    {
+      "id": "description",
+      "name": "description",
+      "desc": "",
+      "required": false,
+      "mode": "r",
+      "define": {
+        "type": "string",
+        "min": "0",
+        "max": "512"
+      }
+    },
+    {
+      "id": "failure",
+      "name": "failure",
+      "desc": "",
+      "required": false,
+      "mode": "r",
+      "define": {
+        "type": "string",
+        "min": "0",
+        "max": "512"
+      }
+    },
+    {
+      "id": "detection_summary",
+      "name": "detection_summary",
+      "desc": "",
+      "required": false,
+      "mode": "r",
+      "define": {
+        "type": "string",
+        "min": "0",
+        "max": "512"
+      }
+    },
+    {
+      "id": "bridge_wall_ms",
+      "name": "bridge_wall_ms",
+      "desc": "",
+      "required": false,
+      "mode": "r",
+      "define": {
+        "type": "string",
+        "min": "0",
+        "max": "20"
+      }
+    },
+    {
+      "id": "bridge_session",
+      "name": "bridge_session",
+      "desc": "",
+      "required": false,
+      "mode": "r",
+      "define": {
+        "type": "string",
+        "min": "0",
+        "max": "64"
+      }
+    },
+    {
+      "id": "bridge_context",
+      "name": "bridge_context",
+      "desc": "",
+      "required": false,
+      "mode": "r",
+      "define": {
+        "type": "string",
+        "min": "0",
+        "max": "512"
+      }
+    },
+    {
+      "id": "target_cache",
+      "name": "target_cache",
+      "desc": "",
+      "required": false,
+      "mode": "r",
+      "define": {
+        "type": "string",
+        "min": "0",
+        "max": "2048"
+      }
+    },
+    {
+      "id": "last_command",
+      "name": "last_command",
+      "desc": "",
+      "required": false,
+      "mode": "r",
+      "define": {
+        "type": "string",
+        "min": "0",
+        "max": "1024"
+      }
+    },
+    {
+      "id": "commands_enabled",
+      "name": "commands_enabled",
+      "required": false,
+      "mode": "r",
+      "define": {
+        "type": "bool",
+        "mapping": {
+          "0": "否",
+          "1": "是"
+        }
+      }
+    },
+    {
+      "id": "sorting_available",
+      "name": "sorting_available",
+      "required": false,
+      "mode": "r",
+      "define": {
+        "type": "bool",
+        "mapping": {
+          "0": "否",
+          "1": "是"
+        }
+      }
+    },
+    {
+      "id": "target_cache_truncated",
+      "name": "目标列表已截断",
+      "required": false,
+      "mode": "r",
+      "define": {
+        "type": "bool",
+        "mapping": {
+          "0": "否",
+          "1": "是"
+        }
+      }
+    },
+    {
+      "id": "queue_total",
+      "name": "queue_total",
+      "required": false,
+      "mode": "r",
+      "define": {
+        "type": "int",
+        "min": "0",
+        "max": "200",
+        "start": "0",
+        "step": "1",
+        "unit": ""
+      }
+    },
+    {
+      "id": "queue_candidate",
+      "name": "queue_candidate",
+      "required": false,
+      "mode": "r",
+      "define": {
+        "type": "int",
+        "min": "0",
+        "max": "200",
+        "start": "0",
+        "step": "1",
+        "unit": ""
+      }
+    },
+    {
+      "id": "queue_ready",
+      "name": "queue_ready",
+      "required": false,
+      "mode": "r",
+      "define": {
+        "type": "int",
+        "min": "0",
+        "max": "200",
+        "start": "0",
+        "step": "1",
+        "unit": ""
+      }
+    },
+    {
+      "id": "queue_reserved",
+      "name": "queue_reserved",
+      "required": false,
+      "mode": "r",
+      "define": {
+        "type": "int",
+        "min": "0",
+        "max": "200",
+        "start": "0",
+        "step": "1",
+        "unit": ""
+      }
+    },
+    {
+      "id": "queue_done",
+      "name": "queue_done",
+      "required": false,
+      "mode": "r",
+      "define": {
+        "type": "int",
+        "min": "0",
+        "max": "200",
+        "start": "0",
+        "step": "1",
+        "unit": ""
+      }
+    },
+    {
+      "id": "queue_review",
+      "name": "queue_review",
+      "required": false,
+      "mode": "r",
+      "define": {
+        "type": "int",
+        "min": "0",
+        "max": "200",
+        "start": "0",
+        "step": "1",
+        "unit": ""
+      }
+    },
+    {
+      "id": "target_cache_shown",
+      "name": "target_cache_shown",
+      "required": false,
+      "mode": "r",
+      "define": {
+        "type": "int",
+        "min": "0",
+        "max": "200",
+        "start": "0",
+        "step": "1",
+        "unit": ""
+      }
+    },
+    {
+      "id": "target_cache_age_s",
+      "name": "快照接收年龄",
+      "required": false,
+      "mode": "r",
+      "define": {
+        "type": "float",
+        "min": "-1",
+        "max": "2147483647",
+        "start": "-1",
+        "step": "0.1",
+        "unit": "s"
+      }
+    }
+  ],
+  "events": [],
+  "actions": [
+    {
+      "id": "task_command",
+      "name": "分拣任务请求",
+      "desc": "接收反馈不表示机械动作完成",
+      "input": [
+        {
+          "id": "request",
+          "name": "带会话及有效期的请求",
+          "define": {
+            "type": "string",
+            "min": "1",
+            "max": "1024"
+          }
+        }
+      ],
+      "output": [
+        {
+          "id": "result",
+          "name": "任务请求反馈",
+          "define": {
+            "type": "string",
+            "min": "1",
+            "max": "1024"
+          }
+        }
+      ]
+    }
+  ]
+}

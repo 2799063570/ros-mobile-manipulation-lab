@@ -1,0 +1,9 @@
+{
+  "description": "AUBO 腾讯云分拣工作台",
+  "projectname": "aubo-tencent-console",
+  "appid": "touristappid",
+  "compileType": "miniprogram",
+  "miniprogramRoot": "miniprogram/",
+  "cloudfunctionRoot": "cloudfunctions/",
+  "setting": {"es6": true, "minified": true, "urlCheck": true}
+}

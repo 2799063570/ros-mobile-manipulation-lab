@@ -1,0 +1,8 @@
+{
+  "product_id": "YOUR_PRODUCT_ID",
+  "device_name": "aubo-sorter-01",
+  "host": "COPY_MQTT_HOST_FROM_TENCENT_CONSOLE",
+  "ca_file": "~/.config/aubo/tencent/ca.crt",
+  "cert_file": "~/.config/aubo/tencent/device.crt",
+  "key_file": "~/.config/aubo/tencent/device.key"
+}

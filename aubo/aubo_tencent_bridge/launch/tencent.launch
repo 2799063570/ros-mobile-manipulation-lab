@@ -1,0 +1,11 @@
+<launch>
+  <arg name="credentials_file" default="$(env HOME)/.config/aubo/tencent/device.json"/>
+  <arg name="enable_commands" default="false"/>
+  <arg name="sorting_ns" default="/sorting"/>
+  <node pkg="aubo_tencent_bridge" type="tencent_bridge" name="aubo_tencent_bridge" output="screen">
+    <rosparam command="load" file="$(find aubo_tencent_bridge)/config/tencent.yaml"/>
+    <param name="credentials_file" value="$(arg credentials_file)"/>
+    <param name="enable_commands" value="$(arg enable_commands)"/>
+    <param name="sorting_ns" value="$(arg sorting_ns)"/>
+  </node>
+</launch>

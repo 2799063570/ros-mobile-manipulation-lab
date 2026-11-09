@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+*.sqlite3*
+*.pem
+*.key
+*.crt
+device.json

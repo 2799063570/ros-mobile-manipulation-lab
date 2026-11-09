@@ -1,0 +1,3 @@
+page { background: #f2f5f9; color: #17263a; font-family: sans-serif; }
+button { font-size: 28rpx; }
+button::after { border: 0; }

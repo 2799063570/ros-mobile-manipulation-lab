@@ -1,0 +1,6 @@
+# Certificates and device identity are read from credentials_file, outside the repository.
+port: 8883
+keepalive: 30
+publish_interval: 2.0
+service_wait: 1.0
+journal_path: "~/.local/state/aubo_tencent_bridge/commands.sqlite3"

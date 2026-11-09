@@ -1,0 +1,6 @@
+{
+  "host": "COPY_DEVICE_MQTTS_HOST_FROM_IOTDA_CONSOLE",
+  "device_id": "YOUR_DEVICE_ID",
+  "device_secret": "YOUR_DEVICE_SECRET",
+  "ca_file": ""
+}

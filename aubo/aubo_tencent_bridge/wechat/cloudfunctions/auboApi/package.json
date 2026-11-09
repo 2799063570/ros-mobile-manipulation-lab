@@ -1,0 +1,7 @@
+{
+  "name": "aubo-tencent-api",
+  "version": "0.1.0",
+  "private": true,
+  "main": "index.js",
+  "dependencies": {"wx-server-sdk": "4.0.2", "tencentcloud-sdk-nodejs-iotexplorer": "4.1.336"}
+}

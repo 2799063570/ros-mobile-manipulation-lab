@@ -1,0 +1,9 @@
+port: 8883
+keepalive: 60
+publish_interval: 30.0
+service_wait: 1.0
+journal_path: "~/.local/state/aubo_huawei_bridge/commands.sqlite3"
+budget_path: "~/.local/state/aubo_huawei_bridge/publish_budget.sqlite3"
+# Local outgoing units only. Device downlink and other devices also consume the instance quota.
+outgoing_units_per_24h: 4000
+reply_reserve: 100

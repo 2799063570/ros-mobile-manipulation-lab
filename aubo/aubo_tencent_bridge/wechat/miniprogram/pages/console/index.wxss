@@ -1,0 +1,29 @@
+.screen { padding: 32rpx 24rpx 56rpx; }
+.header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24rpx; }
+.eyebrow { color: #62758d; font-size: 22rpx; letter-spacing: 2rpx; }
+.title { font-size: 48rpx; font-weight: 700; margin-top: 8rpx; }
+.badge { border-radius: 40rpx; padding: 12rpx 20rpx; background: #e2e8f0; color: #526279; font-size: 24rpx; }
+.online { color: #176a4d; background: #dff4e9; }
+.demo { padding: 20rpx; border-radius: 16rpx; background: #fff0cb; color: #815b13; margin-bottom: 20rpx; font-size: 26rpx; }
+.device { padding: 20rpx 24rpx; background: #fff; border-radius: 16rpx; font-size: 28rpx; }
+.subtitle { font-size: 24rpx; color: #62758d; line-height: 1.8; margin: 16rpx 0 24rpx; }
+.metrics { display: flex; flex-wrap: wrap; justify-content: space-between; }
+.card { box-sizing: border-box; width: 48.5%; background: #fff; border-radius: 20rpx; padding: 24rpx; margin-bottom: 20rpx; }
+.label { color: #62758d; font-size: 24rpx; }
+.value { font-size: 36rpx; font-weight: 700; margin: 16rpx 0; overflow-wrap: break-word; }
+.small { color: #62758d; font-size: 23rpx; line-height: 1.7; word-break: break-all; }
+.panel { background: #fff; border-radius: 20rpx; padding: 28rpx; margin-bottom: 24rpx; }
+.heading { font-size: 30rpx; font-weight: 700; margin-bottom: 24rpx; }
+.controls { display: flex; flex-wrap: wrap; justify-content: space-between; }
+.controls button { width: 48%; margin: 0 0 20rpx; padding: 0 4rpx; color: #28466e; background: #edf2f9; }
+.controls .primary { background: #195ed8; color: #fff; }
+.controls .stop { background: #fde7e7; color: #a82222; }
+.controls button[disabled] { background: #f0f2f5; color: #a1aaba; }
+.feedback { font-size: 26rpx; line-height: 1.7; margin-bottom: 16rpx; }
+.row { display: flex; padding: 20rpx 0; border-bottom: 1rpx solid #edf1f5; font-size: 24rpx; }
+.row text { width: 25%; overflow-wrap: break-word; }
+.table-head { color: #62758d; font-weight: 700; }
+.empty { padding: 24rpx 0; }
+.failure { font-size: 26rpx; margin-bottom: 16rpx; }
+.refresh { background: #e6edf9; color: #195ed8; }
+.identity { font-size: 21rpx; line-height: 1.7; color: #73849a; margin-top: 28rpx; word-break: break-all; }

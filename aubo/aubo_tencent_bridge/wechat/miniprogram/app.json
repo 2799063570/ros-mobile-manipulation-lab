@@ -1,0 +1,9 @@
+{
+  "pages": ["pages/console/index"],
+  "window": {
+    "navigationBarTitleText": "AUBO 分拣工作台",
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f2f5f9"
+  }
+}

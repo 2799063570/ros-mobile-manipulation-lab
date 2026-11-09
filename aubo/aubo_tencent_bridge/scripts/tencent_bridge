@@ -1,0 +1,194 @@
+#!/usr/bin/env python3
+"""Certificate-authenticated Tencent IoT Explorer bridge. Does not launch a robot."""
+import os
+from pathlib import Path
+import re
+import ssl
+import threading
+import time
+import uuid
+
+import paho.mqtt.client as mqtt
+import rosgraph
+import rospy
+from std_msgs.msg import String
+from std_srvs.srv import Trigger
+from aubo_cloud_bridge.commands import Dispatcher
+from aubo_cloud_bridge.protocol import CommandJournal, Telemetry, METHODS, decode_json, encode_json
+from aubo_tencent_bridge.iot import (action_request, action_reply, bounded_result,
+                                    properties, topics, valid_token)
+
+
+class Bridge:
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.shutdown = threading.Event()
+        self.session = ''
+        self.available = False
+        self.health_checked = 0.0
+        self.last_command = {}
+        self.telemetry = Telemetry()
+        self.ns = rospy.get_param('~sorting_ns', '/sorting').rstrip('/')
+        self.enabled = rospy.get_param('~enable_commands', False)
+        self.interval = float(rospy.get_param('~publish_interval', 2))
+        self.service_wait = float(rospy.get_param('~service_wait', 1))
+        if not .5 <= self.interval <= 5 or not .1 <= self.service_wait <= 2:
+            raise ValueError('invalid_interval_or_wait')
+        credentials = decode_json(Path(os.path.expanduser(
+            rospy.get_param('~credentials_file'))).read_text(encoding='utf-8'))
+        product, device = credentials['product_id'], credentials['device_name']
+        if not all(isinstance(x, str) and re.fullmatch(r'[A-Za-z0-9_-]{1,64}', x)
+                   for x in (product, device)):
+            raise ValueError('invalid_device_identity')
+        host = credentials['host']
+        if not isinstance(host, str) or not re.fullmatch(r'[A-Za-z0-9.-]+', host):
+            raise ValueError('invalid_mqtt_hostname')
+        self.topics = topics(product, device)
+        if hasattr(mqtt, 'CallbackAPIVersion'):
+            self.client = mqtt.Client(callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
+                client_id=product + device, clean_session=True)
+            self.client.on_disconnect = self.on_disconnect_v2
+        else:
+            self.client = mqtt.Client(client_id=product + device, clean_session=True)
+            self.client.on_disconnect = self.on_disconnect_v1
+        # Certificate authentication ignores the password. Username fields follow Tencent's protocol.
+        username = '%s%s;12010126;%s;%d' % (product, device, uuid.uuid4().hex[:6],
+                                           int(time.time()) + 365 * 86400)
+        self.client.username_pw_set(username, 'certificate')
+        context = ssl.create_default_context(cafile=os.path.expanduser(credentials['ca_file']))
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
+        context.load_cert_chain(os.path.expanduser(credentials['cert_file']),
+                                os.path.expanduser(credentials['key_file']))
+        self.client.tls_set_context(context)
+        self.client.max_queued_messages_set(8)
+        self.client.max_inflight_messages_set(4)
+        self.client.reconnect_delay_set(min_delay=1, max_delay=30)
+        self.client.on_connect = self.on_connect
+        self.client.on_message = self.on_message
+        journal_path = Path(os.path.expanduser(rospy.get_param('~journal_path')))
+        journal_path.parent.mkdir(parents=True, exist_ok=True)
+        self.journal = CommandJournal(str(journal_path))
+        self.dispatcher = Dispatcher(self.journal, self.execute, self.reply, self.report,
+                                     self.context, enabled=self.enabled)
+        self.subscribers = [rospy.Subscriber(self.ns + '/' + kind, String, self.ros_message,
+            callback_args=kind, queue_size=1) for kind in (
+                'state', 'progress', 'failure', 'detection_summary', 'target_cache')]
+        self.client.connect_async(host, int(rospy.get_param('~port', 8883)),
+                                  int(rospy.get_param('~keepalive', 30)))
+        self.client.loop_start()
+
+    def on_connect(self, client, userdata, flags, reason_code, properties=None):
+        if reason_code != 0:
+            self.disconnected()
+            rospy.logwarn('Tencent MQTT refused connection; check local certificates and endpoint')
+            return
+        with self.lock:
+            self.session = uuid.uuid4().hex
+        client.subscribe([(self.topics['request'], 1), (self.topics['report_reply'], 0)])
+        rospy.loginfo('Tencent IoT Explorer connected; task commands %s',
+                      'enabled' if self.enabled else 'disabled')
+
+    def disconnected(self):
+        with self.lock:
+            self.session = ''
+
+    def on_disconnect_v1(self, client, userdata, rc):
+        self.disconnected()
+
+    def on_disconnect_v2(self, client, userdata, flags, reason_code, properties):
+        self.disconnected()
+
+    def context(self):
+        with self.lock:
+            return self.session, (self.available and not self.shutdown.is_set()
+                and time.monotonic() - self.health_checked < 10)
+
+    def ros_message(self, message, kind):
+        try:
+            self.telemetry.update(kind, message.data)
+        except (ValueError, TypeError, OverflowError):
+            rospy.logwarn_throttle(10, 'Tencent bridge ignored malformed %s', kind)
+
+    def on_message(self, client, userdata, message):
+        if message.topic not in (self.topics['request'], self.topics['report_reply']):
+            return
+        token = None
+        try:
+            if len(message.payload) > 8192:
+                raise ValueError('message_too_large')
+            data = decode_json(message.payload)
+            if message.topic == self.topics['report_reply']:
+                if isinstance(data, dict) and data.get('code', 0) != 0:
+                    rospy.logwarn_throttle(10, 'Tencent rejected a property report; check thing model')
+                return
+            token = data.get('clientToken') if isinstance(data, dict) else None
+            token, document = action_request(data)
+            self.dispatcher.submit(token, document, retained=message.retain)
+        except (ValueError, TypeError, UnicodeError):
+            if valid_token(token):
+                self.reply(token, {'status': 'rejected', 'reason': 'malformed_action'})
+
+    def execute(self, method, guard):
+        service = self.ns + '/' + method
+        rospy.wait_for_service(service, timeout=self.service_wait)
+        if not guard():
+            return False, 'expired, disconnected or cancelled before ROS call'
+        return_value = rospy.ServiceProxy(service, Trigger)()
+        return return_value.success, return_value.message
+
+    def reply(self, token, result):
+        if self.client.is_connected():
+            self.client.publish(self.topics['reply'], encode_json(action_reply(token, result)),
+                                qos=0, retain=False)
+
+    def report(self, result):
+        with self.lock:
+            self.last_command = bounded_result({**result, 'wall_stamp_ms': int(time.time() * 1000)})
+
+    def run(self):
+        master = rosgraph.Master(rospy.get_name())
+        while not rospy.is_shutdown() and not self.shutdown.is_set():
+            try:
+                publishers, _, services = master.getSystemState()
+                published = {name for name, nodes in publishers if nodes}
+                provided = {name for name, nodes in services if nodes}
+                available = (self.ns + '/state' in published and
+                    all(self.ns + '/' + method in provided for method in METHODS))
+            except Exception:
+                available = False
+            with self.lock:
+                self.available, self.health_checked = available, time.monotonic()
+                session, last = self.session, dict(self.last_command)
+            if session and self.client.is_connected():
+                values = properties(self.telemetry.snapshot(), session, available, self.enabled,
+                                    last, int(time.time() * 1000))
+                payload = {'method': 'report', 'clientToken': uuid.uuid4().hex, 'params': values}
+                self.client.publish(self.topics['report'], encode_json(payload), qos=0, retain=False)
+            self.shutdown.wait(self.interval)
+
+    def close(self):
+        self.shutdown.set()
+        self.disconnected()
+        self.client.disconnect()
+        self.client.loop_stop()
+
+
+def main():
+    rospy.init_node('aubo_tencent_bridge')
+    bridge = None
+    try:
+        bridge = Bridge()
+        rospy.on_shutdown(bridge.close)
+        bridge.run()
+    except Exception as error:
+        rospy.logerr('Tencent bridge stopped (%s). Check credentials_file, certificates, host and journal.',
+                     type(error).__name__)
+        return 1
+    finally:
+        if bridge is not None:
+            bridge.close()
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

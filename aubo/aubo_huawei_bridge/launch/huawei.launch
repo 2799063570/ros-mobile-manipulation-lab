@@ -1,0 +1,11 @@
+<launch>
+  <arg name="credentials_file" default="$(env HOME)/.config/aubo/huawei/device.json"/>
+  <arg name="enable_commands" default="false"/>
+  <arg name="sorting_ns" default="/sorting"/>
+  <node pkg="aubo_huawei_bridge" type="huawei_bridge" name="aubo_huawei_bridge" output="screen">
+    <rosparam command="load" file="$(find aubo_huawei_bridge)/config/huawei.yaml"/>
+    <param name="credentials_file" value="$(arg credentials_file)"/>
+    <param name="enable_commands" value="$(arg enable_commands)"/>
+    <param name="sorting_ns" value="$(arg sorting_ns)"/>
+  </node>
+</launch>

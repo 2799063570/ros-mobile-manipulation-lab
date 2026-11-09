@@ -1,0 +1,6 @@
+{
+  "WX_APP_ID": "YOUR_WECHAT_APPID",
+  "IOT_REGION": "ap-guangzhou",
+  "IOT_DEVICES": "{\"sorter-01\":{\"ProductId\":\"YOUR_PRODUCT_ID\",\"DeviceName\":\"aubo-sorter-01\"}}",
+  "ENABLE_COMMANDS": "false"
+}

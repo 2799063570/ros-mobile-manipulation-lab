@@ -1,0 +1,29 @@
+<view class="screen">
+  <view class="header"><view><text class="eyebrow">AUBO · 微信工作台</text><view class="title">智能分拣</view></view><text class="badge {{vm.fresh ? 'online' : ''}}">{{vm.link}}</text></view>
+  <view wx:if="{{demo}}" class="demo">演示模式 · 当前显示样例数据，未连接机器人</view>
+  <picker wx:if="{{devices.length}}" range="{{devices}}" range-key="id" value="{{deviceIndex}}" bindchange="selectDevice" disabled="{{switchingDisabled}}"><view class="device">设备：{{device}} ▾</view></picker>
+  <view class="subtitle">{{vm.mode}}<view>最近上报：{{vm.updated}}</view></view>
+  <view class="metrics">
+    <view class="card"><text class="label">任务状态</text><view class="value">{{vm.state}}</view><text class="small">{{vm.detail}}</text></view>
+    <view class="card"><text class="label">当前步骤</text><view class="value">{{vm.phase}}</view><text class="small">{{vm.description}}</text></view>
+    <view class="card"><text class="label">当前队列</text><view class="value">{{vm.total}}</view><text class="small">可领取 {{vm.ready}} / 执行中 {{vm.reserved}}</text></view>
+    <view class="card"><text class="label">本轮流程完成</text><view class="value">{{vm.done}}</view><text class="small">当前队列快照计数</text></view>
+  </view>
+  <view class="panel"><view class="heading">任务控制</view><view class="controls">
+    <button bindtap="send" data-method="move_to_observation" disabled="{{!vm.canMove}}">前往观察位</button>
+    <button class="primary" bindtap="send" data-method="start" disabled="{{!vm.canStart}}">开始分拣</button>
+    <button bindtap="send" data-method="home" disabled="{{!vm.canMove}}">返回结束位</button>
+    <button class="stop" bindtap="send" data-method="stop" disabled="{{!vm.canStop}}">停止任务</button>
+  </view><view class="feedback">{{message || '观察并确认目标后再开始。软件停止不能替代现场硬件急停。'}}</view>
+    <view class="small">最近指令：{{vm.lastCommand}}</view>
+  </view>
+  <view class="panel"><view class="heading">目标实例</view>
+    <view class="row table-head"><text>ID</text><text>类别</text><text>状态</text><text>置信度</text></view>
+    <view wx:for="{{vm.rows}}" wx:key="id" class="row"><text>#{{item.id}}</text><text>{{item.category}}</text><text>{{item.label}}</text><text>{{item.confidence}}</text></view>
+    <view wx:if="{{!vm.rows.length}}" class="small empty">暂无目标数据</view>
+    <view wx:if="{{vm.truncated}}" class="small">列表为部分目标，队列计数保留完整统计。</view>
+  </view>
+  <view class="panel"><view class="heading">诊断信息</view><view class="failure">{{vm.failure}}</view><view class="small">{{vm.summary}}</view><view class="small">云链路在线表示心跳有效；请结合本地分拣状态判断设备是否就绪。</view></view>
+  <button class="refresh" bindtap="refresh" loading="{{loading}}">刷新状态</button>
+  <view wx:if="{{openid}}" class="identity" bindtap="copyOpenid">当前用户 OpenID（点击复制）：<view selectable="{{true}}">{{openid}}</view></view>
+</view>

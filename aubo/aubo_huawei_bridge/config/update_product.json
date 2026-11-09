@@ -1,0 +1,211 @@
+{
+  "service_capabilities": [
+    {
+      "service_id": "Sorting",
+      "service_type": "Sorting",
+      "properties": [
+        {
+          "property_name": "state",
+          "data_type": "string",
+          "method": "R",
+          "required": false,
+          "max_length": 64
+        },
+        {
+          "property_name": "state_detail",
+          "data_type": "string",
+          "method": "R",
+          "required": false,
+          "max_length": 160
+        },
+        {
+          "property_name": "phase",
+          "data_type": "string",
+          "method": "R",
+          "required": false,
+          "max_length": 96
+        },
+        {
+          "property_name": "description",
+          "data_type": "string",
+          "method": "R",
+          "required": false,
+          "max_length": 160
+        },
+        {
+          "property_name": "failure",
+          "data_type": "string",
+          "method": "R",
+          "required": false,
+          "max_length": 160
+        },
+        {
+          "property_name": "detection_summary",
+          "data_type": "string",
+          "method": "R",
+          "required": false,
+          "max_length": 160
+        },
+        {
+          "property_name": "bridge_wall_ms",
+          "data_type": "string",
+          "method": "R",
+          "required": false,
+          "max_length": 20
+        },
+        {
+          "property_name": "bridge_session",
+          "data_type": "string",
+          "method": "R",
+          "required": false,
+          "max_length": 32
+        },
+        {
+          "property_name": "target_cache",
+          "data_type": "string",
+          "method": "R",
+          "required": false,
+          "max_length": 1200
+        },
+        {
+          "property_name": "last_command",
+          "data_type": "string",
+          "method": "R",
+          "required": false,
+          "max_length": 512
+        },
+        {
+          "property_name": "commands_enabled",
+          "data_type": "int",
+          "method": "R",
+          "required": false,
+          "min": "0",
+          "max": "1"
+        },
+        {
+          "property_name": "sorting_available",
+          "data_type": "int",
+          "method": "R",
+          "required": false,
+          "min": "0",
+          "max": "1"
+        },
+        {
+          "property_name": "target_cache_truncated",
+          "data_type": "int",
+          "method": "R",
+          "required": false,
+          "min": "0",
+          "max": "1"
+        },
+        {
+          "property_name": "queue_total",
+          "data_type": "int",
+          "method": "R",
+          "required": false,
+          "min": "0",
+          "max": "200"
+        },
+        {
+          "property_name": "queue_candidate",
+          "data_type": "int",
+          "method": "R",
+          "required": false,
+          "min": "0",
+          "max": "200"
+        },
+        {
+          "property_name": "queue_ready",
+          "data_type": "int",
+          "method": "R",
+          "required": false,
+          "min": "0",
+          "max": "200"
+        },
+        {
+          "property_name": "queue_reserved",
+          "data_type": "int",
+          "method": "R",
+          "required": false,
+          "min": "0",
+          "max": "200"
+        },
+        {
+          "property_name": "queue_done",
+          "data_type": "int",
+          "method": "R",
+          "required": false,
+          "min": "0",
+          "max": "200"
+        },
+        {
+          "property_name": "queue_review",
+          "data_type": "int",
+          "method": "R",
+          "required": false,
+          "min": "0",
+          "max": "200"
+        },
+        {
+          "property_name": "target_cache_age_s",
+          "data_type": "decimal",
+          "method": "R",
+          "required": false,
+          "min": "-1",
+          "max": "2147483647",
+          "step": 0.1
+        }
+      ],
+      "commands": [
+        {
+          "command_name": "task_command",
+          "paras": [
+            {
+              "para_name": "method",
+              "data_type": "string",
+              "required": true,
+              "max_length": 32
+            },
+            {
+              "para_name": "command_id",
+              "data_type": "string",
+              "required": true,
+              "max_length": 80
+            },
+            {
+              "para_name": "session",
+              "data_type": "string",
+              "required": true,
+              "max_length": 32
+            },
+            {
+              "para_name": "issued_at_ms",
+              "data_type": "string",
+              "required": true,
+              "max_length": 13
+            },
+            {
+              "para_name": "expires_at_ms",
+              "data_type": "string",
+              "required": true,
+              "max_length": 13
+            }
+          ],
+          "responses": [
+            {
+              "response_name": "COMMAND_RESPONSE",
+              "paras": [
+                {
+                  "para_name": "result",
+                  "data_type": "string",
+                  "required": true,
+                  "max_length": 512
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
