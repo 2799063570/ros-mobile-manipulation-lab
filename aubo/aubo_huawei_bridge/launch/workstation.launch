@@ -1,0 +1,16 @@
+<launch>
+  <arg name="enable_commands" default="false"/>
+  <arg name="sorting_ns" default="/sorting"/>
+  <arg name="port" default="8099"/>
+  <arg name="auth_file" default="$(env HOME)/.config/aubo/huawei/dashboard.json"/>
+  <arg name="image_topic" default="$(arg sorting_ns)/debug_image"/>
+  <arg name="task_node" default="/color_sorting_task"/>
+  <node pkg="aubo_huawei_bridge" type="huawei_dashboard" name="aubo_huawei_dashboard" output="screen" required="true">
+    <param name="enable_commands" value="$(arg enable_commands)"/>
+    <param name="sorting_ns" value="$(arg sorting_ns)"/>
+    <param name="port" value="$(arg port)"/>
+    <param name="auth_file" value="$(arg auth_file)"/>
+    <param name="image_topic" value="$(arg image_topic)"/>
+    <param name="task_node" value="$(arg task_node)"/>
+  </node>
+</launch>

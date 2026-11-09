@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+"""Configure cpolar locally without putting its account token in shell history."""
+import argparse
+import getpass
+import json
+import os
+from pathlib import Path
+import shutil
+import sys
+import time
+from urllib.request import ProxyHandler, build_opener
+
+
+class SetupError(Exception):
+    pass
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--configure', action='store_true', help='paste the cpolar account token privately')
+    parser.add_argument('--port', type=int, default=8099)
+    parser.add_argument('--region', default='cn', choices=('cn', 'cn_top'))
+    parser.add_argument('--wait', type=float, default=15, help='wait for the local workstation to start')
+    args = parser.parse_args([arg for arg in sys.argv[1:] if ':=' not in arg])
+    if not 1024 <= args.port <= 65535 or not 0 <= args.wait <= 60:
+        raise SetupError('端口或等待时间不正确。')
+    path = Path.home() / '.config/aubo/huawei/cpolar.yml'
+    native = Path.home() / '.cpolar/cpolar.yml'
+    if not args.configure and not path.exists() and native.is_file():
+        path = native
+    if args.configure:
+        if not sys.stdin.isatty():
+            raise SetupError('请在自己的交互终端运行 --configure。')
+        token = getpass.getpass('粘贴 cpolar 认证 Token（输入不回显）：').strip()
+        if not 16 <= len(token) <= 1024 or any(ord(c) < 33 for c in token):
+            raise SetupError('Token 格式不正确，请从 cpolar 官网复制认证 Token。')
+        path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        # O_EXCL avoids silently replacing another configured account.
+        fd = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, 'w') as stream:
+            stream.write('authtoken: ' + json.dumps(token) + '\n')
+        print('认证配置已保存。接下来启动工作台，再运行 huawei_tunnel。')
+        return
+    if not path.is_file():
+        raise SetupError('请先运行：rosrun aubo_huawei_bridge huawei_tunnel --configure')
+    if path.stat().st_mode & 0o077:
+        raise SetupError('请把当前 cpolar 配置文件的权限设为 600。')
+    binary = shutil.which('cpolar') or str(Path.home() / '.local/bin/cpolar')
+    if not Path(binary).is_file():
+        raise SetupError('请先安装 cpolar 到 ~/.local/bin。')
+    # Fail if the selected port serves another application or the demonstration fixture.
+    opener = build_opener(ProxyHandler({}))
+    deadline = time.monotonic() + args.wait
+    while True:
+        try:
+            response = opener.open('http://127.0.0.1:%d/' % args.port, timeout=3)
+        except OSError:
+            if time.monotonic() >= deadline:
+                raise SetupError('工作台尚未启动，请先启动 workstation.launch 或检查端口。')
+            time.sleep(.25)
+            continue
+        with response:
+            if response.headers.get('X-Aubo-Workstation') != 'ros':
+                raise SetupError('此端口未运行 ROS 工作台，请先启动 workstation.launch。')
+        break
+    print('启动国内 HTTPS 随机隧道。手机请使用输出中的 https:// 地址；Ctrl+C 结束。', flush=True)
+    environment = dict(os.environ)
+    # Local system proxies caused control-channel EOF in this domestic connection.
+    # Change only cpolar's child environment, not the user's shell or ROS nodes.
+    for name in ('HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'http_proxy', 'https_proxy', 'all_proxy'):
+        environment.pop(name, None)
+    os.execve(binary, [binary, 'http', '-config', str(path), '-region', args.region,
+                     '-daemon', 'off', '-processMode', 'single',
+                     '-proto', 'https', '-inspect-addr', '127.0.0.1:4040', '-redirect-https', 'true',
+                     '-log', 'stdout', '-log-level', 'INFO',
+                     '127.0.0.1:%d' % args.port], environment)
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except KeyboardInterrupt:
+        raise SystemExit(130)
+    except FileExistsError:
+        print('已有 cpolar 认证配置，保留原文件；需要换账号时先在本机编辑该私有文件。', file=sys.stderr)
+        raise SystemExit(1)
+    except SetupError as error:
+        print(str(error), file=sys.stderr)
+        raise SystemExit(1)
+    except Exception as error:
+        # Exception details could contain local auth material; report only the safe class.
+        print('隧道未启动（%s）。请检查工作台、cpolar 安装和私有配置文件。' % type(error).__name__, file=sys.stderr)
+        raise SystemExit(1)

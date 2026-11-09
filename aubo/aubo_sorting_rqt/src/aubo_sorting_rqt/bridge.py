@@ -15,7 +15,7 @@ from sensor_msgs.msg import Image
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
 
-from .model import ACTIONS, parameter_changes, planner_options, queue_rows
+from .model import ACTIONS, parameter_changes, planner_options, queue_rows, completion_counts
 
 
 class RosBridge(QObject):
@@ -43,6 +43,7 @@ class RosBridge(QObject):
         self._subscribe('failure', String, self._failure)
         self._subscribe('target_cache', String, self._queue)
         self._subscribe('progress', String, self._progress)
+        self._subscribe('completed_counts', String, self._completed_counts)
         self._subscribers.append(rospy.Subscriber(image_topic, Image, self._image, queue_size=1))
         self._subscribers.append(rospy.Subscriber(hardware_topic, DiagnosticArray,
                                                   self._hardware, queue_size=1))
@@ -100,6 +101,12 @@ class RosBridge(QObject):
                       merged_detections_total=document.get('merged_detections_total',0))
         except (ValueError, TypeError, KeyError, OverflowError) as error:
             self._put(rows=[], queue_error=str(error))
+
+    def _completed_counts(self, message):
+        try:
+            self._put(completed_counts=completion_counts(message.data), completion_error='')
+        except (ValueError, TypeError, OverflowError):
+            self._put(completion_error='完成统计数据无效')
 
     def _progress(self, message):
         try:

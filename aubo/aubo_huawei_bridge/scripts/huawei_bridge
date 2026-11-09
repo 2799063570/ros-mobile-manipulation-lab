@@ -15,7 +15,8 @@ import rospy
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
 from aubo_cloud_bridge.commands import Dispatcher
-from aubo_cloud_bridge.protocol import CommandJournal, Telemetry, METHODS, decode_json, encode_json
+from aubo_cloud_bridge.protocol import CommandJournal, METHODS, decode_json, encode_json
+from aubo_huawei_bridge.telemetry import HuaweiTelemetry
 from aubo_huawei_bridge.budget import PublishBudget
 from aubo_huawei_bridge.iot import (credentials, topics, request_id, decode_command,
                                     property_report, command_reply, result_summary)
@@ -31,7 +32,7 @@ class Bridge:
         self.last_command = {}
         self.last_report_ms = 0
         self.reply_permits = collections.Counter()
-        self.telemetry = Telemetry()
+        self.telemetry = HuaweiTelemetry()
         self.ns = rospy.get_param('~sorting_ns', '/sorting').rstrip('/')
         self.enabled = rospy.get_param('~enable_commands', False)
         self.interval = float(rospy.get_param('~publish_interval', 30))

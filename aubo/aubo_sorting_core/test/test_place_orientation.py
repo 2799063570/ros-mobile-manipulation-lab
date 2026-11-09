@@ -17,6 +17,8 @@ class PlaceOrientationTest(unittest.TestCase):
         harness = r'''
 #include <aubo_sorting_core/placement_height.hpp>
 #include <aubo_sorting_core/gripper_height.hpp>
+#include <aubo_sorting_core/completion_counts.hpp>
+#include <sstream>
 #include <algorithm>
 #include <atomic>
 #include <cassert>
@@ -34,7 +36,9 @@ struct DetectedObject {
   bool depth_valid=true,grasp_geometry_valid=true;
 };
 }
+namespace std_msgs { struct String {std::string data;}; }
 namespace aubo_sorting_core {
+namespace detail {std::string jsonEscape(const std::string& value){return value;}}
 bool wallSleep(double,const std::atomic<bool>& stop) { return !stop.load(); }
 struct Pose { double x,y,z,angle; };
 struct SortingTask {
@@ -51,6 +55,10 @@ struct SortingTask {
   std::map<std::string,std::vector<double>> place_targets_{{"box",{.4,.2}}};
   std::atomic<bool> stop_requested_{false},grasp_secured_{false};
   std::mutex data_mutex_;
+  CompletionCounts completion_counts_;
+  std::string completion_session_{"test-run"};
+  struct {std::string last;void publish(const std_msgs::String& message){last=message.data;}} completed_counts_publisher_;
+  void publishCompletedCounts();
   enum class QueueVisionPhase { MASKED,COLLECT };
   bool lift_ok=true,preplace_ok=true;
   double lift_angle=0;
@@ -88,6 +96,8 @@ int main() {
       SortingTask t;t.use_place_object_yaw_=true;t.place_object_yaw_=target;
       object.grasp_angle=pickup;
       assert(t.pickAndPlaceImpl(object));
+      assert(t.completion_counts_.snapshot().at(0).second==1);
+      assert(t.completed_counts_publisher_.last.find("\"total\":1")!=std::string::npos);
       assert(t.poses.size()==5);
       assert(std::abs(t.poses[0].angle-pickup)<1e-10);
       assert(std::abs(t.poses[1].angle-pickup)<1e-10);
@@ -111,6 +121,8 @@ int main() {
     SortingTask t;t.use_place_object_yaw_=true;
     t.lift_ok=!fail_lift;t.preplace_ok=fail_lift;
     assert(!t.pickAndPlaceImpl(object));
+    assert(t.completion_counts_.snapshot().empty());
+    assert(t.completed_counts_publisher_.last.empty());
     assert(t.active_grasp_angle_==0.);
     assert(t.gripper.size()==2); // Failed transfer cannot open the gripper.
     assert(t.poses.size()==(fail_lift ? 2u : 3u));

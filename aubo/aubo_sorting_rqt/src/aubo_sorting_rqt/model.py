@@ -125,6 +125,19 @@ def parameter_changes(requested, accepted):
             if key not in accepted or not matches(value, accepted[key])]
 
 
+def completion_counts(raw):
+    data = json.loads(raw) if isinstance(raw, str) else raw
+    counts = data.get('counts') if isinstance(data, dict) else None
+    if (not isinstance(counts, dict) or len(counts) > 200 or
+            any(not isinstance(k, str) or not k or len(k) > 256 or type(v) is not int or
+                not 0 <= v <= 9007199254740991 for k, v in counts.items()) or
+            data.get('schema_version') != 1 or data.get('scope') != 'node_session' or
+            not isinstance(data.get('session'), str) or not 0 < len(data['session']) <= 128 or
+            type(data.get('total')) is not int or data['total'] != sum(counts.values())):
+        raise ValueError('完成统计数据无效')
+    return {key: data[key] for key in ('counts', 'total', 'session', 'scope')}
+
+
 def process_step(state, progress=None):
     if state == 'OBSERVING':
         return 0

@@ -28,6 +28,8 @@ SortingTask::SortingTask(ros::NodeHandle nh, ros::NodeHandle private_nh)
   : nh_(std::move(nh)), private_nh_(std::move(private_nh)), tf_listener_(ros::Duration(30.0))
 {
   loadParameters();
+  completion_counts_.configure(sort_classes_);
+  completion_session_ = std::to_string(ros::WallTime::now().toNSec());
   robot_limits_valid_ = verifyLoadedUpperArmLimit();// 检证机械臂基座数第二个关节 
 
   arm_.reset(new moveit::planning_interface::MoveGroupInterface(group_name_));// 初始化MoveGroupInterface
@@ -63,6 +65,8 @@ SortingTask::SortingTask(ros::NodeHandle nh, ros::NodeHandle private_nh)
   base_lock_publisher_ = nh_.advertise<std_msgs::Bool>(base_lock_topic_, 1, true);// 机械臂是否在执行任务 移动底盘是否需要被锁住
   failure_publisher_ = nh_.advertise<std_msgs::String>(failure_topic_, 1, true);// 任务失败原因
   target_cache_publisher_ = nh_.advertise<std_msgs::String>("/sorting/target_cache", 1, true);// 目标的信息目标颜色、平均位置、观测次数、置信度、离散程度、目标年龄以及是否已抓取
+  completed_counts_publisher_ = nh_.advertise<std_msgs::String>("/sorting/completed_counts", 1, true);
+  publishCompletedCounts();
   grasp_attach_publisher_ = nh_.advertise<std_msgs::String>(grasp_attach_topic_, 1);// 将目标吸附到夹爪上
   grasp_detach_publisher_ = nh_.advertise<std_msgs::String>(grasp_detach_topic_, 1);// 从夹爪上分离目标
 

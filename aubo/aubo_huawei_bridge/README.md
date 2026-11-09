@@ -8,7 +8,7 @@
 华为云 IoTDA 控制台 ↔ IoTDA 设备接入 ↔ MQTT/TLS ↔ aubo_huawei_bridge ↔ /sorting
 ```
 
-本包包含只读 ROS 云桥、限量上报、产品模型 API 请求体和命令参数生成器。
+本包包含只读 ROS 云桥、限量上报、产品模型导入包、API 请求体和命令参数生成器。
 纯 Python 状态整理、指令有效期、持久化去重和独立停止线程复用 `aubo_cloud_bridge` 依赖。
 使用独立节点、配置和日志路径；腾讯云包另行保留。
 本阶段尚未接入微信小程序，也不启动机械臂、SDK、MoveIt 或分拣系统。
@@ -50,15 +50,29 @@ MQTT 协议层连接、心跳、订阅和 Ack 的计费规则见[计费项](http
 产品协议选择 **MQTT**，数据格式选择 **JSON**；认证使用设备密钥。
 服务 ID 为 **`Sorting`**，所有遥测属性只读，唯一命令为 **`task_command`**。
 
-为减少逐项添加属性的工作，已提供与官方 API 对应的请求体：
+推荐直接在控制台导入完整模型：
+
+1. 创建产品时选择自定义设备类型 **`AUBOSorter`**，产品名称可填 `AUBO_Sorting`。
+2. 打开该产品详情的 **基本信息 → 模型定义 → 上传模型文件**。
+3. 选择 `config/AUBOSorter_AuboLab.zip`，保持 ZIP 格式直接上传并确认。
+4. 成功后应出现 **`Sorting`** 服务，包含 20 个只读属性，以及 **`task_command`** 命令。
+   命令输入包含 `method`、`command_id`、`session`、`issued_at_ms`、`expires_at_ms`。
+5. 确认后继续注册设备。
+
+压缩包按官方格式包含 `profile/devicetype-capability.json` 和
+`service/Sorting/profile/servicetype-capability.json`；设备类型为 `AUBOSorter`，
+厂商标识为 `AuboLab`。打包格式依据：[离线开发产品模型](https://support.huaweicloud.com/devg-iothub/iot_02_4012.html)。
+
+同时保留与官方 API 对应的请求体，便于自动化配置：
 
 | 文件 | 用途 |
 |---|---|
+| `config/AUBOSorter_AuboLab.zip` | 产品详情页面“上传模型文件”的导入包 |
 | `config/create_product.json` | `CreateProduct` 接口的请求体，创建完整产品和模型 |
 | `config/update_product.json` | `UpdateProduct` 接口的请求体，用于已有空产品 |
-| `config/generate_model.py` | 重新生成两个文件 |
+| `config/generate_model.py` | 重新生成 ZIP 和两个 API JSON 文件 |
 
-推荐使用[华为云 API Explorer](https://apiexplorer.developer.huaweicloud.com/)：
+如需通过[华为云 API Explorer](https://apiexplorer.developer.huaweicloud.com/)创建产品：
 
 1. 登录后选择 **设备接入 IoTDA → 创建产品 CreateProduct**。
 2. 地域和项目选择与刚才的 S0 实例一致，接入 Endpoint 选择该实例对应的应用侧地址。
@@ -67,7 +81,7 @@ MQTT 协议层连接、心跳、订阅和 Ack 的计费规则见[计费项](http
 4. 检查后执行创建请求，回到该 S0 实例的产品列表，确认出现 `AUBO_Sorting`。
 5. 在模型定义中检查 `Sorting` 服务和状态属性，以及 `task_command` 命令。
 
-上述两个文件是 **API 请求体 JSON**，与控制台“上传模型文件”要求的模型归档格式不同。
+`create_product.json` 和 `update_product.json` 是 **API 请求体 JSON**，与控制台“上传模型文件”使用的 ZIP 格式不同。
 若希望完全通过控制台逐项添加，可按 `create_product.json` 中 `service_capabilities` 列表填写，
 属性类型、长度和只读方式均在文件中定义。
 `UpdateProduct` 会更新模型，请只对本次新建的空产品使用该文件。
@@ -223,3 +237,14 @@ source devel/setup.bash
 本地测试覆盖官方签名示例、产品字段、报文大小、预算持久化、只读、去重、旧会话和 MQTT 应答。
 真实华为云账号接入、API 创建产品和控制台联调需要开通 S0 并配置设备后验证。
 微信小程序后续可复用现有界面思路，但需另做华为应用侧接口及用户授权，不能直接使用腾讯云函数。
+
+## 8. 电脑仪表盘与手机 4G/5G
+
+当前采用 **本机 ROS 工作台 + cpolar HTTPS 手机入口**，一次启动电脑网页和手机访问。
+请先看 [完整启动步骤](dashboard/LOCAL_ROS.md)。本方案不需要 APIG、FunctionGraph 或 IAM 应用 AK/SK。
+华为云 IoTDA 保留状态上报；网页直接调用本机的四个任务服务。
+
+已新增参照 `aubo_sorting_rqt` 的响应式工作台，手机浏览器无需安装 App。
+界面、应用侧后台、FunctionGraph 上传包及逐步配置见 [dashboard/README.md](dashboard/README.md)。
+当前已有可连接真实 ROS 的工作台及手机隧道启动命令；公网手机访问还需在本机填写 cpolar Token 并验证网络。
+保持 IoTDA S0 和现有设备不变，先验证只读监控，再单独开放任务控制。

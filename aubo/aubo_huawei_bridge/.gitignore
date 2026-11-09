@@ -5,3 +5,5 @@ __pycache__/
 *.key
 *.crt
 device.json
+dashboard/build/
+dashboard/.env*

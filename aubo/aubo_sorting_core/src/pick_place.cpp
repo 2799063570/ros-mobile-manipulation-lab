@@ -4,6 +4,7 @@
 #include <aubo_sorting_core/gripper_height.hpp>
 #include <algorithm>
 #include <cmath>
+#include <sstream>
 
 namespace aubo_sorting_core
 {
@@ -158,8 +159,33 @@ bool SortingTask::pickAndPlaceImpl(const aubo_perception::DetectedObject& detect
   publishProgress("RETREAT", category);
   completed = cartesianTo(makePose(place_x, place_y, preplace_z), category + " retreat");
   if (completed)
+  {
+    completion_counts_.completed(category);
+    publishCompletedCounts();
     publishProgress("PICK_DONE", category);
+  }
   return completed; // 移动到目标放置位置上方
+}
+
+void SortingTask::publishCompletedCounts()
+{
+  const auto counts = completion_counts_.snapshot();
+  std::uint64_t total = 0;
+  std::ostringstream stream;
+  stream << "{\"schema_version\":1,\"scope\":\"node_session\",\"session\":\""
+         << detail::jsonEscape(completion_session_) << "\",\"counts\":{";
+  bool first = true;
+  for (const auto& item : counts)
+  {
+    if (!first) stream << ',';
+    first = false;
+    stream << '"' << detail::jsonEscape(item.first) << "\":" << item.second;
+    total += item.second;
+  }
+  stream << "},\"total\":" << total << '}';
+  std_msgs::String message;
+  message.data = stream.str();
+  completed_counts_publisher_.publish(message);
 }
 
 bool SortingTask::sortingOperation()

@@ -90,3 +90,12 @@ rosrun aubo_sorting_rqt sorting_panel --task-node /color_sorting_task \
 QT_QPA_PLATFORM=offscreen /usr/bin/python3 -m unittest discover \
   -s $(rospack find aubo_sorting_rqt)/test -v
 ```
+
+## 已完成分拣统计
+
+“工位与队列”页新增 **分拣完成（本次运行累计）**，例如 `bottle：1，can：2，box：3 | 合计：6`。
+订阅任务节点 `/sorting/completed_counts` 的完整计数快照，与网页/手机使用同一份统计。
+它独立于当前目标队列：重新观察、清理队列或重新打开 rqt 不清零；任务节点重启后清零。
+计数在抓取、放置、退离成功完成后增加，失败或停止不作为已完成。
+没有统计话题时显示“等待读取统计”，不会从当前队列反推历史完成数量。
+更新后需重新打开插件；C++ 任务节点也需使用包含统计功能的新版本。

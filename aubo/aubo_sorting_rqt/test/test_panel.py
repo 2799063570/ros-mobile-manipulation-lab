@@ -54,6 +54,7 @@ class PanelTest(unittest.TestCase):
         self.widget.render(data)
         self.assertFalse(self.widget.buttons['start'].isEnabled())
         self.assertTrue(self.widget.buttons['stop'].isEnabled())
+
         data.update(pending=False, hardware_at=time.monotonic(),
                     hardware={'feedback_timeout_latched': 'true'})
         self.widget.render(data)
@@ -61,6 +62,19 @@ class PanelTest(unittest.TestCase):
         data['connected'] = False
         self.widget.render(data)
         self.assertTrue(all(not button.isEnabled() for button in self.widget.buttons.values()))
+
+    def test_completed_statistics_are_independent_from_the_current_queue(self):
+        data = self.data()
+        data['completed_counts'] = dict(counts={'bottle': 1, 'can': 2, 'box': 3}, total=6, session='first')
+        self.widget.render(data)
+        for text in ('bottle：1', 'can：2', 'box：3', '合计：6'):
+            self.assertIn(text, self.widget.completed_summary.text())
+        data.update(rows=[], state='STOPPED')
+        self.widget.render(data)
+        self.assertIn('合计：6', self.widget.completed_summary.text())
+        data['completed_counts'] = dict(counts={'bottle': 0, 'can': 0, 'box': 0}, total=0, session='second')
+        self.widget.render(data)
+        self.assertIn('合计：0', self.widget.completed_summary.text())
 
     def test_edit_draft_survives_updates_and_server_values_are_restored(self):
         self.widget.configuration({'velocity_scaling': .1}, force=True)
@@ -203,6 +217,18 @@ class BridgeTest(unittest.TestCase):
             self.bridge.close()
             self.assertFalse(self.bridge.snapshot()['connected'])
             proxy.assert_not_called()
+
+    def test_latched_completion_snapshot_is_not_counted_again_on_delivery(self):
+        message = NS(data=json.dumps(dict(schema_version=1, scope='node_session', session='run-1',
+                           counts={'bottle': 1, 'can': 2, 'box': 3}, total=6)))
+        self.bridge._completed_counts(message)
+        self.bridge._completed_counts(message)
+        self.bridge._queue(NS(data='{"schema_version":2,"targets":{}}'))
+        data = self.bridge.snapshot()
+        self.assertEqual(data['completed_counts']['total'], 6)
+        self.assertEqual(data['completed_counts']['counts']['can'], 2)
+        with self.assertRaises(ValueError):
+            model.completion_counts(dict(schema_version=1, scope='node_session', session='bad', counts={'can': -1}, total=-1))
 
     def test_stop_is_not_serialized_behind_pending_start_rpc(self):
         self.bridge._jobs.add('start')

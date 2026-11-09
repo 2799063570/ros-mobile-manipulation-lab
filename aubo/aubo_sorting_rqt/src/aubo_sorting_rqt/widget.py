@@ -188,6 +188,12 @@ class SortingWidget(QWidget):
         layout.addWidget(splitter, 1)
         self.queue_summary = QLabel('实例队列为空')
         layout.addWidget(self.queue_summary)
+        self.completed_summary = QLabel('分拣完成（本次运行累计）：等待读取统计')
+        self.completed_summary.setTextFormat(Qt.PlainText)
+        self.completed_summary.setWordWrap(True)
+        self.completed_summary.setStyleSheet('background: #e8f5f3; color: #087e8b; padding: 8px; border-radius: 5px;')
+        self.completed_summary.setToolTip('任务成功完成抓取、放置与退离后计数。队列清理、重新观察及刷新界面不清零；任务节点重启后清零。')
+        layout.addWidget(self.completed_summary)
         self.mode = QLabel('等待读取任务模式')
         self.mode.setWordWrap(True)
         layout.addWidget(self.mode)
@@ -435,8 +441,18 @@ class SortingWidget(QWidget):
         self.map_group.setTitle('工作台目标 · {}'.format(data.get('frame') or '等待坐标系'))
         counts = {status: sum(row.get('status') == status for row in rows) for status in QUEUE_STATES}
         allowed = ', '.join((data.get('cell') or {}).get('sort_classes') or [])
-        self.queue_summary.setText('队列 {} 个  ·  可领取 {}  ·  执行中 {}  ·  已完成 {}  |  允许类别：{}'.format(
+        self.queue_summary.setText('队列 {} 个  ·  可领取 {}  ·  执行中 {}  ·  队列内已完成 {}  |  允许类别：{}'.format(
             len(rows), counts['ready'], counts['reserved'], counts['done'], allowed or '等待读取'))
+        statistics = data.get('completed_counts')
+        if data.get('completion_error'):
+            self.completed_summary.setText('分拣完成统计：数据异常，等待有效上报')
+        elif isinstance(statistics, dict):
+            values = statistics.get('counts', {})
+            categories = list(dict.fromkeys(list((data.get('cell') or {}).get('sort_classes') or []) + list(values)))
+            summary = '，'.join('{}：{}'.format(category, values.get(category, 0)) for category in categories)
+            self.completed_summary.setText('分拣完成（本次运行累计）：{}  |  合计：{}'.format(summary or '暂无类别', statistics['total']))
+        else:
+            self.completed_summary.setText('分拣完成（本次运行累计）：等待读取统计')
         if rows is not self._rows:
             self._rows = rows
             self.table.setRowCount(len(rows))

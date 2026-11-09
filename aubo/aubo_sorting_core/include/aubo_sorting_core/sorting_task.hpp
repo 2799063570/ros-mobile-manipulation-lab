@@ -19,6 +19,7 @@
 #include <std_srvs/Trigger.h>
 #include <tf/transform_listener.h>
 #include <aubo_sorting_core/instance_queue.hpp>
+#include <aubo_sorting_core/completion_counts.hpp>
 
 #include <atomic>
 #include <cstdint>
@@ -152,6 +153,7 @@ private:
   void resetInstanceQueue();
   void processInstanceFrame(const aubo_perception::DetectedObjectArray& message);
   void publishInstanceQueue();
+  void publishCompletedCounts();
   bool validateReservedTarget();
   bool observation();
   bool verifyVisibleCategories();
@@ -211,6 +213,7 @@ private:
   ros::Publisher base_lock_publisher_;
   ros::Publisher failure_publisher_;
   ros::Publisher target_cache_publisher_;
+  ros::Publisher completed_counts_publisher_;
   ros::Publisher grasp_attach_publisher_;
   ros::Publisher grasp_detach_publisher_;
   ros::Subscriber detection_subscriber_;
@@ -326,6 +329,8 @@ private:
   WorkspaceConfig pending_workspace_;
   bool has_pending_workspace_{false};
   std::set<std::string> completed_categories_;
+  CompletionCounts completion_counts_;
+  std::string completion_session_;
   std::map<std::string, TargetTrack> target_tracks_;
   State state_{State::INITIALIZING};
   std::atomic<bool> busy_{true};

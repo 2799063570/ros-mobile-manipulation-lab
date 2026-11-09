@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+"""ROS web workstation. cpolar exposes only its authenticated loopback port."""
+import json
+import os
+from pathlib import Path
+import secrets
+import sys
+import threading
+import time
+
+import rosgraph
+import rospkg
+import rospy
+from std_msgs.msg import String
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge
+from std_srvs.srv import Trigger
+from aubo_cloud_bridge.protocol import METHODS
+from aubo_huawei_bridge.web_tasks import WebTasks
+from aubo_huawei_bridge.camera import CameraBuffer
+
+
+def load_auth(path):
+    path = Path(path).expanduser()
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    try:
+        descriptor = os.open(str(path), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    except FileExistsError:
+        pass
+    else:
+        with os.fdopen(descriptor, 'w') as stream:
+            json.dump({'password': secrets.token_urlsafe(24), 'session_key': secrets.token_urlsafe(48)}, stream, indent=2)
+            stream.write('\n')
+    if path.stat().st_mode & 0o077:
+        raise ValueError('auth file must have permission 600')
+    data = json.loads(path.read_text())
+    if len(data.get('password', '')) < 20 or len(data.get('session_key', '')) < 32:
+        raise ValueError('invalid dashboard authentication file')
+    return data
+
+
+def main():
+    rospy.init_node('aubo_huawei_dashboard')
+    enabled = rospy.get_param('~enable_commands', False)
+    port = rospy.get_param('~port', 8099)
+    ns = rospy.get_param('~sorting_ns', '/sorting').rstrip('/')
+    task_node = rospy.get_param('~task_node', '/color_sorting_task').rstrip('/')
+    if type(enabled) is not bool or type(port) is not int or not 1024 <= port <= 65535:
+        raise ValueError('invalid dashboard parameters')
+    package = Path(rospkg.RosPack().get_path('aubo_huawei_bridge'))
+    sys.path.insert(0, str(package / 'dashboard'))
+    from app import App
+    from http_server import BoundedServer
+    path = rospy.get_param('~auth_file', '~/.config/aubo/huawei/dashboard.json')
+    auth = load_auth(path)
+    os.environ.update(AUBO_DASHBOARD_MODE='ros', DASHBOARD_PASSWORD=auth['password'],
+                      DASHBOARD_SESSION_KEY=auth['session_key'], DASHBOARD_ENABLE_COMMANDS=str(enabled).lower())
+    stopping = threading.Event()
+
+    def execute(method, guard):
+        rospy.wait_for_service(ns + '/' + method, timeout=1)
+        if not guard():
+            return False, 'command expired or cancelled before ROS service call'
+        response = rospy.ServiceProxy(ns + '/' + method, Trigger)()
+        return response.success, response.message
+
+    tasks = WebTasks(rospy.get_param('~state_dir', '~/.local/state/aubo_huawei_bridge/web'), execute, enabled)
+    tasks.camera_buffer = CameraBuffer()
+    tasks.camera_enabled = True
+    converter = CvBridge()
+    def image(message):
+        now = time.monotonic()
+        if now < tasks.camera_buffer.next_frame:
+            return
+        try:
+            if len(message.data) > 32000000:
+                raise ValueError('oversize image')
+            tasks.camera_buffer.update(converter.imgmsg_to_cv2(message, desired_encoding='bgr8'))
+        except Exception:
+            rospy.logwarn_throttle(10, 'Dashboard could not convert the recognition image')
+    def receive(kind, message):
+        try:
+            tasks.telemetry.update(kind, message.data)
+        except (ValueError, TypeError, OverflowError):
+            rospy.logwarn_throttle(10, 'Dashboard ignored malformed %s', kind)
+
+    subscribers = [rospy.Subscriber(ns + '/' + kind, String,
+        lambda msg, kind=kind: receive(kind, msg), queue_size=1) for kind in
+        ('state', 'progress', 'failure', 'detection_summary', 'target_cache', 'completed_counts')]
+    subscribers.append(rospy.Subscriber(rospy.get_param('~image_topic', ns + '/debug_image'), Image,
+                                       image, queue_size=1, buff_size=16000000))
+
+    server = BoundedServer(('127.0.0.1', port), App(tasks))
+    master = rosgraph.Master(rospy.get_name())
+
+    def health():
+        while not stopping.is_set() and not rospy.is_shutdown():
+            try:
+                publishers, _, services = master.getSystemState()
+                topics = {name for name, nodes in publishers if nodes}
+                names = {name for name, nodes in services if nodes}
+                available = ns + '/state' in topics and all(ns + '/' + method in names for method in METHODS)
+            except Exception:
+                available = False
+            tasks.health(available)
+            try:
+                tasks.set_cell(rospy.get_param(task_node + '/table_center', None),
+                               rospy.get_param(task_node + '/table_size', None),
+                               rospy.get_param(task_node + '/target_frame', 'base_link'))
+            except Exception:
+                pass
+            stopping.wait(1)
+
+    def close():
+        stopping.set()
+        tasks.close()
+
+    rospy.on_shutdown(close)
+    threading.Thread(target=health, daemon=True).start()
+    # A separate HTTP thread lets rospy shutdown signals interrupt serve_forever safely.
+    worker = threading.Thread(target=server.serve_forever, daemon=True)
+    worker.start()
+    rospy.loginfo('Workstation http://127.0.0.1:%s; controls %s; password file: %s',
+                  port, 'enabled' if enabled else 'disabled', str(Path(path).expanduser()))
+    try:
+        while not rospy.is_shutdown() and worker.is_alive():
+            stopping.wait(.5)
+    finally:
+        close()
+        server.shutdown()
+        server.server_close()
+        for subscriber in subscribers:
+            subscriber.unregister()
+
+
+if __name__ == '__main__':
+    try:
+        main()
+    except Exception as error:
+        rospy.logerr('Dashboard stopped (%s). Check port, auth file and journal directory.', type(error).__name__)
+        raise SystemExit(1)
