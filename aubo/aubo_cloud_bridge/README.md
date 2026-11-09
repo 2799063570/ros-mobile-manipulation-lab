@@ -28,12 +28,16 @@
 sudo apt update
 sudo apt install python3-paho-mqtt ca-certificates
 source /opt/ros/noetic/setup.bash
-cd ~/catkin_ws
-catkin_make --pkg aubo_cloud_bridge
+cd ~/aubo/ros_mobile_manipulation_lab
+chmod +x src/aubo/aubo_cloud_bridge/scripts/thingsboard_bridge
+catkin_make --pkg aubo_cloud_bridge -DPYTHON_EXECUTABLE=/usr/bin/python3
 source devel/setup.bash
 ```
 
 如果工作空间用了 `CATKIN_WHITELIST_PACKAGES`，将 `aubo_cloud_bridge` 加入现有白名单。
+编译会生成 `devel/lib/aubo_cloud_bridge/thingsboard_bridge` 和 Python 模块入口。
+本机默认 `python3` 指向 Conda；ROS Noetic 使用系统 `/usr/bin/python3`。
+检查 apt 安装的依赖时也使用 `/usr/bin/python3`，避免误判 Paho 缺失。
 
 将 Token 写入本机文件，下面使用 Bash 隐藏输入，不把 Token 写入命令历史：
 
@@ -49,7 +53,7 @@ unset aubo_tb_token
 初次连接使用只读模式，检查上传字段和设备选择正确：
 
 ```bash
-source ~/catkin_ws/devel/setup.bash
+source ~/aubo/ros_mobile_manipulation_lab/devel/setup.bash
 roslaunch aubo_cloud_bridge thingsboard.launch
 # 其他区域示例：用 Check connectivity 显示的实际 MQTT 主机替换
 # roslaunch aubo_cloud_bridge thingsboard.launch host:=YOUR_MQTT_HOST
@@ -65,8 +69,11 @@ roslaunch aubo_cloud_bridge thingsboard.launch
 
 仓库已经生成两个 JSON，**先导入组件包，再导入仪表盘**：
 
-1. **Resources → Widgets library / Widgets bundles → Import**：
+1. **Resources → Widgets → Widgets bundles 标签 → + Add widgets bundle → Import widgets bundle**：
    选择 `dashboards/aubo_widgets_bundle.json`，会创建 `AUBO Sorting` 组件包。
+   部分版本入口名为 **Widgets library**。务必选择组件包导入，不能在单个 **Widgets**
+   列表中使用 **Import widget**；将组件包 JSON 交给单组件入口会报
+   `Unable to import widget: Invalid widget data structure`。
 2. **Dashboards → Import dashboard**：选择 `dashboards/aubo_sorting_dashboard.json`。
 3. 编辑仪表盘的 **Entity aliases**，将 `AUBO 分拣设备` 设置为 **Single entity → Device**，
    选择刚创建的 `aubo-sorter-01`，保存。
@@ -82,6 +89,12 @@ JSON 按官方 ThingsBoard 导入结构生成，组件源码是 `console.html/cs
 若平台导入时为组件分配了不同 FQN，请在仪表盘中重新从 `AUBO Sorting` 选择
 `AUBO Sorting Console` 并配置同一设备数据源；不要修改设备凭据。
 界面标签随 Cloud 版本可能略有差异。
+
+若旧版组件首次打开时报 `Cannot read properties of undefined (reading 'fresh')`，
+在 **Resources → Widgets** 找到 `AUBO Sorting Console`，打开组件编辑器的 HTML，
+将第一行改为 `<main class="aubo-console" *ngIf="vm">`，保存后刷新仪表盘。
+这个保护让模板等待 `onInit` 初始化视图数据后再显示内容。
+仓库的 `console.html` 和生成的组件包已包含修复；修改本地文件不会自动更新云端已导入的组件。
 
 ## 4. 开启任务指令
 
@@ -181,12 +194,29 @@ ThingsBoard 中加时序图查看；可靠累计产量 / 成功率需要另建�
 无 ROS、无账号也可验证协议和网页控制器：
 
 ```bash
-python3 -m unittest discover -s aubo/aubo_cloud_bridge/test -v
-node aubo/aubo_cloud_bridge/test/test_widget.js
-python3 aubo/aubo_cloud_bridge/dashboards/build_dashboard.py
+cd ~/aubo/ros_mobile_manipulation_lab
+/usr/bin/python3 -m unittest discover -s src/aubo/aubo_cloud_bridge/test -v
+node src/aubo/aubo_cloud_bridge/test/test_widget.js
+/usr/bin/python3 src/aubo/aubo_cloud_bridge/dashboards/build_dashboard.py
 ```
 
 Catkin 中也配置了 `catkin_add_nosetests(test)`。
+
+### 找不到 `thingsboard_bridge` 节点
+
+若出现 `Cannot locate node of type [thingsboard_bridge]`，先执行第 2 节的
+`chmod +x`、编译和 `source devel/setup.bash`，再检查：
+
+```bash
+rospack find aubo_cloud_bridge
+ls -l ~/aubo/ros_mobile_manipulation_lab/devel/lib/aubo_cloud_bridge/thingsboard_bridge
+/usr/bin/python3 -c 'import aubo_cloud_bridge, paho.mqtt.client; print("Python dependencies OK")'
+```
+
+`rospack find` 应指向当前工作空间的 `src/aubo/aubo_cloud_bridge`。
+只执行 `chmod +x` 而没有编译时，包内的 `aubo_cloud_bridge` Python 模块仍可能无法导入。
+如果节点启动后报告 `FileNotFoundError`，先检查 Token 文件是否已按第 2 节创建，
+或通过 `token_file:=/实际路径` 指定；也需检查自定义 CA 路径。
 
 本地联调检查：
 
@@ -201,10 +231,12 @@ Catkin 中也配置了 `catkin_add_nosetests(test)`。
 `sorting_available=false` 时检查本地分拣节点和 `sorting_ns`；本包没有启动它们。
 有遥测但按钮不亮时检查数据源设备、启用开关、当前状态与用户 RPC 权限。
 
-当前开发环境是 Windows，已通过 11 项离线 Python 测试（含模拟 ROS / Paho 1.x、2.x 适配器）
-及网页控制器 Node 测试；未安装真实 ROS / Paho 运行时。
-尚无用户 Cloud 账号和 Linux ROS 运行环境，**未声称已通过真实云端导入、TLS 连接、Gazebo 或真机联调**。
-完成注册后，按本说明在实际环境验证上述步骤。
+2026-11-09 在本机 Ubuntu / ROS Noetic 环境完成包编译，通过 11 项离线 Python 测试
+（含模拟 Paho 1.x、2.x 适配器）及网页控制器 Node 测试；使用系统 Python / Paho、
+临时 Token 和独立 ROS master 验证了正式 launch 能启动只读桥并注册五个分拣话题订阅。
+默认 MQTT 端点的 TCP 8883、TLS 握手和系统 CA 校验通过。
+本机默认 Token 文件尚未配置，**尚未验证真实设备认证、云端遥测、仪表盘导入、Gazebo 或真机联调**。
+配置设备凭据后，按本说明继续验证上述步骤。
 
 官方接口依据：[MQTT RPC](https://thingsboard.io/docs/reference/mqtt-api/rpc/)、
 [仪表盘](https://thingsboard.io/docs/user-guide/dashboards/)、

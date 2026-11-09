@@ -1,4 +1,4 @@
-<main class="aubo-console">
+<main class="aubo-console" *ngIf="vm">
   <header><div><span class="eyebrow">AUBO / CLOUD WORKSTATION</span><h1>智能分拣工作台</h1></div><span class="badge" [class.online]="vm.fresh">{{vm.link}}</span></header>
   <p class="muted">{{vm.updated}} · {{vm.controlMode}}</p>
   <section class="metrics">
