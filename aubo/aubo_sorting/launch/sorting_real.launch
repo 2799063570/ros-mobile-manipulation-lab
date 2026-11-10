@@ -1,5 +1,8 @@
 <?xml version="1.0"?>
 <launch>
+  <!-- 从 Gazebo 切换到实机并复用 ROS master 时，清除遗留的仿真时钟设置。
+       所有参数均在节点启动前加载，MoveIt 和相机使用系统时间。 -->
+  <param name="/use_sim_time" value="false" type="bool"/>
   <arg name="planner_id" default=""/>
   <arg name="planning_service" default=""/>
   <arg name="experiment_enabled" default="false"/>

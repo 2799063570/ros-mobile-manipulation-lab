@@ -18,6 +18,10 @@ class BackendQueueGeometryTest(unittest.TestCase):
                       source.index('bool SortingTask::continuousSortingOperation()')]
         fixture = r'''
 #include <aubo_sorting_core/instance_queue.hpp>
+#include <aubo_sorting_core/gripper_height.hpp>
+using aubo_sorting_core::graspCenterOffset;
+using aubo_sorting_core::gripperDescentHeight;
+using aubo_sorting_core::stackedGraspOffset;
 #include <atomic>
 #include <iostream>
 #include <limits>
@@ -26,7 +30,7 @@ class BackendQueueGeometryTest(unittest.TestCase):
 namespace ros {struct WallTime {static WallTime now(){return {};} double toSec()const{return 11.;}};}
 namespace std_msgs {struct String {std::string data;};}
 namespace detail {std::string jsonEscape(const std::string& value){return value;}}
-struct Object {bool grasp_geometry_valid{true};double grasp_angle{0},grasp_width{.064};};
+struct Object {bool grasp_geometry_valid{true};double grasp_angle{0},grasp_width{.064},object_height{.04};};
 using ObjectQueue=aubo_sorting_core::InstanceQueue<Object>;
 class SortingTask {
 public:
@@ -34,6 +38,11 @@ public:
   std::atomic<QueueVisionPhase> queue_vision_phase_{QueueVisionPhase::COLLECT};
   std::mutex queue_mutex_;
   std::string target_frame_{"base_link"};
+  std::string grasp_height_reference_{"surface"};
+  double object_height_{.04},grasp_height_offset_{.01},grasp_surface_inset_{.01};
+  double table_z_{.1},minimum_gripper_height_{0},pregrasp_height_{.2},lift_min_height_{.25};
+  double stacked_grasp_offset_z_{.01},stacked_support_min_height_{.02};
+  std::string height_mode_{"depth"};bool allow_stacked_objects_{true};
   bool queue_target_occluded_{false};
   ObjectQueue instance_queue_;
   struct {void publish(const std_msgs::String& message){std::cout<<message.data;}} target_cache_publisher_;
@@ -47,8 +56,10 @@ int main() {
   const std::string categories[]{"can","zero","invalid","nan"};
   for(unsigned i=0;i<samples.size();++i) {
     samples[i].category=categories[i];samples[i].x=.1*i;samples[i].confidence=.9;
+    samples[i].z=.12;samples[i].surface_z=.14;
   }
   samples[0].payload.grasp_angle=std::acos(-1.)/4;
+  samples[1].z=.20;samples[1].surface_z=.22;
   samples[2].payload.grasp_geometry_valid=false;
   samples[3].payload.grasp_angle=std::numeric_limits<double>::quiet_NaN();
   samples[3].payload.grasp_width=std::numeric_limits<double>::infinity();
@@ -76,10 +87,16 @@ int main() {
         rows = {row['category']: row for row in document['targets'].values()}
         self.assertEqual(document['schema_version'], 2)
         self.assertEqual(document['frame_id'], 'base_link')
+        self.assertEqual(document['selection_policy'], 'fifo')
+        self.assertEqual(document['grasp_height_reference'], 'surface')
+        self.assertAlmostEqual(rows['can']['surface_z'], .14)
+        self.assertAlmostEqual(rows['can']['grasp_z'], .13)
+        self.assertEqual(rows['can']['blocked_by'], 0)
         self.assertEqual(rows['can']['status'], 'reserved')
         self.assertAlmostEqual(rows['can']['grasp_angle'], math.pi/4)
         self.assertAlmostEqual(rows['can']['grasp_width'], .064)
         self.assertEqual(rows['zero']['grasp_angle'], 0.)
+        self.assertAlmostEqual(rows['zero']['grasp_z'], .22)
         for category in ('invalid', 'nan'):
             self.assertIsNone(rows[category]['grasp_angle'])
             self.assertIsNone(rows[category]['grasp_width'])

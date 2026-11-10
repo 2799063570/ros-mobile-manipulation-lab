@@ -11,7 +11,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[2]
 for path in (ROOT / 'src', ROOT.parent / 'aubo_cloud_bridge/src', ROOT / 'dashboard'):
     sys.path.insert(0, str(path))
-from aubo_huawei_bridge.web_tasks import WebTasks
+from aubo_huawei_bridge.web_tasks import JournalInUseError, WebTasks
 from aubo_huawei_bridge.iot import make_command
 from app import App
 from http_server import BoundedServer
@@ -62,6 +62,29 @@ class LocalTests(unittest.TestCase):
         self.assertTrue(self.tasks.command(cmd)['response']['paras']['result']['duplicate'])
         self.assertEqual(self.calls,['start'])
 
+    def test_restart_waits_for_old_journal_owner_and_never_bypasses_an_active_owner(self):
+        ready = threading.Event()
+        result = []
+        def start_replacement():
+            ready.set()
+            result.append(WebTasks(self.tmp.name, lambda *args: (True, ''), owner_wait=1))
+        worker = threading.Thread(target=start_replacement)
+        worker.start()
+        self.assertTrue(ready.wait(1))
+        time.sleep(.08)
+        self.assertEqual(result, [])
+        self.tasks.owner.close()
+        worker.join(2)
+        self.assertFalse(worker.is_alive())
+        self.assertEqual(len(result), 1)
+        replacement = result[0]
+        try:
+            with self.assertRaises(JournalInUseError):
+                WebTasks(self.tmp.name, lambda *args: (True, ''), owner_wait=.05)
+        finally:
+            replacement.close()
+            replacement.journal.db.close()
+            replacement.owner.close()
     def test_health_rotates_session_and_stale_ticket_cannot_execute(self):
         cmd = self.command('home')
         self.tasks.health(False)

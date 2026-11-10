@@ -101,6 +101,34 @@ class PipelineTest(TestCase):
                 self.assertFalse(result.observation_valid)
                 self.assertEqual(result.objects, [])
 
+    def test_bounded_depth_uses_surface_and_class_thickness_for_elevated_targets(self):
+        node = self.node(height_source='bounded_depth')
+        node.class_heights = {'red': .04, 'blue': .06}
+        self.send(node, depth=.78)  # Surface Z=.22; table Z=.10, so targets are elevated.
+        result = node.detections_publisher.publish.call_args[0][0]
+        self.assertTrue(result.observation_valid)
+        self.assertEqual(len(result.objects), 3)
+        for detected in result.objects:
+            thickness = node.class_heights[detected.class_name]
+            self.assertAlmostEqual(detected.object_height, thickness, places=6)
+            self.assertAlmostEqual(detected.pose.position.z, .22-thickness/2, places=6)
+            self.assertTrue(detected.depth_valid)
+            self.assertTrue(all(abs(p.z-.22)<1e-6 for p in detected.footprint.points))
+
+    def test_bounded_depth_preserves_short_objects_and_rejects_invalid_surface(self):
+        node = self.node(height_source='bounded_depth')
+        node.object_height = .065
+        self.send(node, depth=.86)
+        result = node.detections_publisher.publish.call_args[0][0]
+        self.assertAlmostEqual(result.objects[0].object_height, .04, places=6)
+        self.assertAlmostEqual(result.objects[0].pose.position.z, .12, places=6)
+        for depth in (.9, .5):
+            node._depth_cache.clear()  # Each synthetic send reuses the same source timestamp.
+            self.send(node, depth=depth)
+            result = node.detections_publisher.publish.call_args[0][0]
+            self.assertFalse(result.observation_valid)
+            self.assertEqual(result.objects, [])
+
     def test_outside_workspace_height_mismatch_cannot_poison_its_empty_observation(self):
         node = self.node()
         node.workspace = {'min_x': 0., 'max_x': .2}
@@ -112,6 +140,8 @@ class PipelineTest(TestCase):
     def test_measured_source_requires_depth_and_rejects_unknown_configuration(self):
         with self.assertRaisesRegex(ValueError, 'requires height_mode=depth'):
             self.node(height='table', height_source='depth')
+        with self.assertRaisesRegex(ValueError, 'requires height_mode=depth'):
+            self.node(height='table', height_source='bounded_depth')
         with self.assertRaisesRegex(ValueError, 'configured or depth'):
             self.node(height_source='unknown')
 

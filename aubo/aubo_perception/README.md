@@ -180,6 +180,7 @@ roslaunch aubo_perception grasp_perception.launch detector:=yolo \
 | `height_mode=depth` | 对齐深度反投影、TF 转到基座，按 object_height_source 选择物高来源并计算中心 Z |
 | `object_height_source=configured` | 默认保持已知物高校验：顶面 Z≈桌高+类别物高，误差不超过 height_tolerance |
 | `object_height_source=depth` | 要求 height_mode=depth；逐物体估计物高=顶面 Z−桌高，中心 Z=桌高+物高/2 |
+| `object_height_source=bounded_depth` | 要求 height_mode=depth；自身厚度=min(顶面 Z−桌高, 类别厚度上限)，中心 Z=顶面 Z−半自身厚度；用于平放物体叠放 |
 | `camera_mount=eye_in_hand` | 默认 `/camera` 话题；需要腕部到相机的外参和采集时刻的机械臂 TF |
 | `camera_mount=eye_to_hand` | 默认 `/workspace_camera` 话题；需要基座到固定相机的外参 |
 
@@ -191,7 +192,14 @@ roslaunch aubo_perception grasp_perception.launch detector:=yolo \
 
 深度测量物高时，`minimum_object_height/maximum_object_height` 限制可接受测量范围，
 默认 `0.005–0.30 m`，拒绝桌面、负高度及过大的异常返回，不沿用 `class_heights/object_height`
-作固定物高门槛。眼在手外三类实机场景已启用该模式；通用配置默认仍使用已知物高校验。
+作固定物高门槛。该 `depth` 物高模式假设底面贴桌，不能直接用于叠放。
+眼在手外三类实机场景使用 `bounded_depth`：`class_heights` 或默认 `object_height`
+作为平放物体自身厚度上限。较矮桌面目标保留实测厚度；超过该上限后，叠放支撑的增加量
+完整计入中心 Z，不再从固定桌面折半。厚度上限是先验，不是从深度测得的支撑面；
+应按实际物体/摆放方向配置，同类不同厚度、直立高物体或支撑完全遮挡时不能保证真实中心精度。
+`maximum_object_height` 在此模式仍约束顶面离桌总高度，包含支撑。
+任务需同时开启 `allow_stacked_objects`，允许底面高于桌面，并保留底面不得低于桌面的容差校验。
+通用配置默认仍使用已知物高校验。
 物体中心和每个目标的 `object_height` 一起发布，供分拣节点计算该物体的抓放高度。
 该范围独立于任务的 `minimum_gripper_height`：后者限制 TCP 下降终点，实机默认离桌 6 cm。
 工作区 XY 排除先于物高校验，已确认在工作区外的检测不会污染该工作区的有效观测。

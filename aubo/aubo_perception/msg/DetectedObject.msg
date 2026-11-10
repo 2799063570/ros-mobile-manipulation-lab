@@ -10,8 +10,9 @@ float32 confidence
 float32 grasp_width
 float32 grasp_angle
 bool grasp_geometry_valid
-# 深度高度经过桌面 + 物高校验才为 true；table 模式为 false。
+# 深度投影/所选高度模式校验有效时为 true；table 模式为 false。
 bool depth_valid
+# 自身物高；bounded_depth 下是受类别厚度上限约束的估计，不含下层支撑。
 float32 object_height
 # Convex detector rectangle projected onto the object's horizontal surface.
 # Coordinates use DetectedObjectArray.header.frame_id; empty means unavailable.

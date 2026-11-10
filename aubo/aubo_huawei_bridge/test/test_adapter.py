@@ -15,12 +15,15 @@ from aubo_huawei_bridge.iot import make_command
 
 
 class AdapterTests(unittest.TestCase):
-    def exercise(self, version_two, enabled):
+    def exercise(self, version_two, enabled, extended=False):
         with tempfile.TemporaryDirectory() as tmp:
             config = Path(tmp) / 'device.json'
             config.write_text(encode_json(dict(device_id='local_robot', device_secret='test-secret',
                                                host='localhost', ca_file='')))
             params = {'~credentials_file': str(config), '~enable_commands': enabled,
+                      '~extended_telemetry': extended,
+                      '/color_sorting_task/table_center': [.7, 0, 0],
+                      '/color_sorting_task/table_size': [.7, 1, .2],
                       '~journal_path': str(Path(tmp) / 'commands.sqlite3'),
                       '~budget_path': str(Path(tmp) / 'quota.sqlite3')}
             rospy = ModuleType('rospy')
@@ -61,6 +64,8 @@ class AdapterTests(unittest.TestCase):
                     bridge.on_connect(client, None, {}, 0)
                     session = bridge.session
                     bridge.ros_message(SimpleNamespace(data='READY | test'), 'state')
+                    bridge.ros_message(SimpleNamespace(data=encode_json(dict(schema_version=1,
+                        scope='node_session', session='test-run', counts={'can': 2}, total=2))), 'completed_counts')
                     with patch.object(bridge.shutdown, 'wait', side_effect=lambda _: bridge.shutdown.set()) as wait:
                         bridge.run()
                     wait.assert_called_once_with(1)  # Local health remains fast despite 30s cloud reports.
@@ -68,6 +73,10 @@ class AdapterTests(unittest.TestCase):
                     reports = [decode_json(call.args[1]) for call in client.publish.call_args_list
                                if call.args[0] == bridge.topics['report']]
                     self.assertEqual(reports[0]['services'][0]['properties']['state'], 'READY')
+                    if extended:
+                        props = reports[0]['services'][0]['properties']
+                        self.assertEqual(props['completed_total'], '2')
+                        self.assertEqual(decode_json(props['workcell'])['table_center'], [.7, 0])
                     status = decode_json(bridge.status_publisher.publish.call_args.args[0].data)
                     self.assertEqual(status['publish_interval'], 30)
                     self.assertEqual(status['session'], session)
@@ -126,6 +135,9 @@ class AdapterTests(unittest.TestCase):
 
     def test_paho_v1_read_only(self):
         self.exercise(False, False)
+
+    def test_paho_v2_extended_telemetry(self):
+        self.exercise(True, False, extended=True)
 
     def test_paho_v2_commands_budget_and_connection_guards(self):
         self.exercise(True, True)

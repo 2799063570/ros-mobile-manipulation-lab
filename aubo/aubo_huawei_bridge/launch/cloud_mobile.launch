@@ -1,0 +1,24 @@
+<launch>
+  <!-- One read-only IoTDA uplink plus the cpolar task workstation. Run one instance. -->
+  <arg name="enable_commands" default="false"/>
+  <arg name="extended_telemetry" default="false"/>
+  <arg name="sorting_ns" default="/sorting"/>
+  <arg name="task_node" default="/color_sorting_task"/>
+  <arg name="credentials_file" default="$(env HOME)/.config/aubo/huawei/device.json"/>
+  <arg name="port" default="8099"/>
+  <arg name="region" default="cn"/>
+  <include file="$(find aubo_huawei_bridge)/launch/huawei.launch">
+    <arg name="credentials_file" value="$(arg credentials_file)"/>
+    <arg name="enable_commands" value="false"/>
+    <arg name="extended_telemetry" value="$(arg extended_telemetry)"/>
+    <arg name="sorting_ns" value="$(arg sorting_ns)"/>
+    <arg name="task_node" value="$(arg task_node)"/>
+  </include>
+  <include file="$(find aubo_huawei_bridge)/launch/mobile.launch">
+    <arg name="enable_commands" value="$(arg enable_commands)"/>
+    <arg name="sorting_ns" value="$(arg sorting_ns)"/>
+    <arg name="task_node" value="$(arg task_node)"/>
+    <arg name="port" value="$(arg port)"/>
+    <arg name="region" value="$(arg region)"/>
+  </include>
+</launch>

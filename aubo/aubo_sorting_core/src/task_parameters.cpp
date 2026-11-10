@@ -29,6 +29,7 @@ namespace aubo_sorting_core
         inspire_open_tolerance_<0 || inspire_open_tolerance_>50)
       throw std::runtime_error("invalid gripper backend/speed/force/timeout/open tolerance");
     private_nh_.param<std::string>("height_mode", height_mode_, "table");
+    private_nh_.param("allow_stacked_objects", allow_stacked_objects_, false);
     private_nh_.param("use_detected_angle", use_detected_angle_, false);
     private_nh_.param("use_detected_width", use_detected_width_, false);
     use_place_object_yaw_ = private_nh_.hasParam("place_object_yaw");
@@ -53,6 +54,17 @@ namespace aubo_sorting_core
     table_collision_margin_ = std::max(0.0, table_collision_margin_);
     private_nh_.param("object_height", object_height_, 0.04);
     private_nh_.param("grasp_height_offset", grasp_height_offset_, 0.01);
+    private_nh_.param<std::string>("grasp_height_reference", grasp_height_reference_, "center");
+    private_nh_.param("grasp_surface_inset", grasp_surface_inset_, 0.01);
+    private_nh_.param("stacked_grasp_offset_z", stacked_grasp_offset_z_, 0.0);
+    private_nh_.param("stacked_support_min_height", stacked_support_min_height_, 0.02);
+    if (!std::isfinite(stacked_grasp_offset_z_) || stacked_grasp_offset_z_<-.05 || stacked_grasp_offset_z_>.05 ||
+        !std::isfinite(stacked_support_min_height_) || stacked_support_min_height_<.005 || stacked_support_min_height_>.30)
+      throw std::runtime_error("stacked Z correction must be within +/-0.05 m; support threshold within [0.005,0.30] m");
+    if ((grasp_height_reference_!="center" && grasp_height_reference_!="surface") ||
+        (grasp_height_reference_=="surface" && height_mode_!="depth") ||
+        !std::isfinite(grasp_surface_inset_) || grasp_surface_inset_<0)
+      throw std::runtime_error("surface grasp reference requires depth mode and a finite nonnegative inset");
     private_nh_.param("minimum_gripper_height", minimum_gripper_height_, 0.06);
     private_nh_.param<std::string>("observation_named_target", observation_named_target_, "");
     private_nh_.param<std::string>("work_ready_named_target", work_ready_named_target_, "work_ready");
@@ -130,9 +142,25 @@ namespace aubo_sorting_core
     private_nh_.param("queue_match_distance", instance_queue_.match_distance, 0.04);
     private_nh_.param("queue_stable_distance", instance_queue_.stable_distance, 0.015);
     private_nh_.param("queue_reserved_distance", instance_queue_.reserved_distance, 0.035);
+    int anomaly_confirmations=1,recovery_observations=3;
+    private_nh_.param("queue_reserved_anomaly_confirmations", anomaly_confirmations, 1);
+    private_nh_.param("queue_reserved_recovery_observations", recovery_observations, 3);
+    private_nh_.param("queue_reserved_recheck_timeout", queue_reserved_recheck_timeout_, 2.0);
+    private_nh_.param("queue_occlusion_clear_frames", queue_occlusion_clear_frames_, 3);
+    if (anomaly_confirmations<1 || anomaly_confirmations>30 || recovery_observations<1 ||
+        recovery_observations>30 || queue_occlusion_clear_frames_<1 || queue_occlusion_clear_frames_>30 ||
+        !std::isfinite(queue_reserved_recheck_timeout_) || queue_reserved_recheck_timeout_<=0 ||
+        queue_reserved_recheck_timeout_>10)
+      throw std::runtime_error("invalid reserved target confirmation/recheck or occlusion clearing bounds");
+    instance_queue_.reserved_anomaly_confirmations=static_cast<unsigned>(anomaly_confirmations);
+    instance_queue_.reserved_recovery_observations=static_cast<unsigned>(recovery_observations);
     private_nh_.param("queue_duplicate_distance", instance_queue_.duplicate_distance, 0.008);
     private_nh_.param("queue_merge_distance", instance_queue_.merge_distance, 0.02);
     private_nh_.param("queue_merge_overlap", instance_queue_.merge_overlap, 0.5);
+    private_nh_.param<std::string>("queue_selection_policy", instance_queue_.selection_policy, "fifo");
+    private_nh_.param("queue_stack_overlap", instance_queue_.stack_overlap, 0.15);
+    private_nh_.param("queue_stack_height_gap", instance_queue_.stack_height_gap, 0.01);
+    private_nh_.param("queue_top_height_band", instance_queue_.top_height_band, 0.01);
     private_nh_.param("queue_occlusion_radius", queue_occlusion_radius_, 0.06);
     queue_occlusion_links_={end_effector_link_};
     private_nh_.getParam("queue_occlusion_links", queue_occlusion_links_);
@@ -152,6 +180,7 @@ namespace aubo_sorting_core
     for (double value : {instance_queue_.match_distance, instance_queue_.stable_distance,
          instance_queue_.duplicate_distance, instance_queue_.reserved_distance,
          instance_queue_.merge_distance, instance_queue_.merge_overlap, queue_occlusion_radius_,
+         instance_queue_.stack_overlap, instance_queue_.stack_height_gap, instance_queue_.top_height_band,
          instance_queue_.max_age, queue_reserved_max_age_, instance_queue_.confirmation_gap,
          instance_queue_.retention, instance_queue_.done_hold, queue_frame_max_age_, queue_tf_wait_timeout_,
          queue_empty_confirmation_, queue_place_exclusion_radius_, queue_gripper_exclusion_radius_,
@@ -159,6 +188,9 @@ namespace aubo_sorting_core
       if (!std::isfinite(value) || value <= 0)
         throw std::runtime_error("queue parameters must be finite and positive");
     if (instance_queue_.duplicate_distance >= instance_queue_.stable_distance ||
+        (instance_queue_.selection_policy!="fifo" && instance_queue_.selection_policy!="top_first") ||
+        (instance_queue_.selection_policy=="top_first" && height_mode_!="depth") ||
+        instance_queue_.stack_overlap>1 ||
         instance_queue_.merge_distance>instance_queue_.match_distance || instance_queue_.merge_overlap>1 ||
         queue_occlusion_links_.empty() ||
         std::any_of(queue_occlusion_links_.begin(),queue_occlusion_links_.end(),[](const std::string& link) {return link.empty();}) ||

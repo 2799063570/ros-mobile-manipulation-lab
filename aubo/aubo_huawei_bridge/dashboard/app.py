@@ -50,6 +50,14 @@ class Cloud:
         reply = self.client.show_device_shadow(ShowDeviceShadowRequest(device_id=self.device)).to_dict()
         props = next((s.get('reported', {}).get('properties', {}) for s in reply.get('shadow', [])
                       if s.get('service_id') == 'Sorting'), {})
+        for key in ('completed_counts', 'workcell'):
+            if isinstance(props.get(key), str):
+                try:
+                    props[key] = json.loads(props[key])
+                except ValueError:
+                    props[key] = None if key == 'completed_counts' else {}
+        if props.get('statistics_available') != 1:
+            props['completed_counts'] = None
         return props
 
     def command(self, body):
@@ -132,8 +140,7 @@ class App:
             age, fresh = None, False
         return {'properties': props, 'server_ms': int(self.clock() * 1000), 'age_s': age,
                 'fresh': fresh, 'mode': self.mode,
-                'camera_enabled': bool(getattr(self.source(), 'camera_enabled', False)),
-                'workcell': self.source().workcell() if hasattr(self.source(), 'workcell') else {},
+                'workcell': self.source().workcell() if hasattr(self.source(), 'workcell') else props.get('workcell', {}),
                 'controls_enabled': self.controls, 'poll_seconds': getattr(self.source(), 'poll_seconds', 30)}
 
     def guard(self, snapshot, method):
@@ -175,15 +182,6 @@ class App:
                                                          'nonce': secrets.token_hex(16)})}
                 else:
                     self.verify('login', headers.get('authorization', '')[7:] if headers.get('authorization', '').startswith('Bearer ') else '')
-                    if method == 'GET' and path == '/api/camera':
-                        source = self.source()
-                        frame = source.camera() if getattr(source, 'camera_enabled', False) else None
-                        if frame is None:
-                            raise APIError(503, '识别画面尚未就绪或已中断')
-                        content, age, sequence = frame
-                        extra.update({'Content-Type': 'image/jpeg', 'X-Camera-Age': str(round(age, 2)),
-                                      'X-Camera-Sequence': str(sequence)})
-                        return 200, self.headers(extra), content
                     if method == 'GET' and path == '/api/snapshot':
                         result = self.snapshot()
                     elif method == 'POST' and path == '/api/prepare':
@@ -229,7 +227,7 @@ class App:
         extra.setdefault('Content-Type', 'application/json; charset=utf-8')
         extra.update({'Cache-Control': 'no-store', 'X-Aubo-Workstation': self.mode, 'X-Content-Type-Options': 'nosniff',
                       'Referrer-Policy': 'no-referrer', 'X-Frame-Options': 'DENY',
-                      'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"})
+                      'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"})
         return extra
 
 
@@ -248,9 +246,8 @@ def handler(event, context):
     raw = base64.b64decode(body) if event.get('isBase64Encoded') else body.encode()
     status, headers, content = _application.route(method, event.get('rawPath') or event.get('path', '/'),
                                                   event.get('headers'), raw)
-    binary = headers.get('Content-Type') == 'image/jpeg'
     return {'statusCode': status, 'headers': headers,
-            'body': base64.b64encode(content).decode() if binary else content.decode(), 'isBase64Encoded': binary}
+            'body': content.decode(), 'isBase64Encoded': False}
 
 
 if __name__ == '__main__':

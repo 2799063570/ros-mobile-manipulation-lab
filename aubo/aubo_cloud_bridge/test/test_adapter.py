@@ -26,7 +26,9 @@ class AdapterTests(unittest.TestCase):
             mqtt.CallbackAPIVersion = SimpleNamespace(VERSION2=2)
         rospy = ModuleType('rospy')
         params = {'~journal_path': str(journal), '~token_file': str(token),
-                  '~host': 'mqtt.thingsboard.cloud', '~enable_commands': True}
+                  '~host': 'mqtt.thingsboard.cloud', '~enable_commands': True,
+                  '/color_sorting_task/table_center': [.7, 0, .1],
+                  '/color_sorting_task/table_size': [.7, 1, .05]}
         rospy.get_param = lambda name, default=None: params.get(name, default)
         rospy.Subscriber = Mock()
         rospy.loginfo, rospy.logwarn, rospy.logwarn_throttle = Mock(), Mock(), Mock()
@@ -60,12 +62,19 @@ class AdapterTests(unittest.TestCase):
                 self.assertTrue(first_session)
                 client.subscribe.assert_called_with(RPC_PREFIX + '+', qos=1)
                 bridge.ros_message(SimpleNamespace(data='READY | waiting'), 'state')
+                bridge.ros_message(SimpleNamespace(data='{"schema_version":1,"scope":"node_session",'
+                    '"session":"task-session","counts":{"can":2},"total":2}'), 'completed_counts')
+                topics = [call.args[0] for call in rospy.Subscriber.call_args_list]
+                self.assertIn('/sorting/completed_counts', topics)
+                self.assertFalse(any('image' in topic or 'camera' in topic for topic in topics))
                 # Run one wall-clock telemetry cycle with ROS interfaces registered.
                 with patch.object(bridge.shutdown, 'wait', side_effect=lambda _: bridge.shutdown.set()):
                     bridge.run()
                 payloads = [decode_json(c.args[1]) for c in client.publish.call_args_list if c.args[0] == TELEMETRY_TOPIC]
                 self.assertEqual(payloads[0]['state'], 'READY')
                 self.assertTrue(payloads[0]['sorting_available'])
+                self.assertEqual(payloads[0]['completed_total'], 2)
+                self.assertEqual(decode_json(payloads[0]['workcell'])['frame'], 'base_link')
                 bridge.shutdown.clear()
                 now = int(time.time() * 1000)
                 document = {'method': 'start', 'params': {'command_id': uuid.uuid4().hex,

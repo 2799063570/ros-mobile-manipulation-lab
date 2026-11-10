@@ -1,11 +1,14 @@
-# Fixed camera, original table. Each object's height is measured from aligned depth.
+# Fixed camera, original table. Depth measures the visible surface, including stacks.
 target_frame: base_link
 table_z: 0.00285
-object_height: 0.065  # Fallback for configured-height mode; depth measurements override it below.
+object_height: 0.065  # 平放物体自身厚度上限/先验，不包含下层支撑；准确中心需实测此值。
+# 可按类别设置厚度上限（m）；不同实例厚度不同则仍存在估计误差。
 class_heights: {}
-object_height_source: depth
+object_height_source: bounded_depth
+# 自身厚度=min(表面Z-table_z, 类别厚度上限)，中心Z=表面Z-自身厚度/2。
+# 较矮的桌面物体沿用实测厚度；叠放目标超过厚度上限后不再从桌面折半。
 minimum_object_height: 0.005  # Reject table/noise; independent of the 6 cm TCP descent floor.
-maximum_object_height: 0.30
+maximum_object_height: 0.30  # 表面离桌面的总高度上限，包含叠放支撑。
 height_tolerance: 0.02
 minimum_probability: 0.60
 minimum_depth: 0.10

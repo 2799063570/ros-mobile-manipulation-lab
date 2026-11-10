@@ -124,6 +124,40 @@ class PanelTest(unittest.TestCase):
             with self.assertRaises((ValueError, TypeError)):
                 model.queue_rows(document)
 
+    def test_stack_surface_tcp_and_blocker_are_distinct_columns(self):
+        _, rows = model.queue_rows({'targets': {'2': dict(id=2,category='box',status='ready',
+            position=[.1,-.5,.07],surface_z=.103,grasp_z=.093,blocked_by=9)}})
+        data=self.data()
+        data.update(rows=rows,cell={'continuous_sorting':True},selection_policy='top_first')
+        self.widget.render(data)
+        self.assertEqual(self.widget.table.item(0,5).text(),'0.070')
+        self.assertEqual(self.widget.table.item(0,11).text(),'0.103')
+        self.assertEqual(self.widget.table.item(0,12).text(),'0.093')
+        self.assertEqual(self.widget.table.item(0,13).text(),'9')
+        self.assertIn('上层优先',self.widget.mode.text())
+
+    def test_reserved_association_pending_is_visible_without_marking_it_done(self):
+        _,rows=model.queue_rows({'targets':{'17':dict(id=17,category='bottle',status='reserved',
+            position=[-.14,-.62,.028],association_pending=True,association_anomalies=1)}})
+        data=self.data('PICKING | bottle #17');data.update(rows=rows)
+        self.widget.render(data)
+        self.assertIn('关联复核中',self.widget.table.item(0,2).text())
+
+    def test_upper_z_adjustment_can_be_applied_only_while_idle(self):
+        data=self.data('READY')
+        data['config'].update(stacked_grasp_offset_z=0.,stacked_support_min_height=.02)
+        self.widget.render(data)
+        self.assertTrue(self.widget.editors['stacked_grasp_offset_z'].isEnabled())
+        self.assertTrue(self.widget.editors['stacked_support_min_height'].isEnabled())
+        edits=[];self.widget.parameters_requested.connect(edits.append)
+        self.widget.editors['stacked_grasp_offset_z'].setValue(.01)
+        self.widget.apply_button.click()
+        self.assertAlmostEqual(edits[-1]['stacked_grasp_offset_z'],.01)
+        moving=self.data('PICKING | bottle #17');moving['config']=data['config']
+        self.widget.render(moving)
+        self.assertFalse(self.widget.editors['stacked_grasp_offset_z'].isEnabled())
+        self.assertFalse(self.widget.apply_button.isEnabled())
+
     def test_planner_selection_applies_strings_and_preserves_draft_until_reply(self):
         data = self.data()
         data.update(planners={'ompl': ['RRTConnect', 'RRTstar'], 'nsg': ['NSG']}, default_pipeline='ompl')

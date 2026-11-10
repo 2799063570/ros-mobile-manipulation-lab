@@ -2,6 +2,7 @@
 import math
 import threading
 from aubo_cloud_bridge.protocol import Telemetry, decode_json, encode_json
+from aubo_huawei_bridge.iot import workcell_data
 
 
 class HuaweiTelemetry(Telemetry):
@@ -9,6 +10,11 @@ class HuaweiTelemetry(Telemetry):
         super().__init__()
         self.lock = threading.RLock()
         self.values['completed_counts'] = None
+        self.values['workcell'] = {}
+
+    def set_workcell(self, center, size, frame):
+        with self.lock:
+            self.values['workcell'] = workcell_data(center, size, frame)
 
     def update(self, kind, raw, now=None):
         with self.lock:
@@ -25,7 +31,8 @@ class HuaweiTelemetry(Telemetry):
                         not 0 <= v <= 9007199254740991 for k, v in counts.items()) or
                     data.get('scope') != 'node_session' or not isinstance(data.get('session'), str) or
                     not 0 < len(data['session']) <= 128 or data.get('schema_version') != 1 or
-                    type(data.get('total')) is not int or data['total'] != sum(counts.values())):
+                    type(data.get('total')) is not int or not 0 <= data['total'] <= 9007199254740991 or
+                    data['total'] != sum(counts.values())):
                 raise ValueError('invalid completion statistics')
             self.values['completed_counts'] = {key: data[key] for key in ('counts', 'total', 'session', 'scope')}
             return

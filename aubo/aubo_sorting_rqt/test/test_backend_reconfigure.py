@@ -31,6 +31,7 @@ struct PlannerInterfaceDescription {std::string pipeline_id; std::vector<std::st
 struct SortingTaskConfig {
   std::string planning_pipeline, planner_id;
   double detection_timeout{15}, grasp_offset_x{0}, grasp_offset_y{0};
+  double stacked_grasp_offset_z{0},stacked_support_min_height{.02};
   double velocity_scaling{.1}, acceleration_scaling{.1}, queue_max_age{3};
   double queue_merge_distance{.02}, queue_merge_overlap{.5};
   double minimum_gripper_height{.06};
@@ -59,6 +60,7 @@ public:
   std::mutex operation_mutex_, queue_mutex_;
   std::atomic<bool> busy_{false};
   double detection_timeout_{15}, grasp_offset_x_{0}, grasp_offset_y_{0};
+  double stacked_grasp_offset_z_{0},stacked_support_min_height_{.02};
   double velocity_scaling_{.1}, acceleration_scaling_{.1};
   double minimum_gripper_height_{.06},pregrasp_height_{.2},lift_min_height_{.25},preplace_height_{.25};
   int detection_samples_{8}, target_cache_min_observations_{5};
@@ -82,15 +84,29 @@ int main() {
   assert(task.instance_queue_.max_age==5.);
   assert(task.instance_queue_.tracks().begin()->second.status == Queue::Status::CANDIDATE);
   assert(task.instance_queue_.tracks().begin()->second.observations == 0);
-  const int calls = task.arm_->calls;
+  int calls = task.arm_->calls;
   task.busy_.store(true);
   config.velocity_scaling=.8; config.target_cache_min_observations=2;
   config.minimum_gripper_height=.1;
+  config.stacked_grasp_offset_z=.02;config.stacked_support_min_height=.03;
   task.reconfigureCallback(config,0);
   assert(config.velocity_scaling==.2 && config.target_cache_min_observations==8);
   assert(config.minimum_gripper_height==.06 && task.minimum_gripper_height_==.06);
+  assert(config.stacked_grasp_offset_z==0. && config.stacked_support_min_height==.02);
   assert(task.arm_->calls==calls && task.instance_queue_.min_observations==8);
   task.busy_.store(false);
+  config.stacked_grasp_offset_z=.01;config.stacked_support_min_height=.025;
+  task.reconfigureCallback(config,0);
+  assert(task.stacked_grasp_offset_z_==.01 && task.stacked_support_min_height_==.025);
+  const int offset_calls=task.arm_->calls;
+  config.stacked_grasp_offset_z=.051;task.reconfigureCallback(config,0);
+  assert(config.stacked_grasp_offset_z==.01 && task.arm_->calls==offset_calls);
+  config.stacked_support_min_height=0;task.reconfigureCallback(config,0);
+  assert(config.stacked_support_min_height==.025 && task.arm_->calls==offset_calls);
+  config.stacked_grasp_offset_z=std::numeric_limits<double>::quiet_NaN();task.reconfigureCallback(config,0);
+  assert(config.stacked_grasp_offset_z==.01 && task.arm_->calls==offset_calls);
+  // Keep the existing call-count assertions focused on the following rejected edits.
+  calls=offset_calls;
   config.detection_timeout=2.; task.reconfigureCallback(config,0);
   assert(config.detection_timeout==15. && task.arm_->calls==calls);
   config.queue_max_age=11.; task.reconfigureCallback(config,0);

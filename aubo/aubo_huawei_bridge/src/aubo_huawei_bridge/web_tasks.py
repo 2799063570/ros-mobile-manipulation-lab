@@ -1,5 +1,6 @@
 """Local web task provider; transport-independent and guarded by the ROS journal."""
 import copy
+import errno
 import fcntl
 import json
 import math
@@ -14,19 +15,34 @@ from aubo_huawei_bridge.iot import decode_command, result_summary
 from aubo_huawei_bridge.telemetry import HuaweiTelemetry
 
 
+class JournalInUseError(ValueError):
+    """Another process still owns the command journal; never bypass its lock."""
+
+
 class WebTasks:
     poll_seconds = 2
     fresh_seconds = 5
 
-    def __init__(self, directory, execute, enabled=False):
+    def __init__(self, directory, execute, enabled=False, owner_wait=0):
+        if not 0 <= owner_wait <= 5:
+            raise ValueError('invalid journal owner wait')
         directory = Path(directory).expanduser()
         directory.mkdir(parents=True, exist_ok=True, mode=0o700)
         self.owner = (directory / 'dashboard.lock').open('a')
-        try:
-            fcntl.flock(self.owner.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError:
-            self.owner.close()
-            raise ValueError('another dashboard owns this journal directory')
+        deadline = time.monotonic() + owner_wait
+        while True:
+            try:
+                fcntl.flock(self.owner.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except OSError as error:
+                if error.errno not in (errno.EACCES, errno.EAGAIN):
+                    self.owner.close()
+                    raise
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    self.owner.close()
+                    raise JournalInUseError('another dashboard owns this journal directory')
+                time.sleep(min(.05, remaining))
         self.lock = threading.RLock()
         self.journal = CommandJournal(str(directory / 'dashboard_commands.sqlite3'))
         self.telemetry = HuaweiTelemetry()
@@ -37,8 +53,6 @@ class WebTasks:
         self.closed = False
         self.last = {}
         self.cell = {}
-        self.camera_buffer = None
-        self.camera_enabled = False
         self.pending = {}
         self.dispatcher = Dispatcher(self.journal, execute, self.reply, self.report,
                                      self.context, enabled=enabled)
@@ -78,9 +92,6 @@ class WebTasks:
     def workcell(self):
         with self.lock:
             return copy.deepcopy(self.cell)
-
-    def camera(self):
-        return self.camera_buffer.get() if self.camera_buffer else None
 
     def report(self, result):
         with self.lock:

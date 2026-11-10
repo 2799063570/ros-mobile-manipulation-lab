@@ -1,0 +1,98 @@
+[
+  {
+    "source": "notify_data.header.device_id",
+    "target": "device_id"
+  },
+  {
+    "source": "notify_data.body.services[0].service_id",
+    "target": "service_id"
+  },
+  {
+    "source": "notify_data.body.services[0].properties.bridge_wall_ms",
+    "target": "bridge_wall_ms"
+  },
+  {
+    "source": "notify_data.body.services[0].properties.bridge_session",
+    "target": "bridge_session"
+  },
+  {
+    "source": "notify_data.body.services[0].properties.state",
+    "target": "state"
+  },
+  {
+    "source": "notify_data.body.services[0].properties.state_detail",
+    "target": "state_detail"
+  },
+  {
+    "source": "notify_data.body.services[0].properties.phase",
+    "target": "phase"
+  },
+  {
+    "source": "notify_data.body.services[0].properties.description",
+    "target": "description"
+  },
+  {
+    "source": "notify_data.body.services[0].properties.failure",
+    "target": "failure"
+  },
+  {
+    "source": "notify_data.body.services[0].properties.detection_summary",
+    "target": "detection_summary"
+  },
+  {
+    "source": "notify_data.body.services[0].properties.target_cache",
+    "target": "target_cache"
+  },
+  {
+    "source": "notify_data.body.services[0].properties.target_cache_truncated",
+    "target": "target_cache_truncated"
+  },
+  {
+    "source": "notify_data.body.services[0].properties.target_cache_age_s",
+    "target": "target_cache_age_s"
+  },
+  {
+    "source": "notify_data.body.services[0].properties.queue_total",
+    "target": "queue_total"
+  },
+  {
+    "source": "notify_data.body.services[0].properties.queue_candidate",
+    "target": "queue_candidate"
+  },
+  {
+    "source": "notify_data.body.services[0].properties.queue_ready",
+    "target": "queue_ready"
+  },
+  {
+    "source": "notify_data.body.services[0].properties.queue_reserved",
+    "target": "queue_reserved"
+  },
+  {
+    "source": "notify_data.body.services[0].properties.queue_done",
+    "target": "queue_done"
+  },
+  {
+    "source": "notify_data.body.services[0].properties.queue_review",
+    "target": "queue_review"
+  },
+  {
+    "source": "notify_data.body.services[0].properties.completed_counts",
+    "target": "completed_counts"
+  },
+  {
+    "source": "notify_data.body.services[0].properties.completed_total",
+    "target": "completed_total"
+  },
+  {
+    "source": "notify_data.body.services[0].properties.statistics_available",
+    "target": "statistics_available"
+  },
+  {
+    "source": "notify_data.body.services[0].properties.completed_counts_truncated",
+    "target": "completed_counts_truncated"
+  },
+  {
+    "source": "notify_data.body.services[0].properties.workcell",
+    "target": "workcell"
+  }
+]

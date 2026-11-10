@@ -4,7 +4,7 @@ table_z: 0.10
 object_height: 0.04
 # 按类别覆盖已知物高，单位 m，例如 {bottle: 0.12}。
 class_heights: {}
-object_height_source: configured  # depth measures per-object height when height_mode=depth
+object_height_source: configured  # configured | depth（贴桌）| bounded_depth（叠放，使用厚度上限先验）
 minimum_object_height: 0.005
 maximum_object_height: 0.30
 height_tolerance: 0.02

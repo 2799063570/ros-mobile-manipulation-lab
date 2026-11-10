@@ -1,0 +1,76 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- 分拣统一工作台：仿真 / 实机 + ThingsBoard + 电脑网页 + 手机公网入口。
+       修改下面的 default 可设置常用组合，也可在命令行用 参数名:=值 覆盖。
+       开关统一使用 true（开启）/ false（关闭），参数名保留英文以兼容已有命令。 -->
+  <arg name="mode" default="real"
+       doc="运行模式：gazebo=完整仿真；real=眼在手外三类容器实机；existing=连接已有分拣系统"/>
+  <arg name="start_sorting" default="$(eval arg('mode') != 'existing')"
+       doc="是否启动分拣环境；已有环境时设为 false，existing 模式始终复用已有环境"/>
+  <arg name="start_thingsboard" default="true" doc="是否启动 ThingsBoard 云端上报"/>
+  <arg name="start_web" default="true" doc="是否启动本机投影网页"/>
+  <arg name="start_cpolar" default="true" doc="是否启动手机 HTTPS 隧道；开启时自动启动本机网页"/>
+  <arg name="start_rqt" default="true" doc="是否打开本地 rqt 工作台；统一控制仿真和实机的面板，只启动一份"/>
+  <arg name="enable_commands" default="true" doc="是否允许云端和网页发送任务指令；false 为只读监控"/>
+
+  <!-- 仿真可选择检测器和相机安装方式；real 模式沿用实测入口固定的 YOLO + 眼在手外。
+       底层入口的其他参数继续透传，如 robot_ip、start_robot、start_camera、start_gripper、
+       calibration_file、gripper_port、model_path、task_config、velocity_scaling 等。 -->
+  <arg name="detector" default="$(eval 'yolo' if arg('mode') == 'real' else 'color')"
+       doc="仿真检测器：color=颜色，yolo=目标检测；实机模式由实测入口固定为 yolo"/>
+  <arg name="camera_mount" default="$(eval 'eye_to_hand' if arg('mode') == 'real' else 'eye_in_hand')"
+       doc="仿真相机：eye_in_hand=眼在手上，eye_to_hand=眼在手外；实机模式固定眼在手外"/>
+  <arg name="auto_move_to_observation" default="false" doc="启动后是否自动移动到观察位；默认等待手动指令"/>
+  <arg name="auto_start" default="false" doc="启动后是否自动开始分拣；默认等待手动指令"/>
+
+  <!-- 云桥和网页只连接这些 ROS 接口；本组参数不重命名底层分拣节点。 -->
+  <arg name="sorting_ns" default="/sorting" doc="已有分拣状态话题和任务服务的命名空间"/>
+  <arg name="task_node" default="/color_sorting_task" doc="读取工位参数的任务节点名称"/>
+  <arg name="thingsboard_host" default="$(optenv THINGSBOARD_HOST mqtt.thingsboard.cloud)"
+       doc="ThingsBoard MQTT 主机，不带 https://"/>
+  <arg name="thingsboard_token_file" default="$(env HOME)/.config/aubo/thingsboard.token"
+       doc="本机设备 Token 文件路径；不要将密钥内容写入 launch"/>
+  <arg name="web_port" default="8099" doc="本机网页端口，cpolar 自动使用同一端口"/>
+  <arg name="web_auth_file" default="$(env HOME)/.config/aubo/huawei/dashboard.json"
+       doc="本机网页密码配置文件，沿用现有登录密码"/>
+  <arg name="cpolar_region" default="cn" doc="cpolar 隧道区域：cn 或 cn_top"/>
+
+  <!-- 只选择一个底层入口。real 直接复用实测工位的标定、容器、队列及硬件配置。
+       底层实机入口自带 rqt，这里统一关闭，再由 start_rqt 决定是否单独启动面板。 -->
+  <include if="$(eval arg('start_sorting') and arg('mode') != 'existing')"
+           file="$(eval find('aubo_sorting') + {'gazebo':'/launch/sorting_gazebo.launch', 'real':'/launch/scenarios/eye_to_hand_can_sorting_real.launch'}[arg('mode')])"
+           pass_all_args="true">
+    <arg name="rqt" value="false"/>
+  </include>
+
+  <!-- ThingsBoard 云桥：上传状态、坐标和累计完成统计，不上传相机图片。 -->
+  <include if="$(arg start_thingsboard)" file="$(find aubo_cloud_bridge)/launch/thingsboard.launch">
+    <arg name="host" value="$(arg thingsboard_host)"/>
+    <arg name="token_file" value="$(arg thingsboard_token_file)"/>
+    <arg name="enable_commands" value="$(arg enable_commands)"/>
+    <arg name="sorting_ns" value="$(arg sorting_ns)"/>
+    <arg name="task_node" value="$(arg task_node)"/>
+  </include>
+
+  <!-- 手机隧道需要本机网页，两个开关同时开启也只启动一份网页服务。
+       此处复用原包内的本机 ROS 网页代码，不启动华为云 MQTT 桥。
+       网页和隧道为可选节点，启动失败不因 required 设置退出分拣环境。 -->
+  <include if="$(eval arg('start_web') or arg('start_cpolar'))"
+           file="$(find aubo_huawei_bridge)/launch/workstation.launch">
+    <arg name="enable_commands" value="$(arg enable_commands)"/>
+    <arg name="sorting_ns" value="$(arg sorting_ns)"/>
+    <arg name="task_node" value="$(arg task_node)"/>
+    <arg name="port" value="$(arg web_port)"/>
+    <arg name="auth_file" value="$(arg web_auth_file)"/>
+    <arg name="required" value="false"/>
+  </include>
+  <node if="$(arg start_cpolar)" pkg="aubo_huawei_bridge" type="huawei_tunnel"
+        name="aubo_huawei_tunnel" output="screen" required="false"
+        args="--port $(arg web_port) --region $(arg cpolar_region)"/>
+
+  <!-- 本地 rqt 保留相机画面，与远程只显示投影的网页同时使用。 -->
+  <include if="$(arg start_rqt)" file="$(find aubo_sorting_rqt)/launch/sorting_panel.launch">
+    <arg name="sorting_ns" value="$(arg sorting_ns)"/>
+    <arg name="task_node" value="$(arg task_node)"/>
+  </include>
+</launch>

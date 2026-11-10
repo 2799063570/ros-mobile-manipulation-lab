@@ -158,6 +158,34 @@
                   "type": "timeseries",
                   "settings": {},
                   "color": "#195ed8"
+                },
+                {
+                  "name": "completed_counts",
+                  "label": "completed_counts",
+                  "type": "timeseries",
+                  "settings": {},
+                  "color": "#195ed8"
+                },
+                {
+                  "name": "completed_total",
+                  "label": "completed_total",
+                  "type": "timeseries",
+                  "settings": {},
+                  "color": "#195ed8"
+                },
+                {
+                  "name": "statistics_available",
+                  "label": "statistics_available",
+                  "type": "timeseries",
+                  "settings": {},
+                  "color": "#195ed8"
+                },
+                {
+                  "name": "workcell",
+                  "label": "workcell",
+                  "type": "timeseries",
+                  "settings": {},
+                  "color": "#195ed8"
                 }
               ]
             }

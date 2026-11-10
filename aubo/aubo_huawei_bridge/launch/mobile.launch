@@ -3,13 +3,11 @@
   <arg name="sorting_ns" default="/sorting"/>
   <arg name="port" default="8099"/>
   <arg name="region" default="cn"/>
-  <arg name="image_topic" default="$(arg sorting_ns)/debug_image"/>
   <arg name="task_node" default="/color_sorting_task"/>
   <include file="$(find aubo_huawei_bridge)/launch/workstation.launch">
     <arg name="enable_commands" value="$(arg enable_commands)"/>
     <arg name="sorting_ns" value="$(arg sorting_ns)"/>
     <arg name="port" value="$(arg port)"/>
-    <arg name="image_topic" value="$(arg image_topic)"/>
     <arg name="task_node" value="$(arg task_node)"/>
   </include>
   <node pkg="aubo_huawei_bridge" type="huawei_tunnel" name="aubo_huawei_tunnel"

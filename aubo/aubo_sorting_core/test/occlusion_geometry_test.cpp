@@ -40,4 +40,30 @@ TEST(OcclusionGeometry, RecordedRealPregraspPoseCoversBothReportedClassPredictio
   EXPECT_TRUE(robotOccludesTarget(camera,{{-.063039,-.667543,.034801}},links,.06));
 }
 
+TEST(OcclusionGeometry, PartialFootprintOcclusionIsDetectedBeforeCenterIsHidden)
+{
+  const Point3 camera{{0,0,1}},center{{0,0,0}};
+  const std::vector<Point3> outline{{{-.2,-.1,0}},{{.2,-.1,0}},{{.2,.1,0}},{{-.2,.1,0}}};
+  const std::vector<Point3> edge_only{{{.1,.05,.5}}};
+  EXPECT_FALSE(robotOccludesTarget(camera,center,edge_only,.015));
+  EXPECT_TRUE(robotOccludesRegion(camera,center,outline,edge_only,.015));
+  const std::vector<Point3> midpoint_only{{{.1,0,.5}}};
+  EXPECT_TRUE(robotOccludesRegion(camera,center,outline,midpoint_only,.015));
+  EXPECT_FALSE(robotOccludesRegion(camera,center,outline,{{{.4,0,.5}}},.015));
+  EXPECT_FALSE(robotOccludesRegion(camera,center,outline,{{{.1,.05,-.5}}},.015));
+  EXPECT_FALSE(robotOccludesRegion(camera,center,{},edge_only,.015));
+}
+
+TEST(OcclusionGeometry, CurrentStoppedPoseMasksTheReportedBottleTarget)
+{
+  // Read-only snapshot: records/occlusion_fix_20261110_094856/stopped_pose.json.
+  const Point3 camera{{-.0292379638,-.6524278933,.9094763530}};
+  const Point3 target{{-.1405319272,-.6207131473,.0539611569}};
+  const std::vector<Point3> links{{{.1112017953,-.0489531482,.122}},
+      {{.0485615476,-.1912450922,.4992177117}},{{-.0992566755,-.5270183348,.4168641902}},
+      {{-.1405549045,-.6208304043,.4168205641}},{{-.1405524492,-.6207877716,.3228205738}},
+      {{-.1405491371,-.6207329434,.2028205864}}};
+  EXPECT_TRUE(robotOccludesRegion(camera,target,{},links,.06));
+}
+
 int main(int argc,char** argv) {testing::InitGoogleTest(&argc,argv);return RUN_ALL_TESTS();}

@@ -35,9 +35,11 @@ class Bridge:
         self.telemetry = HuaweiTelemetry()
         self.ns = rospy.get_param('~sorting_ns', '/sorting').rstrip('/')
         self.enabled = rospy.get_param('~enable_commands', False)
+        self.extended = rospy.get_param('~extended_telemetry', False)
+        self.task_node = rospy.get_param('~task_node', '/color_sorting_task').rstrip('/')
         self.interval = float(rospy.get_param('~publish_interval', 30))
         self.service_wait = float(rospy.get_param('~service_wait', 1))
-        if type(self.enabled) is not bool or not 5 <= self.interval <= 3600 or not .1 <= self.service_wait <= 2:
+        if type(self.enabled) is not bool or type(self.extended) is not bool or not 5 <= self.interval <= 3600 or not .1 <= self.service_wait <= 2:
             raise ValueError('invalid_bridge_parameters')
         device = decode_json(Path(os.path.expanduser(rospy.get_param('~credentials_file'))).read_text())
         self.device_id = device['device_id']
@@ -73,7 +75,7 @@ class Bridge:
                                      self.context, enabled=self.enabled)
         self.subscribers = [rospy.Subscriber(self.ns + '/' + kind, String, self.ros_message,
             callback_args=kind, queue_size=1) for kind in (
-                'state', 'progress', 'failure', 'detection_summary', 'target_cache')]
+                'state', 'progress', 'failure', 'detection_summary', 'target_cache', 'completed_counts')]
         self.status_publisher = rospy.Publisher('~status', String, queue_size=1, latch=True)
         self.client.connect_async(host, int(rospy.get_param('~port', 8883)),
                                   int(rospy.get_param('~keepalive', 60)))
@@ -168,12 +170,19 @@ class Bridge:
             except Exception:
                 available = False
             now, now_ms = time.monotonic(), int(time.time() * 1000)
+            try:
+                self.telemetry.set_workcell(rospy.get_param(self.task_node + '/table_center', None),
+                    rospy.get_param(self.task_node + '/table_size', None),
+                    rospy.get_param(self.task_node + '/target_frame', 'base_link'))
+            except Exception:
+                pass
             with self.lock:
                 self.available, self.health_checked = available, now
                 session, last = self.session, dict(self.last_command)
             if session and self.client.is_connected() and now >= next_report:
                 next_report = now + self.interval
-                payload = property_report(self.telemetry.snapshot(), session, available, self.enabled, last, now_ms)
+                payload = property_report(self.telemetry.snapshot(), session, available, self.enabled, last, now_ms,
+                                          extended=self.extended)
                 if self.budget.take():
                     info = self.client.publish(self.topics['report'], encode_json(payload), qos=0, retain=False)
                     if info.rc == mqtt.MQTT_ERR_SUCCESS:
@@ -185,7 +194,8 @@ class Bridge:
             status = dict(session=session, connected=bool(session), commands_enabled=self.enabled,
                 sorting_available=available, device_id=self.device_id, status_wall_ms=now_ms,
                 last_report_ms=self.last_report_ms, publish_interval=self.interval,
-                outgoing_units_24h=self.budget.used(), outgoing_limit=self.budget.limit)
+                outgoing_units_24h=self.budget.used(), outgoing_limit=self.budget.limit,
+                extended_telemetry=self.extended)
             self.status_publisher.publish(String(data=encode_json(status)))
             self.shutdown.wait(1)
 

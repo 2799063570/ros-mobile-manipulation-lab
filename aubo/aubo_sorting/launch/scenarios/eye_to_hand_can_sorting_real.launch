@@ -3,7 +3,7 @@
   <!-- Real cell: one YAML owns category destinations and container geometry. -->
   <arg name="containers_config" default="$(find aubo_planning)/config/sorting_containers_real.yaml"/>
   <arg name="camera_stand_config" default="$(find aubo_planning)/config/camera_stand_reference.yaml"/>
-  <!-- Dispatch ready instances in queue order; categories only filter eligibility. -->
+  <!-- Queue YAML selects top-first dispatch; categories only filter eligibility. -->
   <arg name="continuous_sorting" default="true"/>
   <arg name="queue_config" default="$(find aubo_sorting)/config/eye_to_hand_continuous_real.yaml"/>
   <arg name="task_config" default="$(find aubo_sorting)/config/eye_to_hand_can_real.yaml"/>

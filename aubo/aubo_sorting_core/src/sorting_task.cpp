@@ -449,6 +449,8 @@ void SortingTask::setupDynamicReconfigure()
   private_nh_.setParam("detection_samples", detection_samples_);
   private_nh_.setParam("grasp_offset_x", grasp_offset_x_);
   private_nh_.setParam("grasp_offset_y", grasp_offset_y_);
+  private_nh_.setParam("stacked_grasp_offset_z", stacked_grasp_offset_z_);
+  private_nh_.setParam("stacked_support_min_height", stacked_support_min_height_);
   private_nh_.setParam("velocity_scaling", velocity_scaling_);
   private_nh_.setParam("acceleration_scaling", acceleration_scaling_);
   private_nh_.setParam("target_cache_min_observations", target_cache_min_observations_);
@@ -498,6 +500,8 @@ void SortingTask::reconfigureCallback(SortingTaskConfig& config, uint32_t)
       config.detection_samples == detection_samples_ &&
       config.grasp_offset_x == grasp_offset_x_ &&
       config.grasp_offset_y == grasp_offset_y_ &&
+      config.stacked_grasp_offset_z == stacked_grasp_offset_z_ &&
+      config.stacked_support_min_height == stacked_support_min_height_ &&
       config.velocity_scaling == velocity_scaling_ &&
       config.acceleration_scaling == acceleration_scaling_ &&
       config.target_cache_min_observations == target_cache_min_observations_ &&
@@ -509,7 +513,11 @@ void SortingTask::reconfigureCallback(SortingTaskConfig& config, uint32_t)
       std::isfinite(config.acceleration_scaling) && std::isfinite(config.queue_max_age) &&
       std::isfinite(config.queue_merge_distance) && std::isfinite(config.queue_merge_overlap) &&
       std::isfinite(config.minimum_gripper_height);
-  if (busy_.load() || !planner_valid || !finite || config.detection_timeout <= queue_empty_confirmation_ ||
+  const bool stacked_valid=std::isfinite(config.stacked_grasp_offset_z) &&
+      config.stacked_grasp_offset_z>=-.05 && config.stacked_grasp_offset_z<=.05 &&
+      std::isfinite(config.stacked_support_min_height) && config.stacked_support_min_height>=.005 &&
+      config.stacked_support_min_height<=.30;
+  if (busy_.load() || !planner_valid || !finite || !stacked_valid || config.detection_timeout <= queue_empty_confirmation_ ||
       config.queue_max_age > instance_queue_.retention || config.queue_max_age > queue_reserved_max_age_ ||
       config.queue_merge_distance>instance_queue_.match_distance || config.queue_merge_distance<=0 ||
       config.queue_merge_overlap<=0 || config.queue_merge_overlap>1 || config.minimum_gripper_height<0 ||
@@ -521,6 +529,8 @@ void SortingTask::reconfigureCallback(SortingTaskConfig& config, uint32_t)
     config.detection_samples = detection_samples_;
     config.grasp_offset_x = grasp_offset_x_;
     config.grasp_offset_y = grasp_offset_y_;
+    config.stacked_grasp_offset_z = stacked_grasp_offset_z_;
+    config.stacked_support_min_height = stacked_support_min_height_;
     config.velocity_scaling = velocity_scaling_;
     config.acceleration_scaling = acceleration_scaling_;
     config.target_cache_min_observations = target_cache_min_observations_;
@@ -536,6 +546,8 @@ void SortingTask::reconfigureCallback(SortingTaskConfig& config, uint32_t)
   detection_samples_ = config.detection_samples;
   grasp_offset_x_ = config.grasp_offset_x;
   grasp_offset_y_ = config.grasp_offset_y;
+  stacked_grasp_offset_z_ = config.stacked_grasp_offset_z;
+  stacked_support_min_height_ = config.stacked_support_min_height;
   velocity_scaling_ = config.velocity_scaling;
   acceleration_scaling_ = config.acceleration_scaling;
   minimum_gripper_height_=config.minimum_gripper_height;

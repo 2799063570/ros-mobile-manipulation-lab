@@ -11,10 +11,12 @@ ARCHIVE_NAME = DEVICE_TYPE + '_' + MANUFACTURER_ID + '.zip'
 def service():
     strings = {'state': 64, 'state_detail': 160, 'phase': 96, 'description': 160,
         'failure': 160, 'detection_summary': 160, 'bridge_wall_ms': 20,
-        'bridge_session': 32, 'target_cache': 1200, 'last_command': 512}
+        'bridge_session': 32, 'target_cache': 1200, 'last_command': 512,
+        'completed_counts': 512, 'completed_total': 20, 'workcell': 256}
     props = [{'property_name': name, 'data_type': 'string', 'method': 'R',
               'required': False, 'max_length': size} for name, size in strings.items()]
-    for name in ('commands_enabled', 'sorting_available', 'target_cache_truncated'):
+    for name in ('commands_enabled', 'sorting_available', 'target_cache_truncated',
+                 'statistics_available', 'completed_counts_truncated'):
         props.append({'property_name': name, 'data_type': 'int', 'method': 'R',
                       'required': False, 'min': '0', 'max': '1'})
     for kind in ('total', 'candidate', 'ready', 'reserved', 'done', 'review'):
@@ -66,6 +68,9 @@ def console_profiles():
 
 
 def write_artifacts(root):
+    added = {'completed_counts', 'completed_total', 'workcell', 'statistics_available', 'completed_counts_truncated'}
+    (root / 'add_dashboard_properties.json').write_text(json.dumps(
+        [p for p in service()['properties'] if p['property_name'] in added], ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
     for name, value in (('create_product.json', product()),
                         ('update_product.json', {'service_capabilities': [service()]})):
         (root / name).write_text(json.dumps(value, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')

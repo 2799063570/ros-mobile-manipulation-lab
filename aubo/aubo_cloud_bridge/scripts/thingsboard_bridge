@@ -15,7 +15,8 @@ from std_msgs.msg import String
 from std_srvs.srv import Trigger
 
 from aubo_cloud_bridge.commands import Dispatcher
-from aubo_cloud_bridge.protocol import (CommandJournal, Telemetry, METHODS,
+from aubo_cloud_bridge.sorting_telemetry import SortingTelemetry
+from aubo_cloud_bridge.protocol import (CommandJournal, METHODS,
                                        TELEMETRY_TOPIC, RPC_PREFIX, RESPONSE_PREFIX,
                                        decode_json, encode_json)
 
@@ -28,8 +29,9 @@ class Bridge:
         self.available = False
         self.health_checked = 0.0
         self.last_command = '{}'
-        self.telemetry = Telemetry()
+        self.telemetry = SortingTelemetry()
         self.ns = rospy.get_param('~sorting_ns', '/sorting').rstrip('/')
+        self.task_node = rospy.get_param('~task_node', '/color_sorting_task').rstrip('/')
         self.enabled = rospy.get_param('~enable_commands', False)
         self.interval = float(rospy.get_param('~publish_interval', 2.0))
         self.service_wait = float(rospy.get_param('~service_wait', 1.0))
@@ -64,7 +66,7 @@ class Bridge:
                                      self.context, enabled=self.enabled)
         self.subscribers = [rospy.Subscriber(self.ns + '/' + kind, String,
                             self.ros_message, callback_args=kind, queue_size=1)
-                            for kind in ('state', 'progress', 'failure', 'detection_summary', 'target_cache')]
+                            for kind in ('state', 'progress', 'failure', 'detection_summary', 'target_cache', 'completed_counts')]
         host = rospy.get_param('~host')
         if not isinstance(host, str) or not re.fullmatch(r'[A-Za-z0-9.-]+', host):
             raise ValueError('host must be an MQTT hostname without https://')
@@ -148,6 +150,12 @@ class Bridge:
                              all(self.ns + '/' + method in provided for method in METHODS))
             except Exception:
                 available = False
+            try:
+                self.telemetry.set_workcell(rospy.get_param(self.task_node + '/table_center', None),
+                                           rospy.get_param(self.task_node + '/table_size', None),
+                                           rospy.get_param(self.task_node + '/target_frame', 'base_link'))
+            except Exception:
+                self.telemetry.set_workcell(None, None, '')
             with self.lock:
                 self.available = available
                 self.health_checked = time.monotonic()

@@ -27,7 +27,7 @@ from sensor_msgs.msg import CameraInfo, Image
 from std_msgs.msg import String, Float32
 from std_srvs.srv import SetBool, SetBoolResponse, Trigger, TriggerResponse
 from tf.transformations import quaternion_matrix
-from aubo_perception.grasp_geometry import (validate_modes, center_height, object_height_from_depth,
+from aubo_perception.grasp_geometry import (validate_modes, center_height, object_height_from_depth, bounded_depth_center,
                                            ray_plane, rectangle_grasp, rectangle_footprint)
 
 from aubo_perception.msg import DetectedObject, DetectedObjectArray, YoloDetectionArray
@@ -54,13 +54,17 @@ class YoloRgbdTargetNode(object):
         self.object_height_source = rospy.get_param("~object_height_source", "configured")
         self.minimum_object_height = float(rospy.get_param("~minimum_object_height", 0.005))
         self.maximum_object_height = float(rospy.get_param("~maximum_object_height", 0.30))
-        if self.object_height_source not in ("configured", "depth"):
-            raise ValueError("object_height_source must be configured or depth")
-        if self.object_height_source == "depth" and self.height_mode != "depth":
-            raise ValueError("object_height_source=depth requires height_mode=depth")
+        if self.object_height_source not in ("configured", "depth", "bounded_depth"):
+            raise ValueError("object_height_source must be configured or depth or bounded_depth")
+        if self.object_height_source in ("depth", "bounded_depth") and self.height_mode != "depth":
+            raise ValueError("object_height_source=" + self.object_height_source + " requires height_mode=depth")
         if (not all(math.isfinite(v) for v in (self.minimum_object_height, self.maximum_object_height))
                 or not 0 < self.minimum_object_height <= self.maximum_object_height):
             raise ValueError("need 0 < minimum_object_height <= maximum_object_height")
+        if self.object_height_source == "bounded_depth":
+            for height in [self.object_height] + [float(h) for h in self.class_heights.values()]:
+                bounded_depth_center(self.table_z + height, self.table_z, height,
+                                     self.minimum_object_height, self.maximum_object_height)
         for height in self.class_heights.values():
             center_height(self.table_z + float(height), self.table_z, float(height), self.height_tolerance)
         self.boxes_topic = rospy.get_param(
@@ -414,7 +418,10 @@ class YoloRgbdTargetNode(object):
                        for i, axis in enumerate(("x", "y"))):
                     continue
                 if self.height_mode == "depth":
-                    if self.object_height_source == "depth":
+                    if self.object_height_source == "bounded_depth":
+                        z, object_height = bounded_depth_center(surface_z, self.table_z, object_height,
+                            self.minimum_object_height, self.maximum_object_height)
+                    elif self.object_height_source == "depth":
                         object_height = object_height_from_depth(surface_z, self.table_z,
                             self.minimum_object_height, self.maximum_object_height)
                         z = self.table_z + object_height/2

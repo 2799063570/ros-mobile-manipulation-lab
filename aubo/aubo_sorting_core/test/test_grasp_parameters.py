@@ -18,13 +18,15 @@ exec(compile(ast.fix_missing_locations(module), '<actual grasp methods>', 'exec'
 class GraspTest(unittest.TestCase):
     def setUp(self):
         self.t = t = env['Task']()
-        for key, value in dict(height_mode='depth', use_detected_angle=True, use_detected_width=True,
+        for key, value in dict(height_mode='depth', allow_stacked_objects=False, use_detected_angle=True, use_detected_width=True,
                 object_height=.04, table_z=.1, height_tolerance=.02, grasp_height_offset=.01,
                 grasp_offset_x=0., grasp_offset_y=0., gripper_open=0., gripper_closed=.4,
                 gripper_width_open=.08, gripper_width_closed=0., width_close_scale=.9,
                 pregrasp_height=.22, preplace_height=.28, lift_min_height=.18,
                 place_clearance=.02, minimum_place_z=None, place_frame='base_link', place_targets={'red':[.4, .2]},
                 minimum_gripper_height=0.,
+                grasp_height_reference='center', grasp_surface_inset=.01,
+                stacked_grasp_offset_z=0., stacked_support_min_height=.02,
                 grasp_model_names={}, _active_grasp_angle=0., place_object_yaw=None).items():
             setattr(t, key, value)
         t._pose = lambda x,y,z: (x,y,z,t._active_grasp_angle)
@@ -127,6 +129,58 @@ class GraspTest(unittest.TestCase):
         self.t._command_gripper.assert_not_called()
         self.t._move_to_pose.assert_not_called()
         self.assertEqual(self.t._set_failure.call_args[0][0], 'CONFIGURATION_FAILED')
+
+    def test_elevated_support_changes_pick_height_but_not_destination_height(self):
+        self.d.pose.position.z = .20
+        self.assertFalse(self.t._pick_and_place(self.d))
+        self.t._command_gripper.assert_not_called()
+        self.t.allow_stacked_objects = True
+        self.assertTrue(self.t._pick_and_place(self.d))
+        self.assertAlmostEqual(self.t._cartesian_to.call_args_list[0][0][0][2], .21)
+        self.assertAlmostEqual(self.t._cartesian_to.call_args_list[1][0][0][2], .15)
+
+    def test_stack_mode_still_rejects_below_table_or_above_approach_before_motion(self):
+        self.t.allow_stacked_objects = True
+        for center in (.08, .4, float('nan')):
+            self.d.pose.position.z = center
+            self.assertFalse(self.t._pick_and_place(self.d))
+            self.t._command_gripper.assert_not_called()
+            self.t._move_to_pose.assert_not_called()
+
+    def test_surface_reference_does_not_depend_on_the_thickness_prior_for_pick(self):
+        self.t.allow_stacked_objects = True
+        self.t.grasp_height_reference = 'surface'
+        self.t.grasp_surface_inset = .01
+        for thickness in (.04, .065):
+            self.d.object_height = thickness
+            self.d.pose.position.z = .24-thickness/2
+            self.t._cartesian_to.reset_mock()
+            self.assertTrue(self.t._pick_and_place(self.d))
+            self.assertAlmostEqual(self.t._cartesian_to.call_args_list[0][0][0][2], .23)
+            self.assertAlmostEqual(self.t._cartesian_to.call_args_list[1][0][0][2],
+                                   self.t.table_z+thickness-.01+self.t.place_clearance)
+
+    def test_upper_z_correction_raises_pick_only_for_elevated_objects_and_preserves_grip_offset(self):
+        self.t.allow_stacked_objects=True
+        self.t.grasp_height_reference='surface'
+        self.t.stacked_grasp_offset_z=.01
+        self.d.pose.position.z=.20  # Estimated bottom=.18, 8 cm above the table.
+        self.assertTrue(self.t._pick_and_place(self.d))
+        self.assertAlmostEqual(self.t._cartesian_to.call_args_list[0][0][0][2],.22)
+        self.assertAlmostEqual(self.t._cartesian_to.call_args_list[1][0][0][2],.16)
+        self.assertAlmostEqual(self.d.pose.position.z,.20)
+        self.d.pose.position.z=.12
+        self.t._cartesian_to.reset_mock()
+        self.assertTrue(self.t._pick_and_place(self.d))
+        self.assertAlmostEqual(self.t._cartesian_to.call_args_list[0][0][0][2],.13)
+
+    def test_upper_z_correction_cannot_raise_tcp_past_approach(self):
+        self.t.allow_stacked_objects=True
+        self.d.pose.position.z=.27
+        self.t.stacked_grasp_offset_z=.05
+        self.assertFalse(self.t._pick_and_place(self.d))
+        self.t._command_gripper.assert_not_called()
+        self.t._move_to_pose.assert_not_called()
 
     def test_invalid_geometry_cannot_move_robot(self):
         for field, value in [('depth_valid',False), ('grasp_geometry_valid',False),

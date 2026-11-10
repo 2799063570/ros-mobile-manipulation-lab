@@ -10,8 +10,13 @@ table_center: [-0.0442, -0.6707, -0.09715]
 table_size: [0.74, 0.93, 0.20]
 table_collision_margin: 0.02
 object_height: 0.065
+allow_stacked_objects: true  # 接受深度给出的高处中心；底面仍不得低于桌面容差。
 height_tolerance: 0.02
 grasp_height_offset: 0.01
+grasp_height_reference: surface  # TCP 直接参考可见表面，中心厚度先验不再拉低抓取点。
+grasp_surface_inset: 0.01        # TCP 在实测表面下方 1 cm；不是深度值补偿。
+stacked_grasp_offset_z: 0.0     # 仅上层目标的额外 TCP Z 修正（m）；正值抬高，可在 rqt 空闲时调。
+stacked_support_min_height: 0.02  # 估计底面离桌至少 2 cm 才应用修正；依赖自身厚度先验。
 minimum_gripper_height: 0.06  # tcp_link 抓取/放置下降终点至少高于桌面 6 cm
 grasp_rpy: [3.141592653589793, 0.0, 1.5707963267948966]
 # 物体长轴在 base_link XY 平面内沿 X 轴放置；闭合轴沿 Y，抬升后在高位转正。
@@ -23,7 +28,7 @@ work_ready_named_target: real_sort_ready
 finish_named_target: real_observe
 auto_move_to_observation: false
 auto_start: false
-# Dispatch buffered instances in arrival order; this list only allows categories.
+# Queue YAML selects top-first dispatch; this list only allows categories.
 continuous_sorting: true
 sort_classes: [bottle, can, box]
 target_cache_fallback_enabled: false

@@ -5,7 +5,7 @@ catkin_python_setup()
 catkin_package()
 catkin_install_python(PROGRAMS scripts/huawei_bridge scripts/huawei_make_command scripts/huawei_dashboard scripts/huawei_tunnel
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
-install(DIRECTORY launch config DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+install(DIRECTORY launch config cloud_dashboard DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
   PATTERN "__pycache__" EXCLUDE PATTERN "device.json" EXCLUDE
   PATTERN "*.key" EXCLUDE PATTERN "*.pem" EXCLUDE PATTERN "*.crt" EXCLUDE)
 install(FILES README.md DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION})

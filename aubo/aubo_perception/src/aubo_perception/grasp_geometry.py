@@ -41,6 +41,20 @@ def object_height_from_depth(surface_z, table_z, minimum_height, maximum_height)
     return min(max(height, minimum_height), maximum_height)
 
 
+def bounded_depth_center(surface_z, table_z, thickness_limit, minimum_height, maximum_height):
+    """Use a configured thickness prior to separate an elevated object's support.
+
+    A single visible surface cannot reveal a hidden bottom. The thickness limit
+    is a prior, not a measured support plane. Shorter objects on the table keep
+    their measured height; above the limit, center Z follows surface Z one-to-one.
+    """
+    elevation = object_height_from_depth(surface_z, table_z, minimum_height, maximum_height)
+    if not math.isfinite(thickness_limit) or not minimum_height <= thickness_limit <= maximum_height:
+        raise ValueError("object thickness limit must be within the measured height bounds")
+    height = min(elevation, thickness_limit)
+    return surface_z - height / 2, height
+
+
 def ray_plane(u, v, K, rotation, translation, plane_z):
     if K[0] <= 0 or K[4] <= 0:
         raise ValueError("invalid camera intrinsics")

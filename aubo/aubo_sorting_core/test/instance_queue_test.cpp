@@ -222,6 +222,82 @@ TEST(InstanceQueue, ConfidenceSelectionPreservesGroupArrivalOrder)
   EXPECT_EQ(second.sample.payload,2);
 }
 
+TEST(InstanceQueue, TopFirstBlocksHighConfidenceLowerUntilUpperIsRemoved)
+{
+  Queue q;q.selection_policy="top_first";
+  auto low=rectangle(.5,"can",.99,1),high=rectangle(.5,"box",.61,2);
+  low.surface_z=.15;high.z=.20;high.surface_z=.23;
+  confirm(q,{low,high});
+  ASSERT_EQ(q.tracks().size(),2u);
+  Queue::Track first,next;
+  ASSERT_TRUE(q.reserve({"can","box"},1.5,first));
+  EXPECT_EQ(first.sample.payload,2);
+  EXPECT_FALSE(q.reserve({"can","box"},1.5,next)); // Reserved upper still covers the lower.
+  q.finish(first.id,true,1.6);
+  ASSERT_TRUE(q.reserve({"can","box"},1.6,next));
+  EXPECT_EQ(next.sample.payload,1);
+}
+
+TEST(InstanceQueue, TopFirstUsesConfidenceInHighestBandAndPreservesSeparateStacks)
+{
+  Queue q;q.selection_policy="top_first";
+  auto low=rectangle(.2,"can",.99,1),a=rectangle(.5,"box",.65,2),b=rectangle(.8,"bottle",.85,3);
+  low.surface_z=.10;a.surface_z=.20;b.surface_z=.195;
+  confirm(q,{low,a,b});Queue::Track t;
+  ASSERT_TRUE(q.reserve({"can","box","bottle"},1.5,t));EXPECT_EQ(t.sample.payload,3);
+  ASSERT_TRUE(q.reserve({"can","box","bottle"},1.5,t));EXPECT_EQ(t.sample.payload,2);
+  ASSERT_TRUE(q.reserve({"can","box","bottle"},1.5,t));EXPECT_EQ(t.sample.payload,1);
+}
+
+TEST(InstanceQueue, UnconfirmedUpperBlocksLowerButStaleAndDoneUpperDoNot)
+{
+  Queue q;q.selection_policy="top_first";
+  auto low=rectangle(.5,"can",.99,1),high=rectangle(.5,"box",.7,2);
+  low.surface_z=.12;high.z=.20;high.surface_z=.22;
+  confirm(q,{low});q.update({low,high},1.5);Queue::Track t;
+  EXPECT_FALSE(q.reserve({"can","box"},1.5,t));
+  confirm(q,{low},5.);
+  ASSERT_TRUE(q.reserve({"can","box"},5.5,t));EXPECT_EQ(t.sample.payload,1);
+}
+
+TEST(InstanceQueue, SameClassStackRetainsVerticalIdentityAcrossInputReordering)
+{
+  Queue q;q.selection_policy="top_first";
+  auto low=rectangle(.5,"can",.9,1),high=rectangle(.5,"can",.8,2);
+  low.surface_z=.15;high.z=.22;high.surface_z=.25;
+  confirm(q,{low,high});
+  confirm(q,{high,low},1.5);
+  ASSERT_EQ(q.tracks().size(),2u);
+  Queue::Track t;ASSERT_TRUE(q.reserve({"can"},2.1,t));EXPECT_EQ(t.sample.payload,2);
+}
+
+TEST(InstanceQueue, MissingFootprintsDoNotMergeVerticallySeparatedSameClassObjects)
+{
+  Queue q;q.selection_policy="top_first";
+  auto low=object(.5,"can",1),high=object(.5,"can",2);
+  low.surface_z=.15;high.z=.22;high.surface_z=.25;
+  confirm(q,{low,high});ASSERT_EQ(q.tracks().size(),2u);
+  Queue::Track t;ASSERT_TRUE(q.reserve({"can"},1.5,t));EXPECT_EQ(t.sample.payload,2);
+}
+
+TEST(InstanceQueue, TopFirstStillRejectsActualReservedTargetMovement)
+{
+  Queue q;q.selection_policy="top_first";
+  auto sample=rectangle(.5,"can",.8);sample.surface_z=.15;
+  confirm(q,{sample});Queue::Track t;ASSERT_TRUE(q.reserve({"can"},1.5,t));
+  sample.x+=.038;for(auto& p:sample.footprint)p[0]+=.038;
+  q.update({sample},1.6);EXPECT_FALSE(q.executionValid(t.id,1.6));
+}
+
+TEST(InstanceQueue, NearHeightSeparateObjectsAreNotBlockedWithoutFootprintOverlap)
+{
+  Queue q;q.selection_policy="top_first";
+  auto low=rectangle(.5,"can",.9,1,.004),high=rectangle(.52,"box",.8,2,.004);
+  low.surface_z=.10;high.z=.20;high.surface_z=.20;
+  confirm(q,{low,high});
+  EXPECT_EQ(q.blockingTrackId(q.tracks().begin()->second.sample,1.5,q.tracks().begin()->first),0u);
+}
+
 TEST(InstanceQueue, ClassFlickerKeepsIdentityAndBetterClassRequiresReconfirmation)
 {
   Queue q;
@@ -267,6 +343,57 @@ TEST(InstanceQueue, ReservedSnapshotSurvivesDuplicateClassButNotActualMovement)
   EXPECT_EQ(q.tracks().size(),1u);
   q.update({rectangle(.538,"can",.99,99)},1.7);
   EXPECT_FALSE(q.executionValid(reserved.id,1.7));
+}
+
+TEST(InstanceQueue, SingleClassAndPositionJumpPausesThenOriginalFramesRecover)
+{
+  Queue q;q.selection_policy="top_first";q.reserved_anomaly_confirmations=3;
+  q.reserved_recovery_observations=3;
+  const auto original=rectangle(.5,"bottle",.92,17);
+  confirm(q,{original});Queue::Track t;ASSERT_TRUE(q.reserve({"bottle"},1.5,t));
+  auto shifted=rectangle(.5375667,"box",.81,50);
+  q.update({shifted},1.6);
+  EXPECT_FALSE(q.executionValid(t.id,1.6));
+  EXPECT_TRUE(q.tracks().at(t.id).association_pending);
+  EXPECT_FALSE(q.tracks().at(t.id).disturbed);
+  for (int n=0;n<2;++n) {
+    q.update({original},1.7+.1*n);EXPECT_FALSE(q.executionValid(t.id,1.7+.1*n));
+  }
+  q.update({original},1.9);EXPECT_TRUE(q.executionValid(t.id,1.9));
+  EXPECT_EQ(q.tracks().at(t.id).sample.payload,17);
+  EXPECT_EQ(q.tracks().at(t.id).sample.category,"bottle");
+  EXPECT_DOUBLE_EQ(q.tracks().at(t.id).sample.x,.5);
+}
+
+TEST(InstanceQueue, ConfirmedMovementRemainsLatchedAndOcclusionCannotErasePending)
+{
+  Queue q;q.reserved_anomaly_confirmations=3;
+  auto original=rectangle(.5,"bottle",.92,17),shifted=rectangle(.5375667,"box",.81,50);
+  confirm(q,{original});Queue::Track t;ASSERT_TRUE(q.reserve({"bottle"},1.5,t));
+  q.update({shifted},1.6);q.update({},1.7);
+  EXPECT_FALSE(q.executionValid(t.id,1.7)); // Missing/occluded data cannot prove recovery.
+  q.update({shifted},1.8);q.update({shifted},1.9);
+  EXPECT_TRUE(q.tracks().at(t.id).disturbed);
+  for(int i=0;i<4;++i)q.update({original},2.+i*.1);
+  EXPECT_FALSE(q.executionValid(t.id,2.4)); // Confirmed movement never clears automatically.
+}
+
+TEST(InstanceQueue, RecoveryRequiresOriginalClassEligibleGeometryAndStablePosition)
+{
+  Queue q;q.reserved_anomaly_confirmations=3;
+  auto original=rectangle(.5,"bottle",.92,17);
+  confirm(q,{original});Queue::Track t;ASSERT_TRUE(q.reserve({"bottle"},1.5,t));
+  q.update({rectangle(.5375667,"box",.8)},1.6);
+  for(int i=0;i<4;++i)q.update({rectangle(.506,"box",.8)},1.7+i*.1);
+  EXPECT_FALSE(q.executionValid(t.id,2.1)); // Overlapping wrong class doesn't reconfirm the original.
+  auto unstable=original;unstable.x+=.025;
+  for(int i=0;i<4;++i)q.update({unstable},2.2+i*.1);
+  EXPECT_FALSE(q.executionValid(t.id,2.6)); // Below descent tolerance, outside stable recovery radius.
+  auto invalid=original;invalid.eligible=false;
+  for(int i=0;i<4;++i)q.update({invalid},2.7+i*.1);
+  EXPECT_FALSE(q.executionValid(t.id,3.1));
+  q.update({original},3.2);q.update({original},3.3);q.update({original},3.4);
+  EXPECT_TRUE(q.executionValid(t.id,3.4));
 }
 
 TEST(InstanceQueue, UnrelatedClassCannotRefreshReservedTarget)

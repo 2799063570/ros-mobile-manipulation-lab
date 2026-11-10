@@ -1,6 +1,8 @@
 #include <aubo_sorting_core/sorting_task.hpp>
 #include <aubo_sorting_core/observation_tf.hpp>
 #include <aubo_sorting_core/occlusion_geometry.hpp>
+#include <aubo_sorting_core/object_support.hpp>
+#include <aubo_sorting_core/gripper_height.hpp>
 #include "task_utils.hpp"
 #include <tf/transform_datatypes.h>
 #include <chrono>
@@ -20,6 +22,7 @@ void SortingTask::resetInstanceQueue()
   queue_last_frame_ = queue_last_source_frame_ = queue_empty_since_ = ros::WallTime();
   queue_empty_frames_ = 0;
   queue_target_occluded_ = false;
+  queue_occlusion_clear_observations_=0;
   queue_occlusion_checked_at_ = ros::WallTime();
 }
 
@@ -32,6 +35,7 @@ void SortingTask::setQueueVisionPhase(QueueVisionPhase phase)
   queue_epoch_=ros::Time::now();
   pending_detection_.reset();
   queue_target_occluded_=false;
+  queue_occlusion_clear_observations_=0;
   queue_occlusion_checked_at_=ros::WallTime();
   if (phase==QueueVisionPhase::MASKED) queue_last_frame_=ros::WallTime();
   queue_vision_phase_.store(phase);
@@ -53,7 +57,10 @@ bool SortingTask::reservedTargetOccluded(const aubo_perception::DetectedObjectAr
     links.push_back({{transform.getOrigin().x(),transform.getOrigin().y(),transform.getOrigin().z()}});
   }
   const auto& sample=found->second.sample;
-  return robotOccludesTarget(camera,Point3{{sample.x,sample.y,sample.z}},links,queue_occlusion_radius_);
+  std::vector<Point3> boundary;
+  const double surface=ObjectQueue::surfaceHeight(sample);
+  for (const auto& corner:sample.footprint) boundary.push_back({{corner[0],corner[1],surface}});
+  return robotOccludesRegion(camera,Point3{{sample.x,sample.y,surface}},boundary,links,queue_occlusion_radius_);
 }
 
 bool SortingTask::waitForInstanceTransforms(const aubo_perception::DetectedObjectArray& message,std::string& error)
@@ -179,15 +186,20 @@ void SortingTask::processInstanceFrame(const aubo_perception::DetectedObjectArra
     queue_empty_frames_=0; queue_empty_since_=ros::WallTime();
     return;
   }
-  queue_target_occluded_=false;
   if (vision_phase==QueueVisionPhase::APPROACH && source_frame) {
-    queue_target_occluded_=reservedTargetOccluded(message);
+    const bool hidden=reservedTargetOccluded(message);
+    if (hidden) {queue_target_occluded_=true;queue_occlusion_clear_observations_=0;}
+    else if (queue_target_occluded_)
+      queue_target_occluded_=++queue_occlusion_clear_observations_<queue_occlusion_clear_frames_;
     queue_occlusion_checked_at_=received;
     if (queue_target_occluded_) {
       queue_last_source_frame_=received;
       queue_empty_frames_=0; queue_empty_since_=ros::WallTime();
       return;
     }
+  } else {
+    queue_target_occluded_=false;
+    queue_occlusion_clear_observations_=0;
   }
   if (!message.observation_valid || message.header.frame_id.empty()) {
     queue_last_frame_=ros::WallTime();
@@ -274,10 +286,12 @@ void SortingTask::processInstanceFrame(const aubo_perception::DetectedObjectArra
     sample.payload.pose.position.z = point.z();
     // 使用观测高度还是默认高度
     const double height = object.object_height > 0 ? object.object_height : object_height_;
+    sample.surface_z=point.z()+height/2;
     sample.eligible = std::isfinite(height) && height > 0 &&
-        std::abs(point.z() - (table_z_ + height / 2)) <= queue_height_tolerance_ &&
+        validObjectSupport(point.z(), height, table_z_, queue_height_tolerance_,
+                           height_mode_ == "depth" && allow_stacked_objects_) &&
         (height_mode_ != "depth" || (object.depth_valid &&
-         std::abs(point.z() - (table_z_ + height / 2)) <= height_tolerance_)) &&
+         validObjectSupport(point.z(), height, table_z_, height_tolerance_, allow_stacked_objects_))) &&
         (!(use_detected_angle_ || use_detected_width_) || object.grasp_geometry_valid);
     // Cached geometry is displayed in target_frame even when angle control is disabled.
     const auto axis = source_to_target.getBasis() * tf::Vector3(std::cos(object.grasp_angle), std::sin(object.grasp_angle), 0);
@@ -316,36 +330,59 @@ void SortingTask::processInstanceFrame(const aubo_perception::DetectedObjectArra
 bool SortingTask::validateReservedTarget()
 {
   if (!continuous_sorting_ || active_instance_id_ == 0) return true;
+  const auto deadline=ros::WallTime::now()+ros::WallDuration(queue_reserved_recheck_timeout_);
   std::string reason;
-  {
-    std::lock_guard<std::mutex> lock(queue_mutex_);
-    const auto now = ros::WallTime::now();
-    // 已领走的目标允许在机械臂接近时短暂遮挡；仍要求检测流新鲜且不能出现位移证据。
-    const auto found = instance_queue_.tracks().find(active_instance_id_);
-    if (found == instance_queue_.tracks().end() || found->second.status != ObjectQueue::Status::RESERVED)
-      reason = "reservation no longer exists";
-    else if (found->second.disturbed) {
-      std::ostringstream detail;
-      detail << "reserved target association changed: distance="
-             << found->second.disturbance_distance << " m, observed category="
-             << found->second.disturbance_category;
-      reason = detail.str();
+  do {
+    bool rechecking=false;
+    {
+      std::lock_guard<std::mutex> lock(queue_mutex_);
+      const auto now = ros::WallTime::now();
+      // 已领走的目标允许在机械臂接近时短暂遮挡；仍要求检测流新鲜且不能出现位移证据。
+      const auto found = instance_queue_.tracks().find(active_instance_id_);
+      if (found == instance_queue_.tracks().end() || found->second.status != ObjectQueue::Status::RESERVED)
+        reason = "reservation no longer exists";
+      else if (found->second.disturbed) {
+        std::ostringstream detail;
+        detail << "reserved target association changed: distance="
+               << found->second.disturbance_distance << " m, observed category="
+               << found->second.disturbance_category << ", reserved category=" << found->second.sample.category
+               << ", confirmations=" << found->second.anomaly_observations;
+        reason = detail.str();
+      }
+      else if (found->second.association_pending) {
+        if (now>=deadline) {
+          std::ostringstream detail;
+          detail << "reserved target association uncertain after recheck: distance="
+                 << found->second.disturbance_distance << " m, reserved category="
+                 << found->second.sample.category << ", observed category=" << found->second.disturbance_category
+                 << "; original target not reconfirmed before descent";
+          reason=detail.str();
+        } else rechecking=true;
+      }
+      else if (instance_queue_.selection_policy=="top_first" &&
+               instance_queue_.blockingTrackId(found->second.sample,now.toSec(),active_instance_id_))
+        reason="reserved target is covered by a higher object";
+      else if (now.toSec() - found->second.last_seen > queue_reserved_max_age_) {
+        std::ostringstream detail;
+        detail << "reserved target last seen " << now.toSec() - found->second.last_seen
+               << " s ago (limit " << queue_reserved_max_age_ << " s)";
+        reason = detail.str();
+      } else {
+        const bool known_occlusion=queue_vision_phase_.load()==QueueVisionPhase::APPROACH && queue_target_occluded_ &&
+            !queue_occlusion_checked_at_.isZero() && (now-queue_occlusion_checked_at_).toSec()<=queue_frame_max_age_;
+        const auto heartbeat=known_occlusion ? queue_last_source_frame_:queue_last_frame_;
+        if (heartbeat.isZero() || (now-heartbeat).toSec()>queue_frame_max_age_)
+          reason="valid observation stream unavailable before descent";
+      }
     }
-    else if (now.toSec() - found->second.last_seen > queue_reserved_max_age_) {
-      std::ostringstream detail;
-      detail << "reserved target last seen " << now.toSec() - found->second.last_seen
-             << " s ago (limit " << queue_reserved_max_age_ << " s)";
-      reason = detail.str();
-    } else {
-      const bool known_occlusion=queue_vision_phase_.load()==QueueVisionPhase::APPROACH && queue_target_occluded_ &&
-          !queue_occlusion_checked_at_.isZero() && (now-queue_occlusion_checked_at_).toSec()<=queue_frame_max_age_;
-      const auto heartbeat=known_occlusion ? queue_last_source_frame_:queue_last_frame_;
-      if (heartbeat.isZero() || (now-heartbeat).toSec()>queue_frame_max_age_)
-        reason="valid observation stream unavailable before descent";
-    }
-  }
+    if (!rechecking) break;
+    ROS_WARN_THROTTLE(1.0,"Pausing descent: rechecking reserved target association (%0.1f s limit)",
+                      queue_reserved_recheck_timeout_);
+    // No queue mutex is held while the camera worker collects confirmation frames.
+    if (!detail::wallSleep(0.05,stop_requested_)) return false;
+  } while (ros::ok() && !stop_requested_.load());
   if (!reason.empty()) setFailure("DETECTION_FAILED", reason);
-  return reason.empty() && !stop_requested_.load();
+  return reason.empty() && ros::ok() && !stop_requested_.load();
 }
 
 void SortingTask::publishInstanceQueue()
@@ -353,6 +390,8 @@ void SortingTask::publishInstanceQueue()
   std::ostringstream stream;
   stream.precision(15);
   stream << "{\"schema_version\":2,\"frame_id\":\"" << detail::jsonEscape(target_frame_) << '"';
+  stream << ",\"selection_policy\":\"" << instance_queue_.selection_policy << '"'
+         << ",\"grasp_height_reference\":\"" << grasp_height_reference_ << '"';
   {
     std::lock_guard<std::mutex> lock(queue_mutex_);
     const auto phase=queue_vision_phase_.load();
@@ -382,6 +421,26 @@ void SortingTask::publishInstanceQueue()
         stream << track.sample.payload.grasp_width;
       else stream << "null";
       stream << ",\"observations\":" << track.observations
+             << ",\"association_pending\":" << (track.association_pending ? "true":"false")
+             << ",\"association_anomalies\":" << track.anomaly_observations
+             << ",\"association_recovery\":" << track.recovery_observations
+             << ",\"surface_z\":" << ObjectQueue::surfaceHeight(track.sample)
+             << ",\"blocked_by\":" << (instance_queue_.selection_policy=="top_first" ?
+                  instance_queue_.blockingTrackId(track.sample,now,track.id):0);
+      stream << ",\"grasp_z\":";
+      double applied_z_correction=0;
+      try {
+        const double height=track.sample.payload.object_height>0 ? track.sample.payload.object_height:object_height_;
+        const double correction=stackedGraspOffset(track.sample.z,height,table_z_,stacked_support_min_height_,
+            stacked_grasp_offset_z_,height_mode_=="depth" && allow_stacked_objects_);
+        applied_z_correction=correction;
+        const double offset=graspCenterOffset(height,grasp_height_offset_,grasp_surface_inset_,
+                                              grasp_height_reference_=="surface")+correction;
+        stream << gripperDescentHeight(track.sample.z+offset,table_z_,minimum_gripper_height_,
+                                      table_z_+std::min(pregrasp_height_,lift_min_height_));
+      } catch (const std::invalid_argument&) { stream << "null"; }
+      stream
+             << ",\"grasp_z_correction\":" << applied_z_correction
              << ",\"detection_confidence\":" << track.sample.confidence
              << ",\"confidence\":" << std::min(1.0, static_cast<double>(track.observations)/instance_queue_.min_observations)
              << ",\"stability\":" << std::min(1.0, static_cast<double>(track.observations)/instance_queue_.min_observations)

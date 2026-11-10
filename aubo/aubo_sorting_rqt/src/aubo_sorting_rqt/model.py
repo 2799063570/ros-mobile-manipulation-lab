@@ -26,6 +26,8 @@ PARAMETERS = (
     ('acceleration_scaling', '运动加速度比例', .01, 1., .01, 2),
     ('grasp_offset_x', '抓取 X 修正 / m', -.05, .05, .001, 3),
     ('grasp_offset_y', '抓取 Y 修正 / m', -.05, .05, .001, 3),
+    ('stacked_grasp_offset_z', '上层抓取 Z 修正 / m', -.05, .05, .001, 3),
+    ('stacked_support_min_height', '上层支撑高度阈值 / m', .005, .30, .005, 3),
     ('minimum_gripper_height', '夹爪 TCP 最低离桌 / m', 0., .5, .005, 3),
     ('detection_timeout', '检测等待上限 / s', 1., 120., 1., 1),
     ('target_cache_min_observations', '队列稳定确认帧数', 2, 30, 1, 0),
@@ -101,10 +103,14 @@ def queue_rows(message):
                 raise ValueError('检测置信度无效')
         if row['id'] < 0 or not math.isfinite(row['age']) or row['age'] < 0 or row['observations'] < 0:
             raise ValueError('目标编号、年龄或确认帧数无效')
-        for field in ('grasp_angle', 'grasp_width'):
+        row['blocked_by'] = int(row.get('blocked_by') or 0)
+        if row['blocked_by'] < 0:
+            raise ValueError('上层阻挡编号无效')
+        for field in ('grasp_angle', 'grasp_width', 'surface_z', 'grasp_z', 'grasp_z_correction'):
             number = None
             raw = row.get(field)
-            if row.get('grasp_geometry_valid') is True and raw is not None and not isinstance(raw, bool):
+            geometry_valid=field in ('surface_z', 'grasp_z', 'grasp_z_correction') or row.get('grasp_geometry_valid') is True
+            if geometry_valid and raw is not None and not isinstance(raw, bool):
                 try:
                     candidate = float(raw)
                     if math.isfinite(candidate) and (field != 'grasp_width' or candidate > 0):

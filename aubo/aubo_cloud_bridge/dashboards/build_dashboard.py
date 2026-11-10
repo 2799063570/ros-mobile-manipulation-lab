@@ -7,7 +7,8 @@ ALIAS = 'a1b0c100-0000-4000-8000-000000000001'
 WIDGET = 'a1b0c100-0000-4000-8000-000000000002'
 KEYS = ('bridge_wall_ms bridge_session commands_enabled sorting_available state state_detail phase description '
         'failure detection_summary target_cache target_cache_age_s queue_total queue_candidate queue_ready '
-        'queue_reserved queue_done queue_review last_command').split()
+        'queue_reserved queue_done queue_review last_command completed_counts completed_total '
+        'statistics_available workcell').split()
 
 
 def build():

@@ -8,6 +8,7 @@
 #include <set>
 #include <string>
 #include <vector>
+#include <limits>
 #include <aubo_sorting_core/footprint.hpp>
 
 namespace aubo_sorting_core
@@ -25,6 +26,7 @@ public:
     std::string category;
     double x{0}, y{0}, z{0};
     double confidence{0};
+    double surface_z{std::numeric_limits<double>::quiet_NaN()};
     Footprint footprint;
     bool eligible{true};
     Payload payload;
@@ -38,6 +40,9 @@ public:
     unsigned observations{0};
     double last_seen{0}, changed_at{0}, sampled_at{0};
     bool disturbed{false};
+    bool association_pending{false};
+    unsigned anomaly_observations{0}, recovery_observations{0};
+    double anomaly_last_seen{0}, recovery_last_seen{0};
     double disturbance_distance{0};
     std::string disturbance_category;
   };
@@ -48,7 +53,30 @@ public:
   double max_age{3.0}, confirmation_gap{1.0}, retention{30.0}, done_hold{2.0};
   // 达到确认帧数才可分配；容量限制防止轨迹无限增长。
   unsigned min_observations{5};
+  unsigned reserved_anomaly_confirmations{1}, reserved_recovery_observations{3};
   std::size_t capacity{200};
+  std::string selection_policy{"fifo"}; // fifo | top_first
+  double stack_overlap{0.15}, stack_height_gap{0.01}, top_height_band{0.01};
+
+  static double surfaceHeight(const Sample& sample) {
+    return std::isfinite(sample.surface_z) ? sample.surface_z : sample.z;
+  }
+  // Fresh candidates also block an underlying object while being confirmed.
+  // A picked/DONE object no longer blocks; a RESERVED object still does.
+  std::uint64_t blockingTrackId(const Sample& sample, double now, std::uint64_t ignore_id=0) const {
+    std::uint64_t blocker=0;
+    double highest=surfaceHeight(sample)+stack_height_gap;
+    for (const auto& item:tracks_) {
+      const auto& other=item.second;
+      if (item.first==ignore_id || other.status==Status::DONE || now-other.last_seen>max_age ||
+          now-other.sampled_at>max_age || surfaceHeight(other.sample)<highest) continue;
+      const bool overlap=sample.footprint.empty() || other.sample.footprint.empty() ?
+          distance(sample,other.sample)<=match_distance :
+          footprintOverlap(sample.footprint,other.sample.footprint)>=stack_overlap;
+      if (overlap) { blocker=item.first; highest=surfaceHeight(other.sample); }
+    }
+    return blocker;
+  }
 
   static const char* statusName(Status status)
   {
@@ -119,7 +147,8 @@ public:
     for (std::size_t i = 0; i < samples.size(); ++i)
       for (auto& item : tracks_) {
         auto& track = item.second;
-        const double d = distance(track.sample, samples[i]);
+        const double d = selection_policy=="top_first" ? positionDistance(track.sample,samples[i]) :
+                                                       distance(track.sample, samples[i]);
         if ((track.sample.category == samples[i].category || track.status == Status::RESERVED ||
              overlappingDuplicate(track.sample,samples[i])) && d <= match_distance)
           edges.push_back({d, item.first, i});
@@ -139,10 +168,12 @@ public:
         // 机械臂移动时手眼视角会让轮廓中心轻微偏移；预留目标采用独立的执行容差。
         if (edge.distance > reserved_distance || (samples[edge.sample].category != track.sample.category &&
                                                  !overlappingDuplicate(track.sample,samples[edge.sample]))) {
-          track.disturbed = true;
-          track.disturbance_distance = edge.distance;
-          track.disturbance_category = samples[edge.sample].category;
-        } else track.last_seen = now;
+          noteReservedAnomaly(track,edge.distance,samples[edge.sample].category,now);
+        } else {
+          const bool reliable=edge.distance<=stable_distance && samples[edge.sample].eligible &&
+                              samples[edge.sample].category==track.sample.category;
+          noteReservedMatch(track,now,reliable);
+        }
         continue;
       }
       // 已完成目标在屏蔽期内吸收原位置的残留检测，不重新成为可抓取目标。
@@ -160,6 +191,8 @@ public:
         filtered.x = 0.5 * (sample.x + track.sample.x);
         filtered.y = 0.5 * (sample.y + track.sample.y);
         filtered.z = 0.5 * (sample.z + track.sample.z);
+        if (std::isfinite(sample.surface_z) && std::isfinite(track.sample.surface_z))
+          filtered.surface_z=0.5*(sample.surface_z+track.sample.surface_z);
       }
       track.sample = filtered;
       if (!retain_best) track.sampled_at=now;
@@ -184,9 +217,7 @@ public:
       if (track.status != Status::RESERVED || used_tracks.count(item.first)) continue;
       for (std::size_t i = 0; i < samples.size(); ++i) {
         if (used_samples.count(i) || samples[i].category != track.sample.category) continue;
-        track.disturbed = true;
-        track.disturbance_distance = distance(track.sample, samples[i]);
-        track.disturbance_category = samples[i].category;
+        noteReservedAnomaly(track,distance(track.sample,samples[i]),samples[i].category,now);
         break;
       }
     }
@@ -210,23 +241,44 @@ public:
     }
     mergeTracks(now);
   }
-  // categories 只作为允许类别列表；按入队 ID 领取最早的近期就绪目标。
+  // Top-first: reject covered objects, then confidence within the highest band.
+  // FIFO remains the default for other cells. ID breaks confidence ties.
   bool reserve(const std::vector<std::string>& categories, double now, Track& result)
   {
+    std::vector<std::uint64_t> candidates;
+    double highest=-std::numeric_limits<double>::infinity();
     for (auto& item : tracks_)
     {
       auto& track = item.second;
       if (track.status != Status::READY || now - track.last_seen > max_age || now-track.sampled_at>max_age ||
           std::find(categories.begin(), categories.end(), track.sample.category) == categories.end()) continue;
-      track.status = Status::RESERVED;
-      track.disturbed = false;
-      track.disturbance_distance = 0;
-      track.disturbance_category.clear();
-      track.changed_at = now;
-      result = track; // 返回独立的执行快照，后续帧不会改变本次抓取坐标。
-      return true;
+      if (selection_policy=="top_first" && blockingTrackId(track.sample,now,track.id)) continue;
+      candidates.push_back(item.first);
+      highest=std::max(highest,surfaceHeight(track.sample));
     }
-    return false;
+    if (candidates.empty()) return false;
+    std::uint64_t selected=candidates.front();
+    if (selection_policy=="top_first") {
+      bool found=false;
+      for (auto id:candidates) {
+        const auto& track=tracks_.at(id);
+        if (surfaceHeight(track.sample)<highest-top_height_band) continue;
+        if (!found || track.sample.confidence>tracks_.at(selected).sample.confidence) {
+          selected=id; found=true;
+        }
+      }
+    }
+    auto& track=tracks_.at(selected);
+    track.status = Status::RESERVED;
+    track.disturbed = false;
+    track.association_pending=false;
+    track.anomaly_observations=track.recovery_observations=0;
+    track.anomaly_last_seen=track.recovery_last_seen=0;
+    track.disturbance_distance = 0;
+    track.disturbance_category.clear();
+    track.changed_at = now;
+    result = track; // 返回独立的执行快照，后续帧不会改变本次抓取坐标。
+    return true;
   }
   // 成功后进入残留画面屏蔽期；失败后隔离该目标并使其他可用目标重新确认。
   void finish(std::uint64_t id, bool success, double now)
@@ -243,10 +295,39 @@ public:
   {
     const auto found = tracks_.find(id);
     return found != tracks_.end() && found->second.status == Status::RESERVED &&
-        !found->second.disturbed && now - found->second.last_seen <= reserved_max_age;
+        !found->second.disturbed && !found->second.association_pending &&
+        now - found->second.last_seen <= reserved_max_age;
   }
   bool executionValid(std::uint64_t id, double now) const { return executionValid(id, now, max_age); }
 private:
+  void noteReservedAnomaly(Track& track,double displacement,const std::string& category,double now) {
+    if (track.disturbed) return; // Confirmed movement/quarantine faults remain latched.
+    const bool consecutive=track.association_pending && track.recovery_observations==0 &&
+                           now-track.anomaly_last_seen<=confirmation_gap;
+    track.anomaly_observations=consecutive ? track.anomaly_observations+1:1;
+    track.recovery_observations=0;
+    track.association_pending=true;
+    track.anomaly_last_seen=now;
+    track.disturbance_distance=displacement;
+    track.disturbance_category=category;
+    if (track.anomaly_observations>=reserved_anomaly_confirmations) track.disturbed=true;
+  }
+  void noteReservedMatch(Track& track,double now,bool reliable) {
+    if (track.disturbed) return;
+    if (track.association_pending) {
+      if (!reliable) {track.recovery_observations=0;return;}
+      const bool consecutive=track.recovery_observations>0 && now-track.recovery_last_seen<=confirmation_gap;
+      track.recovery_observations=consecutive ? track.recovery_observations+1:1;
+      track.recovery_last_seen=now;
+      track.anomaly_observations=0;
+      if (track.recovery_observations<reserved_recovery_observations) return;
+      track.association_pending=false;
+      track.recovery_observations=0;
+      track.disturbance_distance=0;
+      track.disturbance_category.clear();
+    }
+    track.last_seen=now;
+  }
   int protectionRank(const Track& track,double now) const {
     return track.status==Status::RESERVED ? 3 :
         (track.status==Status::DONE && now-track.changed_at<done_hold ? 2 : (track.status==Status::REVIEW ? 1 : 0));
@@ -288,9 +369,13 @@ private:
     }
   }
   bool overlappingDuplicate(const Sample& a,const Sample& b) const {
+    if (selection_policy=="top_first" && std::abs(surfaceHeight(a)-surfaceHeight(b))>=stack_height_gap)
+      return false;
     return positionDistance(a,b)<=merge_distance && footprintOverlap(a.footprint,b.footprint)>=merge_overlap;
   }
   bool duplicateSamples(const Sample& a,const Sample& b) const {
+    if (selection_policy=="top_first" && std::abs(surfaceHeight(a)-surfaceHeight(b))>=stack_height_gap)
+      return false;
     return (a.category==b.category && (a.footprint.empty() || b.footprint.empty()) &&
             distance(a,b)<duplicate_distance) || overlappingDuplicate(a,b);
   }

@@ -7,6 +7,29 @@
     <article><label>当前队列</label><strong>{{vm.total}} <em>个目标</em></strong><small>可领取 {{vm.ready}} / 执行中 {{vm.reserved}}</small></article>
     <article><label>本轮流程完成</label><strong>{{vm.done}}</strong><small>队列快照计数；不代表实物验证成功</small></article>
   </section>
+  <section class="panel completion"><h2>分拣完成 <span class="muted">本次任务节点运行累计；重启后清零</span></h2>
+    <div class="completion-counts"><strong>合计 {{vm.completedTotal}}</strong>
+      <span *ngFor="let item of vm.completedClasses">{{item.name}}：<b>{{item.count}}</b></span>
+    </div><p class="muted" *ngIf="!vm.statisticsAvailable">等待任务节点上报完成统计</p>
+    <p class="muted">按成功抓取、放置与退离统计；清理目标队列不清零。</p>
+  </section>
+  <section class="panel projection" *ngIf="vm.map"><h2>工作台目标 · 平面投影 <span class="muted">XY / m · {{vm.map.frame}}</span></h2>
+    <svg viewBox="0 0 720 320" role="img" aria-label="工作台目标 XY 平面投影">
+      <rect x="60" y="30" width="600" height="240" fill="#fbfdff" stroke="#bfd2e4"></rect>
+      <g *ngFor="let tick of vm.map.ticks">
+        <line [attr.x1]="tick.x" y1="30" [attr.x2]="tick.x" y2="270" stroke="#e8eff6"></line>
+        <line x1="60" [attr.y1]="tick.y" x2="660" [attr.y2]="tick.y" stroke="#e8eff6"></line>
+        <text [attr.x]="tick.x" y="293" text-anchor="middle">{{tick.xLabel}}</text>
+        <text x="49" [attr.y]="tick.y+4" text-anchor="end">{{tick.yLabel}}</text>
+      </g>
+      <g *ngFor="let point of vm.map.points">
+        <circle [attr.cx]="point.x" [attr.cy]="point.y" r="6" [attr.fill]="point.color"><title>#{{point.id}} {{point.category}} · {{point.status}} · {{point.coordinates}} m</title></circle>
+        <text [attr.x]="point.x+10" [attr.y]="point.y+4">#{{point.id}}</text>
+      </g>
+      <text x="360" y="150" text-anchor="middle" *ngIf="!vm.map.points.length">等待有效目标坐标 / 最新快照</text>
+      <text x="680" y="293">X</text><text x="49" y="20">Y</text>
+    </svg><p class="muted">{{vm.map.points.length}} 个有坐标目标 · {{vm.map.outside}} 个超出工位范围 · {{vm.summary}}</p>
+  </section>
   <section class="panel"><h2>任务控制</h2><div class="controls">
     <button (click)="send('move_to_observation')" [disabled]="!vm.canMove">前往观察位</button>
     <button class="primary" (click)="send('start')" [disabled]="!vm.canStart">开始分拣</button>
@@ -16,9 +39,9 @@
     <p class="result">最近指令：{{vm.lastCommand}}</p>
   </section>
   <section class="panel"><h2>目标实例 <span class="muted">{{vm.queueAge}}</span></h2>
-    <div class="table-wrap"><table><thead><tr><th>ID</th><th>类别</th><th>队列状态</th><th>检测置信度</th></tr></thead><tbody>
-      <tr *ngFor="let row of vm.rows"><td>#{{row.id}}</td><td>{{row.category}}</td><td>{{row.label}}</td><td>{{row.confidence}}</td></tr>
-      <tr *ngIf="!vm.rows.length"><td colspan="4">暂无目标数据</td></tr>
+    <div class="table-wrap"><table><thead><tr><th>ID</th><th>类别</th><th>队列状态</th><th>X / m</th><th>Y / m</th><th>检测置信度</th></tr></thead><tbody>
+      <tr *ngFor="let row of vm.rows"><td>#{{row.id}}</td><td>{{row.category}}</td><td>{{row.label}}</td><td>{{row.x}}</td><td>{{row.y}}</td><td>{{row.confidence}}</td></tr>
+      <tr *ngIf="!vm.rows.length"><td colspan="6">暂无目标数据</td></tr>
     </tbody></table></div>
   </section>
   <section class="panel"><h2>诊断信息</h2><p class="failure">{{vm.failure || '暂无故障报告'}}</p><p class="muted">{{vm.summary}}</p><p class="muted">桥接在线仅说明云链路正常；ROS 接口注册状态不等于机械臂已就绪。状态与队列保留最后快照，请结合更新时间判断。</p></section>

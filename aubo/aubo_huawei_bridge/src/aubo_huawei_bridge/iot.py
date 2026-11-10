@@ -2,6 +2,7 @@
 from datetime import datetime, timezone
 import hashlib
 import hmac
+import math
 import re
 import uuid
 from aubo_cloud_bridge.protocol import decode_json, encode_json, METHODS
@@ -87,13 +88,49 @@ def command_reply(result):
             'response_name': 'COMMAND_RESPONSE', 'paras': {'result': encode_json(result_summary(result))}}
 
 
-def property_report(snapshot, session, available, enabled, last, now_ms):
+def workcell_data(center, size, frame):
+    if (not isinstance(center, (list, tuple)) or not isinstance(size, (list, tuple)) or
+            len(center) < 2 or len(size) < 2 or
+            any(type(v) not in (int, float) or not math.isfinite(v) for v in list(center[:2]) + list(size[:2])) or
+            any(v <= 0 or v > 100 for v in size[:2])):
+        return {}
+    value = {'table_center': [round(v, 5) for v in center[:2]],
+             'table_size': [round(v, 5) for v in size[:2]], 'frame': limited(frame, 64)}
+    return value if all(v > 0 for v in value['table_size']) and len(encode_json(value).encode()) <= 256 else {}
+
+
+def completion_properties(statistics):
+    if not isinstance(statistics, dict):
+        return {'completed_counts': 'null', 'completed_total': '0', 'statistics_available': 0,
+                'completed_counts_truncated': 0}
+    shown = {key: statistics[key] for key in ('scope', 'session', 'total')}
+    shown['counts'] = {}
+    total = statistics['total']
+    if type(total) is not int or not 0 <= total <= 9007199254740991:
+        raise ValueError('invalid_completion_total')
+    shown['session'] = limited(shown['session'], 128)
+    clipped = False
+    for category, count in statistics['counts'].items():
+        candidate = dict(shown, counts={**shown['counts'], category: count})
+        if len(encode_json(candidate).encode()) <= 512:
+            shown = candidate
+        else:
+            clipped = True
+    return {'completed_counts': encode_json(shown), 'completed_total': str(total),
+            'statistics_available': 1, 'completed_counts_truncated': int(clipped)}
+
+
+def property_report(snapshot, session, available, enabled, last, now_ms, extended=True):
     values = {key: limited(snapshot.get(key, ''), length) for key, length in TEXT_LIMITS.items()}
     values.update({'queue_' + key: int(snapshot.get('queue_' + key, 0)) for key in QUEUES})
     values.update(bridge_wall_ms=str(now_ms), bridge_session=session,
                   commands_enabled=int(enabled), sorting_available=int(available),
                   target_cache_age_s=min(2147483647, float(snapshot.get('target_cache_age_s', -1))),
                   last_command=encode_json(result_summary(last)))
+    if extended:
+        values.update(completion_properties(snapshot.get('completed_counts')))
+        cell = snapshot.get('workcell') or {}
+        values['workcell'] = encode_json(workcell_data(cell.get('table_center'), cell.get('table_size'), cell.get('frame', '')))
     rows = decode_json(snapshot.get('target_cache', '{}')).get('targets', [])
     shown = []
     for row in rows:

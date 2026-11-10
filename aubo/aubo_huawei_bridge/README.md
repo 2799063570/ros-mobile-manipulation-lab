@@ -55,7 +55,7 @@ MQTT 协议层连接、心跳、订阅和 Ack 的计费规则见[计费项](http
 1. 创建产品时选择自定义设备类型 **`AUBOSorter`**，产品名称可填 `AUBO_Sorting`。
 2. 打开该产品详情的 **基本信息 → 模型定义 → 上传模型文件**。
 3. 选择 `config/AUBOSorter_AuboLab.zip`，保持 ZIP 格式直接上传并确认。
-4. 成功后应出现 **`Sorting`** 服务，包含 20 个只读属性，以及 **`task_command`** 命令。
+4. 成功后应出现 **`Sorting`** 服务，包含 25 个只读属性（已有旧版 20 项的产品按下方第 9 节追加 5 项），以及 **`task_command`** 命令。
    命令输入包含 `method`、`command_id`、`session`、`issued_at_ms`、`expires_at_ms`。
 5. 确认后继续注册设备。
 
@@ -248,3 +248,11 @@ source devel/setup.bash
 界面、应用侧后台、FunctionGraph 上传包及逐步配置见 [dashboard/README.md](dashboard/README.md)。
 当前已有可连接真实 ROS 的工作台及手机隧道启动命令；公网手机访问还需在本机填写 cpolar Token 并验证网络。
 保持 IoTDA S0 和现有设备不变，先验证只读监控，再单独开放任务控制。
+
+## 9. 无相机投影 + 华为云同时上报
+
+远程页面只保留平面投影、队列、状态、完成统计及四个任务按钮；不订阅或上传相机图片，rqt 保留本地画面。
+新增 `cloud_mobile.launch` 可同时启动 IoTDA 只读上报、网页控制和 cpolar；不要与已有云桥重复运行。
+旧产品保留兼容模式；追加 5 项统计与工位属性后再设 `extended_telemetry:=true`。
+华为云原生大屏的字段映射、转换器、免费权益检查与逐步配置见 [cloud_dashboard/README.md](cloud_dashboard/README.md)。
+当前不创建付费资源；云端大屏未部署，需先确认账号的 DLV 与 OBS 免费权益。

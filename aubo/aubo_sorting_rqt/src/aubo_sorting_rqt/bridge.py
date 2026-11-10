@@ -97,6 +97,8 @@ class RosBridge(QObject):
             document=json.loads(message.data)
             frame, rows = queue_rows(document)
             self._put(frame=frame, rows=rows, queue_error='', vision_phase=document.get('vision_phase',''),
+                      selection_policy=document.get('selection_policy','fifo'),
+                      grasp_height_reference=document.get('grasp_height_reference','center'),
                       target_occluded=document.get('target_occluded',False),
                       merged_detections_total=document.get('merged_detections_total',0))
         except (ValueError, TypeError, KeyError, OverflowError) as error:

@@ -43,6 +43,7 @@ public:
   double queue_frame_max_age_{1};
   int queue_empty_frames_{7},processed{0};
   bool queue_target_occluded_{false},occludes{true},missing_tf{false};
+  int queue_occlusion_clear_frames_{3},queue_occlusion_clear_observations_{0};
   bool reservedTargetOccluded(const aubo_perception::DetectedObjectArray&) {
     if (missing_tf) throw std::runtime_error("TF unavailable");
     return occludes;
@@ -63,6 +64,12 @@ int main() {
   assert(hidden.processed==0 && hidden.queue_target_occluded_);
   assert(!hidden.queue_last_source_frame_.isZero() && hidden.queue_last_frame_.isZero());
   assert(hidden.queue_empty_frames_==0);
+  hidden.occludes=false;
+  auto clear1=frame();clear1.observation_valid=true;hidden.processInstanceFrame(clear1);
+  auto clear2=frame();clear2.observation_valid=true;hidden.processInstanceFrame(clear2);
+  assert(hidden.processed==0 && hidden.queue_target_occluded_);
+  auto clear3=frame();clear3.observation_valid=true;hidden.processInstanceFrame(clear3);
+  assert(hidden.processed==1 && !hidden.queue_target_occluded_);
   SortingTask visible;visible.occludes=false;
   auto valid=frame();valid.observation_valid=true;
   visible.processInstanceFrame(valid);
@@ -107,6 +114,15 @@ int main() {
 #include <mutex>
 #include <sstream>
 #include <string>
+#include <thread>
+#include <chrono>
+#define ROS_WARN_THROTTLE(...) ((void)0)
+namespace ros {bool ok(){return true;}}
+namespace detail {
+bool wallSleep(double seconds,const std::atomic<bool>& stop) {
+  std::this_thread::sleep_for(std::chrono::duration<double>(seconds));return !stop.load();
+}
+}
 using ObjectQueue=aubo_sorting_core::InstanceQueue<int>;
 class SortingTask {
 public:
@@ -116,6 +132,7 @@ public:
   std::mutex queue_mutex_;
   ObjectQueue instance_queue_;
   double queue_reserved_max_age_{120},queue_frame_max_age_{1};
+  double queue_reserved_recheck_timeout_{.2};
   ros::WallTime queue_last_frame_,queue_last_source_frame_,queue_occlusion_checked_at_;
   std::atomic<QueueVisionPhase> queue_vision_phase_{QueueVisionPhase::APPROACH};
   std::atomic<bool> stop_requested_{false};
@@ -158,6 +175,26 @@ int main() {
   assert(old.reason.find("last seen")!=std::string::npos);
   SortingTask stopped;prepare(stopped);stopped.stop_requested_.store(true);
   assert(!stopped.validateReservedTarget());
+  SortingTask pending;prepare(pending);pending.instance_queue_.reserved_anomaly_confirmations=3;
+  pending.instance_queue_.update({moved},ros::WallTime::now().toSec());
+  assert(!pending.validateReservedTarget()); // A pending jump + known occlusion cannot authorize descent.
+  assert(pending.reason.find("uncertain after recheck")!=std::string::npos);
+  SortingTask recovering;prepare(recovering);recovering.instance_queue_.reserved_anomaly_confirmations=3;
+  recovering.instance_queue_.update({moved},ros::WallTime::now().toSec());
+  std::thread frames([&recovering] {
+    ObjectQueue::Sample original;original.x=.5;original.category="can";original.payload=1;
+    for(int i=0;i<3;++i) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(20));
+      std::lock_guard<std::mutex> lock(recovering.queue_mutex_);
+      recovering.queue_target_occluded_=false;recovering.queue_last_frame_=ros::WallTime::now();
+      recovering.instance_queue_.update({original},ros::WallTime::now().toSec());
+    }
+  });
+  assert(recovering.validateReservedTarget());frames.join(); // Worker can acquire mutex during recheck.
+  SortingTask cancelled;prepare(cancelled);cancelled.instance_queue_.reserved_anomaly_confirmations=3;
+  cancelled.instance_queue_.update({moved},ros::WallTime::now().toSec());
+  std::thread cancel([&cancelled] {std::this_thread::sleep_for(std::chrono::milliseconds(20));cancelled.stop_requested_=true;});
+  assert(!cancelled.validateReservedTarget());cancel.join();
 }
 '''
         with tempfile.TemporaryDirectory(prefix='sorting_mask_') as directory:

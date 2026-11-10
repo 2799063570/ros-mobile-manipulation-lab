@@ -5,6 +5,7 @@
 
 | 要做什么 | 入口 | 默认行为 |
 | --- | --- | --- |
+| 统一启动仿真 / 实机、ThingsBoard、电脑 / 手机网页 | [sorting_workstation.launch](sorting_workstation.launch) | mode 选择 gazebo / real / existing；当前本机预设实机及全部通道，等待显式运动指令 |
 | MoveIt、控制器、相机和 TF 已运行，只启动分拣算法 | [sorting.launch](sorting.launch) | 颜色、眼在手上；自动前往观察位，等待开始服务 |
 | 启动完整 Gazebo 分拣环境 | [sorting_gazebo.launch](sorting_gazebo.launch) | 颜色方块场景、眼在手上；自动前往观察位，等待开始服务 |
 | 启动通用实机分拣环境 | [sorting_real.launch](sorting_real.launch) | 颜色、眼在手上；等待显式运动指令 |
@@ -17,6 +18,7 @@
 
 ```text
 launch/
+├── sorting_workstation.launch # 统一工作台：仿真 / 实机 + 可选 ThingsBoard / 网页 / cpolar / rqt
 ├── sorting.launch          # 感知 + 几何定位 + 分拣任务
 ├── sorting_gazebo.launch   # Gazebo + MoveIt + sorting.launch
 ├── sorting_real.launch     # 实机硬件 + MoveIt + 相机 + 夹爪 + sorting.launch
@@ -28,6 +30,26 @@ launch/
 流程图放在 [docs/](../docs/感知、维护目标、依次抓取流程图.png)。
 
 ## 常用命令
+
+分拣仿真、ThingsBoard、手机公网网页一并启动：
+
+```bash
+roslaunch aubo_sorting sorting_workstation.launch mode:=gazebo \
+  start_thingsboard:=true start_cpolar:=true enable_commands:=true
+```
+
+`start_cpolar` 会自动带起本机网页；`start_rqt:=true` 可同时打开本地相机工作台。
+实机三容器工位使用 `mode:=real`，直接复用 `eye_to_hand_can_sorting_real.launch`；
+已有仿真或实机分拣运行时加 `mode:=existing`（也兼容 `start_sorting:=false`），只启动远程访问通道。
+例如实机与手机工作台一起启动：
+
+```bash
+roslaunch aubo_sorting sorting_workstation.launch mode:=real \
+  start_thingsboard:=true start_cpolar:=true start_rqt:=true enable_commands:=true
+```
+
+完整参数、凭据准备、仪表盘更新、手机登录和排查步骤见
+[ThingsBoard 与手机工作台操作指南](../docs/ThingsBoard与手机工作台操作指南.md)。
 
 ```bash
 # 仿真：眼在手外 + YOLO；会按 detector 选择对应 world 和任务配置。

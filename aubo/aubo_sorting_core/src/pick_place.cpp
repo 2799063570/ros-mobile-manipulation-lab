@@ -2,6 +2,7 @@
 #include "task_utils.hpp"
 #include <aubo_sorting_core/placement_height.hpp>
 #include <aubo_sorting_core/gripper_height.hpp>
+#include <aubo_sorting_core/object_support.hpp>
 #include <algorithm>
 #include <cmath>
 #include <sstream>
@@ -29,7 +30,8 @@ bool SortingTask::pickAndPlaceImpl(const aubo_perception::DetectedObject& detect
   double close_command = gripper_closed_;
   if (!std::isfinite(object_x) || !std::isfinite(object_y) || !std::isfinite(center_z) ||
       !std::isfinite(height) || height <= 0.0 ||
-      (height_mode_ == "depth" && (!detected.depth_valid || std::abs(center_z - expected_center) > height_tolerance_)) ||
+      (height_mode_ == "depth" && (!detected.depth_valid ||
+       !validObjectSupport(center_z, height, table_z_, height_tolerance_, allow_stacked_objects_))) ||
       ((use_detected_angle_ || use_detected_width_) && !detected.grasp_geometry_valid) ||
       (use_detected_angle_ && !std::isfinite(detected.grasp_angle)))
   {
@@ -50,9 +52,16 @@ bool SortingTask::pickAndPlaceImpl(const aubo_perception::DetectedObject& detect
         (gripper_width_open_ - gripper_width_closed_) * (gripper_closed_ - gripper_open_);
   }
   double grasp_z;
+  double tcp_center_offset;
+  double stacked_z_correction;
   try
   {
-    grasp_z=gripperDescentHeight(center_z+grasp_height_offset_,table_z_,minimum_gripper_height_,
+    tcp_center_offset=graspCenterOffset(height,grasp_height_offset_,grasp_surface_inset_,
+                                       grasp_height_reference_=="surface");
+    stacked_z_correction=stackedGraspOffset(center_z,height,table_z_,stacked_support_min_height_,
+                                           stacked_grasp_offset_z_,height_mode_=="depth" && allow_stacked_objects_);
+    tcp_center_offset+=stacked_z_correction;
+    grasp_z=gripperDescentHeight(center_z+tcp_center_offset,table_z_,minimum_gripper_height_,
                                 table_z_+std::min(pregrasp_height_,lift_min_height_));
   }
   catch (const std::invalid_argument& error)
@@ -68,7 +77,7 @@ bool SortingTask::pickAndPlaceImpl(const aubo_perception::DetectedObject& detect
   double place_z;
   try
   {
-    place_z = placementHeight(expected_center + grasp_height_offset_ + place_clearance_,
+    place_z = placementHeight(expected_center + tcp_center_offset + place_clearance_,
                               std::max(minimum_place_z_,table_z_+minimum_gripper_height_), preplace_z);
   }
   catch (const std::invalid_argument& error)
@@ -77,6 +86,8 @@ bool SortingTask::pickAndPlaceImpl(const aubo_perception::DetectedObject& detect
     return false;  // Reject an invalid approach/release height before grasping.
   }
   ROS_INFO("Picking %s at [%.3f, %.3f, %.3f]", category.c_str(), object_x, object_y, grasp_z);
+  ROS_INFO("Pick Z reference=%s center=%.4f surface=%.4f stacked_correction=%+.4f TCP=%.4f m",
+           grasp_height_reference_.c_str(),center_z,center_z+height/2,stacked_z_correction,grasp_z);
 
   if (!validateReservedTarget())
     return false;

@@ -4,6 +4,11 @@
 先看 [launch 启动索引](launch/README.md) 选择入口。原 `roslaunch aubo_sorting 文件名.launch`
 命令保持可用；XML include 请使用整理后的实际路径。
 
+仿真 / 实机、ThingsBoard、电脑 / 手机网页统一入口为 `sorting_workstation.launch`，
+`mode:=real` 直接复用眼在手外三容器工位，`mode:=existing` 连接已有分拣；
+可分别开关云桥、网页、cpolar 和 rqt。日常启动与手机操作见
+[ThingsBoard 与手机工作台操作指南](docs/ThingsBoard与手机工作台操作指南.md)。
+
 当前工位的独立 SDK 视觉伺服统一使用 `roslaunch aubo_ros_control eye_to_hand_visual_servo_real.launch`；
 原 `eye_to_hand_yolo_servo_test_real.launch` 保留为兼容入口，
 默认低速、禁用且停在观测表面上方 15 cm，见[实机视觉伺服测试步骤](../../docs/AUBO眼在手外视觉伺服实机测试.md)。
@@ -373,7 +378,7 @@ roslaunch aubo_sorting sorting.launch gripper_backend:=inspire \
 
 | 入口 | 默认任务方式 |
 | --- | --- |
-| `eye_to_hand_can_sorting_real.launch` | 从实例缓冲队列按入队顺序领取就绪物体 |
+| `eye_to_hand_can_sorting_real.launch` | 上层优先，同层按检测置信度领取就绪物体 |
 | `eye_to_hand_yolo_sorting_real.launch` | 同一工位的 YOLO 快捷入口，使用相同实例队列 |
 
 连续分拣启动：
@@ -388,13 +393,25 @@ rosservice call /sorting/start '{}'
 两个入口共享 `eye_to_hand_can_real.yaml` 中的实机抓放参数，并叠加
 [`eye_to_hand_continuous_real.yaml`](config/eye_to_hand_continuous_real.yaml) 的实例队列参数。
 稳定确认使用 `target_cache_min_observations: 8`；每个实例独立编号、跟踪和领取。
-按入队 ID 从小到大领取允许类别中的新鲜就绪实例，跳过尚未确认或过期的目标。
+实机默认 `queue_selection_policy: top_first`，先排除被更高物体覆盖的目标，再从最高
+表面以下 `queue_top_height_band: 0.01 m` 范围内按检测置信度选择，平分时按入队 ID。
+覆盖要求 XY 投影重叠比例至少 `queue_stack_overlap: 0.15`，且表面至少高
+`queue_stack_height_gap: 0.01 m`；新鲜的候选上层物体也阻挡下层，等待其稳定确认。
+完成的上层不再阻挡，过期检测不继续阻挡；预抓取下降前会再次检查是否有上层覆盖。
+排序使用深度表面 Z，不使用受厚度先验影响的中心 Z。其他场景默认保留 `fifo`。
 `sort_classes: [bottle, can, box]` 只作为允许类别列表，不决定抓取顺序；
-例如先入队的 can 会先于后入队的 bottle 被抓取，同一类别可以连续抓取多个实例。
+同一类别可以连续抓取多个实例。
 缺少 bottle 不会阻塞已有 can/box，列表以外的类别不会进入待抓队列。
 同一物体被预测为多个类别时，结合中心距离和世界坐标投影框重叠做合并，保留高置信度数据。
 默认 `queue_merge_distance: 0.02` m、`queue_merge_overlap: 0.50`（交集 / 较小框面积），可在 rqt 空闲调参。
 预抓取接近时根据机器人 TF 判断遮挡；确认自身遮挡后冻结队列，下降/夹放阶段按流程屏蔽。
+遮挡检查覆盖冻结目标的可见表面中心、投影框角点及边中点，避免只挡住边缘时漏判；
+连续 `queue_occlusion_clear_frames: 3` 帧无遮挡才恢复关联。
+实机 `queue_reserved_anomaly_confirmations: 3`：单帧位置/类别跳变先进入关联复核，
+下降前最多等待 `queue_reserved_recheck_timeout: 2.0 s`。必须在稳定半径 1.5 cm 内，
+以原类别、有效几何连续收到 `queue_reserved_recovery_observations: 3` 帧才解除未确认异常。
+遮挡和空帧不能解除待复核；连续异常确认后仍锁定停止，后续恢复也不会自动覆盖该故障。
+无法复核时明确报 `association uncertain after recheck`，不根据可疑帧继续下降。
 相机失联、TF 缺失、目标超龄或已发现的真实位移仍会阻止下降；屏蔽不会放宽这些保护。
 可靠实例存在时继续领取；缺少实例才返回工作观察位 `real_sort_ready` 重建观测。
 只有在观察位收到至少 5 帧、持续 2 秒的有效空检测，才结束本轮并返回 `real_observe`。
@@ -446,14 +463,36 @@ box `[-0.42,-0.5425]`（米，`base_link`）。容器采用底板加四面侧壁
 
 容器 YAML 的 `minimum_place_z: 0.18` 是 `target_frame` 下的绝对 TCP Z 下限，
 本工位 `target_frame=base_link`。放置高度取
-`max(table_z + 物高/2 + grasp_height_offset + place_clearance, minimum_place_z, table_z + minimum_gripper_height)`。
+`max(table_z + 物高/2 + TCP相对中心偏移 + place_clearance, minimum_place_z, table_z + minimum_gripper_height)`。
+中心抓取的偏移为 `grasp_height_offset`；表面抓取的偏移为 `物高/2 - grasp_surface_inset`，
+放置保留相同的 TCP 相对物体中心关系。
 它不改变抓取高度；预放置/退离 TCP 高度必须大于实际放置高度，否则在抓取前报配置错误。
 该值描述 TCP，不是物体底面或箱底。
-当前实机感知设置 `object_height_source: depth`，三类物体均按各自检测框对应的对齐深度
-估计顶面 Z，以 `物高=顶面Z−table_z`、`中心Z=table_z+物高/2` 发布目标。
-测量范围默认 `0.005–0.30 m`，不再把瓶子、盒子都按 `0.065 m` 校验；
-`object_height/class_heights` 仅在切回 `configured` 物高来源时作为固定值。
-抓取 TCP Z 仍取 `max(中心Z+grasp_height_offset, table_z+0.06)`，6 cm 是 TCP 下限。
+当前实机感知设置 `object_height_source: bounded_depth`，由对齐深度估计可见表面 Z，
+以 `自身厚度=min(表面Z−table_z, 类别厚度上限)`、`中心Z=表面Z−自身厚度/2` 发布目标。
+`class_heights` 可按类别设置厚度上限，未设置时使用 `object_height`，默认 `0.065 m`。
+这是平放物体的厚度先验，不包含下面物体的支撑高度；较矮桌面目标保留实测厚度，
+高于上限的目标随叠放支撑高度完整抬高。要获得准确中心，必须按实际物体厚度调整先验；
+同类实例厚度不同或直立高物体不能仅凭上表面深度确定真实中心。
+测量范围默认 `0.005–0.30 m`，限制的是表面到桌面的总高度，包含叠放支撑。
+实机任务同时设置 `allow_stacked_objects: true`，队列和抓取都允许目标底面高于桌面；
+未开启的其他场景继续校验物体是否贴桌。抓取点必须低于预抓取/最低抬升高度，
+放置高度仍按目的桌面与自身厚度计算，不带入取物时的叠放支撑高度。
+实机抓取默认 `grasp_height_reference: surface`、`grasp_surface_inset: 0.01 m`，
+TCP Z 取 `max(实测表面Z - 0.01 + 上层Z修正, table_z + 0.06)`，不再受中心厚度先验拉低。
+1 cm 是 TCP 低于可见表面的距离，不是深度图补偿；它的合适值仍需按实际手指/TCP 几何验证。
+`grasp_height_offset` 仅在 `grasp_height_reference: center` 时参与抓取。
+`stacked_grasp_offset_z` 是额外的上层 TCP Z 修正，默认 `0.0 m`，范围 `[-0.05,0.05] m`；
+正值抬高，例如 `0.005` 为 +5 mm、`0.010` 为 +1 cm。仅在 depth 模式且允许叠放时，
+估计底面 `中心Z−自身厚度/2` 比桌面至少高 `stacked_support_min_height`（默认 `0.02 m`）
+才应用；该判定仍依赖厚度先验，并非直接测量隐藏支撑面。桌面物体不应用此修正。
+两项参数均可在 rqt 空闲时在线应用；执行中拒绝修改。修正不改变检测坐标、深度或出队排序，
+表格“抓取 TCP Z”与日志包含修正；放置保留修正后的 TCP 相对中心关系，仍不继承源支撑高度。
+需要持久化时修改 `eye_to_hand_can_real.yaml`，或把 rqt 导出的实际参数合并到任务 YAML。
+`/sorting/target_cache` 分别发布中心 `position[2]`、表面 `surface_z`、下降目标 `grasp_z`
+和覆盖它的 `blocked_by`；`grasp_z_correction` 是该目标实际应用的上层修正。
+rqt 对应显示中心、表面、抓取 TCP 高度及阻挡 ID，抓取高度单元格提示所应用的修正量。
+6 cm 仍为 TCP 离桌下限，超出接近/最低抬升高度的抓取目标在运动前拒绝。
 拒绝日志会显示类别、像素位置、目标坐标系，以及测量值/期望值或测量范围；
 确认标定和有效深度后再调整范围。容器配置完成不代表三类物体均已实机验证。
 复用已运行的节点时，按实际情况追加 `start_robot:=false start_camera:=false

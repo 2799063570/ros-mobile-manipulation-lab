@@ -48,5 +48,19 @@ inline bool robotOccludesTarget(const Point3& camera,const Point3& target,
     if (segmentDistance2(start,target,links[i-1],links[i])<=radius*radius) return true;
   return false;
 }
+// A partially hidden outline can change its class/center before the center ray
+// is hidden. Test the frozen footprint boundary as well as the center ray.
+inline bool robotOccludesRegion(const Point3& camera,const Point3& center,
+                                const std::vector<Point3>& boundary,
+                                const std::vector<Point3>& links,double radius) {
+  if (robotOccludesTarget(camera,center,links,radius)) return true;
+  for (std::size_t i=0;i<boundary.size();++i) {
+    const auto& a=boundary[i];const auto& b=boundary[(i+1)%boundary.size()];
+    const Point3 midpoint{{(a[0]+b[0])/2,(a[1]+b[1])/2,(a[2]+b[2])/2}};
+    if (robotOccludesTarget(camera,a,links,radius) ||
+        robotOccludesTarget(camera,midpoint,links,radius)) return true;
+  }
+  return false;
+}
 }
 #endif

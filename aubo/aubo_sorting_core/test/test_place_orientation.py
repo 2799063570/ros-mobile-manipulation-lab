@@ -17,6 +17,7 @@ class PlaceOrientationTest(unittest.TestCase):
         harness = r'''
 #include <aubo_sorting_core/placement_height.hpp>
 #include <aubo_sorting_core/gripper_height.hpp>
+#include <aubo_sorting_core/object_support.hpp>
 #include <aubo_sorting_core/completion_counts.hpp>
 #include <sstream>
 #include <algorithm>
@@ -45,8 +46,12 @@ struct SortingTask {
   double grasp_offset_x_=0,grasp_offset_y_=0,object_height_=.04,table_z_=.1;
   double gripper_closed_=.22,gripper_open_=0,height_tolerance_=.02;
   bool use_detected_angle_=true,use_detected_width_=false;
+  bool allow_stacked_objects_=false;
   double width_close_scale_=.9,gripper_width_open_=.08,gripper_width_closed_=0;
   double grasp_height_offset_=.01,minimum_gripper_height_=0,pregrasp_height_=.22;
+  std::string grasp_height_reference_="center";
+  double grasp_surface_inset_=.01;
+  double stacked_grasp_offset_z_=0,stacked_support_min_height_=.02;
   double lift_min_height_=.28,active_grasp_angle_=0,preplace_height_=.28;
   double place_clearance_=.02,minimum_place_z_=.15,place_object_yaw_=0;
   bool use_place_object_yaw_=false,continuous_sorting_=false,use_grasp_attachment_=false;
@@ -117,6 +122,34 @@ int main() {
   object.grasp_angle=.7;
   SortingTask legacy;assert(legacy.pickAndPlaceImpl(object));
   for (auto p:legacy.poses) assert(std::abs(p.angle-.7)<1e-10);
+  // Actual C++ grasp sequence accepts elevated centers only in stack mode.
+  object.pose.position.z=.22;
+  SortingTask strict;assert(!strict.pickAndPlaceImpl(object));assert(strict.gripper.empty());
+  SortingTask stacked;stacked.allow_stacked_objects_=true;
+  assert(stacked.pickAndPlaceImpl(object));
+  assert(std::abs(stacked.poses[1].z-.23)<1e-10);
+  assert(std::abs(stacked.poses[3].z-.15)<1e-10); // Destination doesn't inherit the support.
+  SortingTask surface;surface.allow_stacked_objects_=true;surface.grasp_height_reference_="surface";
+  surface.grasp_surface_inset_=.005;
+  assert(surface.pickAndPlaceImpl(object));
+  assert(std::abs(surface.poses[1].z-.235)<1e-10); // .22 + .04/2 - .005.
+  assert(std::abs(surface.poses[3].z-.155)<1e-10); // Same TCP-to-center offset at destination.
+  SortingTask corrected;corrected.allow_stacked_objects_=true;corrected.grasp_height_reference_="surface";
+  corrected.grasp_surface_inset_=.005;corrected.stacked_grasp_offset_z_=.01;
+  assert(corrected.pickAndPlaceImpl(object));
+  assert(std::abs(corrected.poses[1].z-.245)<1e-10);
+  assert(std::abs(corrected.poses[3].z-.165)<1e-10);
+  object.pose.position.z=.125;
+  SortingTask tabletop;tabletop.allow_stacked_objects_=true;tabletop.stacked_grasp_offset_z_=.01;
+  assert(tabletop.pickAndPlaceImpl(object));assert(std::abs(tabletop.poses[1].z-.135)<1e-10);
+  object.pose.position.z=.22;
+  object.pose.position.z=.4;
+  SortingTask too_high;too_high.allow_stacked_objects_=true;
+  assert(!too_high.pickAndPlaceImpl(object));assert(too_high.gripper.empty());assert(too_high.poses.empty());
+  object.pose.position.z=.08;
+  SortingTask below_table;below_table.allow_stacked_objects_=true;
+  assert(!below_table.pickAndPlaceImpl(object));assert(below_table.gripper.empty());
+  object.pose.position.z=.125;
   for (bool fail_lift : {true,false}) {
     SortingTask t;t.use_place_object_yaw_=true;
     t.lift_ok=!fail_lift;t.preplace_ok=fail_lift;

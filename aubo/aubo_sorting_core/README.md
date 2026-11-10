@@ -100,8 +100,15 @@ dynamic_reconfigure 接口；执行中拒绝修改，队列设置改变后要求
 操作线程顺序抓放。队列不积压图像，也不在运动期间持有目标锁。同类多个物体按
 类别和 XY 距离一对一匹配，短距离重复检测去重，多帧稳定后可领取。队列最多保留
 200 个实例，过期记录在新有效帧到来时清理；ID 在节点生命周期内不复用。
-`sort_classes` 只筛选允许类别；领取时按入队 ID 从小到大选择新鲜的就绪实例，
+`sort_classes` 只筛选允许类别；默认 `queue_selection_policy: fifo` 按入队 ID 从小到大选择新鲜的就绪实例，
 类别列表顺序不影响领取顺序。未就绪、过期或类别不允许的目标不会阻塞后续就绪实例。
+
+实机场景启用 `queue_selection_policy: top_first`，先剔除 XY 投影重叠且被更高表面覆盖的目标，
+再从最高可抓表面以下 `queue_top_height_band`（默认 1 cm）范围内按模型检测置信度选择，ID 打破平分。
+覆盖阈值为 `queue_stack_overlap`（默认 0.15）和 `queue_stack_height_gap`（默认 1 cm）。
+新鲜的候选/预留/待复核上层也会阻挡下层，完成或过期的上层不再阻挡；下降前再次检查覆盖。
+该策略要求 depth 模式，使用表面 Z，并以三维距离关联叠放实例，避免同 XY 的上下层串号。
+它依赖可见检测与投影重叠，不是完整的接触关系或手指可达性判断。
 
 重复实例按世界坐标和检测框投影合并：中心三维距离 ≤ `queue_merge_distance`（默认 0.02 m），
 且两个凸投影框的交集面积 / 较小框面积 ≥ `queue_merge_overlap`（默认 0.5）。
@@ -122,8 +129,17 @@ dynamic_reconfigure 接口；执行中拒绝修改，队列设置改变后要求
 
 预抓取使用 `APPROACH` 阶段：按检测采集时间查询相机和机器人链路 TF，用
 `queue_occlusion_links` 原点间的胶囊包络（半径 `queue_occlusion_radius`，默认 0.06 m）
-判断机器人是否挡住相机到预留目标的视线。确认遮挡时冻结整个实例队列，只保留新鲜源帧心跳，
+判断机器人是否挡住相机到冻结目标的可见表面中心、投影角点或边中点的视线。
+确认遮挡时冻结整个实例队列，只保留新鲜源帧心跳，
 不把遮挡框的类别/位置写回目标，也不把空检测当作桌面清空。可见时仍正常跟踪和检查位移。
+遮挡解除要求连续 `queue_occlusion_clear_frames`（默认 3）帧均未被包络遮挡，减少边缘闪烁。
+`queue_reserved_anomaly_confirmations` 控制确认预留关联变化所需的异常观测数，
+通用默认 1，实机配置为 3。首个异常立即暂停下降，并标记 `association_pending`；
+只有原类别、有效几何且位于 `queue_stable_distance` 内连续
+`queue_reserved_recovery_observations`（默认 3）次观测才能解除尚未确认的异常。
+确认的位移/隔离故障保持锁定，不因恢复或遮挡清除。连续性仍受 `queue_confirmation_gap` 约束。
+下降前的关联复核在队列锁外等待，最多 `queue_reserved_recheck_timeout`（默认 2 s），
+停止请求可中断。未恢复、无有效数据或已确认变化均拒绝下降；已确认遮挡不能替代异常后的重新确认。
 下降前允许已确认遮挡使用源帧心跳，但仍检查遮挡 TF 时效、预留目标最大年龄、已有位移故障和停止请求。
 这不能检测完全被挡住期间的外力移动；遮挡例外有 `queue_reserved_max_age` 上限，不会无限延长。
 相机帧可能比关节 TF 超前一个反馈周期。跟踪线程在队列锁外最多等待
@@ -259,6 +275,16 @@ Inspire 后端将它映射到最大开度，并非发送协议开度 0。启动�
 
 `minimum_gripper_height` 是抓取及放置下降终点的最低 TCP 离桌高度，默认 `0.06 m`。
 抓取 Z 取 `max(物体中心Z + grasp_height_offset, table_z + minimum_gripper_height)`；
+实机可选择 `grasp_height_reference: surface`，改用
+`max(可见表面Z - grasp_surface_inset, table_z + minimum_gripper_height)`，要求有效 depth 模式。
+`stacked_grasp_offset_z`（默认 0，范围 ±0.05 m）给上层目标额外增加 TCP Z 修正；
+判定阈值 `stacked_support_min_height`（默认 0.02 m，可调 0.005–0.30 m）与
+`中心Z−自身厚度/2−table_z` 比较，依赖原有厚度先验。只有 depth + allow_stacked_objects 时启用，
+中心参考或表面参考抓取均可应用。修正叠加在 TCP 相对中心偏移上，放置沿用同一偏移。
+两者通过 dynamic_reconfigure 提供，空闲时允许更新、执行中拒绝并回传原值。
+感知中心/表面、上层优先排序不随修正而改变；修正后的抓取/放置仍须通过接近高度检查。
+默认 inset 为 1 cm，描述 TCP 相对表面的几何关系；中心 Z 与自身物高仍单独发布。
+抓放使用相同 TCP 相对中心偏移，目的放置不继承源物体的支撑高度。
 放置还保留 `minimum_place_z` 的绝对高度下限。该参数必须小于预抓取、最低抬升及预放置高度，
 可在空闲时通过 dynamic_reconfigure/rqt 修改。它以 `end_effector_link`（实机为 `tcp_link`）
 控制点为准，不代表手指最低几何点，也不替代运动路径碰撞检查。已有小物体仿真 YAML

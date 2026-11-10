@@ -16,6 +16,36 @@ from aubo_huawei_bridge.telemetry import HuaweiTelemetry
 
 
 class ProtocolTests(unittest.TestCase):
+    def test_extended_report_contains_projection_counts_and_stays_one_unit(self):
+        telemetry = HuaweiTelemetry()
+        telemetry.set_workcell([.7, 0, 0], [.7, 1, .2], 'base_link')
+        statistics = dict(schema_version=1, scope='node_session', session='task-run',
+                          counts={'bottle': 1, 'can': 2, 'box': 3}, total=6)
+        telemetry.update('completed_counts', encode_json(statistics))
+        target = dict(id=1, category='bottle', status='ready', position=[.54, .12, .1], detection_confidence=.9)
+        telemetry.update('target_cache', encode_json({'schema_version': 2, 'targets': {'1': target}}))
+        snapshot = dict(telemetry.snapshot(), camera_image='TEST_FRAME_MUST_NEVER_LEAVE_ROS')
+        report = property_report(snapshot, 'a' * 32, True, False, {}, 1794191363000)
+        values = report['services'][0]['properties']
+        self.assertEqual(values['completed_total'], '6')
+        self.assertEqual(decode_json(values['completed_counts'])['counts'], statistics['counts'])
+        self.assertEqual(decode_json(values['workcell'])['table_center'], [.7, 0])
+        self.assertEqual(values['statistics_available'], 1)
+        self.assertNotIn('TEST_FRAME_MUST_NEVER_LEAVE_ROS', encode_json(report))
+        self.assertLessEqual(len(encode_json(report).encode()), MAX_REPORT_BYTES)
+        legacy = property_report(snapshot, 'a' * 32, True, False, {}, 1794191363000, extended=False)
+        self.assertEqual(len(legacy['services'][0]['properties']), 20)
+        counts = {'类别\\"' * 4 + str(i): i for i in range(200)}
+        telemetry.update('completed_counts', encode_json(dict(statistics, counts=counts, total=sum(counts.values()))))
+        for kind in ('state', 'failure', 'detection_summary'):
+            telemetry.update(kind, '\\"测' * 300)
+        report = property_report(telemetry.snapshot(), 'b' * 32, True, False, {}, 1794191363000)
+        values = report['services'][0]['properties']
+        self.assertEqual(values['completed_total'], str(sum(counts.values())))
+        self.assertEqual(values['completed_counts_truncated'], 1)
+        self.assertLessEqual(len(values['completed_counts'].encode()), 512)
+        self.assertLessEqual(len(encode_json(report).encode()), MAX_REPORT_BYTES)
+
     def test_completion_statistics_replace_snapshots_and_survive_queue_clear(self):
         telemetry = HuaweiTelemetry()
         self.assertIsNone(telemetry.snapshot()['completed_counts'])

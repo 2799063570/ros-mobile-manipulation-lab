@@ -5,6 +5,51 @@
 首版覆盖状态、步骤、识别汇总、故障、实例列表，以及观察 / 开始 / 停止 / 回结束位。
 不需要开发或安装手机 App。
 
+## 当前方案：继续使用 ThingsBoard
+
+现已提供 `aubo_sorting/launch/sorting_workstation.launch` 统一入口，可用开关同时启动分拣仿真、
+本包、网页和 cpolar。日常命令、开关表、手机访问及更新步骤统一整理在
+[ThingsBoard 与手机工作台操作指南](../aubo_sorting/docs/ThingsBoard与手机工作台操作指南.md)。
+
+电脑与手机均登录已有 ThingsBoard 账号，打开同一个仪表盘；手机可使用 4G/5G。
+本包不依赖华为云、DLV、OBS 或 cpolar，不上传相机图片。本地 rqt 保留相机画面。
+云端仍需有可用的 ThingsBoard 账号权益，不能把切换平台视为自动获得永久免费配额。
+
+本次已补齐 **XY 平面投影、目标坐标表格、本次运行累计完成数量**。
+完成数量来自 `/sorting/completed_counts`，支持 `bottle / can / box` 或实际类别名称；
+仅完整抓取、放置与退离成功后增加。重复上报替换快照，不累加；清理目标队列不清零，
+重启任务节点后清零。未收到统计时显示“等待任务节点上报完成统计”，不编造数量。
+
+已有凭据时，下次启动入口仍为：
+
+```bash
+source /opt/ros/noetic/setup.bash
+source /home/zlab/aubo/ros_mobile_manipulation_lab/devel/setup.bash
+roslaunch aubo_cloud_bridge thingsboard.launch enable_commands:=true
+```
+
+先启动原有分拣程序；同一台设备只运行一份 ThingsBoard 桥。
+本轮已用现有凭据确认日志 `ThingsBoard connected; remote task commands enabled`，
+没有发送机器人任务。华为云旧桥的 launch 还承载当前 ROS master，因此保留到正常退出 ROS；
+下次启动不再需要华为云桥。本机网页和 cpolar 可通过统一入口独立启用，
+与 ThingsBoard 云端仪表盘同时使用。
+
+### 更新已经导入的仪表盘
+
+本地生成文件不会自动更新云端已有组件。保留已有仪表盘，按第 3 节先导入新版组件包，
+再将新版仪表盘导入为一个新仪表盘（可命名“分拣工作台－投影统计版”），绑定原来的设备。
+如果平台提示同名组件冲突，进入已有 `AUBO Sorting Console` 编辑器，分别用
+`dashboards/console.html`、`console.css`、`console.js` 替换 HTML、CSS、JavaScript 后保存。
+已有仪表盘若继续复用，还需在组件数据源中添加遥测键
+`completed_counts`、`completed_total`、`statistics_available`、`workcell`；新版仪表盘文件已包含它们。
+无需像 IoTDA 一样提前创建产品属性。
+
+工位范围从 `/color_sorting_task` 的 `table_center / table_size / target_frame` 读取；
+任务节点名称不同则传 `task_node:=/实际节点名`。无工位参数时仅按有效目标自动缩放。
+过期或无效坐标不绘点，超出配置工位范围的目标单独计数；相机图像不进入此链路。
+本轮离线协议/适配器 13 项测试、网页控制器测试与 ROS 包编译通过；
+云端新版组件导入与真实抓放后统计变化仍需在设备上线后核对。
+
 ## 1. 注册云端，创建设备
 
 1. 在 [ThingsBoard Cloud](https://thingsboard.cloud/) 注册并登录。
@@ -171,6 +216,9 @@ MQTT 和遥测仍可运行。停止会撤销尚未调用 ROS 的运动请求；�
 | `phase` / `description` | 当前子步骤及说明 |
 | `failure` / `detection_summary` | 故障与识别汇总 |
 | `target_cache` | schema 2 目标队列的精简 JSON 字符串，最多 200 条 |
+| `workcell` | 工位中心、尺寸和坐标系的 JSON 字符串，用于 XY 投影 |
+| `completed_counts` / `completed_total` | 本次任务节点运行的按类别累计完成 JSON / 合计 |
+| `statistics_available` | 是否收到有效的任务完成统计 |
 | `queue_*` | 当前队列的 candidate / ready / reserved / done / review 数量 |
 | `*_age_s` | 桥接收到该 ROS 消息后过去的单调时间，-1 表示从未收到 |
 | `last_command` | 最近完成服务应答的指令编号、方法、反馈和时间 |
@@ -181,8 +229,9 @@ MQTT 和遥测仍可运行。停止会撤销尚未调用 ROS 的运动请求；�
 故障字段是原核心最后一次报告，不代表每次新任务都会自动清空。
 
 `queue_done` 是当前队列中的抓放流程完成数，会随观察、重建队列、过期清理而变化，
-不是当天累计产量，也不能证明实物已入筐。首版云端存储这些遥测，历史记录可在
-ThingsBoard 中加时序图查看；可靠累计产量 / 成功率需要另建唯一抓放事件及实物确认。
+不是当天累计产量，也不能证明实物已入筐。新增的 `completed_counts` 则独立于队列，
+按任务控制器成功完成抓放退离累计，也不表示由额外传感器确认实物入筐。
+历史记录可在 ThingsBoard 中加时序图查看，但不要把历史快照里的累计数求和。
 不上传相机视频、点云或图像；后续视频需要单独设计链路。
 
 默认每 2 秒上传一个快照（每天约 43,200 次上传），含 20 多个遥测键；
@@ -235,8 +284,9 @@ ls -l ~/aubo/ros_mobile_manipulation_lab/devel/lib/aubo_cloud_bridge/thingsboard
 （含模拟 Paho 1.x、2.x 适配器）及网页控制器 Node 测试；使用系统 Python / Paho、
 临时 Token 和独立 ROS master 验证了正式 launch 能启动只读桥并注册五个分拣话题订阅。
 默认 MQTT 端点的 TCP 8883、TLS 握手和系统 CA 校验通过。
-本机默认 Token 文件尚未配置，**尚未验证真实设备认证、云端遥测、仪表盘导入、Gazebo 或真机联调**。
-配置设备凭据后，按本说明继续验证上述步骤。
+以上为最初接入记录。2026-11-09 切回 ThingsBoard 时已使用本机既有 Token 验证真实 MQTT 认证连接，
+并注册包含完成统计在内的六个分拣话题订阅。新版组件仍需按上方说明导入云端，
+实时遥测、投影与真实抓放统计需继续在运行中的分拣程序和云端页面核对。
 
 官方接口依据：[MQTT RPC](https://thingsboard.io/docs/reference/mqtt-api/rpc/)、
 [仪表盘](https://thingsboard.io/docs/user-guide/dashboards/)、

@@ -2,7 +2,7 @@
 import math
 import unittest
 import numpy as np
-from aubo_perception.grasp_geometry import (center_height, object_height_from_depth,
+from aubo_perception.grasp_geometry import (center_height, object_height_from_depth, bounded_depth_center,
                                            rectangle_grasp, ray_plane, validate_modes)
 
 
@@ -44,6 +44,25 @@ class GeometryTest(unittest.TestCase):
         np.testing.assert_allclose(point, [.086, 0, .14])
         with self.assertRaises(ValueError):
             ray_plane(50, 50, self.K, np.eye(3), self.t, .14)
+
+    def test_stack_height_is_added_in_full_with_constant_own_thickness(self):
+        table, thickness = .00285, .065
+        base, height = bounded_depth_center(table+thickness, table, thickness, .005, .30)
+        elevated, elevated_height = bounded_depth_center(table+thickness+.08, table, thickness, .005, .30)
+        self.assertAlmostEqual(elevated-base, .08)
+        self.assertAlmostEqual(height, thickness)
+        self.assertAlmostEqual(elevated_height, thickness)
+
+    def test_bounded_depth_keeps_short_table_objects_and_rejects_bad_returns(self):
+        center, height = bounded_depth_center(.04285, .00285, .065, .005, .30)
+        self.assertAlmostEqual(center, .02285)
+        self.assertAlmostEqual(height, .04)
+        for surface in (.00285, -.01, .4, float('nan')):
+            with self.subTest(surface=surface), self.assertRaises(ValueError):
+                bounded_depth_center(surface, .00285, .065, .005, .30)
+        for limit in (0, .001, .4, float('inf')):
+            with self.subTest(limit=limit), self.assertRaises(ValueError):
+                bounded_depth_center(.1, .00285, limit, .005, .30)
 
     def test_servo_requires_explicit_class(self):
         validate_modes('sorting', 'table', 'eye_to_hand', '')

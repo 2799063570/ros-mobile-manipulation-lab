@@ -3,11 +3,13 @@
   <arg name="token_file" default="$(env HOME)/.config/aubo/thingsboard.token"/>
   <arg name="enable_commands" default="false"/>
   <arg name="sorting_ns" default="/sorting"/>
+  <arg name="task_node" default="/color_sorting_task"/>
   <node pkg="aubo_cloud_bridge" type="thingsboard_bridge" name="aubo_cloud_bridge" output="screen" required="false">
     <rosparam command="load" file="$(find aubo_cloud_bridge)/config/thingsboard.yaml"/>
     <param name="host" value="$(arg host)"/>
     <param name="token_file" value="$(arg token_file)"/>
     <param name="enable_commands" value="$(arg enable_commands)"/>
     <param name="sorting_ns" value="$(arg sorting_ns)"/>
+    <param name="task_node" value="$(arg task_node)"/>
   </node>
 </launch>

@@ -75,6 +75,27 @@
           "max_length": 512
         },
         {
+          "property_name": "completed_counts",
+          "data_type": "string",
+          "method": "R",
+          "required": false,
+          "max_length": 512
+        },
+        {
+          "property_name": "completed_total",
+          "data_type": "string",
+          "method": "R",
+          "required": false,
+          "max_length": 20
+        },
+        {
+          "property_name": "workcell",
+          "data_type": "string",
+          "method": "R",
+          "required": false,
+          "max_length": 256
+        },
+        {
           "property_name": "commands_enabled",
           "data_type": "int",
           "method": "R",
@@ -92,6 +113,22 @@
         },
         {
           "property_name": "target_cache_truncated",
+          "data_type": "int",
+          "method": "R",
+          "required": false,
+          "min": "0",
+          "max": "1"
+        },
+        {
+          "property_name": "statistics_available",
+          "data_type": "int",
+          "method": "R",
+          "required": false,
+          "min": "0",
+          "max": "1"
+        },
+        {
+          "property_name": "completed_counts_truncated",
           "data_type": "int",
           "method": "R",
           "required": false,

@@ -264,6 +264,7 @@ private:
 
   // 感知抓取参数仅在一次抓放期间生效，观察位姿仍使用原始 grasp_rpy。
   std::string height_mode_{"table"};
+  bool allow_stacked_objects_{false};
   bool use_detected_angle_{false}, use_detected_width_{false};
   bool use_place_object_yaw_{false};
   double place_object_yaw_{0.0}; // Object long-axis yaw in target_frame; gripper is pi-symmetric.
@@ -273,6 +274,9 @@ private:
   double table_collision_margin_{0.0};
   double object_height_{0.04};
   double grasp_height_offset_{0.01};
+  std::string grasp_height_reference_{"center"};
+  double grasp_surface_inset_{0.01};
+  double stacked_grasp_offset_z_{0.0}, stacked_support_min_height_{0.02};
   double minimum_gripper_height_{0.06};
   double pregrasp_height_{0.25};
   double lift_height_{0.30};
@@ -351,6 +355,8 @@ private:
   std::vector<std::string> queue_occlusion_links_;
   bool queue_target_occluded_{false}; // Protected by queue_mutex_.
   ros::WallTime queue_occlusion_checked_at_;
+  int queue_occlusion_clear_frames_{3}, queue_occlusion_clear_observations_{0};
+  double queue_reserved_recheck_timeout_{2.0};
   int queue_empty_min_frames_{5};
   std::mutex queue_mutex_;
   std::condition_variable queue_condition_;

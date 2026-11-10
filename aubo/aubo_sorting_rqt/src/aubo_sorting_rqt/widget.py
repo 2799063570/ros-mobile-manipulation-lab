@@ -197,9 +197,13 @@ class SortingWidget(QWidget):
         self.mode = QLabel('等待读取任务模式')
         self.mode.setWordWrap(True)
         layout.addWidget(self.mode)
-        self.table = QTableWidget(0, 11)
-        self.table.setHorizontalHeaderLabels(('入队 ID', '类别', '状态', 'X / m', 'Y / m', 'Z / m',
-                                             '旋转角度 / °', '夹取宽度 / mm', '检测置信度', '确认帧数', '观测年龄 / s'))
+        self.table = QTableWidget(0, 14)
+        self.table.setHorizontalHeaderLabels(('入队 ID', '类别', '状态', 'X / m', 'Y / m', '中心 Z / m',
+                                             '旋转角度 / °', '夹取宽度 / mm', '检测置信度', '确认帧数', '观测年龄 / s',
+                                             '表面 Z / m', '抓取 TCP Z / m', '上层阻挡 ID'))
+        self.table.horizontalHeaderItem(5).setToolTip('物体中心高度；叠放物体仍受自身厚度估计影响。')
+        self.table.horizontalHeaderItem(11).setToolTip('对齐深度测得的可见表面高度，用于上层优先选择。')
+        self.table.horizontalHeaderItem(12).setToolTip('应用抓取参考和 TCP 离桌下限后的下降目标；— 表示高度不满足接近限制。')
         self.table.horizontalHeaderItem(6).setToolTip('缓存物体短边在队列坐标系 XY 平面内相对 X 轴的角度；TCP 还会叠加配置的抓取偏航角。')
         self.table.horizontalHeaderItem(7).setToolTip('缓存检测的夹取方向宽度，单位 mm；它是物体几何尺寸。')
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
@@ -252,6 +256,10 @@ class SortingWidget(QWidget):
             editor.setEnabled(False)
             editor.valueChanged.connect(self._mark_dirty)
             editor.setToolTip(key)
+            if key == 'stacked_grasp_offset_z':
+                editor.setToolTip('正值抬高上层物体的抓取 TCP，例如 0.010 表示 +1 cm；空闲时应用。检测中心和表面高度不变。')
+            elif key == 'stacked_support_min_height':
+                editor.setToolTip('估计底面 Z=中心 Z−自身厚度/2；比桌面高至少该值才应用上层 Z 修正。依赖物体厚度先验。')
             self.editors[key] = editor
             self.actual[key] = QLabel('尚未连接')
             grid.addWidget(QLabel(label), index, 0)
@@ -394,8 +402,9 @@ class SortingWidget(QWidget):
         vision=data.get('vision_phase','')
         vision_label='抓放阶段屏蔽' if vision=='masked' else ('预抓取遮挡保护' if
             vision=='approach' and data.get('target_occluded') else ('观测目标' if vision in ('approach','collect') else '未采集'))
-        self.mode.setText(('队列模式 · 感知：{} · 累计合并 {} 次重复记录'.format(
-            vision_label,data.get('merged_detections_total',0))) if queue_mode else
+        policy_label='上层优先，同层按检测置信度' if data.get('selection_policy')=='top_first' else '入队顺序'
+        self.mode.setText(('队列模式 · {} · 感知：{} · 累计合并 {} 次重复记录'.format(
+            policy_label,vision_label,data.get('merged_detections_total',0))) if queue_mode else
             '当前任务未启用队列模式；请重启分拣 launch 加载新配置后开始。')
         self.mode.setStyleSheet('color: {};'.format('#52788a' if queue_mode else '#a04b19'))
         for key, button in self.buttons.items():
@@ -458,13 +467,20 @@ class SortingWidget(QWidget):
             self.table.setRowCount(len(rows))
             for i, row in enumerate(rows):
                 values = [str(row['id']), row['category'], QUEUE_STATES.get(row.get('status'), '未知')]
+                if row.get('association_pending'):
+                    values[2] += ' · 关联复核中'
                 values += ['{:.3f}'.format(v) for v in row['position']]
                 values += ['{:.1f}'.format(math.degrees(row['grasp_angle'])) if row.get('grasp_angle') is not None else '—',
                            '{:.1f}'.format(row['grasp_width'] * 1000) if row.get('grasp_width') is not None else '—']
                 values += ['{:.2f}'.format(float(row['detection_confidence'])) if 'detection_confidence' in row else '—',
                            str(row.get('observations', '')), '{:.2f}'.format(float(row.get('age', 0.)))]
+                values += ['{:.3f}'.format(row[key]) if row.get(key) is not None else '—'
+                           for key in ('surface_z', 'grasp_z')]
+                values += [str(row['blocked_by']) if row.get('blocked_by') else '—']
                 for j, value in enumerate(values):
                     item = QTableWidgetItem(value)
+                    if j == 12 and row.get('grasp_z_correction') is not None:
+                        item.setToolTip('该目标的上层 Z 修正：{:+.3f} m；显示高度已包含修正和 TCP 离桌下限。'.format(row['grasp_z_correction']))
                     if row.get('status') == 'reserved':
                         item.setBackground(QColor('#d9f3ed'))
                     self.table.setItem(i, j, item)

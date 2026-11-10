@@ -1,16 +1,24 @@
 # 连续分拣叠加配置：桌面、抓放高度、类别和观察姿态复用实机任务 YAML。
-# 实例独立编号；按入队 ID 领取就绪目标，sort_classes 只筛选允许类别。
+# 实例独立编号；实机优先移除上层物体，sort_classes 只筛选允许类别。
 continuous_sorting: true
+queue_selection_policy: top_first
+queue_stack_overlap: 0.15       # XY 投影交集 / 较小投影面积达到 15% 才判断覆盖。
+queue_stack_height_gap: 0.01    # 表面 Z 高至少 1 cm 的物体覆盖下层；候选目标也会阻挡。
+queue_top_height_band: 0.01     # 可抓目标最高表面以下 1 cm 内，按检测置信度降序，ID 打破平分。
 target_cache_min_observations: 8
 queue_match_distance: 0.04
 queue_stable_distance: 0.015
 queue_reserved_distance: 0.035
+queue_reserved_anomaly_confirmations: 3  # 单帧跳框先待复核；连续异常确认后仍停止。
+queue_reserved_recovery_observations: 3  # 原类别、原位置 1.5 cm 内连续有效观测才恢复。
+queue_reserved_recheck_timeout: 2.0      # 下降前最多等待复核 2 s；未恢复不下降。
 queue_duplicate_distance: 0.008
 # 跨类别合并：中心距离与投影面积重叠必须同时满足，保留高置信度数据。
 queue_merge_distance: 0.02
 queue_merge_overlap: 0.50  # 交集面积 / 较小投影框面积
 # 预抓取接近时，根据采集时刻 TF 判断机械臂胶囊包络是否挡住相机到目标的视线。
 queue_occlusion_radius: 0.06
+queue_occlusion_clear_frames: 3  # 中心/投影边缘无遮挡连续 3 帧后恢复队列关联。
 queue_occlusion_links: [upperArm_Link, foreArm_Link, wrist1_Link, wrist2_Link, wrist3_Link, tcp_link]
 queue_max_age: 10.0
 # 本工位 0.10 速度比例下，已实测预抓取运动约 100 s。

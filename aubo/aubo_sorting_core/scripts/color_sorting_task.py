@@ -53,6 +53,7 @@ class ColorSortingTask(object):
         )
 
         self.height_mode = rospy.get_param("~height_mode", "table")
+        self.allow_stacked_objects = bool(rospy.get_param("~allow_stacked_objects", False))
         self.use_detected_angle = bool(rospy.get_param("~use_detected_angle", False))
         self.use_detected_width = bool(rospy.get_param("~use_detected_width", False))
         self.place_object_yaw = rospy.get_param("~place_object_yaw", None)
@@ -83,6 +84,17 @@ class ColorSortingTask(object):
         self.grasp_height_offset = float(
             rospy.get_param("~grasp_height_offset", 0.01)
         )
+        self.grasp_height_reference = rospy.get_param("~grasp_height_reference", "center")
+        self.grasp_surface_inset = float(rospy.get_param("~grasp_surface_inset", 0.01))
+        self.stacked_grasp_offset_z = float(rospy.get_param("~stacked_grasp_offset_z", 0.0))
+        self.stacked_support_min_height = float(rospy.get_param("~stacked_support_min_height", 0.02))
+        if (not math.isfinite(self.stacked_grasp_offset_z) or not -.05 <= self.stacked_grasp_offset_z <= .05
+                or not math.isfinite(self.stacked_support_min_height) or not .005 <= self.stacked_support_min_height <= .30):
+            raise ValueError("invalid stacked Z correction/support threshold")
+        if (self.grasp_height_reference not in ("center", "surface") or
+                (self.grasp_height_reference == "surface" and self.height_mode != "depth") or
+                not math.isfinite(self.grasp_surface_inset) or self.grasp_surface_inset < 0):
+            raise ValueError("surface grasp reference requires depth mode and a finite nonnegative inset")
         self.grasp_rpy = rospy.get_param("~grasp_rpy", [math.pi, 0.0, 0.0])
         self.observation_pose = rospy.get_param(
             "~observation_pose", [0.58, 0.0, 0.62]
@@ -1447,9 +1459,13 @@ class ColorSortingTask(object):
         height = detected.object_height if detected.object_height > 0 else self.object_height
         expected_center = self.table_z + height/2
         center_z = detected.pose.position.z if self.height_mode == "depth" else expected_center
+        support_offset = center_z - expected_center
+        support_valid = (math.isfinite(support_offset) and
+                         (support_offset >= -self.height_tolerance if self.allow_stacked_objects
+                          else abs(support_offset) <= self.height_tolerance))
         if (not all(math.isfinite(v) for v in (object_x, object_y, center_z, height)) or height <= 0
                 or (self.height_mode == "depth" and
-                    (not detected.depth_valid or abs(center_z-expected_center) > self.height_tolerance))
+                    (not detected.depth_valid or not support_valid))
                 or ((self.use_detected_angle or self.use_detected_width) and not detected.grasp_geometry_valid)
                 or (self.use_detected_angle and not math.isfinite(detected.grasp_angle))):
             self._set_failure("DETECTION_FAILED", "invalid or unvalidated grasp geometry/height")
@@ -1464,14 +1480,19 @@ class ColorSortingTask(object):
                 return False
             close_command = self.gripper_open + ((self.gripper_width_open-opening) /
                 (self.gripper_width_open-self.gripper_width_closed)) * (self.gripper_closed-self.gripper_open)
-        nominal_grasp_z = center_z + self.grasp_height_offset
+        tcp_center_offset = (height/2-self.grasp_surface_inset if self.grasp_height_reference == "surface"
+                             else self.grasp_height_offset)
+        if (self.height_mode == "depth" and self.allow_stacked_objects and
+                center_z-height/2-self.table_z >= self.stacked_support_min_height):
+            tcp_center_offset += self.stacked_grasp_offset_z
+        nominal_grasp_z = center_z + tcp_center_offset
         grasp_z = max(nominal_grasp_z, self.table_z + self.minimum_gripper_height)
         if not self.table_z < nominal_grasp_z or not self.table_z < grasp_z < self.table_z + min(self.pregrasp_height, self.lift_min_height):
             self._set_failure("DETECTION_FAILED", "grasp height outside approach/lift clearance")
             return False
         self._active_grasp_angle = detected.grasp_angle if self.use_detected_angle else 0.0
         preplace_z = self.table_z + self.preplace_height
-        place_z = expected_center + self.grasp_height_offset + self.place_clearance
+        place_z = expected_center + tcp_center_offset + self.place_clearance
         place_z = max(place_z, self.table_z + self.minimum_gripper_height)
         if self.minimum_place_z is not None:
             place_z = max(place_z, self.minimum_place_z)

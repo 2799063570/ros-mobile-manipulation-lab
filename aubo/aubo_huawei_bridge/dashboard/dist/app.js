@@ -15,33 +15,8 @@ function log(message) {
   t.textContent = new Date().toLocaleTimeString('zh-CN', {hour12:false}); body.textContent = message; li.append(t, body); $('logs').prepend(li);
   while ($('logs').children.length > 200) $('logs').lastChild.remove();
 }
-let cameraUrl=null, cameraPending=false, cameraAbort=null, cameraShownAt=0;
-function clearCamera(message='等待识别图像') {
-  if(cameraUrl){URL.revokeObjectURL(cameraUrl);cameraUrl=null;}
-  $('camera-image').removeAttribute('src');$('camera-image').hidden=true;$('camera-placeholder').hidden=false;
-  text('camera-status','图像未就绪');text('camera-message',message);cameraShownAt=0;
-}
-async function refreshCamera() {
-  if(!token || document.hidden || !snapshot?.camera_enabled || cameraPending)return;
-  cameraPending=true;const version=serial, started=performance.now();
-  const controller=new AbortController();cameraAbort=controller;const timeout=setTimeout(()=>controller.abort(),4000);
-  try {
-    const response=await fetch('./api/camera',{headers:{Authorization:'Bearer '+token},cache:'no-store',credentials:'omit',signal:controller.signal});
-    if(version!==serial)return;
-    if(response.status===401){showLogin();return;}
-    if(!response.ok || !response.headers.get('Content-Type')?.startsWith('image/jpeg'))throw new Error('识别画面未就绪或已中断');
-    const blob=await response.blob();
-    if(version!==serial)return;
-    const frameAgeMs=Number(response.headers.get('X-Camera-Age') || 0)*1000+performance.now()-started;
-    if(!Number.isFinite(frameAgeMs)||frameAgeMs>3000)throw new Error('图像传输延迟，请检查网络');
-    const previous=cameraUrl;cameraUrl=URL.createObjectURL(blob);$('camera-image').src=cameraUrl;
-    $('camera-image').hidden=false;$('camera-placeholder').hidden=true;cameraShownAt=performance.now()-frameAgeMs;
-    text('camera-status','识别画面 · 约 1 帧/秒');if(previous)URL.revokeObjectURL(previous);
-  } catch(error) {if(version===serial)clearCamera(navigator.onLine ? (error.name==='AbortError' ? '图像连接超时' : error.message) : '网络断开，图像已暂停');}
-  finally{clearTimeout(timeout);cameraPending=false;if(cameraAbort===controller)cameraAbort=null;}
-}
 function showLogin() {
-  token = ''; serial++; if(cameraAbort)cameraAbort.abort();clearCamera('登录后查看识别画面'); snapshot = null; online = false; text('source', '未连接'); text('state','等待连接'); text('state-code','—');
+  token = ''; serial++; snapshot = null; online = false; text('source', '未连接'); text('state','等待连接'); text('state-code','—');
   text('detail','登录后查看设备状态'); text('fresh','● 等待数据'); text('update','尚未同步'); text('phase','等待设备数据'); text('description','');
   text('detection','识别摘要：—'); text('session','—'); text('available','等待数据'); text('cache-age','—'); text('settings-source','未连接');
   document.querySelectorAll('[data-count]').forEach(el => el.textContent = '—');
@@ -65,6 +40,10 @@ function currentFresh() {
   if (!snapshot || !online || !navigator.onLine || !snapshot.fresh) return false;
   const age = snapshot.age_s + (performance.now()-receivedAt)/1000;
   return age >= 0 && age <= (snapshot.mode === 'ros' ? 5 : 90);
+}
+function snapshotAgeLabel() {
+  if (!snapshot || !(Number(snapshot.properties.bridge_wall_ms) > 0) || typeof snapshot.age_s !== 'number') return '尚无设备快照';
+  return `快照 ${Math.max(0,Math.round(snapshot.age_s+(performance.now()-receivedAt)/1000))} 秒前`;
 }
 function updateControls() {
   const p = snapshot?.properties || {};
@@ -141,7 +120,7 @@ function render(data) {
   text('settings-source',data.mode==='demo' ? '本地演示数据（非真实设备）' : data.mode==='ros' ? '本机 ROS / Sorting' : '华为云 IoTDA / Sorting');
   text('state',stateNames[p.state]||p.state||'未知状态');text('state-code',p.state);
   text('detail',p.state_detail);text('phase',phaseNames[p.phase]||p.phase||'等待操作');text('description',p.description);
-  text('update',typeof data.age_s==='number' ? `快照 ${Math.max(0,Math.round(data.age_s))} 秒前` : '尚无设备快照');
+  text('update',snapshotAgeLabel());
   $('failure').hidden=!p.failure;text('failure',p.failure);text('detection','识别摘要：'+(p.detection_summary||'—'));
   text('available',p.sorting_available===1 ? '接口可用' : '接口未就绪');text('session',p.bridge_session);text('cache-age',p.target_cache_age_s>=0 ? num(p.target_cache_age_s,1)+' s' : '尚未收到队列');
   document.querySelectorAll('[data-count]').forEach(el=>el.textContent=p['queue_'+el.dataset.count]??'—');
@@ -150,7 +129,7 @@ function render(data) {
   document.querySelectorAll('.steps li').forEach((li,i)=>{li.classList.toggle('active',i===step);if(i===step)li.setAttribute('aria-current','step');else li.removeAttribute('aria-current');});
   const sig=JSON.stringify([p.state,p.state_detail,p.phase,p.description,p.failure,p.last_command]);
   if(sig!==lastSignature){log(`${stateNames[p.state]||p.state} · ${p.state_detail||''}\n${phaseNames[p.phase]||p.phase||''} ${p.description||''}${p.failure ? '\n故障：'+p.failure : ''}`); const command=parse(p.last_command,{});if(command.status)log('云桥最近命令：'+JSON.stringify(command));lastSignature=sig;}
-  updateControls();renderQueue();if(data.camera_enabled)refreshCamera();else clearCamera(data.mode==='demo' ? '演示模式不提供相机图像' : '当前连接未提供相机图像');
+  updateControls();renderQueue();
 }
 async function refresh() {
   if(!token || refreshing) return; refreshing=true;const requestSerial=serial;
@@ -190,10 +169,9 @@ async function send(method) {
   finally{if(method==='stop')stopping=false;else pending=false;updateControls();refresh();}
 }
 document.querySelectorAll('[data-method]').forEach(button=>button.addEventListener('click',()=>send(button.dataset.method)));
-window.addEventListener('offline',()=>{online=false;if(cameraAbort)cameraAbort.abort();clearCamera('网络断开，图像已暂停');updateControls();text('feedback','网络已断开，任务操作已停用');});
-window.addEventListener('online',refresh);document.addEventListener('visibilitychange',()=>{if(document.hidden){if(cameraAbort)cameraAbort.abort();clearCamera('画面已暂停');}else{refresh();refreshCamera();}});
-setInterval(()=>{updateControls();if(snapshot)text('update',`快照 ${Math.max(0,Math.round((snapshot.age_s||0)+(performance.now()-receivedAt)/1000))} 秒前`);},1000);
+window.addEventListener('offline',()=>{online=false;updateControls();text('feedback','网络已断开，任务操作已停用');});
+window.addEventListener('online',refresh);document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
+setInterval(()=>{updateControls();if(snapshot)text('update',snapshotAgeLabel());},1000);
 let nextPoll=0;
 setInterval(()=>{if(!document.hidden && performance.now() >= nextPoll){nextPoll=performance.now()+(snapshot?.poll_seconds || 30)*1000;refresh();}},1000);
-setInterval(()=>{if(cameraShownAt && performance.now()-cameraShownAt>3500)clearCamera('图像已中断');refreshCamera();},1000);
 showLogin();

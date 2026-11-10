@@ -6,6 +6,36 @@ var states = {INITIALIZING:'初始化', IDLE:'等待操作', READY:'已就绪', 
 var labels = {candidate:'待确认', ready:'可领取', reserved:'执行中', done:'流程完成', review:'待复核'};
 function parse(value, fallback) { try { return JSON.parse(value); } catch (e) { return fallback; } }
 function yes(value) { return value === true || value === 'true'; }
+function numeric(value) { return typeof value === 'number' && Number.isFinite(value); }
+function projection(rows, cell, fresh) {
+    var valid = rows.filter(function(row) { return Array.isArray(row.position) && row.position.length === 3 && row.position.every(numeric); });
+    var center = cell.table_center, size = cell.table_size, bounds;
+    if (Array.isArray(center) && Array.isArray(size) && center.length >= 2 && size.length >= 2 &&
+            center.slice(0,2).every(numeric) && size.slice(0,2).every(function(v){return numeric(v) && v > 0;})) {
+        bounds = [center[0]-size[0]/2, center[0]+size[0]/2, center[1]-size[1]/2, center[1]+size[1]/2];
+    } else if (valid.length) {
+        var xs = valid.map(function(r){return r.position[0];}), ys = valid.map(function(r){return r.position[1];});
+        bounds = [Math.min.apply(null,xs)-.1, Math.max.apply(null,xs)+.1, Math.min.apply(null,ys)-.1, Math.max.apply(null,ys)+.1];
+    } else { bounds = [0,1,0,1]; }
+    var result = {points:[], ticks:[], frame:cell.frame || '等待工位参数', outside:0};
+    for (var i=0;i<=4;i++) {
+        result.ticks.push({x:60+i*150, y:270-i*60,
+            xLabel:(bounds[0]+i*(bounds[1]-bounds[0])/4).toFixed(2),
+            yLabel:(bounds[2]+i*(bounds[3]-bounds[2])/4).toFixed(2)});
+    }
+    valid.forEach(function(row) {
+        var x = row.position[0], y = row.position[1];
+        if (x < bounds[0] || x > bounds[1] || y < bounds[2] || y > bounds[3]) { result.outside++; return; }
+        if (!fresh) return;
+        var category = String(row.category).toLowerCase();
+        var color = ({red:'#de5656',green:'#24996c',blue:'#398ad2',bottle:'#24996c',can:'#398ad2',box:'#bd770e'})[category] || '#8ba0b0';
+        result.points.push({id:row.id, category:row.category, status:labels[row.status] || row.status,
+            x:60+(x-bounds[0])/(bounds[1]-bounds[0])*600,
+            y:270-(y-bounds[2])/(bounds[3]-bounds[2])*240, color:color,
+            coordinates:x.toFixed(3)+', '+y.toFixed(3)});
+    });
+    return result;
+}
 function refresh() {
     var vm = self.ctx.$scope.vm, now = Date.now();
     vm.fresh = received.bridge_wall_ms > 0 && now - received.bridge_wall_ms < 10000 &&
@@ -22,13 +52,27 @@ function refresh() {
     vm.summary = values.detection_summary || '';
     vm.failure = values.failure || '';
     vm.queueAge = Number(values.target_cache_age_s) >= 0 ? '桥接收到此快照后 ' + values.target_cache_age_s + ' 秒' : '未收到快照';
-    var latest = parse(values.last_command, {});
+    var latest = parse(values.last_command, {}) || {};
     vm.lastCommand = latest.status ? (latest.method || '') + ' / ' + latest.status + ' / ' + (latest.message || latest.reason || '') : '暂无';
     var cache = parse(values.target_cache, {targets:[]});
-    vm.rows = (Array.isArray(cache.targets) ? cache.targets : []).map(function(row) {
+    cache = cache && typeof cache === 'object' ? cache : {};
+    var rows = (Array.isArray(cache.targets) ? cache.targets : []).filter(function(row){return row && typeof row === 'object';});
+    vm.rows = rows.map(function(row) {
         return {id:row.id, category:row.category, label:labels[row.status] || row.status,
+            x:Array.isArray(row.position) && numeric(row.position[0]) ? row.position[0].toFixed(3) : '—',
+            y:Array.isArray(row.position) && numeric(row.position[1]) ? row.position[1].toFixed(3) : '—',
             confidence:typeof row.detection_confidence === 'number' ? (100 * row.detection_confidence).toFixed(1) + '%' : '—'};
     });
+    var cell = parse(values.workcell, {}) || {};
+    vm.map = projection(rows, cell, vm.fresh && Number(values.target_cache_age_s) >= 0 && Number(values.target_cache_age_s) <= 10);
+    var stats = parse(values.completed_counts, null);
+    vm.statisticsAvailable = yes(values.statistics_available) && stats && stats.scope === 'node_session' &&
+        stats.counts && typeof stats.counts === 'object' && !Array.isArray(stats.counts) &&
+        Number.isSafeInteger(stats.total) && stats.total >= 0;
+    vm.completedTotal = vm.statisticsAvailable ? stats.total : '—';
+    vm.completedClasses = vm.statisticsAvailable ? Object.keys(stats.counts).sort().map(function(name) {
+        return {name:name, count:stats.counts[name]};
+    }) : [];
     var enabled = vm.fresh && yes(values.commands_enabled) && yes(values.sorting_available) && !!deviceId && !!values.bridge_session;
     vm.canStop = enabled; // Stop stays available while a motion RPC is pending.
     vm.canMove = enabled && !pending && ['IDLE','READY','STOPPED','ERROR'].indexOf(values.state) >= 0;
