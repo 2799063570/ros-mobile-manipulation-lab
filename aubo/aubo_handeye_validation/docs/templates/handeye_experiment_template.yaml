@@ -1,0 +1,51 @@
+# Fill measured/observed values. null means not recorded, not zero.
+experiment_id: null
+date_local: null
+timezone: Asia/Shanghai
+camera:
+  model: D435i
+  serial_number: null
+  actual_resolution_px: null
+  actual_fps: null
+  image_topic: /camera/color/image_raw
+  camera_info_topic: /camera/color/camera_info
+  image_is_rectified: false
+  intrinsic_source: driver_camera_info  # Change only if actually configured otherwise.
+  camera_info_snapshot: camera_info_used.yaml
+robot:
+  model: AUBO_i5
+  motion_source: MoveIt_RViz_Plan_Execute
+  planning_group: aubo_i5
+  velocity_scaling_actual: null
+  acceleration_scaling_actual: null
+frames:
+  base: base_link
+  effector: gripper_link
+  optical: camera_color_optical_frame
+  marker: aruco_marker_frame
+marker:
+  dictionary_verified: null
+  actual_id: null
+  measured_black_side_m: null
+  measurement_method: null
+  rigid_mount_description: null
+datasets:
+  fit_pose_count_actual: null
+  selection_pose_count_actual: null
+  final_test_pose_count_actual: null
+  excluded_sample_ids: []
+  exclusion_reasons: []
+solver:
+  algorithm_actual: null
+  opencv_version: null
+  output_yaml: null
+validation:
+  metric: marker_in_effector_consistency
+  absolute_reference_method: null
+  position_rmse_mm: null
+  rotation_rmse_deg: null
+task_trials:
+  criterion: null
+  total_actual: null
+  successes_actual: null
+  failures: []

@@ -70,7 +70,10 @@
         <node name="easy_handeye_calibration_server"
               pkg="easy_handeye"
               type="calibrate.py"
-              output="screen" />
+              output="screen">
+            <!-- Use the ROS/system OpenCV instead of incompatible ~/.local wheels. -->
+            <env name="PYTHONNOUSERSITE" value="1" />
+        </node>
 
         <!-- start rqt GUI for taking_samples -->
         <node if="$(arg start_sampling_gui)" name="$(anon namespace)_rqt" pkg="rqt_easy_handeye" type="rqt_easy_handeye" respawn="false" output="screen" />

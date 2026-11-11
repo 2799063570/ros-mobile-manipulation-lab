@@ -32,7 +32,18 @@
 - 传入机器人基座、末端、相机和 marker 的 frame 名称
 - 进入 `easy_handeye` 的标定界面
 
-这个文件更像“项目级标定配置入口”，你只需要在这里改 frame 名称、marker 编号、marker 尺寸等参数。
+标记与采集配置可通过命令行传入 `marker_id`、`marker_size`（单位米）、
+`start_camera`、`image_topic`、`camera_info_topic`、`width`、`height`、`fps`
+及 frame 参数。默认彩色图像为 640×480 / 30 Hz，原始图像设置
+`image_is_rectified:=false`；复用其他图像源时应匹配其真实分辨率与校正状态。
+
+此入口不启动机械臂驱动，使用外部 RViz 的 Plan/Execute 运动，再在
+easy_handeye 界面采样。`freehand_robot_movement=true` 只表示关闭
+easy_handeye 自己的自动运动助手，不限制使用上位机 MoveIt 规划执行。
+默认规划组已与当前模型统一为 `aubo_i5`。
+
+实机准备、采样、验证及论文数据归档步骤见
+[标定准备与论文记录指南](../../../aubo/aubo_handeye_validation/docs/标定准备与论文记录指南.md)。
 
 ## 4. `aubo_realsense_publish_only.launch`
 
