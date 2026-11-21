@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="engine_path"/>
+  <arg name="config" default="$(find aubo_perception)/config/ultralytics_yolo.yaml"/>
+  <arg name="image_topic" default="/camera/color/image_raw"/>
+  <arg name="detections_topic" default="/yolo/detections"/>
+  <arg name="annotated_image_topic" default="/yolo/annotated_image"/>
+  <arg name="gpu_device" default="0"/>
+
+  <node pkg="aubo_perception" type="tensorrt_yolo_node" name="tensorrt_yolo" output="screen" required="true">
+    <rosparam command="load" file="$(arg config)"/>
+    <param name="engine_path" type="str" value="$(arg engine_path)"/>
+    <param name="image_topic" type="str" value="$(arg image_topic)"/>
+    <param name="detections_topic" type="str" value="$(arg detections_topic)"/>
+    <param name="annotated_image_topic" type="str" value="$(arg annotated_image_topic)"/>
+    <param name="gpu_device" type="int" value="$(arg gpu_device)"/>
+  </node>
+</launch>

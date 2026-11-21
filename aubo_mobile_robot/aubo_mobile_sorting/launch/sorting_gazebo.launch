@@ -5,6 +5,7 @@
   <arg name="rviz" default="true"/>
   <arg name="perception_mode" default="color" doc="color | yolo"/>
   <arg name="yolo_model" default="/home/zlab/deepL/code/ultralytics-main-modify/weights/GC-yolo.pt"/>
+  <arg name="yolo_engine" default="" doc="TensorRT engine path for YOLO perception"/>
   <arg name="rviz_config" default="$(find aubo_mobile_moveit_config)/config/aubo_mobile_sort.rviz"/>
   <arg name="debug_view" default="true"/>
   <arg name="paused" default="false"/>
@@ -42,6 +43,7 @@
   <include file="$(find aubo_mobile_sorting)/launch/sorting.launch">
     <arg name="perception_mode" value="$(arg perception_mode)"/>
     <arg name="yolo_model" value="$(arg yolo_model)"/>
+    <arg name="yolo_engine" value="$(arg yolo_engine)"/>
     <arg name="task_executable" value="$(arg task_executable)"/>
     <arg name="debug_view" value="$(arg debug_view)"/>
     <arg name="auto_move_to_observation" value="$(arg auto_move_to_observation)"/>

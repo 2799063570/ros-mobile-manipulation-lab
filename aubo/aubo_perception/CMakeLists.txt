@@ -36,6 +36,25 @@ target_compile_features(workspace_cloud_filter_node PRIVATE cxx_std_14)
 target_link_libraries(workspace_cloud_filter_node ${catkin_LIBRARIES})
 add_dependencies(workspace_cloud_filter_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
+option(AUBO_ENABLE_TENSORRT_YOLO "Build the CUDA/TensorRT OBB detector" OFF)
+if(AUBO_ENABLE_TENSORRT_YOLO)
+  find_package(CUDA REQUIRED)
+  find_package(OpenCV REQUIRED COMPONENTS core imgproc)
+  set(TENSORRT_ROOT "" CACHE PATH "TensorRT SDK root when installed outside system paths")
+  find_path(TENSORRT_INCLUDE_DIR NvInfer.h HINTS ${TENSORRT_ROOT} PATH_SUFFIXES include)
+  find_library(TENSORRT_LIBRARY NAMES nvinfer HINTS ${TENSORRT_ROOT} PATH_SUFFIXES lib lib64)
+  if(NOT TENSORRT_INCLUDE_DIR OR NOT TENSORRT_LIBRARY)
+    message(FATAL_ERROR "TensorRT 10+ C++ SDK not found. Set TENSORRT_ROOT or install the SDK system-wide.")
+  endif()
+
+  add_executable(tensorrt_yolo_node src/tensorrt_yolo_node.cpp)
+  target_compile_features(tensorrt_yolo_node PRIVATE cxx_std_17)
+  target_include_directories(tensorrt_yolo_node PRIVATE ${TENSORRT_INCLUDE_DIR} ${CUDA_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS})
+  target_link_libraries(tensorrt_yolo_node ${catkin_LIBRARIES} ${TENSORRT_LIBRARY} ${CUDA_CUDART_LIBRARY} ${OpenCV_LIBS})
+  add_dependencies(tensorrt_yolo_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+  install(TARGETS tensorrt_yolo_node RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+endif()
+
 catkin_install_python(PROGRAMS
   scripts/check_rgbd_camera.py
   scripts/move_to_observation.py

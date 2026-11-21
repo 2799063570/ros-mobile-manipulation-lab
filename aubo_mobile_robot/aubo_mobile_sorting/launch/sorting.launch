@@ -5,6 +5,7 @@
   <arg name="perception_mode" default="color"/>
   <arg name="gripper_backend" default="trajectory"/>
   <arg name="yolo_model" default="/home/zlab/deepL/code/ultralytics-main-modify/weights/GC-yolo.pt"/>
+  <arg name="yolo_engine" default="" doc="TensorRT engine path for YOLO perception"/>
   <arg name="depth_save_directory" default=""/>
   <arg name="start_task" default="true"/>
   <arg name="task_executable" default="sorting_task_cpp"/>
@@ -29,6 +30,7 @@
     <group if="$(eval arg('perception_mode') == 'yolo')">
       <include file="$(find aubo_mobile_perception)/launch/yolo_rgbd_detector.launch">
         <arg name="model_path" value="$(arg yolo_model)"/>
+        <arg name="engine_path" value="$(arg yolo_engine)"/>
         <arg name="depth_save_directory" value="$(arg depth_save_directory)"/>
       </include>
     </group>

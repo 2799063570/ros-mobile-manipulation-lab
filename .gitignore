@@ -25,3 +25,6 @@ xf_mic_asr_offline/tmp/*.tar
 xf_mic_asr_offline_circle/tmp/*.pcm
 xf_mic_asr_offline_circle/tmp/*.tar
 *.avi
+
+# Local Codex build artifacts.
+/.codex-build/
