@@ -1,0 +1,8 @@
+uint8 ROS_CONTROL=1
+uint8 VISUAL_SERVO=2
+uint8 HOLD=3
+uint8 mode
+---
+bool accepted
+uint64 switch_id
+string message

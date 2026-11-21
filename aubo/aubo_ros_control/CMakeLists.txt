@@ -32,6 +32,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_geometry_msgs
   tf2_ros
   trajectory_msgs
+  urdf
   visualization_msgs
   rviz
 )
@@ -41,7 +42,8 @@ find_package(orocos_kdl REQUIRED)
 find_package(Qt5 REQUIRED COMPONENTS Widgets)
 
 add_action_files(FILES MoveHome.action)
-add_message_files(FILES VisualServoStatus.msg)
+add_message_files(FILES VisualServoStatus.msg ControlModeState.msg ServoJointPoint.msg)
+add_service_files(FILES SetControlMode.srv)
 generate_messages(DEPENDENCIES actionlib_msgs std_msgs geometry_msgs)
 
 generate_dynamic_reconfigure_options(
@@ -91,11 +93,12 @@ catkin_package(
   LIBRARIES ${PROJECT_NAME} aubo_visual_servo_panel
   CATKIN_DEPENDS actionlib actionlib_msgs message_runtime aubo_sdk control_msgs controller_manager controller_interface joint_trajectory_controller controller_manager_msgs diagnostic_msgs dynamic_reconfigure geometry_msgs hardware_interface
     kdl_parser moveit_msgs moveit_core moveit_ros_planning shape_msgs pluginlib roscpp rospy roslib rviz sensor_msgs
-    std_msgs std_srvs tf2_geometry_msgs tf2_ros visualization_msgs
+    std_msgs std_srvs tf2_geometry_msgs tf2_ros urdf visualization_msgs
   DEPENDS orocos_kdl
 )
 
-add_library(${PROJECT_NAME} src/aubo_hardware_interface.cpp)
+add_library(${PROJECT_NAME} src/aubo_hardware_interface.cpp src/hybrid_motion_switch.cpp)
+add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_14)
 target_include_directories(${PROJECT_NAME} PUBLIC
   include
@@ -114,10 +117,12 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
   LINK_FLAGS "-Wl,--disable-new-dtags")
 
 add_library(aubo_guarded_jtc src/guarded_joint_trajectory_controller.cpp)
+add_dependencies(aubo_guarded_jtc ${${PROJECT_NAME}_EXPORTED_TARGETS})
 target_compile_features(aubo_guarded_jtc PRIVATE cxx_std_14)
 target_link_libraries(aubo_guarded_jtc ${PROJECT_NAME} ${catkin_LIBRARIES})
 
 add_executable(aubo_hw_node src/aubo_hw_main.cpp)
+add_dependencies(aubo_hw_node ${${PROJECT_NAME}_EXPORTED_TARGETS})
 target_compile_features(aubo_hw_node PRIVATE cxx_std_14)
 target_link_libraries(aubo_hw_node ${PROJECT_NAME} ${catkin_LIBRARIES})
 set_target_properties(aubo_hw_node PROPERTIES
@@ -132,7 +137,7 @@ add_executable(aubo_visual_servo_node
   src/hybrid_control.cpp
   src/visual_servo_common.cpp
   src/direct_sdk_backend.cpp)
-add_dependencies(aubo_visual_servo_node ${PROJECT_NAME}_gencfg ${catkin_EXPORTED_TARGETS})
+add_dependencies(aubo_visual_servo_node ${PROJECT_NAME}_gencfg ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_compile_features(aubo_visual_servo_node PRIVATE cxx_std_14)
 target_include_directories(aubo_visual_servo_node PRIVATE
   include
@@ -210,6 +215,10 @@ if(CATKIN_ENABLE_TESTING)
   target_include_directories(sdk_flow_control_test PRIVATE include)
   target_link_libraries(sdk_flow_control_test Threads::Threads)
   add_test(NAME sdk_flow_control_test COMMAND sdk_flow_control_test)
+  add_executable(motion_hold_fence_test test/motion_hold_fence_test.cpp)
+  target_compile_features(motion_hold_fence_test PRIVATE cxx_std_14)
+  target_include_directories(motion_hold_fence_test PRIVATE include)
+  add_test(NAME motion_hold_fence_test COMMAND motion_hold_fence_test)
   add_executable(direct_sdk_backend_feedback_test
     test/direct_sdk_backend_feedback_test.cpp src/direct_sdk_backend.cpp src/visual_servo_common.cpp)
   target_compile_features(direct_sdk_backend_feedback_test PRIVATE cxx_std_14)
@@ -231,7 +240,7 @@ if(CATKIN_ENABLE_TESTING)
   find_package(rostest REQUIRED)
   add_executable(aubo_visual_servo_fake_sdk_node
     src/visual_servo.cpp src/hybrid_control.cpp src/visual_servo_common.cpp test/fake_direct_sdk_backend.cpp)
-  add_dependencies(aubo_visual_servo_fake_sdk_node ${PROJECT_NAME}_gencfg ${catkin_EXPORTED_TARGETS})
+  add_dependencies(aubo_visual_servo_fake_sdk_node ${PROJECT_NAME}_gencfg ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
   target_compile_features(aubo_visual_servo_fake_sdk_node PRIVATE cxx_std_14)
   target_include_directories(aubo_visual_servo_fake_sdk_node PRIVATE
     include ${catkin_INCLUDE_DIRS} ${orocos_kdl_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIRS} ${EIGEN3_INCLUDE_DIR})
@@ -252,6 +261,7 @@ if(CATKIN_ENABLE_TESTING)
   add_rostest_gtest(aubo_hardware_feedback_test
     test/aubo_hardware_feedback.test test/aubo_hardware_feedback_test.cpp)
   if(TARGET aubo_hardware_feedback_test)
+    add_dependencies(aubo_hardware_feedback_test ${${PROJECT_NAME}_EXPORTED_TARGETS})
     target_compile_features(aubo_hardware_feedback_test PRIVATE cxx_std_14)
     target_include_directories(aubo_hardware_feedback_test PRIVATE include ${catkin_INCLUDE_DIRS})
     target_link_libraries(aubo_hardware_feedback_test ${PROJECT_NAME} ${catkin_LIBRARIES})
@@ -261,7 +271,7 @@ if(CATKIN_ENABLE_TESTING)
   add_rostest_gtest(aubo_hardware_streaming_test
     test/aubo_hardware_streaming.test test/aubo_hardware_streaming_test.cpp)
   if(TARGET aubo_hardware_streaming_test)
-    add_dependencies(aubo_hardware_streaming_test aubo_guarded_jtc)
+    add_dependencies(aubo_hardware_streaming_test aubo_guarded_jtc ${${PROJECT_NAME}_EXPORTED_TARGETS})
     target_compile_features(aubo_hardware_streaming_test PRIVATE cxx_std_14)
     target_include_directories(aubo_hardware_streaming_test PRIVATE include ${catkin_INCLUDE_DIRS})
     target_link_libraries(aubo_hardware_streaming_test ${PROJECT_NAME} ${catkin_LIBRARIES})

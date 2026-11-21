@@ -16,6 +16,7 @@
   <arg name="trajectory_preload_points" default="$(eval int(arg('mac_buffer_target')) // 6)"/>
   <!-- true: ros_control/MoveIt 接管运动；false: 仅读取状态，运动由示教器控制。 -->
   <arg name="enable_motion_control" default="true"/>
+  <arg name="hybrid_control_enabled" default="false"/>
   <arg name="load_robot_description" default="true"/>
   <arg name="require_real_robot" default="true"/>
   <arg name="use_realtime_feedback" default="false"/>
@@ -58,6 +59,7 @@
       <param name="motion_trace_capacity" value="$(arg motion_trace_capacity)"/>
       <!-- 是否由 ros_control 接管真机运动；硬件节点异常退出时 required 会终止整个 launch。 -->
       <param name="enable_motion_control" value="$(arg enable_motion_control)"/>
+      <param name="hybrid_control_enabled" value="$(arg hybrid_control_enabled)"/>
       <!-- JointTrajectoryController 已输出平滑样条，避免二次滤波造成滞后。 -->
       <param name="enable_command_smoothing" value="false"/>
       <param name="command_filter_alpha" value="1.0"/>

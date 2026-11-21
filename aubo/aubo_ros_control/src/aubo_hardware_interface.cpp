@@ -12,6 +12,7 @@
  */
 
 #include "aubo_ros_control/aubo_hardware_interface.h"
+#include "aubo_ros_control/motion_hold_fence.h"
 #include <sensor_msgs/JointState.h>
 #include <diagnostic_msgs/DiagnosticStatus.h>
 #include <diagnostic_msgs/KeyValue.h>
@@ -145,6 +146,14 @@ bool AuboHardwareInterface::init()
     nh_.param<int>        ("server_port", server_port_, SERVER_PORT);
     nh_.param<int>        ("collision_class", collision_class_, 6);
     nh_.param<bool>       ("enable_motion_control", enable_motion_control_, true);
+    nh_.param("hybrid_control_enabled", hybrid_control_enabled_, false);
+    nh_.param("hybrid_switch_timeout", hybrid_switch_timeout_, 5.0);
+    if (hybrid_control_enabled_ && (!enable_motion_control_ ||
+        !std::isfinite(hybrid_switch_timeout_) || hybrid_switch_timeout_ < 2.0))
+    {
+        ROS_ERROR("[AuboHW] Hybrid control requires motion control and a switch timeout of at least 2 s");
+        return false;
+    }
     nh_.param<bool>       ("require_real_robot", require_real_robot_, true);
     nh_.param<bool>       ("use_realtime_feedback", use_realtime_feedback_, false);
     nh_.param<double>     ("feedback_timeout", feedback_timeout_s_, 0.2);
@@ -193,6 +202,8 @@ bool AuboHardwareInterface::init()
             return false;
         }
     }
+    if (hybrid_control_enabled_ && !loadServoPositionLimits())
+        return false;
 
     raw_joint_state_pub_ = nh_.advertise<sensor_msgs::JointState>("raw_joint_states", 1);
     flow_diagnostics_pub_ = nh_.advertise<diagnostic_msgs::DiagnosticArray>(
@@ -401,17 +412,28 @@ void AuboHardwareInterface::read(const ros::Time& /*time*/,
 // =============================================================================
 
 void AuboHardwareInterface::doSwitch(const std::list<hardware_interface::ControllerInfo>& start_list,
-                                    const std::list<hardware_interface::ControllerInfo>& /*stop_list*/)
+                                    const std::list<hardware_interface::ControllerInfo>& stop_list)
 {
     // Latch initial readiness only. JointStateController claims no command
     // interface and must not start a stream of stale pre-controller holds.
+    if (hybrid_control_enabled_)
+        for (const auto& controller : stop_list)
+            if (controller.name == trajectory_controller_)
+            {
+                jtc_running_.store(false);
+                jtc_goal_active_.store(false);
+            }
     for (const auto& controller : start_list)
         for (const auto& claim : controller.claimed_resources)
             if (claim.hardware_interface == "hardware_interface::PositionJointInterface" &&
                 std::all_of(joint_names_.begin(), joint_names_.end(), [&](const std::string& name) {
                     return claim.resources.count(name) != 0;
                 }))
+            {
                 position_controller_started_.store(true, std::memory_order_release);
+                if (hybrid_control_enabled_ && controller.name == trajectory_controller_)
+                    jtc_running_.store(true);
+            }
 }
 
 bool AuboHardwareInterface::canGenerateJtcSample()
@@ -423,7 +445,8 @@ bool AuboHardwareInterface::canGenerateJtcSample()
     if (!motionFeedbackFresh()) return false;
     const auto limit = jtc_feed_started_.load() ? JTC_QUEUE_TARGET_POINTS :
         static_cast<std::size_t>(trajectory_preload_points_);
-    if (ros_motion_queue_.size_approx() < limit) return true;
+    if (ros_motion_queue_.size_approx() < limit)
+        return !hybrid_control_enabled_ || hybridCanGenerate();
     jtc_backpressure_waits_.fetch_add(1, std::memory_order_relaxed);
     return false;
 }
@@ -449,6 +472,11 @@ void AuboHardwareInterface::write(const ros::Time& time,
         return;
 
     std::array<double, NUM_JOINTS> smoothed_cmd = joint_position_cmd_;
+    std::uint64_t fence = 0;
+    bool trajectory = true;
+    if (hybrid_control_enabled_ && !hybridSelectCommand(smoothed_cmd, fence, trajectory))
+        return;
+
     for (double value : smoothed_cmd)
     {
         if (!std::isfinite(value))
@@ -460,7 +488,7 @@ void AuboHardwareInterface::write(const ros::Time& time,
         }
     }
 
-    if (enable_command_smoothing_)
+    if (trajectory && enable_command_smoothing_)
     {
         // --- 低通：抑制上层控制器的小幅抖动 ---
         for (int i = 0; i < NUM_JOINTS; ++i)
@@ -483,7 +511,7 @@ void AuboHardwareInterface::write(const ros::Time& time,
 
     for (int i = 0; i < NUM_JOINTS; ++i)
     {
-        if (enable_command_smoothing_ &&
+        if (trajectory && enable_command_smoothing_ &&
             std::fabs(smoothed_cmd[i] - last_cmd_sent_[i]) < command_deadband_)
         {
             smoothed_cmd[i] = last_cmd_sent_[i];
@@ -507,7 +535,7 @@ void AuboHardwareInterface::write(const ros::Time& time,
         feed_thread_running_.store(false);
         return;
     }
-    if (!ros_motion_queue_.try_enqueue(QueuedCommand{cmd, command_record_ns}))
+    if (!ros_motion_queue_.try_enqueue(QueuedCommand{cmd, command_record_ns, fence}))
     {
         motion_queue_full_count_.fetch_add(1, std::memory_order_relaxed);
         ROS_ERROR("[AuboHW] write(): 运动队列已满，已锁定停止；禁止丢点后继续执行");
@@ -516,6 +544,13 @@ void AuboHardwareInterface::write(const ros::Time& time,
         return;
     }
 
+    if (hybrid_control_enabled_)
+    {
+        bool still = true;
+        for (int i = 0; i < NUM_JOINTS; ++i)
+            still &= std::fabs(smoothed_cmd[i] - last_cmd_sent_[i]) <= 1e-6;
+        stationary_command_samples_ = still ? std::min(stationary_command_samples_ + 1, 10u) : 0;
+    }
     last_cmd_sent_ = smoothed_cmd;
     ++command_sequence_;
     if (motion_trace_)
@@ -589,6 +624,9 @@ void AuboHardwareInterface::shutdown()
     controller_connected_flag_.store(false);
     ROS_INFO("[AuboHW] SDK 连接已关闭；停止是否获确认见前述日志。");
     motion_lease_.release();
+    // The controller manager owned by main must outlive its switch RPC.
+    if (controller_switch_result_.valid())
+        controller_switch_result_.wait();
     // Export only after stream mode/logout; file IO must not delay the cabinet stop.
     if (motion_trace_)
     {
@@ -1157,6 +1195,7 @@ void AuboHardwareInterface::publishWaypointToRobot()
         motion_queue_full_count_.load(std::memory_order_relaxed);
     std::uint64_t last_tcp_retransmissions = tcp_transport_.snapshot().total_retransmissions;
     std::size_t small_batch_wait_samples = 0;
+    MotionHoldFence hold_fence;
     const int minimum_batch_points = std::min(4, std::max(1, mac_buffer_target_ / NUM_JOINTS / 2));
 
     const auto publish_flow_window = [&](bool force)
@@ -1415,6 +1454,14 @@ void AuboHardwareInterface::publishWaypointToRobot()
             publish_flow_window(true);
             break;
         }
+        if (hybrid_control_enabled_ && current_macsz > MotionHoldFence::max_mac_scalars)
+        {
+            ROS_ERROR("[AuboHW/hybrid] MAC diagnosis exceeds the supported FIFO bound");
+            requestExecutionStop();
+            break;
+        }
+        if (const auto confirmed = hold_fence.confirmedAfterDiagnosis(current_macsz, NUM_JOINTS))
+            confirmed_fence_.store(confirmed);
 
         // A cached startup zero must not authorize another full preload after
         // the first successful send. Wait for a nonzero cabinet observation;
@@ -1510,10 +1557,14 @@ void AuboHardwareInterface::publishWaypointToRobot()
                 send_points += waypoint_vector.size();
                 max_send_ms = std::max(max_send_ms, send_ms);
                 last_send_result = send_ret;
-                if (send_ret == InterfaceCallSuccCode && !first_send_accepted)
+                if (send_ret == InterfaceCallSuccCode)
                 {
-                    first_send_accepted = true;
-                    first_send_completed = SteadyClock::now();
+                    if (!first_send_accepted)
+                    {
+                        first_send_accepted = true;
+                        first_send_completed = SteadyClock::now();
+                    }
+                    hold_fence.acceptedBatch(batch_fence_, batch_hold_points_, waypoint_vector.size());
                 }
                 if (send_ret != InterfaceCallSuccCode)
                 {
@@ -1548,6 +1599,8 @@ void AuboHardwareInterface::publishWaypointToRobot()
 
 std::vector<wayPoint_S> AuboHardwareInterface::tryPopWaypoint(int count)
 {
+    batch_fence_ = 0;
+    batch_hold_points_ = 0;
     if (!controller_connected_flag_.load())
         return {};
     std::vector<wayPoint_S> points;
@@ -1570,6 +1623,13 @@ std::vector<wayPoint_S> AuboHardwareInterface::tryPopWaypoint(int count)
     {
         if (!ros_motion_queue_.try_dequeue(queued))
             break;
+        if (queued.hold_fence != batch_fence_)
+        {
+            batch_fence_ = queued.hold_fence;
+            batch_hold_points_ = 0;
+        }
+        if (batch_fence_)
+            ++batch_hold_points_;
         const auto& joint = queued.positions;
         if (!stream_reference_initialized_)
         {

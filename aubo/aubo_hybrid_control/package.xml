@@ -1,0 +1,12 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>aubo_hybrid_control</name>
+  <version>1.0.0</version>
+  <description>Single-writer MoveIt and visual servo bringup for the AUBO i5.</description>
+  <maintainer email="wheeltec@example.com">WHEELTEC</maintainer>
+  <license>BSD-3-Clause</license>
+  <buildtool_depend>catkin</buildtool_depend>
+  <exec_depend>aubo_sorting</exec_depend>
+  <exec_depend>aubo_ros_control</exec_depend>
+  <exec_depend>aubo_perception</exec_depend>
+</package>

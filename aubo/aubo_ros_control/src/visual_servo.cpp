@@ -6,6 +6,7 @@
  */
 
 #include <aubo_ros_control/direct_sdk_backend.h>
+#include <aubo_ros_control/ServoJointPoint.h>
 #include <aubo_ros_control/visual_servo.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <ros/ros.h>
@@ -141,6 +142,11 @@ VisualServo::VisualServo()
   bool requested_stream = true;
   private_nh_.param("on_demand_output", requested_stream, true);
   on_demand_output_ = requested_stream && !hybrid_enabled_;
+  if (backend_ == "hybrid_driver" && !on_demand_output_) {
+    ROS_ERROR("[visual_servo] hybrid_driver requires on-demand visual servo output");
+    valid_ = false;
+    return;
+  }
   if (hybrid_enabled_ && requested_stream)
     ROS_INFO("[visual_servo] hybrid保留规划轨迹回放路径；独立PBVS使用按需平滑输出");
   if (on_demand_output_) {
@@ -190,6 +196,11 @@ VisualServo::VisualServo()
       enabled_ = false;
     }
   }
+  if (backend_ == "hybrid_driver") {
+    enabled_ = false;
+    initial_search_enabled_ = false;
+    loss_strategy_ = "stop";
+  }
   state_ = enabled_ ? ServoState::WAITING : ServoState::DISABLED;
 
   state_pub_ = nh_.advertise<std_msgs::String>(state_topic_, 1, true);
@@ -211,6 +222,13 @@ VisualServo::VisualServo()
     }
     output_timer_ = nh_.createTimer(ros::Duration(1.0 / output_rate_),
                                     &VisualServo::gazeboOutput, this);  // 创建输出定时器
+  } else if (backend_ == "hybrid_driver") {
+    joint_sub_ = nh_.subscribe(joint_states_topic_, 2, &VisualServo::jointStateCallback,
+                               this, ros::TransportHints().tcpNoDelay());
+    driver_point_pub_ = nh_.advertise<ServoJointPoint>("/aubo_i5/servo_joint_point", 32);
+    driver_mode_sub_ = nh_.subscribe("/aubo_i5/control_mode_state", 4,
+                                     &VisualServo::driverModeCallback, this);
+    output_timer_ = nh_.createTimer(ros::Duration(1.0 / output_rate_), &VisualServo::driverOutput, this);
   } else if (backend_ == "sdk") {
     // 对于sdk实机模式 直接通过SDK下发关节位置 缓冲队列+限速限加速度+向控制柜发送的频率
     sdk_.reset(new DirectSdkBackend(queue_, velocity_limits_,
@@ -234,7 +252,7 @@ VisualServo::VisualServo()
     if (sdk_->readState(initial))
       setJointFeedback(initial);
   } else {
-    ROS_ERROR("[visual_servo] backend 只能是 gazebo 或 sdk，当前为 '%s'",
+    ROS_ERROR("[visual_servo] backend 必须为 gazebo、sdk 或 hybrid_driver，当前为 '%s'",
               backend_.c_str());
     valid_ = false;
     return;
@@ -816,6 +834,11 @@ bool VisualServo::setEnabled(std_srvs::SetBool::Request &request,
     response.message = "controller is shutting down";
     return true;
   }
+  if (request.data && backend_ == "hybrid_driver" && (!driver_session_ || driver_releasing_)) {
+    response.success = false;
+    response.message = "wait for the driver's active VISUAL_SERVO session";
+    return true;
+  }
   if (on_demand_output_) {
     JointPoint feedback;
     bool caught_up = streamFeedback(feedback) && stream_->initialized() && stream_->settled();
@@ -919,6 +942,11 @@ bool VisualServo::reset(std_srvs::Trigger::Request &,
 
 void VisualServo::jointStateCallback(
     const sensor_msgs::JointState::ConstPtr &message) {
+  if (backend_ == "hybrid_driver") {
+    const double age = (ros::Time::now() - message->header.stamp).toSec();
+    if (message->header.stamp.isZero() || age < 0.0 || age > stream_feedback_timeout_)
+      return;
+  }
   JointPoint ordered{};
   for (std::size_t i = 0; i < kDof; ++i) {
     const auto found =
@@ -1186,6 +1214,7 @@ void VisualServo::publishState() {
 void VisualServo::controlLoop(const ros::TimerEvent &event) {
   const auto begin_ns = TimingTrace::ns();
   std::lock_guard<std::mutex> control_lock(control_mutex_);
+  if (backend_ == "hybrid_driver" && !driver_session_) return;
   const auto locked_ns = TimingTrace::ns();
   JointPoint feedback{};
   if (on_demand_output_) {
@@ -1430,6 +1459,67 @@ void VisualServo::controlLoop(const ros::TimerEvent &event) {
     }
     queue_.push(command_position_);
   }
+}
+
+void VisualServo::driverModeCallback(const ControlModeState::ConstPtr& message) {
+  std::lock_guard<std::mutex> lock(control_mutex_);
+  const auto session = message->active_mode == ControlModeState::VISUAL_SERVO
+      ? message->servo_session : 0;
+  if (session == driver_session_) {
+    if (session && message->requested_mode != ControlModeState::VISUAL_SERVO) {
+      driver_releasing_ = true;
+      enabled_ = false;
+      updateStreamTarget(JointPoint{});
+    }
+    return;
+  }
+
+  driver_session_ = 0;
+  driver_releasing_ = false;
+  enabled_ = false;
+  last_tracking_velocity_.setZero();
+  updateStreamTarget(JointPoint{});
+  transitionTo(ServoState::DISABLED);
+  if (!session)
+    return;
+
+  JointPoint low, high, seed;
+  for (std::size_t i = 0; i < kDof; ++i) {
+    low[i] = lower_limits_[i] + joint_limit_margin_;
+    high[i] = upper_limits_[i] - joint_limit_margin_;
+    seed[i] = message->hold_position[i];
+  }
+  try {
+    auto next = std::make_unique<visual_servo_internal::VisualServoStream>(
+        velocity_limits_, acceleration_limits_, jerk_limits_, low, high);
+    next->initialize(seed);
+    stream_ = std::move(next);
+    driver_sequence_ = 0;
+    driver_session_ = session;
+  } catch (const std::exception& error) {
+    ROS_ERROR("[visual_servo] Cannot seed the driver session: %s", error.what());
+  }
+}
+
+void VisualServo::driverOutput(const ros::TimerEvent&) {
+  std::lock_guard<std::mutex> lock(control_mutex_);
+  if (!driver_session_)
+    return;
+  JointPoint point;
+  try {
+    if (!generateStreamPointLocked(point, nullptr))
+      return;
+  } catch (const std::exception& error) {
+    ROS_ERROR_THROTTLE(1.0, "[visual_servo] Hybrid output failed: %s", error.what());
+    return;  // The driver owns the input watchdog and stops on a broken sequence.
+  }
+  ServoJointPoint message;
+  message.stamp = ros::Time::now();
+  message.session = driver_session_;
+  message.sequence = ++driver_sequence_;
+  std::copy(point.begin(), point.end(), message.position.begin());
+  message.disabled_and_settled = !enabled_ && stream_->settled();
+  driver_point_pub_.publish(message);
 }
 
 void VisualServo::gazeboOutput(const ros::TimerEvent &) {

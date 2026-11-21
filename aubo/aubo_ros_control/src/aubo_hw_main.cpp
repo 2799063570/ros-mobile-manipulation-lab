@@ -93,6 +93,7 @@ int main(int argc, char** argv)
     // controller_manager
     // ------------------------------------------------------------------
     controller_manager::ControllerManager cm(&aubo_hw, nh);
+    aubo_hw.setupHybridControl(nh);
 
     // ------------------------------------------------------------------
     // AsyncSpinner 处理 controller_manager 的服务回调
@@ -133,6 +134,7 @@ int main(int argc, char** argv)
         }
         for (std::size_t tick = 0; tick < due && ros::ok() && aubo_hw.isConnected(); ++tick)
         {
+            aubo_hw.updateHybridControl();
             if (!aubo_hw.canGenerateJtcSample())
             {
                 sample_clock.defer(SampleClock::Clock::now());
@@ -150,6 +152,7 @@ int main(int argc, char** argv)
         }
     }
 
+    aubo_hw.updateHybridControl();
     if (ros::ok() && !aubo_hw.isConnected())
         ROS_ERROR("[aubo_hw_node] 与机械臂连接已失效，退出控制循环。");
 

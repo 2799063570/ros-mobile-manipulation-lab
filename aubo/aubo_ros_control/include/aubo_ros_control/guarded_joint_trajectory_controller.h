@@ -20,6 +20,7 @@ public:
         if (!hardware_ || !hardware_->isConnected()) return;
         const auto active = rt_active_goal_;
         Base::update(time, period);
+        hardware_->setTrajectoryGoalActive(static_cast<bool>(rt_active_goal_));
         if (active && active->preallocated_result_->error_code !=
                           control_msgs::FollowJointTrajectoryResult::SUCCESSFUL)
         {

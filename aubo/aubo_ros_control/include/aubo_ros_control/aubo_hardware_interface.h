@@ -21,6 +21,9 @@
 #include <aubo_ros_control/motion_lease.h>
 #include <aubo_ros_control/sdk_tcp_transport.h>
 #include <aubo_ros_control/hardware_motion_trace.h>
+#include <aubo_ros_control/ControlModeState.h>
+#include <aubo_ros_control/ServoJointPoint.h>
+#include <aubo_ros_control/SetControlMode.h>
 
 #include <string>
 #include <vector>
@@ -34,6 +37,8 @@
 #include <queue>
 #include <memory>
 #include <list>
+#include <deque>
+#include <future>
 #include <cmath>
 
 #include <ros/ros.h>
@@ -140,6 +145,11 @@ public:
     void write(const ros::Time& time, const ros::Duration& period) override;
     void doSwitch(const std::list<hardware_interface::ControllerInfo>& start_list,
                   const std::list<hardware_interface::ControllerInfo>& stop_list) override;
+    bool prepareSwitch(const std::list<hardware_interface::ControllerInfo>& start_list,
+                       const std::list<hardware_interface::ControllerInfo>& stop_list) override;
+    void setupHybridControl(ros::NodeHandle& controller_nh);
+    void updateHybridControl();
+    void setTrajectoryGoalActive(bool active) { jtc_goal_active_.store(active); }
 
     /** 安全关闭：离开 TCP2CANBUS、注销 SDK */
     void shutdown();
@@ -156,6 +166,37 @@ private:
     friend struct AuboHardwareStreamingTestAccess;
     std::atomic<bool> execution_stop_accepted_{false};
     bool stopStreamSession();
+    bool requestControlMode(SetControlMode::Request& request, SetControlMode::Response& response);
+    void acceptServoPoint(const ServoJointPoint::ConstPtr& point);
+    bool hybridCanGenerate();
+    bool hybridSelectCommand(std::array<double, NUM_JOINTS>& command, std::uint64_t& fence, bool& trajectory);
+    void publishControlMode(const char* message);
+    void failControlMode(const char* message);
+    bool hybridFeedbackAt(const std::array<double, NUM_JOINTS>& position);
+    bool loadServoPositionLimits();
+
+    bool hybrid_control_enabled_{false};
+    std::mutex hybrid_mutex_;
+    ControlModeState control_mode_;
+    ros::ServiceServer control_mode_service_;
+    ros::Subscriber servo_point_sub_;
+    ros::Publisher control_mode_pub_;
+    ros::ServiceClient controller_switch_client_;
+    std::future<bool> controller_switch_result_;
+    std::atomic<bool> allow_trajectory_controller_start_{true};
+    std::array<double, NUM_JOINTS> servo_lower_limits_{}, servo_upper_limits_{};
+    std::string trajectory_controller_{"aubo_i5_controller"};
+    std::deque<ServoJointPoint> servo_points_;
+    std::uint64_t next_servo_sequence_{1};
+    bool servo_stream_started_{false}, servo_settled_{false}, servo_input_fault_{false};
+    unsigned stationary_command_samples_{0};
+    double hybrid_switch_timeout_{5.0};
+    std::chrono::steady_clock::time_point switch_deadline_{}, stable_since_{}, last_servo_point_{};
+    std::atomic<std::uint64_t> confirmed_fence_{0};
+    std::uint64_t batch_fence_{0}; // SDK feeder thread only.
+    std::size_t batch_hold_points_{0};
+    std::atomic<bool> jtc_running_{false};
+    std::atomic<bool> jtc_goal_active_{false};
     virtual int stopRobotMotion();
     virtual int exitStreamMode();
     bool startRobotPreservingTool(aubo_robot_namespace::ROBOT_SERVICE_STATE& result);
@@ -301,6 +342,7 @@ private:
     {
         std::array<double, NUM_JOINTS> positions;
         std::int64_t enqueued_ns;
+        std::uint64_t hold_fence{0};
     };
     moodycamel::ReaderWriterQueue<QueuedCommand> ros_motion_queue_;
     double max_command_queue_duration_s_{1.0};

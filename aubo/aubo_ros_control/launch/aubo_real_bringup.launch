@@ -32,6 +32,7 @@
   <arg name="enable_motion_control"
        value="$(eval {'move_group': true, 'teach_pendant': false}[arg('motion_source')])"/>
   <arg name="allow_trajectory_execution" default="$(arg enable_motion_control)"/>
+  <arg name="hybrid_control_enabled" default="false"/>
 
   <!-- 先建立真机 ros_control 通道，并由该入口统一加载 URDF/SRDF。 -->
   <include file="$(find aubo_ros_control)/launch/aubo_control.launch">
@@ -41,6 +42,7 @@
     <arg name="robot_xacro" value="$(arg robot_xacro)"/>
     <arg name="robot_srdf" value="$(arg robot_srdf)"/>
     <arg name="enable_motion_control" value="$(arg enable_motion_control)"/>
+    <arg name="hybrid_control_enabled" value="$(arg hybrid_control_enabled)"/>
     <arg name="control_frequency" value="$(arg control_frequency)"/>
     <arg name="mac_buffer_target" value="$(arg mac_buffer_target)"/>
     <arg name="trajectory_preload_points" value="$(arg trajectory_preload_points)"/>

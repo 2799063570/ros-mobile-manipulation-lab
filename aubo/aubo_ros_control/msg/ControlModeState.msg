@@ -1,0 +1,16 @@
+uint8 ROS_CONTROL=1
+uint8 VISUAL_SERVO=2
+uint8 HOLD=3
+uint8 ACTIVE=0
+uint8 WAIT_STILL=1
+uint8 DRAINING=2
+uint8 SWITCHING_CONTROLLER=3
+uint8 FAULT=4
+uint8 STARTING=5
+uint64 switch_id
+uint64 servo_session
+uint8 active_mode
+uint8 requested_mode
+uint8 phase
+float64[6] hold_position
+string message

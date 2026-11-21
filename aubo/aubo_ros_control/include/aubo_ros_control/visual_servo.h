@@ -2,6 +2,7 @@
 #define AUBO_ROS_CONTROL_VISUAL_SERVO_H
 
 #include <aubo_ros_control/VisualServoConfig.h>
+#include <aubo_ros_control/ControlModeState.h>
 #include <aubo_ros_control/direct_sdk_backend.h>
 #include <aubo_ros_control/visual_servo_stream.h>
 
@@ -119,6 +120,8 @@ private:
   void publishState();
   void controlLoop(const ros::TimerEvent &event);
   void gazeboOutput(const ros::TimerEvent &event);
+  void driverModeCallback(const ControlModeState::ConstPtr& message);
+  void driverOutput(const ros::TimerEvent& event);
   bool generateStreamPoint(JointPoint& point, PointTiming* timing);
   bool generateStreamPointLocked(JointPoint& point, PointTiming* timing);
   bool streamFeedback(JointPoint& feedback);
@@ -170,6 +173,8 @@ private:
   CommandQueue queue_;
   bool on_demand_output_{false};
   bool stream_armed_{false};
+  std::uint64_t driver_session_{0}, driver_sequence_{0};
+  bool driver_releasing_{false};
   bool shutting_down_{false}, collision_check_{true};
   double collision_resolution_{0.002};
   std::unique_ptr<visual_servo_internal::VisualServoStream> stream_;
@@ -242,6 +247,8 @@ private:
   ros::Subscriber target_sub_, joint_sub_;
   ros::Subscriber hybrid_scene_ready_sub_;
   ros::Publisher state_pub_, legacy_state_pub_, sdk_joint_pub_;
+  ros::Subscriber driver_mode_sub_;
+  ros::Publisher driver_point_pub_;
   ros::ServiceServer enable_service_, reset_service_;
   std::vector<ros::Publisher> gazebo_publishers_;
   ros::Timer control_timer_, output_timer_, sdk_state_timer_;

@@ -15,6 +15,7 @@
   <arg name="robot_ip" default="192.168.1.2"/>
   <!-- Reuse an already running real hardware/MoveIt session. -->
   <arg name="start_robot" default="true"/>
+  <arg name="hybrid_control_enabled" default="false"/>
   <arg name="camera_serial_no" default=""/>
   <arg name="start_camera" default="true"/>
   <arg name="calibration_file" default="$(find aubo_ros_control)/config/aubo_realsense_handeye_eye_on_base.yaml"/>
@@ -59,6 +60,7 @@
 
   <include if="$(arg start_robot)" file="$(find aubo_ros_control)/launch/aubo_real_bringup.launch">
     <arg name="robot_ip" value="$(arg robot_ip)"/>
+    <arg name="hybrid_control_enabled" value="$(arg hybrid_control_enabled)"/>
     <arg name="use_rviz" value="$(arg rviz)"/>
     <arg name="rviz_config" value="$(arg rviz_config)"/>
     <arg name="robot_xacro" value="$(arg robot_xacro)"/>

@@ -29,6 +29,7 @@
   <test_depend>rostest</test_depend>
   <test_depend>roslaunch</test_depend>
   <depend>trajectory_msgs</depend>
+  <depend>urdf</depend>
   <depend>visualization_msgs</depend>
   <depend>pluginlib</depend>
   <build_depend>liborocos-kdl-dev</build_depend>

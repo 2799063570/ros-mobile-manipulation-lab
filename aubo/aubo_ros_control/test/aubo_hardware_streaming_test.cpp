@@ -74,6 +74,42 @@ struct AuboHardwareStreamingTestAccess
         if (oldest) oldest->enqueued_ns -= 1100000000;
     }
     static bool queueLimit(AuboHardwareInterface& hw) { return hw.command_queue_limit_exceeded_.load(); }
+    static void prepareHybrid(AuboHardwareInterface& hw, ros::NodeHandle& nh)
+    {
+        hw.hybrid_control_enabled_ = true;
+        hw.setupHybridControl(nh);
+        hw.control_mode_.phase = ControlModeState::ACTIVE;
+        hw.jtc_running_.store(true);
+        hw.startup_reference_seeded_.store(true);
+        hw.servo_lower_limits_.fill(-1.0);
+        hw.servo_upper_limits_.fill(1.0);
+    }
+    static SetControlMode::Response requestMode(AuboHardwareInterface& hw, std::uint8_t mode)
+    {
+        SetControlMode request;
+        request.request.mode = mode;
+        hw.requestControlMode(request.request, request.response);
+        return request.response;
+    }
+    static ControlModeState mode(const AuboHardwareInterface& hw) { return hw.control_mode_; }
+    static void setServoActive(AuboHardwareInterface& hw, std::uint64_t session)
+    {
+        hw.control_mode_.active_mode = hw.control_mode_.requested_mode = ControlModeState::VISUAL_SERVO;
+        hw.control_mode_.servo_session = session;
+        hw.last_servo_point_ = std::chrono::steady_clock::now();
+        hw.allow_trajectory_controller_start_.store(false);
+        hw.jtc_running_.store(false);
+    }
+    static void servoPoint(AuboHardwareInterface& hw, std::uint64_t session, std::uint64_t sequence,
+                           double position)
+    {
+        ServoJointPoint::Ptr point(new ServoJointPoint);
+        point->session = session;
+        point->sequence = sequence;
+        point->stamp = ros::Time::now();
+        point->position.assign(position);
+        hw.acceptServoPoint(point);
+    }
     static void allowCapacityTest(AuboHardwareInterface& hw)
     { hw.max_command_queue_duration_s_ = 1000.0; } // Mock only: exercise physical queue overflow separately.
     static std::uint64_t queueFull(AuboHardwareInterface& hw) { return hw.motion_queue_full_count_.load(); }
@@ -104,6 +140,7 @@ struct AuboHardwareStreamingTestAccess
 
 using Access = aubo_ros_control::AuboHardwareStreamingTestAccess;
 using aubo_ros_control::NUM_JOINTS;
+using aubo_ros_control::ControlModeState;
 
 class StreamHardware : public aubo_ros_control::AuboHardwareInterface
 {
@@ -189,6 +226,54 @@ TEST(AuboHardwareStreaming, HoldsAndSubMicroradianSamplesRetainEveryFiveMillisec
     for (int i = 0; i < 60; ++i) EXPECT_DOUBLE_EQ(points[i].jointpos[0], 0.0);
     for (int i = 1; i <= 10; ++i) EXPECT_DOUBLE_EQ(points[59 + i].jointpos[0], i * 1e-7);
     EXPECT_TRUE(hw.isConnected());
+}
+
+TEST(AuboHardwareStreaming, HybridRequestKeepsSourceUntilStoppedThenOnlyProducesHold)
+{
+    ros::NodeHandle nh("/stream_hybrid_fence");
+    StreamHardware hw(nh);
+    Access::prepareHybrid(hw, nh);
+    hw.setTrajectoryGoalActive(true);
+    const auto request = Access::requestMode(hw, ControlModeState::VISUAL_SERVO);
+    ASSERT_TRUE(request.accepted);
+    for (int i = 0; i < 12; ++i) Access::command(hw, 0.0);
+    hw.updateHybridControl();
+    ASSERT_EQ(Access::mode(hw).active_mode, ControlModeState::ROS_CONTROL);
+    ASSERT_EQ(Access::mode(hw).phase, ControlModeState::WAIT_STILL);
+
+    hw.setTrajectoryGoalActive(false);
+    hw.updateHybridControl();
+    ASSERT_EQ(Access::mode(hw).phase, ControlModeState::DRAINING);
+    ASSERT_EQ(Access::mode(hw).active_mode, ControlModeState::HOLD);
+    EXPECT_FALSE(Access::requestMode(hw, ControlModeState::ROS_CONTROL).accepted);
+    Access::servoPoint(hw, request.switch_id, 1, 0.8);
+    Access::command(hw, 0.6);
+    const auto points = Access::pop(hw, 13);
+    ASSERT_EQ(points.size(), 13u);
+    EXPECT_DOUBLE_EQ(points.back().jointpos[0], 0.0);
+    hw.updateHybridControl();
+    EXPECT_EQ(Access::mode(hw).phase, ControlModeState::DRAINING);
+}
+
+TEST(AuboHardwareStreaming, HybridServoTransmitsOnlyCurrentSessionAndStopsOnGap)
+{
+    ros::NodeHandle nh("/stream_hybrid_servo");
+    StreamHardware hw(nh);
+    Access::prepareHybrid(hw, nh);
+    Access::setServoActive(hw, 42);
+    Access::servoPoint(hw, 41, 1, 0.8);
+    for (int i = 1; i <= 6; ++i)
+        Access::servoPoint(hw, 42, i, 0.00001 * i);
+
+    ASSERT_TRUE(hw.canGenerateJtcSample());
+    Access::command(hw, 0.6);
+    const auto points = Access::pop(hw, 1);
+    ASSERT_EQ(points.size(), 1u);
+    EXPECT_DOUBLE_EQ(points[0].jointpos[0], 0.00001);
+    Access::servoPoint(hw, 42, 8, 0.00008);
+    hw.updateHybridControl();
+    EXPECT_EQ(Access::mode(hw).phase, ControlModeState::FAULT);
+    EXPECT_FALSE(hw.isConnected());
 }
 
 TEST(AuboHardwareStreaming, SignedReversalTriggersAccelerationProtection)

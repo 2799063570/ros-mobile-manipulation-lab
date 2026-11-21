@@ -1,0 +1,51 @@
+<?xml version="1.0"?>
+<launch>
+  <arg name="robot_ip" default="192.168.1.2"/>
+  <arg name="camera_mount" default="eye_in_hand" doc="eye_in_hand | eye_to_hand"/>
+  <arg name="camera_serial_no" default=""/>
+  <arg name="calibration_file" default="$(find aubo_ros_control)/config/aubo_realsense_handeye_eye_on_base.yaml"/>
+  <arg name="start_camera" default="true"/>
+  <arg name="start_servo_perception" default="$(arg start_camera)"/>
+  <arg name="target_label" default="red"/>
+  <arg name="target_topic" default="/visual_servo/target_pose"/>
+  <arg name="servo_config" default=""/>
+  <arg name="start_sorting_task" default="false"/>
+  <arg name="start_gripper" default="$(arg start_sorting_task)"/>
+  <arg name="publish_sorting_box" default="false"/>
+  <arg name="rviz" default="true"/>
+
+  <include file="$(find aubo_sorting)/launch/sorting_real.launch">
+    <arg name="robot_ip" value="$(arg robot_ip)"/>
+    <arg name="hybrid_control_enabled" value="true"/>
+    <arg name="camera_mount" value="$(arg camera_mount)"/>
+    <arg name="camera_serial_no" value="$(arg camera_serial_no)"/>
+    <arg name="calibration_file" value="$(arg calibration_file)"/>
+    <arg name="start_camera" value="$(arg start_camera)"/>
+    <arg name="start_perception" value="$(arg start_sorting_task)"/>
+    <arg name="start_task" value="$(arg start_sorting_task)"/>
+    <arg name="start_gripper" value="$(arg start_gripper)"/>
+    <arg name="publish_sorting_box" value="$(arg publish_sorting_box)"/>
+    <arg name="rviz" value="$(arg rviz)"/>
+  </include>
+
+  <include file="$(find aubo_ros_control)/launch/visual_servo_core.launch">
+    <arg name="backend" value="hybrid_driver"/>
+    <arg name="mode_config" value="$(find aubo_ros_control)/config/visual_servo_$(arg camera_mount).yaml"/>
+    <arg name="override_config" value="$(arg servo_config)"/>
+    <arg name="joint_states_topic" value="/aubo_i5/aubo_hw_node/raw_joint_states"/>
+    <arg name="target_topic" value="$(arg target_topic)"/>
+    <arg name="start_enabled" value="false"/>
+    <arg name="visualization" value="false"/>
+  </include>
+
+  <node if="$(arg start_servo_perception)" name="rgbd_visual_target"
+        pkg="aubo_perception" type="rgbd_visual_target_node.py" output="screen">
+    <rosparam file="$(find aubo_perception)/config/rgbd_target_$(arg camera_mount).yaml"/>
+    <param name="color_topic" value="/camera/color/image_raw"/>
+    <param name="aligned_depth_topic" value="/camera/aligned_depth_to_color/image_raw"/>
+    <param name="camera_info_topic" value="/camera/color/camera_info"/>
+    <param name="target_pose_topic" value="$(arg target_topic)"/>
+    <param name="target_label" value="$(arg target_label)"/>
+    <param name="start_enabled" value="true"/>
+  </node>
+</launch>
