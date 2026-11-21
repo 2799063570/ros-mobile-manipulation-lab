@@ -23,6 +23,8 @@
   <!-- YOLO 使用的 Python 解释器和权重路径，换机器时需按本地安装位置覆盖。 -->
   <arg name="python" default="/home/zlab/anaconda3/envs/yolo/bin/python"/>
   <arg name="model_path" default="/home/zlab/deepL/code/ultralytics-main-modify/weights/GC-yolo.pt"/>
+  <arg name="yolo_engine" default="" doc="TensorRT engine path for YOLO; empty selects PyTorch"/>
+  <arg name="yolo_gpu_device" default="0" doc="CUDA device index for TensorRT"/>
   <!-- 桌高与物高单位为米；target_frame 是分拣结果坐标系，应与桌高、工作区和 TF 保持一致。 -->
   <arg name="table_z" default="0.10"/>
   <arg name="object_height" default="0.04"/>
@@ -37,13 +39,21 @@
 
   <!-- YOLO 分支：订阅实时 RGB 图像，发布与颜色检测相同格式的二维框。 -->
   <group if="$(eval arg('detector') == 'yolo')">
-    <include file="$(find aubo_perception)/launch/ultralytics_yolo.launch">
+    <include if="$(eval arg('yolo_engine') == '')" file="$(find aubo_perception)/launch/ultralytics_yolo.launch">
       <!-- 几何计算必须匹配采集时刻的深度与 TF，因此强制使用话题输入并清空离线图片路径。 -->
       <arg name="input_mode" value="topic"/>
       <arg name="image_path" value=""/>
       <arg name="config" value="$(arg yolo_config)"/>
       <arg name="python" value="$(arg python)"/>
       <arg name="model_path" value="$(arg model_path)"/>
+      <arg name="image_topic" value="$(arg image_topic)"/>
+      <arg name="detections_topic" value="$(arg boxes_topic)"/>
+      <arg name="annotated_image_topic" value="$(arg annotated_image_topic)"/>
+    </include>
+    <include if="$(eval arg('yolo_engine') != '')" file="$(find aubo_perception)/launch/tensorrt_yolo.launch">
+      <arg name="engine_path" value="$(arg yolo_engine)"/>
+      <arg name="gpu_device" value="$(arg yolo_gpu_device)"/>
+      <arg name="config" value="$(arg yolo_config)"/>
       <arg name="image_topic" value="$(arg image_topic)"/>
       <arg name="detections_topic" value="$(arg boxes_topic)"/>
       <arg name="annotated_image_topic" value="$(arg annotated_image_topic)"/>

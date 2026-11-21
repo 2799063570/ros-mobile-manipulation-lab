@@ -38,6 +38,8 @@
   <arg name="perception_config" default="$(find aubo_perception)/config/grasp_pipeline.yaml"/>
   <arg name="python" default="/home/zlab/anaconda3/envs/yolo/bin/python"/>
   <arg name="model_path" default="/home/zlab/deepL/code/ultralytics-main-modify/weights/GC-yolo.pt"/>
+  <arg name="yolo_engine" default="" doc="TensorRT engine path for YOLO; empty selects PyTorch"/>
+  <arg name="yolo_gpu_device" default="0" doc="CUDA device index for TensorRT"/>
   <include if="$(arg start_perception)" file="$(find aubo_perception)/launch/grasp_perception.launch">
     <arg name="colors_config" value="$(arg colors_config)"/>
     <arg name="yolo_config" value="$(arg yolo_config)"/>
@@ -50,6 +52,8 @@
     <arg name="config" value="$(arg perception_config)"/>
     <arg name="python" value="$(arg python)"/>
     <arg name="model_path" value="$(arg model_path)"/>
+    <arg name="yolo_engine" value="$(arg yolo_engine)"/>
+    <arg name="yolo_gpu_device" value="$(arg yolo_gpu_device)"/>
     <arg name="annotated_image_topic" value="$(arg debug_image_topic)"/>
   </include>
 

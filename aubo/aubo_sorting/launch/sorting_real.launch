@@ -33,6 +33,8 @@
   <arg name="yolo_config" default="$(find aubo_perception)/config/ultralytics_yolo.yaml"/>
   <arg name="python" default="/home/zlab/anaconda3/envs/yolo/bin/python"/>
   <arg name="model_path" default="/home/zlab/deepL/code/ultralytics-main-modify/weights/GC-yolo.pt"/>
+  <arg name="yolo_engine" default="" doc="TensorRT engine path for YOLO; empty selects PyTorch"/>
+  <arg name="yolo_gpu_device" default="0" doc="CUDA device index for TensorRT"/>
   <!-- The supplied real calibration names camera_color_optical_frame. -->
   <arg name="camera_namespace" default="/camera"/>
   <arg name="robot_xacro" value="$(eval {'eye_in_hand': 'aubo_i5_with_camera.xacro', 'eye_to_hand': 'aubo_i5.xacro'}[arg('camera_mount')])"/>
@@ -108,6 +110,8 @@
     <arg name="yolo_config" value="$(arg yolo_config)"/>
     <arg name="python" value="$(arg python)"/>
     <arg name="model_path" value="$(arg model_path)"/>
+    <arg name="yolo_engine" value="$(arg yolo_engine)"/>
+    <arg name="yolo_gpu_device" value="$(arg yolo_gpu_device)"/>
     <arg name="height_mode" value="$(arg height_mode)"/>
     <arg name="table_z" value="$(arg table_z)"/>
     <arg name="object_height" value="$(arg object_height)"/>

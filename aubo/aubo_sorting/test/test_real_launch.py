@@ -73,6 +73,9 @@ class RealLaunchTest(unittest.TestCase):
     def test_real_can_launch_accepts_no_arguments(self):
         config = resolve('eye_to_hand_can_sorting_real.launch')
         params = {key: value.value for key, value in config.params.items()}
+        names = {node.name for node in config.nodes}
+        self.assertIn('ultralytics_yolo', names)
+        self.assertNotIn('tensorrt_yolo', names)
         self.assertEqual(params['/publish_camera_stand/object_id'], 'camera_stand')
         self.assertEqual(len(params['/publish_camera_stand/parts']), 4)
         self.assertFalse(params['/color_sorting_task/auto_start'])
@@ -86,6 +89,25 @@ class RealLaunchTest(unittest.TestCase):
         self.assertEqual(params['/color_sorting_task/queue_tf_wait_timeout'], .15)
         self.assertLessEqual(params['/color_sorting_task/queue_tf_wait_timeout'],
                              params['/color_sorting_task/queue_frame_max_age'])
+
+    def test_real_yolo_tensorrt_feeds_the_existing_depth_geometry(self):
+        for launch in ('eye_to_hand_can_sorting_real.launch', 'eye_to_hand_yolo_sorting_real.launch'):
+            with self.subTest(launch=launch):
+                config = resolve(launch, 'yolo_engine:=/tmp/gc-yolo.engine', 'yolo_gpu_device:=1',
+                                 'start_robot:=false', 'start_camera:=false', 'start_gripper:=false')
+                names = {node.name for node in config.nodes}
+                params = {key: value.value for key, value in config.params.items()}
+                self.assertNotIn('ultralytics_yolo', names)
+                self.assertIn('tensorrt_yolo', names)
+                self.assertEqual(params['/tensorrt_yolo/engine_path'], '/tmp/gc-yolo.engine')
+                self.assertEqual(params['/tensorrt_yolo/gpu_device'], 1)
+                self.assertEqual(params['/tensorrt_yolo/image_topic'], '/camera/color/image_raw')
+                self.assertEqual(params['/tensorrt_yolo/annotated_image_topic'], '/sorting/debug_image')
+                self.assertEqual(params['/tensorrt_yolo/detections_topic'],
+                                 params['/grasp_geometry/boxes_topic'])
+                self.assertEqual(params['/grasp_geometry/detections_topic'], '/sorting/detections')
+                self.assertEqual(params['/grasp_geometry/aligned_depth_topic'],
+                                 '/camera/aligned_depth_to_color/image_raw')
 
     def test_real_can_reuses_hardware_and_keeps_observation_and_obstacles(self):
         config = resolve('eye_to_hand_can_sorting_real.launch',

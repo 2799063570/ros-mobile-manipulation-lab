@@ -82,6 +82,7 @@ class UltralyticsYoloNode:
         self.confidence = float(rospy.get_param("~confidence", 0.25))
         self.iou = float(rospy.get_param("~iou", 0.70))
         self.image_size = int(rospy.get_param("~image_size", 640))
+        self.rect = bool(rospy.get_param("~rect", True))
         self.device = str(rospy.get_param("~device", "cpu"))
         self.max_detections = int(rospy.get_param("~max_detections", 100))
         self.publish_annotated = bool(rospy.get_param("~publish_annotated_image", True)) # 是否发布标注后的图像
@@ -184,6 +185,7 @@ class UltralyticsYoloNode:
                 conf=self.confidence,
                 iou=self.iou,
                 imgsz=self.image_size,
+                rect=self.rect,
                 device=self.device,
                 max_det=self.max_detections,
                 verbose=False,

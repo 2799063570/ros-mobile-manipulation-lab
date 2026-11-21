@@ -446,6 +446,9 @@ rosservice call /sorting/move_to_observation '{}'
 rosservice call /sorting/start '{}'
 ```
 
+实机可用 `yolo_engine:=/absolute/path/to/GC-yolo-fp16.engine` 为 GC-YOLO 启用 TensorRT。
+构建 engine、检查 2D/3D 话题及复现加速对比见 [GC-YOLO TensorRT 部署与对比](../aubo_perception/models/gc_yolo/README.md)。
+
 上面的支架文件是原工位参考包络，换工位应传入实测文件。桌面顶高为 `0.00285 m`，
 XY 中心 `[-0.0442,-0.6707]`，物理尺寸 `0.74 × 0.93 × 0.20 m`，
 XY 碰撞余量 `0.02 m`；当前平躺 can 的物高（直径）配置为 `0.065 m`。

@@ -56,6 +56,7 @@ if(AUBO_ENABLE_TENSORRT_YOLO)
 endif()
 
 catkin_install_python(PROGRAMS
+  scripts/benchmark_gc_yolo.py
   scripts/check_rgbd_camera.py
   scripts/move_to_observation.py
   scripts/color_object_detector.py

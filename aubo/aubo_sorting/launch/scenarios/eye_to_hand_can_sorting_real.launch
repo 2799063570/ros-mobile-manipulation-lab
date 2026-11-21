@@ -10,6 +10,8 @@
   <!-- Empty follows task_config; explicit value can select a validated named pose. -->
   <arg name="observation_named_target" default=""/>
   <arg name="perception_config" default="$(find aubo_sorting)/config/eye_to_hand_can_perception_real.yaml"/>
+  <arg name="yolo_engine" default="" doc="TensorRT engine path; empty selects PyTorch"/>
+  <arg name="yolo_gpu_device" default="0" doc="CUDA device index for TensorRT"/>
   <arg name="start_robot" default="true"/>
   <arg name="start_camera" default="true"/>
   <arg name="start_gripper" default="true"/>
